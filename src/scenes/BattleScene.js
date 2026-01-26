@@ -3,6 +3,7 @@
 import Phaser from 'phaser';
 import { Storage } from '../systems/storage.js';
 import { getShipById, getShipStats, RARITY, SHIP_TYPES } from '../data/ships.js';
+import { getEnemyById, getEnemyStats } from '../data/enemies.js';
 import { MAPS, MAP_ORDER, getMapById, getNodeById, getDamageState } from '../data/maps.js';
 import { AudioManager, BGM } from '../systems/audio.js';
 import { FORMATIONS, getFormationById } from '../data/formations.js';
@@ -454,9 +455,9 @@ export class BattleScene extends Phaser.Scene {
 
     // Build enemy fleet from node data
     const enemyFleet = nodeData.enemies.map((id, i) => {
-      const data = getShipById(id);
+      const data = getEnemyById(id);
       const level = nodeData.enemyLevels[i];
-      const stats = getShipStats(data, level);
+      const stats = getEnemyStats(data, level);
       return { ...data, ...stats, level, currentHp: stats.hp, maxHp: stats.hp, isPlayer: false };
     });
 
