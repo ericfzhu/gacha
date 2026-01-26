@@ -30,9 +30,13 @@ A browser-based naval fleet management and combat game designed as a **single-se
 12. ~~PvP System~~ (Removed)
 13. ~~Event System~~ (Removed)
 14. [Secret Code System](#14-secret-code-system)
-15. [Special Gift Reveal](#15-valentines-gift-reveal)
+15. [Special Gift Reveal](#15-special-gift-reveal)
 16. [UI/UX Design](#16-uiux-design)
 17. [Technical Architecture](#17-technical-architecture)
+18. [Monetization](#18-monetization)
+19. [Development Phases](#19-development-phases)
+20. [Asset Requirements](#20-asset-requirements)
+21. [Implementation Notes](#21-implementation-notes)
 
 ---
 
@@ -1014,6 +1018,87 @@ POST   /api/repair/complete
 - BGM tracks (port, battle, event)
 - SFX (attacks, UI)
 - Voice lines (optional)
+
+---
+
+## 21. Implementation Notes
+
+This section documents deviations and enhancements from the original specification.
+
+### 21.1 Visual Design
+
+**Notion-Inspired UI (Changed from KanColle Style)**
+- Clean white/gray color scheme instead of naval blue
+- System font stack (`-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`)
+- Subtle borders and rounded corners (6-8px)
+- Light backgrounds: Primary `#ffffff`, Secondary `#f7f6f3`
+- Text colors: Primary `#37352f`, Secondary `#787774`, Tertiary `#9b9a97`
+
+**Responsive Design**
+- All scenes calculate dimensions from `window.innerWidth` and `window.innerHeight`
+- Panels scale proportionally based on screen size
+- Fleet scene: 65% fleet panel, 35% ship list
+- Secretary panel: 45% width (min 350px, max 550px)
+
+### 21.2 Ship Artwork
+
+**Portrait Images**
+- Located in `public/assets/ships/`
+- Used for: Secretary display, fleet organization, collection, gacha results
+- Naming: `{ship_id}.png` (e.g., `dd_001.png`)
+
+**Banner Images**
+- Located in `public/assets/banners/`
+- 240x60 horizontal format (KanColle style)
+- Used for: Battle/sortie UI ship displays
+- Naming: `{ship_id}.png`
+
+### 21.3 Battle System
+
+**Fuel Rewards (5x Base Rate)**
+| Node Type | Base | A-Rank | S-Rank |
+|-----------|------|--------|--------|
+| Boss | 250 | 300 | 375 |
+| Regular | 100 | 100 | 150 |
+
+**Persistent Ship Damage**
+- Ship HP persists between battles until repaired
+- Damage states: Full, Light (<75%), Medium (<50%), Heavy (<25%)
+- Heavy damage ships cannot sortie
+- Repair dock with timer-based healing
+
+### 21.4 Special Gacha Configuration
+
+**Environment Variables**
+Prize names and descriptions are configurable via Cloudflare Pages environment variables:
+
+| Variable | Description |
+|----------|-------------|
+| `VITE_PRIZE1_NAME` | Name for Grand Prize 1 |
+| `VITE_PRIZE1_DESC` | Description for Grand Prize 1 |
+| `VITE_PRIZE2_NAME` | Name for Grand Prize 2 |
+| `VITE_PRIZE2_DESC` | Description for Grand Prize 2 |
+| `VITE_PRIZE3_NAME` | Name for Grand Prize 3 |
+| `VITE_PRIZE3_DESC` | Description for Grand Prize 3 |
+
+### 21.5 Map Navigation
+
+**Node-Based Progression**
+- Each map has multiple nodes (Start → Combat/Resource → Boss)
+- Player manually selects next node at branch points
+- Node types: Combat (⚔️), Resource (📦), Boss (👑)
+- Retreat option available (except at boss)
+
+### 21.6 Technical Implementation
+
+**Framework**: Phaser 3 with Vite build system
+**Hosting**: Cloudflare Pages
+**Package Manager**: Yarn 4.x (bundled in `.yarn/releases/`)
+
+**Asset Loading**
+- Ship portraits loaded as `ship_portrait_{id}`
+- Ship banners loaded as `ship_banner_{id}`
+- UI assets generated programmatically in BootScene
 
 ---
 
