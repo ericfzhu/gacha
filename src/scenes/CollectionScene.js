@@ -3,6 +3,7 @@
 import Phaser from 'phaser';
 import { Storage } from '../systems/storage.js';
 import { SHIPS, RARITY, getShipById, getShipStats, getXpForLevel } from '../data/ships.js';
+import { AudioManager, BGM } from '../systems/audio.js';
 
 // Notion-inspired colors
 const COLORS = {
@@ -20,8 +21,9 @@ const COLORS = {
 export class CollectionScene extends Phaser.Scene {
   constructor() {
     super('CollectionScene');
-    this.currentPage = 0;
-    this.shipsPerPage = 12;
+    this.scrollY = 0;
+    this.maxScroll = 0;
+    this.isDragging = false;
   }
 
   create() {
@@ -30,11 +32,14 @@ export class CollectionScene extends Phaser.Scene {
     const height = window.innerHeight;
     this.scale.resize(width, height);
 
+    // Set audio scene and play menu music
+    AudioManager.setScene(this);
+    AudioManager.playBgm(BGM.MENU);
+
     this.createBackground();
     this.createHeader();
-    this.createShipGrid();
+    this.createShipList();
     this.createDetailPanel();
-    this.createBottomBar();
   }
 
   createBackground() {
@@ -49,12 +54,13 @@ export class CollectionScene extends Phaser.Scene {
     const width = window.innerWidth;
     const g = this.add.graphics();
 
+    // Taller header to accommodate progress bar
     g.fillStyle(COLORS.bgPrimary, 1);
-    g.fillRect(0, 0, width, 56);
+    g.fillRect(0, 0, width, 80);
     g.fillStyle(COLORS.border, 1);
-    g.fillRect(0, 55, width, 1);
+    g.fillRect(0, 79, width, 1);
 
-    const backBtn = this.add.text(24, 28, '← Back', {
+    const backBtn = this.add.text(24, 24, '← Back', {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '14px',
       fill: COLORS.textSecondary,
@@ -64,76 +70,181 @@ export class CollectionScene extends Phaser.Scene {
     backBtn.on('pointerout', () => backBtn.setStyle({ fill: COLORS.textSecondary }));
     backBtn.on('pointerdown', () => this.scene.start('TitleScene'));
 
-    this.add.text(width / 2, 28, 'Dock', {
+    this.add.text(width / 2, 20, 'Ship Collection', {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '20px',
       fill: COLORS.textPrimary,
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    const owned = Storage.getOwnedShipCount();
-    this.add.text(width - 24, 28, `${owned}/${SHIPS.length} ships`, {
+    // Calculate collection stats
+    const ownedIds = Storage.getOwnedShipIds();
+    const owned = ownedIds.length;
+    const total = SHIPS.length;
+    const percent = Math.floor((owned / total) * 100);
+
+    // Count by rarity
+    const rarityCount = { N: 0, R: 0, SR: 0, SSR: 0 };
+    const rarityTotal = { N: 0, R: 0, SR: 0, SSR: 0 };
+    SHIPS.forEach(ship => {
+      rarityTotal[ship.rarity]++;
+      if (ownedIds.includes(ship.id)) {
+        rarityCount[ship.rarity]++;
+      }
+    });
+
+    // Main progress text
+    this.add.text(width / 2, 42, `${owned}/${total} (${percent}%)`, {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '13px',
-      fill: COLORS.textTertiary,
-    }).setOrigin(1, 0.5);
+      fill: COLORS.textSecondary,
+    }).setOrigin(0.5);
+
+    // Progress bar
+    const barWidth = Math.min(300, width * 0.3);
+    const barX = width / 2 - barWidth / 2;
+    const barY = 58;
+
+    g.fillStyle(0xe9e9e7, 1);
+    g.fillRoundedRect(barX, barY, barWidth, 8, 4);
+
+    // Filled portion with gradient based on completion
+    const fillWidth = (owned / total) * barWidth;
+    if (fillWidth > 0) {
+      const fillColor = percent === 100 ? 0xffaa00 : 0x4dab9a;
+      g.fillStyle(fillColor, 1);
+      g.fillRoundedRect(barX, barY, Math.max(8, fillWidth), 8, 4);
+    }
+
+    // Rarity breakdown on the right
+    const rarityX = width - 24;
+    const rarities = [
+      { key: 'SSR', color: '#ffaa00' },
+      { key: 'SR', color: '#aa44ff' },
+      { key: 'R', color: '#44aaff' },
+      { key: 'N', color: '#888888' },
+    ];
+
+    rarities.forEach((r, i) => {
+      const x = rarityX - (3 - i) * 70;
+      this.add.text(x, 58, `${r.key}: ${rarityCount[r.key]}/${rarityTotal[r.key]}`, {
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontSize: '10px',
+        fill: r.color,
+      }).setOrigin(1, 0.5);
+    });
   }
 
-  createShipGrid() {
+  createShipList() {
     const width = window.innerWidth;
     const height = window.innerHeight;
+
+    // Panel dimensions
+    const panelX = 24;
+    const panelY = 96;
+    const panelWidth = Math.min(420, Math.max(320, width * 0.4));
+    const panelHeight = height - 120;
+    this.listPanelWidth = panelWidth;
+    this.listPanelX = panelX;
+
+    // Panel background
     const g = this.add.graphics();
-
-    // Responsive grid panel (about 65% of screen)
-    const gridPanelWidth = Math.min(720, Math.max(500, width * 0.65));
-    this.gridPanelWidth = gridPanelWidth;
-
     g.fillStyle(COLORS.bgPrimary, 1);
-    g.fillRoundedRect(24, 72, gridPanelWidth, height - 130, 6);
+    g.fillRoundedRect(panelX, panelY, panelWidth, panelHeight, 6);
     g.lineStyle(1, COLORS.border, 1);
-    g.strokeRoundedRect(24, 72, gridPanelWidth, height - 130, 6);
+    g.strokeRoundedRect(panelX, panelY, panelWidth, panelHeight, 6);
 
-    this.add.text(40, 92, 'Ship List', {
+    this.add.text(panelX + 16, panelY + 20, 'Ship List', {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '12px',
       fill: COLORS.textTertiary,
       fontStyle: 'bold',
     }).setOrigin(0, 0.5);
 
-    const startX = 50;
-    const startY = 125;
-    const cellWidth = 160;
-    const cellHeight = 140;
-    const cols = 4;
+    // Scrollable area dimensions
+    const listX = panelX + 8;
+    const listY = panelY + 40;
+    const listWidth = panelWidth - 16;
+    const listHeight = panelHeight - 50;
 
+    // Create ship list container
+    this.shipListContainer = this.add.container(listX, listY);
+
+    // Create all ship cards in the container
+    const cardHeight = 70;
+    const cardSpacing = 8;
     const ownedIds = Storage.getOwnedShipIds();
-    const startIndex = this.currentPage * this.shipsPerPage;
-    const endIndex = Math.min(startIndex + this.shipsPerPage, SHIPS.length);
 
-    for (let i = startIndex; i < endIndex; i++) {
-      const ship = SHIPS[i];
-      const localIndex = i - startIndex;
-      const col = localIndex % cols;
-      const row = Math.floor(localIndex / cols);
-      const x = startX + col * cellWidth + cellWidth / 2;
-      const y = startY + row * cellHeight + cellHeight / 2;
-
+    SHIPS.forEach((ship, i) => {
+      const y = i * (cardHeight + cardSpacing);
       const isOwned = ownedIds.includes(ship.id);
-      this.createShipCard(x, y, ship, isOwned);
+      this.createShipListCard(0, y, listWidth, cardHeight, ship, isOwned);
+    });
+
+    // Calculate max scroll
+    const totalHeight = SHIPS.length * (cardHeight + cardSpacing);
+    this.maxScroll = Math.max(0, totalHeight - listHeight);
+
+    // Create mask for scrolling
+    const maskShape = this.make.graphics();
+    maskShape.fillStyle(0xffffff);
+    maskShape.fillRect(listX, listY, listWidth, listHeight);
+    const mask = maskShape.createGeometryMask();
+    this.shipListContainer.setMask(mask);
+
+    // Store list bounds for scroll detection
+    this.listBounds = { x: listX, y: listY, width: listWidth, height: listHeight };
+
+    // Mouse wheel scrolling
+    this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY) => {
+      if (pointer.x >= listX && pointer.x <= listX + listWidth &&
+          pointer.y >= listY && pointer.y <= listY + listHeight) {
+        this.scrollY = Phaser.Math.Clamp(this.scrollY + deltaY * 0.5, 0, this.maxScroll);
+        this.shipListContainer.y = listY - this.scrollY;
+      }
+    });
+
+    // Scrollbar
+    if (this.maxScroll > 0) {
+      const scrollbarX = panelX + panelWidth - 8;
+      const scrollbarHeight = listHeight;
+      const thumbHeight = Math.max(30, (listHeight / totalHeight) * scrollbarHeight);
+
+      // Scrollbar track
+      const track = this.add.graphics();
+      track.fillStyle(0xe9e9e7, 1);
+      track.fillRoundedRect(scrollbarX, listY, 4, scrollbarHeight, 2);
+
+      // Scrollbar thumb
+      this.scrollThumb = this.add.graphics();
+      this.updateScrollThumb(scrollbarX, listY, thumbHeight, scrollbarHeight);
+
+      // Update thumb on scroll
+      this.events.on('update', () => {
+        this.updateScrollThumb(scrollbarX, listY, thumbHeight, scrollbarHeight);
+      });
     }
   }
 
-  createShipCard(x, y, shipData, isOwned) {
+  updateScrollThumb(x, trackY, thumbHeight, trackHeight) {
+    if (!this.scrollThumb) return;
+    this.scrollThumb.clear();
+    this.scrollThumb.fillStyle(0x9b9a97, 1);
+    const thumbY = trackY + (this.scrollY / this.maxScroll) * (trackHeight - thumbHeight);
+    this.scrollThumb.fillRoundedRect(x, thumbY, 4, thumbHeight, 2);
+  }
+
+  createShipListCard(x, y, w, h, shipData, isOwned) {
     const c = this.add.container(x, y);
     const rarity = RARITY[shipData.rarity];
 
     const bg = this.add.graphics();
-    bg.fillStyle(isOwned ? COLORS.bgSecondary : 0xf1f1ef, 1);
-    bg.fillRoundedRect(-65, -60, 130, 120, 6);
+    bg.fillStyle(isOwned ? 0xffffff : 0xf7f6f3, 1);
+    bg.fillRoundedRect(0, 0, w, h, 4);
 
     if (isOwned) {
       bg.fillStyle(rarity.color, 1);
-      bg.fillRect(-65, -60, 130, 3);
+      bg.fillRect(0, 0, 4, h);
     }
 
     c.add(bg);
@@ -141,100 +252,135 @@ export class CollectionScene extends Phaser.Scene {
     if (isOwned) {
       const savedData = Storage.getShipData(shipData.id);
       const level = savedData ? savedData.level : 1;
-      const stats = getShipStats(shipData, level);
 
-      // Ship portrait
+      // Ship portrait (small)
       const portraitKey = `ship_portrait_${shipData.id}`;
       if (this.textures.exists(portraitKey)) {
-        const portrait = this.add.image(0, -20, portraitKey);
-        const maxSize = 60;
+        const portrait = this.add.image(40, h / 2, portraitKey);
+        const maxSize = h - 16;
         const pScale = Math.min(maxSize / portrait.width, maxSize / portrait.height);
         portrait.setScale(pScale);
         c.add(portrait);
       }
 
       // Ship name
-      c.add(this.add.text(0, 22, shipData.name, {
+      c.add(this.add.text(80, h / 2 - 12, shipData.name, {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        fontSize: '12px',
+        fontSize: '13px',
         fill: COLORS.textPrimary,
         fontStyle: 'bold',
-      }).setOrigin(0.5));
+      }).setOrigin(0, 0.5));
 
-      // Stars and level
+      // Stars
       let stars = '';
       for (let i = 0; i < rarity.stars; i++) stars += '★';
-      c.add(this.add.text(-30, 38, stars, {
-        fontSize: '9px',
+      c.add(this.add.text(80, h / 2 + 10, stars, {
+        fontSize: '10px',
         fill: `#${rarity.color.toString(16).padStart(6, '0')}`,
       }).setOrigin(0, 0.5));
 
-      c.add(this.add.text(30, 38, `Lv.${level}`, {
+      // Level on right
+      c.add(this.add.text(w - 16, h / 2 - 8, `Lv.${level}`, {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        fontSize: '11px',
+        fontSize: '12px',
         fill: COLORS.textSecondary,
       }).setOrigin(1, 0.5));
 
+      // Type
+      c.add(this.add.text(w - 16, h / 2 + 10, shipData.type, {
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontSize: '10px',
+        fill: COLORS.textTertiary,
+      }).setOrigin(1, 0.5));
+
+      // XP bar
       if (level < shipData.maxLevel && savedData) {
         const xpNeeded = getXpForLevel(level);
         const xpPercent = Math.min(savedData.xp / xpNeeded, 1);
-        c.add(this.add.rectangle(0, 50, 100, 4, 0xe9e9e7));
-        const xpBar = this.add.rectangle(-50 + (100 * xpPercent) / 2, 50, 100 * xpPercent, 3, rarity.color);
-        xpBar.setOrigin(0, 0.5);
-        c.add(xpBar);
+        const barWidth = 80;
+        const barX = 80;
+        const barY = h / 2 + 26;
+
+        c.add(this.add.rectangle(barX + barWidth / 2, barY, barWidth, 3, 0xe9e9e7).setOrigin(0.5));
+        if (xpPercent > 0) {
+          const fillW = barWidth * xpPercent;
+          c.add(this.add.rectangle(barX + fillW / 2, barY, fillW, 3, rarity.color).setOrigin(0.5));
+        }
       }
 
-      const hit = this.add.rectangle(0, 0, 130, 120, 0x000000, 0).setInteractive();
+      // Hit area
+      const hit = this.add.rectangle(w / 2, h / 2, w, h, 0x000000, 0).setInteractive();
       hit.on('pointerover', () => {
         bg.clear();
         bg.fillStyle(COLORS.bgHover, 1);
-        bg.fillRoundedRect(-65, -60, 130, 120, 6);
+        bg.fillRoundedRect(0, 0, w, h, 4);
         bg.fillStyle(rarity.color, 1);
-        bg.fillRect(-65, -60, 130, 3);
+        bg.fillRect(0, 0, 4, h);
       });
       hit.on('pointerout', () => {
         bg.clear();
-        bg.fillStyle(COLORS.bgSecondary, 1);
-        bg.fillRoundedRect(-65, -60, 130, 120, 6);
+        bg.fillStyle(0xffffff, 1);
+        bg.fillRoundedRect(0, 0, w, h, 4);
         bg.fillStyle(rarity.color, 1);
-        bg.fillRect(-65, -60, 130, 3);
+        bg.fillRect(0, 0, 4, h);
       });
       hit.on('pointerdown', () => this.selectShip(shipData));
       c.add(hit);
     } else {
-      c.add(this.add.text(0, 0, '?', {
+      // Unowned ship
+      c.add(this.add.text(40, h / 2, '?', {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        fontSize: '36px',
+        fontSize: '24px',
         fill: COLORS.textTertiary,
       }).setOrigin(0.5));
+
+      c.add(this.add.text(80, h / 2, '???', {
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontSize: '13px',
+        fill: COLORS.textTertiary,
+      }).setOrigin(0, 0.5));
     }
+
+    this.shipListContainer.add(c);
   }
 
   createDetailPanel() {
     const width = window.innerWidth;
     const height = window.innerHeight;
-    const g = this.add.graphics();
 
-    // Position after grid panel
-    const gridPanelWidth = this.gridPanelWidth || 680;
-    const panelX = 24 + gridPanelWidth + 16;
+    // Position after list panel
+    const listPanelWidth = this.listPanelWidth || 400;
+    const panelX = this.listPanelX + listPanelWidth + 16;
+    const panelY = 96;
     const panelWidth = width - panelX - 24;
+    const panelHeight = height - 120;
 
+    const g = this.add.graphics();
     g.fillStyle(COLORS.bgPrimary, 1);
-    g.fillRoundedRect(panelX, 72, panelWidth, height - 130, 6);
+    g.fillRoundedRect(panelX, panelY, panelWidth, panelHeight, 6);
     g.lineStyle(1, COLORS.border, 1);
-    g.strokeRoundedRect(panelX, 72, panelWidth, height - 130, 6);
+    g.strokeRoundedRect(panelX, panelY, panelWidth, panelHeight, 6);
 
-    this.add.text(panelX + 16, 92, 'Ship Details', {
+    this.add.text(panelX + 16, panelY + 20, 'Ship Details', {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '12px',
       fill: COLORS.textTertiary,
       fontStyle: 'bold',
     }).setOrigin(0, 0.5);
 
-    this.detailContainer = this.add.container(panelX + panelWidth / 2, height / 2);
+    // Store panel info for detail content
+    this.detailPanelX = panelX;
+    this.detailPanelY = panelY;
+    this.detailPanelWidth = panelWidth;
+    this.detailPanelHeight = panelHeight;
 
-    this.detailPlaceholder = this.add.text(panelX + panelWidth / 2, height / 2, 'Select a ship\nto view details', {
+    // Center point for detail content (within the panel, not the screen)
+    const contentCenterX = panelX + panelWidth / 2;
+    const contentCenterY = panelY + 50 + (panelHeight - 60) / 2;
+
+    this.detailContainer = this.add.container(contentCenterX, contentCenterY);
+
+    this.detailPlaceholder = this.add.text(contentCenterX, contentCenterY, 'Select a ship\nto view details', {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '14px',
       fill: COLORS.textTertiary,
@@ -251,51 +397,87 @@ export class CollectionScene extends Phaser.Scene {
     const stats = getShipStats(shipData, level);
     const rarity = RARITY[shipData.rarity];
 
-    // Large ship portrait
+    // Available space in panel (with padding)
+    const panelWidth = this.detailPanelWidth - 40;
+    const panelHeight = this.detailPanelHeight - 80;
+
+    // Portrait takes at least 50% of panel height
+    const minPortraitHeight = panelHeight * 0.5;
+    const portraitSize = Math.min(panelWidth * 0.85, Math.max(minPortraitHeight, panelHeight * 0.55));
+
+    // Remaining space for info and stats
+    const remainingHeight = panelHeight - portraitSize;
+    const numStats = 5;
+
+    // Font sizes based on remaining height (compact when space is tight)
+    const scale = Math.min(1, remainingHeight / 250);
+    const titleFontSize = Math.max(14, Math.min(22, 20 * scale));
+    const subtitleFontSize = Math.max(10, Math.min(14, 13 * scale));
+    const labelFontSize = Math.max(9, Math.min(12, 11 * scale));
+    const starFontSize = Math.max(10, Math.min(16, 14 * scale));
+
+    // Compact spacing based on remaining height
+    const spacing = Math.max(4, remainingHeight * 0.025);
+
+    // Start from top of content area
+    let currentY = -panelHeight / 2 + portraitSize / 2 + 10;
+
+    // Ship portrait
     const portraitKey = `ship_portrait_${shipData.id}`;
     if (this.textures.exists(portraitKey)) {
-      const portrait = this.add.image(0, -140, portraitKey);
-      const maxSize = 150;
-      const pScale = Math.min(maxSize / portrait.width, maxSize / portrait.height);
+      const portrait = this.add.image(0, currentY, portraitKey);
+      const pScale = Math.min(portraitSize / portrait.width, portraitSize / portrait.height);
       portrait.setScale(pScale);
       this.detailContainer.add(portrait);
     }
+    currentY += portraitSize / 2 + spacing + 10;
 
+    // Stars
     let stars = '';
     for (let i = 0; i < rarity.stars; i++) stars += '★';
-    this.detailContainer.add(this.add.text(0, -50, stars, {
-      fontSize: '16px',
+    this.detailContainer.add(this.add.text(0, currentY, stars, {
+      fontSize: `${starFontSize}px`,
       fill: `#${rarity.color.toString(16).padStart(6, '0')}`,
     }).setOrigin(0.5));
+    currentY += starFontSize + spacing;
 
-    this.detailContainer.add(this.add.text(0, -25, shipData.name, {
+    // Ship name
+    this.detailContainer.add(this.add.text(0, currentY, shipData.name, {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      fontSize: '22px',
+      fontSize: `${titleFontSize}px`,
       fill: COLORS.textPrimary,
       fontStyle: 'bold',
     }).setOrigin(0.5));
+    currentY += titleFontSize + spacing * 0.5;
 
-    this.detailContainer.add(this.add.text(0, 5, `${shipData.type} • ${rarity.name}`, {
+    // Type and rarity
+    this.detailContainer.add(this.add.text(0, currentY, `${shipData.type} • ${rarity.name}`, {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      fontSize: '12px',
+      fontSize: `${labelFontSize}px`,
       fill: `#${rarity.color.toString(16).padStart(6, '0')}`,
     }).setOrigin(0.5));
+    currentY += labelFontSize + spacing;
 
-    this.detailContainer.add(this.add.text(0, 35, `Level ${level} / ${shipData.maxLevel}`, {
+    // Level
+    this.detailContainer.add(this.add.text(0, currentY, `Level ${level} / ${shipData.maxLevel}`, {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      fontSize: '18px',
+      fontSize: `${subtitleFontSize}px`,
       fill: COLORS.textSecondary,
     }).setOrigin(0.5));
+    currentY += subtitleFontSize + spacing * 0.3;
 
+    // XP text
     if (level < shipData.maxLevel && savedData) {
       const xpNeeded = getXpForLevel(level);
-      this.detailContainer.add(this.add.text(0, 58, `EXP: ${savedData.xp} / ${xpNeeded}`, {
+      this.detailContainer.add(this.add.text(0, currentY, `EXP: ${savedData.xp} / ${xpNeeded}`, {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        fontSize: '11px',
+        fontSize: `${labelFontSize * 0.9}px`,
         fill: COLORS.textTertiary,
       }).setOrigin(0.5));
     }
+    currentY += spacing * 1.5;
 
+    // Stats
     const statsList = [
       { label: 'HP', value: stats.hp, max: 150, color: 0x4dab9a },
       { label: 'ATK', value: stats.attack, max: 100, color: 0xe03e3e },
@@ -304,67 +486,44 @@ export class CollectionScene extends Phaser.Scene {
       { label: 'EVA', value: stats.evasion, max: 70, color: 0x9b9a97 },
     ];
 
+    // Bar dimensions scale with remaining space
+    const barMaxWidth = Math.min(panelWidth * 0.6, 160);
+    const barHeight = Math.max(5, Math.min(10, remainingHeight * 0.03));
+    const statSpacing = Math.max(16, remainingHeight * 0.08);
+
     statsList.forEach((stat, i) => {
-      const yPos = 85 + i * 32;
+      const yPos = currentY + i * statSpacing;
 
-      this.detailContainer.add(this.add.text(-120, yPos, stat.label, {
+      // Label
+      this.detailContainer.add(this.add.text(-barMaxWidth / 2 - 10, yPos, stat.label, {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        fontSize: '13px',
+        fontSize: `${labelFontSize}px`,
         fill: COLORS.textSecondary,
-      }).setOrigin(0, 0.5));
+      }).setOrigin(1, 0.5));
 
-      this.detailContainer.add(this.add.rectangle(20, yPos, 160, 12, 0xe9e9e7));
+      // Bar background
+      const barBg = this.add.rectangle(0, yPos, barMaxWidth, barHeight, 0xe9e9e7);
+      this.detailContainer.add(barBg);
 
-      const barWidth = Math.min((stat.value / stat.max) * 160, 160);
-      const bar = this.add.rectangle(-60 + barWidth / 2, yPos, barWidth, 10, stat.color);
-      bar.setOrigin(0.5);
-      this.detailContainer.add(bar);
+      // Bar fill
+      const barFillWidth = Math.min((stat.value / stat.max) * barMaxWidth, barMaxWidth);
+      if (barFillWidth > 0) {
+        const barFill = this.add.rectangle(
+          -barMaxWidth / 2 + barFillWidth / 2,
+          yPos,
+          barFillWidth,
+          barHeight - 2,
+          stat.color
+        );
+        this.detailContainer.add(barFill);
+      }
 
-      this.detailContainer.add(this.add.text(110, yPos, stat.value.toString(), {
+      // Value text
+      this.detailContainer.add(this.add.text(barMaxWidth / 2 + 10, yPos, stat.value.toString(), {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        fontSize: '13px',
+        fontSize: `${labelFontSize}px`,
         fill: COLORS.textPrimary,
       }).setOrigin(0, 0.5));
     });
-  }
-
-  createBottomBar() {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    const g = this.add.graphics();
-
-    g.fillStyle(COLORS.bgPrimary, 1);
-    g.fillRect(0, height - 48, width, 48);
-    g.fillStyle(COLORS.border, 1);
-    g.fillRect(0, height - 48, width, 1);
-
-    const totalPages = Math.ceil(SHIPS.length / this.shipsPerPage);
-    this.add.text(width / 2, height - 24, `Page ${this.currentPage + 1} / ${totalPages}`, {
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      fontSize: '13px',
-      fill: COLORS.textTertiary,
-    }).setOrigin(0.5);
-
-    if (this.currentPage > 0) {
-      const prevBtn = this.add.text(width / 2 - 100, height - 24, '← Prev', {
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        fontSize: '13px',
-        fill: COLORS.textSecondary,
-      }).setOrigin(0.5).setInteractive();
-      prevBtn.on('pointerover', () => prevBtn.setStyle({ fill: COLORS.textPrimary }));
-      prevBtn.on('pointerout', () => prevBtn.setStyle({ fill: COLORS.textSecondary }));
-      prevBtn.on('pointerdown', () => { this.currentPage--; this.scene.restart(); });
-    }
-
-    if (this.currentPage < totalPages - 1) {
-      const nextBtn = this.add.text(width / 2 + 100, height - 24, 'Next →', {
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        fontSize: '13px',
-        fill: COLORS.textSecondary,
-      }).setOrigin(0.5).setInteractive();
-      nextBtn.on('pointerover', () => nextBtn.setStyle({ fill: COLORS.textPrimary }));
-      nextBtn.on('pointerout', () => nextBtn.setStyle({ fill: COLORS.textSecondary }));
-      nextBtn.on('pointerdown', () => { this.currentPage++; this.scene.restart(); });
-    }
   }
 }
