@@ -73,11 +73,6 @@ export class PremiumGachaScene extends Phaser.Scene {
     backBtn.on('pointerout', () => backBtn.setStyle({ fill: COLORS.textSecondary }));
     backBtn.on('pointerdown', () => this.scene.start('TitleScene'));
 
-    this.add.text(width / 2 - 12, 28, '❤', {
-      fontSize: '18px',
-      fill: COLORS.special,
-    }).setOrigin(1, 0.5);
-
     this.add.text(width / 2, 28, "Special Gacha", {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '20px',

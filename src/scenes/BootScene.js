@@ -2,6 +2,7 @@
 
 import Phaser from 'phaser';
 import { SHIPS } from '../data/ships.js';
+import { ENEMIES } from '../data/enemies.js';
 import { AudioManager, BGM } from '../systems/audio.js';
 
 // Notion-inspired colors
@@ -74,6 +75,11 @@ export class BootScene extends Phaser.Scene {
     // Load ship banner images (for battle/sortie UI)
     SHIPS.forEach(ship => {
       this.load.image(`ship_banner_${ship.id}`, `assets/banners/${ship.id}.png`);
+    });
+
+    // Load enemy banner images (for battle UI)
+    ENEMIES.forEach(enemy => {
+      this.load.image(`ship_banner_${enemy.id}`, `assets/banners/${enemy.id}.png`);
     });
 
     // Load audio files

@@ -581,8 +581,11 @@ export class BattleScene extends Phaser.Scene {
       await this.executeAttack(attacker, playerFleet, enemyFleet);
     }
 
-    if (!this.checkBattleEnd(playerFleet, enemyFleet)) {
-      await this.showPhase('SHELLING PHASE');
+    // Run 3 rounds of shelling
+    for (let round = 1; round <= 3; round++) {
+      if (this.checkBattleEnd(playerFleet, enemyFleet)) break;
+
+      await this.showPhase(`SHELLING PHASE ${round}`);
       await this.delay(800);
       const shellingOrder = allShips.filter(s => s.currentHp > 0).sort((a, b) => b.attack - a.attack);
       for (const attacker of shellingOrder) {
@@ -1418,6 +1421,17 @@ export class BattleScene extends Phaser.Scene {
     const bannerWidth = Math.min(160, cardWidth * 0.45);
     const bannerHeight = 40;
     const bannerX = 4 + bannerWidth / 2;
+
+    // Add dark background for enemy banners (they have transparent backgrounds)
+    if (!isPlayer) {
+      const bannerBg = this.add.graphics();
+      bannerBg.fillStyle(0x1a1a2e, 1);
+      bannerBg.fillRoundedRect(4, -bannerHeight / 2, bannerWidth, bannerHeight, 4);
+      bannerBg.lineStyle(1, 0x3a3a4e, 1);
+      bannerBg.strokeRoundedRect(4, -bannerHeight / 2, bannerWidth, bannerHeight, 4);
+      c.add(bannerBg);
+    }
+
     if (this.textures.exists(bannerKey)) {
       const banner = this.add.image(bannerX, 0, bannerKey);
       const bScale = Math.min(bannerWidth / banner.width, bannerHeight / banner.height);
@@ -1481,8 +1495,11 @@ export class BattleScene extends Phaser.Scene {
       await this.executeAttack(attacker, playerFleet, enemyFleet);
     }
 
-    if (!this.checkBattleEnd(playerFleet, enemyFleet)) {
-      await this.showPhase('SHELLING PHASE');
+    // Run 3 rounds of shelling
+    for (let round = 1; round <= 3; round++) {
+      if (this.checkBattleEnd(playerFleet, enemyFleet)) break;
+
+      await this.showPhase(`SHELLING PHASE ${round}`);
       await this.delay(800);
       const shellingOrder = allShips.filter(s => s.currentHp > 0).sort((a, b) => b.attack - a.attack);
       for (const attacker of shellingOrder) {
