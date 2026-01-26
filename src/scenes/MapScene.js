@@ -5,6 +5,7 @@ import Phaser from 'phaser';
 import { Storage } from '../systems/storage.js';
 import { getShipById, getShipStats, RARITY } from '../data/ships.js';
 import { MAPS, getMapById, getNodeById, getDamageState } from '../data/maps.js';
+import { AudioManager, BGM } from '../systems/audio.js';
 
 // Notion-inspired colors
 const COLORS = {
@@ -25,12 +26,19 @@ const COLORS = {
 export class MapScene extends Phaser.Scene {
   constructor() {
     super('MapScene');
+    this.mapOffsetX = 0;
+    this.mapOffsetY = 0;
+    this.isDragging = false;
+    this.dragStartX = 0;
+    this.dragStartY = 0;
   }
 
   init(data) {
     this.mapId = data.mapId || '1-1';
     this.currentNode = data.currentNode || 'start';
     this.fleetHp = data.fleetHp || {}; // Track HP during sortie
+    this.mapOffsetX = 0;
+    this.mapOffsetY = 0;
   }
 
   create() {
@@ -38,6 +46,10 @@ export class MapScene extends Phaser.Scene {
     const width = window.innerWidth;
     const height = window.innerHeight;
     this.scale.resize(width, height);
+
+    // Set audio scene and play battle music (we're in sortie)
+    AudioManager.setScene(this);
+    AudioManager.playBgm(BGM.BATTLE);
 
     this.mapData = getMapById(this.mapId);
     if (!this.mapData) {
@@ -106,13 +118,17 @@ export class MapScene extends Phaser.Scene {
     const height = window.innerHeight;
     const g = this.add.graphics();
 
-    // Responsive map panel (takes most of the screen, leaves room for fleet status)
-    const fleetPanelWidth = Math.min(240, Math.max(200, width * 0.2));
+    // Responsive map panel - takes 75% of width, fleet panel gets the rest
+    const mapWidthPercent = 0.75;
+    const fleetPanelWidth = Math.min(220, Math.max(180, width * (1 - mapWidthPercent) - 32));
     this.fleetPanelWidth = fleetPanelWidth;
-    const panelX = 24;
+    const panelX = 16;
     const panelY = 72;
-    const panelW = width - fleetPanelWidth - 40;
+    const panelW = width * mapWidthPercent - 24;
     const panelH = height - 180;
+
+    // Store panel bounds for dragging limits
+    this.mapPanel = { x: panelX, y: panelY, w: panelW, h: panelH };
 
     g.fillStyle(COLORS.bgPrimary, 1);
     g.fillRoundedRect(panelX, panelY, panelW, panelH, 6);
@@ -123,23 +139,64 @@ export class MapScene extends Phaser.Scene {
     g.fillStyle(COLORS.ocean, 1);
     g.fillRoundedRect(panelX + 10, panelY + 10, panelW - 20, panelH - 20, 4);
 
+    // Calculate node bounds for scaling
+    const nodes = Object.values(this.mapData.nodes);
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    nodes.forEach(node => {
+      minX = Math.min(minX, node.x);
+      maxX = Math.max(maxX, node.x);
+      minY = Math.min(minY, node.y);
+      maxY = Math.max(maxY, node.y);
+    });
+
+    // Add padding around nodes
+    const nodePadding = 80;
+    const nodeRangeX = maxX - minX + nodePadding * 2;
+    const nodeRangeY = maxY - minY + nodePadding * 2;
+
+    // Calculate scale to fit nodes in panel (with some padding)
+    const innerW = panelW - 40;
+    const innerH = panelH - 40;
+    const scaleX = innerW / nodeRangeX;
+    const scaleY = innerH / nodeRangeY;
+    this.mapScale = Math.min(scaleX, scaleY, 1.5); // Cap at 1.5x to prevent huge nodes
+
+    // Calculate scaled map size
+    const scaledMapW = nodeRangeX * this.mapScale;
+    const scaledMapH = nodeRangeY * this.mapScale;
+
+    // Store for coordinate transforms
+    this.nodeOrigin = { x: minX - nodePadding, y: minY - nodePadding };
+    this.mapContentSize = { w: scaledMapW, h: scaledMapH };
+
+    // Create draggable map container
+    this.mapContainer = this.add.container(panelX + 20, panelY + 20);
+
+    // Create mask for the map area
+    const maskShape = this.make.graphics();
+    maskShape.fillStyle(0xffffff);
+    maskShape.fillRect(panelX + 10, panelY + 10, panelW - 20, panelH - 20);
+    const mask = maskShape.createGeometryMask();
+    this.mapContainer.setMask(mask);
+
+    // Calculate max drag bounds
+    this.maxDragX = Math.max(0, scaledMapW - innerW);
+    this.maxDragY = Math.max(0, scaledMapH - innerH);
+
     // Draw paths between nodes
-    this.drawPaths(panelX, panelY);
+    this.drawPaths();
 
     // Draw nodes
     this.nodeButtons = [];
     Object.entries(this.mapData.nodes).forEach(([nodeId, node]) => {
-      this.createNode(panelX + node.x, panelY + node.y - 30, nodeId, node);
+      this.createNode(nodeId, node);
     });
 
     // Draw current position marker
     const currentNodeData = this.mapData.nodes[this.currentNode];
-    this.shipMarker = this.add.text(
-      panelX + currentNodeData.x,
-      panelY + currentNodeData.y - 60,
-      '⚓',
-      { fontSize: '28px' }
-    ).setOrigin(0.5);
+    const markerPos = this.getScaledNodePosition(currentNodeData);
+    this.shipMarker = this.add.text(markerPos.x, markerPos.y - 35, '⚓', { fontSize: '28px' }).setOrigin(0.5);
+    this.mapContainer.add(this.shipMarker);
 
     // Animate ship marker
     this.tweens.add({
@@ -150,45 +207,138 @@ export class MapScene extends Phaser.Scene {
       repeat: -1,
       ease: 'Sine.easeInOut',
     });
+
+    // Setup drag controls
+    this.setupMapDragging(panelX, panelY, panelW, panelH);
   }
 
-  drawPaths(offsetX, offsetY) {
+  getScaledNodePosition(node) {
+    return {
+      x: (node.x - this.nodeOrigin.x) * this.mapScale,
+      y: (node.y - this.nodeOrigin.y) * this.mapScale,
+    };
+  }
+
+  setupMapDragging(panelX, panelY, panelW, panelH) {
+    // Track pointer state for drag detection
+    this.dragThreshold = 5; // Pixels moved before considered a drag
+
+    this.input.on('pointerdown', (pointer) => {
+      // Only start drag tracking if within map panel
+      if (pointer.x >= panelX + 10 && pointer.x <= panelX + panelW - 10 &&
+          pointer.y >= panelY + 10 && pointer.y <= panelY + panelH - 10) {
+        this.potentialDrag = true;
+        this.dragStartX = pointer.x;
+        this.dragStartY = pointer.y;
+        this.dragOffsetStartX = this.mapOffsetX;
+        this.dragOffsetStartY = this.mapOffsetY;
+      }
+    });
+
+    this.input.on('pointermove', (pointer) => {
+      if (!this.potentialDrag) return;
+
+      const dx = pointer.x - this.dragStartX;
+      const dy = pointer.y - this.dragStartY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // Start dragging if moved past threshold
+      if (distance > this.dragThreshold) {
+        this.isDragging = true;
+      }
+
+      if (this.isDragging) {
+        // Update offset with bounds
+        this.mapOffsetX = Phaser.Math.Clamp(this.dragOffsetStartX + dx, -this.maxDragX, 0);
+        this.mapOffsetY = Phaser.Math.Clamp(this.dragOffsetStartY + dy, -this.maxDragY, 0);
+
+        // Update container position
+        this.mapContainer.x = this.mapPanel.x + 20 + this.mapOffsetX;
+        this.mapContainer.y = this.mapPanel.y + 20 + this.mapOffsetY;
+      }
+    });
+
+    this.input.on('pointerup', () => {
+      this.potentialDrag = false;
+      // Small delay before resetting isDragging to prevent click-through
+      this.time.delayedCall(50, () => {
+        this.isDragging = false;
+      });
+    });
+
+    // Also support mouse wheel for panning
+    this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY) => {
+      if (pointer.x >= panelX && pointer.x <= panelX + panelW &&
+          pointer.y >= panelY && pointer.y <= panelY + panelH) {
+        this.mapOffsetX = Phaser.Math.Clamp(this.mapOffsetX - deltaX * 0.5, -this.maxDragX, 0);
+        this.mapOffsetY = Phaser.Math.Clamp(this.mapOffsetY - deltaY * 0.5, -this.maxDragY, 0);
+        this.mapContainer.x = this.mapPanel.x + 20 + this.mapOffsetX;
+        this.mapContainer.y = this.mapPanel.y + 20 + this.mapOffsetY;
+      }
+    });
+
+    // Show drag hint if map is larger than panel
+    if (this.maxDragX > 0 || this.maxDragY > 0) {
+      const hint = this.add.text(panelX + panelW - 16, panelY + panelH - 16, '↔ Drag to pan', {
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontSize: '11px',
+        fill: COLORS.textTertiary,
+      }).setOrigin(1);
+
+      // Fade out hint after a moment
+      this.time.delayedCall(3000, () => {
+        this.tweens.add({
+          targets: hint,
+          alpha: 0,
+          duration: 500,
+          onComplete: () => hint.destroy(),
+        });
+      });
+    }
+  }
+
+  drawPaths() {
     const g = this.add.graphics();
-    g.lineStyle(3, 0x9b9a97, 0.5);
+    g.lineStyle(3 * Math.min(this.mapScale, 1), 0x9b9a97, 0.5);
 
     Object.entries(this.mapData.nodes).forEach(([nodeId, node]) => {
       if (node.next) {
+        const pos = this.getScaledNodePosition(node);
         node.next.forEach(nextId => {
           const nextNode = this.mapData.nodes[nextId];
           if (nextNode) {
-            g.lineBetween(
-              offsetX + node.x, offsetY + node.y - 30,
-              offsetX + nextNode.x, offsetY + nextNode.y - 30
-            );
+            const nextPos = this.getScaledNodePosition(nextNode);
+            g.lineBetween(pos.x, pos.y, nextPos.x, nextPos.y);
           }
         });
       }
     });
+
+    this.mapContainer.add(g);
   }
 
-  createNode(x, y, nodeId, node) {
+  createNode(nodeId, node) {
+    const pos = this.getScaledNodePosition(node);
     const isCurrentNode = nodeId === this.currentNode;
     const currentNodeData = this.mapData.nodes[this.currentNode];
     const isReachable = currentNodeData.next && currentNodeData.next.includes(nodeId);
     const isVisited = nodeId === 'start' || this.isNodeVisited(nodeId);
 
-    const container = this.add.container(x, y);
+    const container = this.add.container(pos.x, pos.y);
+
+    // Scale node size based on map scale
+    const baseSize = node.type === 'boss' ? 45 : 35;
+    const nodeSize = baseSize * Math.min(this.mapScale, 1.2);
+    const lineWidth = 3 * Math.min(this.mapScale, 1);
 
     // Node background
     const bg = this.add.graphics();
     let nodeColor = 0x9b9a97; // Default gray
-    let nodeSize = 35;
 
     if (nodeId === 'start') {
       nodeColor = 0x4dab9a;
     } else if (node.type === 'boss') {
       nodeColor = 0xe03e3e;
-      nodeSize = 45;
     } else if (node.type === 'resource') {
       nodeColor = 0xcb912f;
     } else if (node.type === 'combat') {
@@ -204,7 +354,7 @@ export class MapScene extends Phaser.Scene {
       bg.fillStyle(nodeColor, 1);
       bg.fillCircle(0, 0, nodeSize - 5);
     } else if (isReachable) {
-      bg.lineStyle(3, nodeColor, 1);
+      bg.lineStyle(lineWidth, nodeColor, 1);
       bg.strokeCircle(0, 0, nodeSize);
       bg.fillStyle(0xffffff, 0.9);
       bg.fillCircle(0, 0, nodeSize - 3);
@@ -215,32 +365,38 @@ export class MapScene extends Phaser.Scene {
 
     container.add(bg);
 
-    // Node icon
+    // Node icon - scale font size
     let icon = '';
     if (nodeId === 'start') icon = '🚢';
     else if (node.type === 'boss') icon = '👑';
     else if (node.type === 'resource') icon = '📦';
     else if (node.type === 'combat') icon = '⚔️';
 
+    const iconFontSize = Math.round((node.type === 'boss' ? 24 : 20) * Math.min(this.mapScale, 1.2));
     const iconText = this.add.text(0, 0, icon, {
-      fontSize: node.type === 'boss' ? '24px' : '20px',
+      fontSize: `${iconFontSize}px`,
     }).setOrigin(0.5);
     container.add(iconText);
 
-    // Node label
-    const label = this.add.text(0, nodeSize + 15, nodeId === 'start' ? 'Start' : nodeId, {
+    // Node label - scale font size
+    const labelFontSize = Math.round(12 * Math.min(this.mapScale, 1.2));
+    const label = this.add.text(0, nodeSize + 12, nodeId === 'start' ? 'Start' : nodeId, {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      fontSize: '12px',
+      fontSize: `${labelFontSize}px`,
       fill: isCurrentNode ? COLORS.textPrimary : COLORS.textTertiary,
       fontStyle: isCurrentNode ? 'bold' : 'normal',
     }).setOrigin(0.5);
     container.add(label);
 
-    // Make reachable nodes clickable
+    this.mapContainer.add(container);
+
+    // Make reachable nodes clickable - create hit area that moves with container
     if (isReachable && !isCurrentNode) {
-      const hitArea = this.add.circle(x, y, nodeSize, 0x000000, 0).setInteractive();
+      const hitArea = this.add.circle(0, 0, nodeSize, 0x000000, 0).setInteractive();
+      container.add(hitArea);
 
       hitArea.on('pointerover', () => {
+        if (this.isDragging) return;
         bg.clear();
         bg.fillStyle(nodeColor, 1);
         bg.fillCircle(0, 0, nodeSize);
@@ -251,7 +407,7 @@ export class MapScene extends Phaser.Scene {
 
       hitArea.on('pointerout', () => {
         bg.clear();
-        bg.lineStyle(3, nodeColor, 1);
+        bg.lineStyle(lineWidth, nodeColor, 1);
         bg.strokeCircle(0, 0, nodeSize);
         bg.fillStyle(0xffffff, 0.9);
         bg.fillCircle(0, 0, nodeSize - 3);
@@ -259,10 +415,24 @@ export class MapScene extends Phaser.Scene {
       });
 
       hitArea.on('pointerdown', () => {
-        this.advanceToNode(nodeId);
+        // Mark that we started on this node
+        this.clickedNode = nodeId;
       });
 
-      this.nodeButtons.push({ nodeId, hitArea });
+      hitArea.on('pointerup', () => {
+        // Only advance if we clicked this node and didn't drag
+        if (this.clickedNode === nodeId && !this.isDragging) {
+          // Small delay to ensure drag state is finalized
+          this.time.delayedCall(10, () => {
+            if (!this.isDragging) {
+              this.advanceToNode(nodeId);
+            }
+          });
+        }
+        this.clickedNode = null;
+      });
+
+      this.nodeButtons.push({ nodeId, hitArea, container });
     }
   }
 
@@ -339,11 +509,11 @@ export class MapScene extends Phaser.Scene {
     const height = window.innerHeight;
     const g = this.add.graphics();
 
-    // Responsive fleet panel on the right
-    const fleetPanelWidth = this.fleetPanelWidth || 240;
-    const panelX = width - fleetPanelWidth - 8;
+    // Fleet panel on the right - fills remaining space after map
+    const mapWidthPercent = 0.75;
+    const panelX = width * mapWidthPercent;
     const panelY = 72;
-    const panelW = fleetPanelWidth - 8;
+    const panelW = width * (1 - mapWidthPercent) - 16;
     const panelH = height - 180;
 
     g.fillStyle(COLORS.bgPrimary, 1);
