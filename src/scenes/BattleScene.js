@@ -663,7 +663,7 @@ export class BattleScene extends Phaser.Scene {
         }
 
         // Fuel reward on boss clear
-        const fuelReward = Math.floor(50 * (rank === 'S' ? 1.5 : rank === 'A' ? 1.2 : 1));
+        const fuelReward = Math.floor(250 * (rank === 'S' ? 1.5 : rank === 'A' ? 1.2 : 1));
         Storage.addCurrency(fuelReward);
         this.add.text(width / 2, height / 2 + yOffset, `+${fuelReward} Fuel`, {
           fontFamily: 'Arial, sans-serif',
@@ -673,7 +673,7 @@ export class BattleScene extends Phaser.Scene {
         yOffset += 30;
       } else {
         // Regular node - smaller fuel reward
-        const fuelReward = Math.floor(20 * (rank === 'S' ? 1.5 : 1));
+        const fuelReward = Math.floor(100 * (rank === 'S' ? 1.5 : 1));
         Storage.addCurrency(fuelReward);
         this.add.text(width / 2, height / 2 + yOffset, `+${fuelReward} Fuel`, {
           fontFamily: 'Arial, sans-serif',
