@@ -2,7 +2,7 @@
 
 ## Overview
 
-A browser-based naval fleet management and combat game designed as a **single-session Valentine's gift experience**. The player collects and battles with anthropomorphized warships (ship girls) to earn Premium Tickets, which can be used in a special gacha where the 3 Grand Prizes represent **real-life Valentine's gift choices**.
+A browser-based naval fleet management and combat game designed as a **single-session Special gift experience**. The player collects and battles with anthropomorphized warships (ship girls) to earn Premium Tickets, which can be used in a special gacha where the 3 Grand Prizes represent **real-life Special gift choices**.
 
 **Target Experience:**
 - Completable in one sitting (~30 minutes)
@@ -30,7 +30,7 @@ A browser-based naval fleet management and combat game designed as a **single-se
 12. ~~PvP System~~ (Removed)
 13. ~~Event System~~ (Removed)
 14. [Secret Code System](#14-secret-code-system)
-15. [Valentine's Gift Reveal](#15-valentines-gift-reveal)
+15. [Special Gift Reveal](#15-valentines-gift-reveal)
 16. [UI/UX Design](#16-uiux-design)
 17. [Technical Architecture](#17-technical-architecture)
 
@@ -208,7 +208,7 @@ Tutorial → Unlock Ships → Battle Maps → Earn Tickets → Pull Gacha → Ch
 2. **Early Maps (20-30 min)**: Easy battles, earn tickets, unlock new ships
 3. **Mid Maps (30-40 min)**: Moderate difficulty, more tickets
 4. **Late Maps (30-40 min)**: Challenging battles, bonus ticket rewards
-5. **Gacha Phase**: Use accumulated tickets to pull for Valentine's gifts
+5. **Gacha Phase**: Use accumulated tickets to pull for Special gifts
 6. **Secret Code**: Optional code entry for 50 bonus tickets
 7. **Gift Selection**: Exchange tokens for chosen gift OR get lucky from pulls
 
@@ -217,7 +217,7 @@ Tutorial → Unlock Ships → Battle Maps → Earn Tickets → Pull Gacha → Ch
 - **Collection**: Acquire ship girls through map drops and standard construction
 - **Combat**: Tactical battles with formation choices
 - **Gacha**: Fun pulling experience leading to real gift selection
-- **Reward**: The 3 Grand Prizes are actual Valentine's gift choices
+- **Reward**: The 3 Grand Prizes are actual Special gift choices
 
 ### 2.3 Removed Systems (Simplified for Single Session)
 
@@ -559,21 +559,21 @@ A secondary gacha system with exclusive rewards, designed for accessibility with
 - **Secret code:** 50 tickets
 - **Maximum possible:** 150 tickets
 
-*This guarantees the player can exchange for ANY Grand Prize (max cost 150 tokens), ensuring they can always choose their preferred Valentine's gift.*
+*This guarantees the player can exchange for ANY Grand Prize (max cost 150 tokens), ensuring they can always choose their preferred Special gift.*
 
 **Reward Structure:**
 
 | Tier | Drop Rate | Rewards |
 |------|-----------|---------|
-| **Grand Prize 1** | 2.0% | [TBD - Valentine's Gift Choice #1] |
-| **Grand Prize 2** | 0.5% | [TBD - Valentine's Gift Choice #2] |
-| **Grand Prize 3** | 0.2% | [TBD - Valentine's Gift Choice #3] |
+| **Grand Prize 1** | 2.0% | [TBD - Special Gift Choice #1] |
+| **Grand Prize 2** | 0.5% | [TBD - Special Gift Choice #2] |
+| **Grand Prize 3** | 0.2% | [TBD - Special Gift Choice #3] |
 | **Consolation A** | 12.3% | Super Rare Ship (in-game reward) |
 | **Consolation B** | 25% | Rare Equipment (in-game reward) |
 | **Consolation C** | 30% | Resources (in-game reward) |
 | **Consolation D** | 30% | Resources (in-game reward) |
 
-*Note: Grand Prizes represent REAL Valentine's gift choices. When obtained, a special screen reveals the gift with a personalized message.*
+*Note: Grand Prizes represent REAL Special gift choices. When obtained, a special screen reveals the gift with a personalized message.*
 
 **Grand Prize Limit:**
 - Each Grand Prize can only be obtained **once** (via pull OR exchange)
@@ -689,7 +689,7 @@ Instead of daily/weekly quests, progression is tied to maps:
 
 ## 13. Event System
 
-**REMOVED** - The entire game IS the Valentine's event.
+**REMOVED** - The entire game IS the Special event.
 
 ---
 
@@ -723,7 +723,7 @@ The code should be configurable (set by you before giving her the game):
 
 ---
 
-## 15. Valentine's Gift Reveal
+## 15. Special Gift Reveal
 
 ### 15.1 Grand Prize Reveal Screen
 
@@ -731,11 +731,11 @@ When a Grand Prize is obtained (via pull or exchange), display a special reveal:
 
 **Animation Sequence:**
 1. Screen dims, sparkle effects
-2. Gift box appears (themed to Valentine's)
+2. Gift box appears (themed to Special)
 3. Box opens with flourish
 4. Gift image/description revealed
 5. Personalized message displays
-6. "This is your Valentine's gift!" confirmation
+6. "This is your Special gift!" confirmation
 
 ### 15.2 Gift Display
 
@@ -976,7 +976,7 @@ POST   /api/repair/complete
 - [ ] Token exchange shop
 - [ ] Grand Prize limit (one each)
 
-### Phase 4: Valentine's Features
+### Phase 4: Special Features
 - [ ] Secret code entry screen
 - [ ] Gift reveal animations
 - [ ] Gift collection screen

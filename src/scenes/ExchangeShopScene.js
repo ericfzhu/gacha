@@ -79,7 +79,7 @@ export class ExchangeShopScene extends Phaser.Scene {
     const width = window.innerWidth;
     const height = window.innerHeight;
 
-    this.add.text(width / 2, 115, "Exchange your pity tokens for guaranteed Valentine's gifts!", {
+    this.add.text(width / 2, 115, "Exchange your pity tokens for guaranteed gifts!", {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '13px',
       fill: COLORS.textSecondary,

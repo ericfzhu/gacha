@@ -1,4 +1,4 @@
-// Gift Reveal scene - special Valentine's reveal animation (Notion style)
+// Gift Reveal scene - special special reveal animation (Notion style)
 
 import Phaser from 'phaser';
 import { GRAND_PRIZES } from '../systems/premiumGacha.js';
@@ -13,8 +13,8 @@ const COLORS = {
   textTertiary: '#9b9a97',
   border: 0xe9e9e7,
   success: '#4dab9a',
-  valentine: '#e03e3e',
-  valentineLight: '#ffb6c1',
+  special: '#e03e3e',
+  specialLight: '#ffb6c1',
 };
 
 export class GiftRevealScene extends Phaser.Scene {
@@ -238,10 +238,10 @@ export class GiftRevealScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // "You won!" text
-    const wonText = this.add.text(0, 85, "❤ This is your Valentine's gift! ❤", {
+    const wonText = this.add.text(0, 85, "❤ This is your special gift! ❤", {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '15px',
-      fill: COLORS.valentine,
+      fill: COLORS.special,
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
@@ -291,10 +291,10 @@ export class GiftRevealScene extends Phaser.Scene {
     const width = window.innerWidth;
     const height = window.innerHeight;
 
-    const message = this.add.text(width / 2, height - 140, "Happy Valentine's Day! ❤", {
+    const message = this.add.text(width / 2, height - 140, "Congratulations! ❤", {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '20px',
-      fill: COLORS.valentineLight,
+      fill: COLORS.specialLight,
       fontStyle: 'bold',
     }).setOrigin(0.5).setAlpha(0);
 

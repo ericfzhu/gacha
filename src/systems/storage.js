@@ -4,10 +4,10 @@ const STORAGE_KEY = 'fleet_collection_save';
 
 const DEFAULT_SAVE = {
   currency: 1000,
-  tickets: 5, // Premium tickets for Valentine's gacha
+  tickets: 5, // Premium tickets for special gacha
   pity: 0, // Standard gacha pity
   pityTokens: 0, // Tokens for premium gacha exchange shop
-  // Grand prizes - Valentine's gift choices (can only obtain each once)
+  // Grand prizes - special gift choices (can only obtain each once)
   grandPrizes: {
     prize1: false, // 2.0% rate - obtained?
     prize2: false, // 0.5% rate - obtained?
@@ -241,7 +241,7 @@ export const Storage = {
     return this.save(data);
   },
 
-  // Grand prize management (Valentine's gifts)
+  // Grand prize management (special gifts)
   getGrandPrizes() {
     const data = this.load();
     return data.grandPrizes || { prize1: false, prize2: false, prize3: false };

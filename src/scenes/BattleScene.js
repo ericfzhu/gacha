@@ -19,7 +19,7 @@ const COLORS = {
   danger: 0xe03e3e,
 };
 
-// Stages with ticket rewards for Valentine's gift progression
+// Stages with ticket rewards for special gift progression
 // Reduced to 4 maps for ~30 minute gameplay
 // First clear gives base tickets, S-rank gives +2 bonus
 const STAGES = [

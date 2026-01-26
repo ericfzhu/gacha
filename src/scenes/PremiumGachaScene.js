@@ -1,10 +1,10 @@
-// Premium Gacha scene for Valentine's gift selection (Notion style)
+// Premium Gacha scene for Special gift selection (Notion style)
 
 import Phaser from 'phaser';
 import { PremiumGacha, GRAND_PRIZES, CONSOLATION_PRIZES } from '../systems/premiumGacha.js';
 import { Storage } from '../systems/storage.js';
 
-// Notion-inspired colors with Valentine's accents
+// Notion-inspired colors with Special accents
 const COLORS = {
   bgPrimary: 0xffffff,
   bgSecondary: 0xf7f6f3,
@@ -17,8 +17,8 @@ const COLORS = {
   success: '#4dab9a',
   warning: '#cb912f',
   danger: '#e03e3e',
-  valentine: '#e03e3e',
-  valentineLight: '#ffb6c1',
+  special: '#e03e3e',
+  specialLight: '#ffb6c1',
 };
 
 export class PremiumGachaScene extends Phaser.Scene {
@@ -70,13 +70,13 @@ export class PremiumGachaScene extends Phaser.Scene {
 
     this.add.text(width / 2 - 12, 28, '❤', {
       fontSize: '18px',
-      fill: COLORS.valentine,
+      fill: COLORS.special,
     }).setOrigin(1, 0.5);
 
-    this.add.text(width / 2, 28, "Valentine's Gacha", {
+    this.add.text(width / 2, 28, "Special Gacha", {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '20px',
-      fill: COLORS.valentine,
+      fill: COLORS.special,
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
@@ -118,14 +118,14 @@ export class PremiumGachaScene extends Phaser.Scene {
     // Heart decoration
     this.add.text(panelCenterX, 130, '❤', {
       fontSize: '48px',
-      fill: COLORS.valentine,
+      fill: COLORS.special,
     }).setOrigin(0.5);
 
     // Status text
-    this.statusText = this.add.text(panelCenterX, 190, "Pull for Valentine's Gifts!", {
+    this.statusText = this.add.text(panelCenterX, 190, "Pull for Special Gifts!", {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '15px',
-      fill: COLORS.valentine,
+      fill: COLORS.special,
     }).setOrigin(0.5);
 
     // Token counter
@@ -154,7 +154,7 @@ export class PremiumGachaScene extends Phaser.Scene {
     ratesBtn.on('pointerdown', () => this.showRatePopup());
 
     // Info text
-    this.add.text(panelCenterX, 520, "Win Valentine's gifts or exchange tokens!", {
+    this.add.text(panelCenterX, 520, "Win Special gifts or exchange tokens!", {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '11px',
       fill: COLORS.textTertiary,
@@ -347,7 +347,7 @@ export class PremiumGachaScene extends Phaser.Scene {
     const rateText = this.add.text(-cardWidth / 2 + 16, bottomY, `Drop Rate: ${prize.rate}%`, {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '10px',
-      fill: COLORS.valentine,
+      fill: COLORS.special,
     }).setOrigin(0, 0.5);
 
     const costText = this.add.text(cardWidth / 2 - 16, bottomY, `Exchange: ${prize.tokenCost} tokens`, {
@@ -358,7 +358,7 @@ export class PremiumGachaScene extends Phaser.Scene {
 
     // Status badge
     const statusText = obtained ? '✓ Obtained' : 'Available';
-    const statusColor = obtained ? COLORS.success : COLORS.valentineLight;
+    const statusColor = obtained ? COLORS.success : COLORS.specialLight;
     const badge = this.add.text(cardWidth / 2 - 16, topY, statusText, {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '11px',
@@ -388,7 +388,7 @@ export class PremiumGachaScene extends Phaser.Scene {
     this.add.text(width - 24, height - 24, 'Each Grand Prize can only be won ONCE!', {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '12px',
-      fill: COLORS.valentine,
+      fill: COLORS.special,
     }).setOrigin(1, 0.5);
   }
 
@@ -417,7 +417,7 @@ export class PremiumGachaScene extends Phaser.Scene {
   updateDisplays() {
     this.ticketText.setText(`${Storage.getTickets()}`);
     this.tokenText.setText(`Pity Tokens: ${Storage.getPityTokens()}`);
-    this.statusText.setText("Pull for Valentine's Gifts!");
+    this.statusText.setText("Pull for Special Gifts!");
   }
 
   showResults(results) {
@@ -509,7 +509,7 @@ export class PremiumGachaScene extends Phaser.Scene {
     this.ratePopup.add(bg);
 
     // Title
-    this.ratePopup.add(this.add.text(0, -popupHeight / 2 + 28, "Valentine's Gacha Rates", {
+    this.ratePopup.add(this.add.text(0, -popupHeight / 2 + 28, "Special Gacha Rates", {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '16px',
       fill: '#e03e3e',

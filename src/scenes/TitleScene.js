@@ -196,7 +196,7 @@ export class TitleScene extends Phaser.Scene {
     // Menu buttons - Notion style list items
     const menuItems = [
       { text: 'Sortie', desc: 'Deploy fleet for combat', scene: 'BattleScene', icon: '\u2694' },
-      { text: 'Valentine\'s Gacha', desc: 'Win Valentine\'s gifts!', scene: 'PremiumGachaScene', icon: '\u2764', highlight: true },
+      { text: 'Special Gacha', desc: 'Win special gifts!', scene: 'PremiumGachaScene', icon: '\u2764', highlight: true },
       { text: 'Organize', desc: 'Manage fleet composition', scene: 'FleetScene', icon: '\u2693' },
       { text: 'Repair Dock', desc: 'Repair damaged ships', scene: 'DockScene', icon: '\u{1F527}' },
       { text: 'Collection', desc: 'View ship collection', scene: 'CollectionScene', icon: '\u{1F6A2}' },

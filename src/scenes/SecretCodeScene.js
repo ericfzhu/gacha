@@ -310,7 +310,7 @@ export class SecretCodeScene extends Phaser.Scene {
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    this.add.text(width / 2, height / 2 + 30, "Use them in the Valentine's Gacha!", {
+    this.add.text(width / 2, height / 2 + 30, "Use them in the Special Gacha!", {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '14px',
       fill: COLORS.textSecondary,

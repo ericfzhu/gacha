@@ -1,4 +1,4 @@
-// Gift Collection scene - shows all Valentine's gift prizes (Notion style)
+// Gift Collection scene - shows all Special gift prizes (Notion style)
 
 import Phaser from 'phaser';
 import { GRAND_PRIZES } from '../systems/premiumGacha.js';
@@ -14,8 +14,8 @@ const COLORS = {
   textTertiary: '#9b9a97',
   border: 0xe9e9e7,
   success: '#4dab9a',
-  valentine: '#e03e3e',
-  valentineLight: '#ffb6c1',
+  special: '#e03e3e',
+  specialLight: '#ffb6c1',
 };
 
 export class GiftCollectionScene extends Phaser.Scene {
@@ -52,10 +52,10 @@ export class GiftCollectionScene extends Phaser.Scene {
     g.fillStyle(COLORS.border, 1);
     g.fillRect(0, 89, width, 1);
 
-    this.add.text(width / 2, 32, "🎁 Valentine's Gift Collection", {
+    this.add.text(width / 2, 32, "🎁 Special Gift Collection", {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '24px',
-      fill: COLORS.valentine,
+      fill: COLORS.special,
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
@@ -236,10 +236,10 @@ export class GiftCollectionScene extends Phaser.Scene {
 
     if (obtained >= 3) {
       const congrats = this.add.text(width / 2, height - 50,
-        "❤ Congratulations! You've collected all Valentine's gifts! ❤", {
+        "❤ Congratulations! You've collected all Special gifts! ❤", {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         fontSize: '18px',
-        fill: COLORS.valentine,
+        fill: COLORS.special,
         fontStyle: 'bold',
       }).setOrigin(0.5);
 
@@ -252,7 +252,7 @@ export class GiftCollectionScene extends Phaser.Scene {
       });
     } else {
       this.add.text(width / 2, height - 50,
-        "Keep playing to collect all your Valentine's gifts!", {
+        "Keep playing to collect all your Special gifts!", {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         fontSize: '14px',
         fill: COLORS.textTertiary,

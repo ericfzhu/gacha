@@ -1,10 +1,10 @@
-// Premium Gacha system for Valentine's gift selection
-// Features 3 Grand Prizes (real Valentine's gifts) and consolation prizes
+// Premium Gacha system for special gift selection
+// Features 3 Grand Prizes (real special gifts) and consolation prizes
 
 import { Storage } from './storage.js';
 import { SHIPS, getShipsByRarity } from '../data/ships.js';
 
-// Grand Prize definitions - Valentine's gift choices
+// Grand Prize definitions - special gift choices
 // Names and descriptions are configurable via environment variables:
 // VITE_PRIZE1_NAME, VITE_PRIZE1_DESC
 // VITE_PRIZE2_NAME, VITE_PRIZE2_DESC
@@ -13,7 +13,7 @@ export const GRAND_PRIZES = {
   prize1: {
     key: 'prize1',
     name: import.meta.env.VITE_PRIZE1_NAME || 'Gift Choice #1',
-    description: import.meta.env.VITE_PRIZE1_DESC || 'Your first Valentine\'s gift option!',
+    description: import.meta.env.VITE_PRIZE1_DESC || 'Your first special gift option!',
     rate: 2.0, // 2% chance
     tokenCost: 50,
     color: 0xff6b8a, // Pink
@@ -21,7 +21,7 @@ export const GRAND_PRIZES = {
   prize2: {
     key: 'prize2',
     name: import.meta.env.VITE_PRIZE2_NAME || 'Gift Choice #2',
-    description: import.meta.env.VITE_PRIZE2_DESC || 'Your second Valentine\'s gift option!',
+    description: import.meta.env.VITE_PRIZE2_DESC || 'Your second special gift option!',
     rate: 0.5, // 0.5% chance
     tokenCost: 100,
     color: 0x8b5cf6, // Purple
@@ -29,7 +29,7 @@ export const GRAND_PRIZES = {
   prize3: {
     key: 'prize3',
     name: import.meta.env.VITE_PRIZE3_NAME || 'Gift Choice #3',
-    description: import.meta.env.VITE_PRIZE3_DESC || 'Your third Valentine\'s gift option!',
+    description: import.meta.env.VITE_PRIZE3_DESC || 'Your third special gift option!',
     rate: 0.2, // 0.2% chance
     tokenCost: 150,
     color: 0xfbbf24, // Gold
