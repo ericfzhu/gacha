@@ -2,6 +2,7 @@
 
 import Phaser from 'phaser';
 import { SHIPS } from '../data/ships.js';
+import { AudioManager, BGM } from '../systems/audio.js';
 
 // Notion-inspired colors
 const COLORS = {
@@ -75,11 +76,20 @@ export class BootScene extends Phaser.Scene {
       this.load.image(`ship_banner_${ship.id}`, `assets/banners/${ship.id}.png`);
     });
 
+    // Load audio files
+    this.load.audio(BGM.PORT, 'assets/audio/bgm_port.mp3');
+    this.load.audio(BGM.MENU, 'assets/audio/bgm_menu.mp3');
+    this.load.audio(BGM.BATTLE, 'assets/audio/bgm_battle.mp3');
+    this.load.audio(BGM.VICTORY, 'assets/audio/bgm_victory.mp3');
+    this.load.audio(BGM.GIFT, 'assets/audio/bgm_gift.mp3');
+
     // Create UI assets
     this.createUIAssets();
   }
 
   create() {
+    // Initialize audio manager
+    AudioManager.init(this);
     this.scene.start('TitleScene');
   }
 

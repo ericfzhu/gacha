@@ -4,6 +4,7 @@ import Phaser from 'phaser';
 import { Storage } from '../systems/storage.js';
 import { getShipById, getShipStats, RARITY } from '../data/ships.js';
 import { getDamageState } from '../data/maps.js';
+import { AudioManager, BGM } from '../systems/audio.js';
 
 // Notion-inspired colors
 const COLORS = {
@@ -30,6 +31,10 @@ export class FleetScene extends Phaser.Scene {
     const width = window.innerWidth;
     const height = window.innerHeight;
     this.scale.resize(width, height);
+
+    // Set audio scene and play menu music
+    AudioManager.setScene(this);
+    AudioManager.playBgm(BGM.MENU);
 
     this.createBackground();
     this.createHeader();

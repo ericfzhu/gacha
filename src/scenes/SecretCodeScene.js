@@ -2,6 +2,7 @@
 
 import Phaser from 'phaser';
 import { Storage } from '../systems/storage.js';
+import { AudioManager, BGM } from '../systems/audio.js';
 
 // CONFIGURE THIS: Set the secret code here!
 // Change this to something meaningful (anniversary date, pet name, etc.)
@@ -39,6 +40,10 @@ export class SecretCodeScene extends Phaser.Scene {
     const width = window.innerWidth;
     const height = window.innerHeight;
     this.scale.resize(width, height);
+
+    // Set audio scene and play menu music
+    AudioManager.setScene(this);
+    AudioManager.playBgm(BGM.MENU);
 
     this.inputText = '';
     this.createBackground();

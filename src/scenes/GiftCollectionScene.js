@@ -3,6 +3,7 @@
 import Phaser from 'phaser';
 import { GRAND_PRIZES } from '../systems/premiumGacha.js';
 import { Storage } from '../systems/storage.js';
+import { AudioManager, BGM } from '../systems/audio.js';
 
 // Notion-inspired colors
 const COLORS = {
@@ -28,6 +29,10 @@ export class GiftCollectionScene extends Phaser.Scene {
     const width = window.innerWidth;
     const height = window.innerHeight;
     this.scale.resize(width, height);
+
+    // Set audio scene and play menu music
+    AudioManager.setScene(this);
+    AudioManager.playBgm(BGM.MENU);
 
     this.createBackground();
     this.createHeader();
