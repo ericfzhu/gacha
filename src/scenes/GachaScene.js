@@ -4,6 +4,7 @@ import Phaser from 'phaser';
 import { Gacha } from '../systems/gacha.js';
 import { Storage } from '../systems/storage.js';
 import { RARITY } from '../data/ships.js';
+import { AudioManager, BGM } from '../systems/audio.js';
 
 // Notion-inspired colors
 const COLORS = {
@@ -29,6 +30,10 @@ export class GachaScene extends Phaser.Scene {
     const width = window.innerWidth;
     const height = window.innerHeight;
     this.scale.resize(width, height);
+
+    // Set audio scene and play menu music
+    AudioManager.setScene(this);
+    AudioManager.playBgm(BGM.MENU);
 
     this.createBackground();
     this.createHeader();
@@ -284,40 +289,225 @@ export class GachaScene extends Phaser.Scene {
     this.currencyText.setText(Storage.get('currency').toLocaleString());
     this.pityText.setText(`Counter: ${Gacha.getPity()}/${Gacha.getPityThreshold()}`);
 
-    // Construction animation
+    // Get the best rarity for telegraphing
+    const rarityOrder = { 'N': 0, 'R': 1, 'SR': 2, 'SSR': 3 };
+    const bestResult = results.reduce((best, r) =>
+      rarityOrder[r.ship.rarity] > rarityOrder[best.ship.rarity] ? r : best
+    );
+    const bestRarity = RARITY[bestResult.ship.rarity];
+
+    // Start the pull animation sequence
+    this.runPullAnimation(results, bestRarity);
+  }
+
+  async runPullAnimation(results, bestRarity) {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const leftPanelWidth = this.leftPanelWidth || 380;
+    const panelX = 24 + leftPanelWidth + 16;
+    const panelWidth = width - panelX - 24;
+    const centerX = panelX + panelWidth / 2;
+    const centerY = 72 + (height - 130) / 2;
+
+    // Construction status
     this.constructionText.setText('Building...');
     this.constructionText.setStyle({ fill: '#cb912f' });
 
-    this.time.delayedCall(1000, () => {
-      this.constructionText.setText('Complete!');
-      this.constructionText.setStyle({ fill: '#4dab9a' });
-      this.showResults(results);
+    // Create orb container at result panel center
+    const orbContainer = this.add.container(centerX, centerY);
+
+    // Spinning particles around the orb
+    const particles = [];
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const particle = this.add.circle(
+        Math.cos(angle) * 40,
+        Math.sin(angle) * 40,
+        4,
+        0xcccccc
+      );
+      particles.push(particle);
+      orbContainer.add(particle);
+    }
+
+    // Animate particles spinning
+    this.tweens.add({
+      targets: orbContainer,
+      angle: 360,
+      duration: 1500,
+      repeat: -1,
+      ease: 'Linear',
     });
+
+    // Inner glowing orb - starts gray
+    const orb = this.add.circle(0, 0, 30, 0xaaaaaa);
+    orbContainer.add(orb);
+
+    // Orb glow effect
+    const glow = this.add.circle(0, 0, 45, 0xaaaaaa, 0.3);
+    orbContainer.addAt(glow, 0);
+
+    // Pulse animation
+    this.tweens.add({
+      targets: glow,
+      scale: 1.3,
+      alpha: 0.1,
+      duration: 600,
+      yoyo: true,
+      repeat: -1,
+    });
+
+    // Wait then transition to rarity color
+    await this.delay(800);
+
+    // Color transition - telegraph the rarity!
+    this.tweens.add({
+      targets: orb,
+      fillColor: bestRarity.color,
+      duration: 400,
+    });
+    this.tweens.add({
+      targets: glow,
+      fillColor: bestRarity.color,
+      duration: 400,
+    });
+    particles.forEach(p => {
+      this.tweens.add({
+        targets: p,
+        fillColor: bestRarity.color,
+        duration: 400,
+      });
+    });
+
+    // Intensify for higher rarities
+    if (bestRarity.stars >= 3) {
+      // SR or higher - more dramatic
+      await this.delay(300);
+      this.cameras.main.flash(150, 255, 255, 255, false);
+
+      // Speed up rotation
+      this.tweens.killTweensOf(orbContainer);
+      this.tweens.add({
+        targets: orbContainer,
+        angle: orbContainer.angle + 720,
+        duration: 600,
+        ease: 'Cubic.easeIn',
+      });
+    }
+
+    if (bestRarity.stars >= 4) {
+      // SSR - screen shake buildup
+      await this.delay(200);
+      this.cameras.main.shake(300, 0.008);
+    }
+
+    await this.delay(400);
+
+    // Burst effect
+    this.cameras.main.flash(200, 255, 255, 255, false);
+
+    // Explosion particles
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const burst = this.add.circle(
+        centerX,
+        centerY,
+        6,
+        bestRarity.color
+      );
+      this.tweens.add({
+        targets: burst,
+        x: centerX + Math.cos(angle) * 150,
+        y: centerY + Math.sin(angle) * 150,
+        alpha: 0,
+        scale: 0.3,
+        duration: 500,
+        ease: 'Cubic.easeOut',
+        onComplete: () => burst.destroy(),
+      });
+    }
+
+    // Remove orb
+    this.tweens.add({
+      targets: orbContainer,
+      scale: 2,
+      alpha: 0,
+      duration: 300,
+      onComplete: () => orbContainer.destroy(),
+    });
+
+    this.constructionText.setText('Complete!');
+    this.constructionText.setStyle({ fill: '#4dab9a' });
+
+    await this.delay(200);
+    this.showResults(results);
+  }
+
+  delay(ms) {
+    return new Promise(resolve => this.time.delayedCall(ms, resolve));
   }
 
   showResults(results) {
     const isSingle = results.length === 1;
     const panelWidth = this.resultPanelWidth || 600;
+    const height = window.innerHeight;
+    const panelHeight = height - 130 - 40; // Account for header/footer and padding
 
-    // Calculate grid layout based on panel width
-    const cardWidth = isSingle ? 150 : 110;
-    const cardSpacing = 10;
-    const cols = isSingle ? 1 : Math.min(5, Math.floor(panelWidth / (cardWidth + cardSpacing)));
-
-    results.forEach((result, index) => {
-      const row = Math.floor(index / cols);
-      const col = index % cols;
-
-      const totalRowWidth = cols * cardWidth + (cols - 1) * cardSpacing;
-      const startX = -totalRowWidth / 2 + cardWidth / 2;
-
-      const x = isSingle ? 0 : startX + col * (cardWidth + cardSpacing);
-      const y = isSingle ? 0 : row * 140 - 70;
-
-      this.time.delayedCall(index * 100, () => {
-        this.showShipCard(result, x, y, isSingle);
+    if (isSingle) {
+      // Single pull - larger centered card
+      const scale = Math.min(1.5, panelWidth / 200, panelHeight / 280);
+      this.time.delayedCall(100, () => {
+        this.showShipCard(results[0], 0, 0, scale);
       });
-    });
+    } else {
+      // 10-pull - responsive grid
+      const padding = 20;
+      const availableWidth = panelWidth - padding * 2;
+      const availableHeight = panelHeight - padding * 2;
+
+      // Calculate optimal card size based on available space
+      // We want 5 columns for 10 cards (2 rows of 5)
+      const cols = 5;
+      const rows = 2;
+      const spacingRatio = 0.1; // 10% of card size for spacing
+
+      // Calculate card dimensions that fit the space
+      const maxCardWidth = availableWidth / (cols + (cols - 1) * spacingRatio);
+      const maxCardHeight = availableHeight / (rows + (rows - 1) * spacingRatio);
+
+      // Card aspect ratio is roughly 100:150 (width:height)
+      const cardAspect = 100 / 150;
+      let cardWidth, cardHeight;
+
+      if (maxCardWidth / cardAspect <= maxCardHeight) {
+        // Width-constrained
+        cardWidth = maxCardWidth;
+        cardHeight = cardWidth / cardAspect;
+      } else {
+        // Height-constrained
+        cardHeight = maxCardHeight;
+        cardWidth = cardHeight * cardAspect;
+      }
+
+      const spacing = cardWidth * spacingRatio;
+      const scale = cardWidth / 100; // Base card is 100px wide
+
+      // Calculate grid dimensions
+      const totalWidth = cols * cardWidth + (cols - 1) * spacing;
+      const totalHeight = rows * cardHeight + (rows - 1) * spacing;
+
+      results.forEach((result, index) => {
+        const row = Math.floor(index / cols);
+        const col = index % cols;
+
+        const x = -totalWidth / 2 + cardWidth / 2 + col * (cardWidth + spacing);
+        const y = -totalHeight / 2 + cardHeight / 2 + row * (cardHeight + spacing);
+
+        this.time.delayedCall(index * 100, () => {
+          this.showShipCard(result, x, y, scale);
+        });
+      });
+    }
 
     // SSR celebration
     const hasSSR = results.some(r => r.ship.rarity === 'SSR');
@@ -327,10 +517,9 @@ export class GachaScene extends Phaser.Scene {
     }
   }
 
-  showShipCard(result, x, y, isSingle) {
+  showShipCard(result, x, y, scale) {
     const ship = result.ship;
     const rarity = RARITY[ship.rarity];
-    const scale = isSingle ? 1.5 : 1;
 
     const container = this.add.container(x, y);
 
@@ -339,11 +528,11 @@ export class GachaScene extends Phaser.Scene {
     const cardHeight = 150 * scale;
     const card = this.add.graphics();
     card.fillStyle(0xffffff, 1);
-    card.fillRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 4);
+    card.fillRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 4 * scale);
     card.fillStyle(rarity.color, 1);
-    card.fillRect(-cardWidth / 2, -cardHeight / 2, cardWidth, 4);
-    card.lineStyle(2, rarity.color, 0.8);
-    card.strokeRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 4);
+    card.fillRect(-cardWidth / 2, -cardHeight / 2, cardWidth, 4 * scale);
+    card.lineStyle(2 * scale, rarity.color, 0.8);
+    card.strokeRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 4 * scale);
 
     // Add card first (background)
     container.add(card);
@@ -353,7 +542,7 @@ export class GachaScene extends Phaser.Scene {
     if (this.textures.exists(portraitKey)) {
       const portrait = this.add.image(0, -20 * scale, portraitKey);
       // Scale portrait to fit card width with some padding
-      const maxPortraitWidth = cardWidth - 10;
+      const maxPortraitWidth = cardWidth - 10 * scale;
       const maxPortraitHeight = 80 * scale;
       const scaleX = maxPortraitWidth / portrait.width;
       const scaleY = maxPortraitHeight / portrait.height;
@@ -362,10 +551,11 @@ export class GachaScene extends Phaser.Scene {
       container.add(portrait);
     }
 
-    // Ship name
+    // Ship name - scale font size
+    const baseFontSize = Math.max(9, Math.min(14, 11 * scale));
     const nameText = this.add.text(0, 35 * scale, ship.name, {
       fontFamily: 'Arial, sans-serif',
-      fontSize: `${isSingle ? 14 : 11}px`,
+      fontSize: `${baseFontSize}px`,
       fill: '#1a1a2e',
       fontStyle: 'bold',
     }).setOrigin(0.5);
@@ -374,45 +564,46 @@ export class GachaScene extends Phaser.Scene {
     let stars = '';
     for (let i = 0; i < rarity.stars; i++) stars += '\u2605';
     const starsText = this.add.text(0, 52 * scale, stars, {
-      fontSize: `${10 * scale}px`,
+      fontSize: `${Math.max(8, 10 * scale)}px`,
       fill: `#${rarity.color.toString(16).padStart(6, '0')}`,
     }).setOrigin(0.5);
 
     // Rarity name
     const rarityText = this.add.text(0, 65 * scale, rarity.name, {
       fontFamily: 'Arial, sans-serif',
-      fontSize: `${isSingle ? 11 : 9}px`,
+      fontSize: `${Math.max(7, 9 * scale)}px`,
       fill: `#${rarity.color.toString(16).padStart(6, '0')}`,
     }).setOrigin(0.5);
 
     container.add([nameText, starsText, rarityText]);
 
     // NEW badge or XP badge for duplicates
+    const badgeFontSize = Math.max(7, 9 * scale);
     if (result.isNew) {
       const newBadge = this.add.text(40 * scale, -55 * scale, 'NEW', {
         fontFamily: 'Arial, sans-serif',
-        fontSize: `${isSingle ? 12 : 9}px`,
+        fontSize: `${badgeFontSize}px`,
         fill: '#ffffff',
         backgroundColor: '#f44336',
-        padding: { x: 4, y: 2 },
+        padding: { x: 3 * scale, y: 1 * scale },
       }).setOrigin(0.5);
       container.add(newBadge);
     } else if (result.xpGained > 0) {
       // Show XP gained for duplicate
       const xpBadge = this.add.text(40 * scale, -55 * scale, `+${result.xpGained} XP`, {
         fontFamily: 'Arial, sans-serif',
-        fontSize: `${isSingle ? 11 : 8}px`,
+        fontSize: `${badgeFontSize}px`,
         fill: '#ffffff',
         backgroundColor: '#4dab9a',
-        padding: { x: 4, y: 2 },
+        padding: { x: 3 * scale, y: 1 * scale },
       }).setOrigin(0.5);
       container.add(xpBadge);
 
       // Show level up if applicable
       if (result.levelUp && result.levelUp.leveledUp) {
-        const lvlUpText = this.add.text(0, 58 * scale, `LV UP! → ${result.levelUp.newLevel}`, {
+        const lvlUpText = this.add.text(0, 75 * scale, `LV UP! → ${result.levelUp.newLevel}`, {
           fontFamily: 'Arial, sans-serif',
-          fontSize: `${isSingle ? 11 : 8}px`,
+          fontSize: `${badgeFontSize}px`,
           fill: '#ffaa00',
           fontStyle: 'bold',
         }).setOrigin(0.5);
