@@ -345,6 +345,9 @@ export class GachaScene extends Phaser.Scene {
     card.lineStyle(2, rarity.color, 0.8);
     card.strokeRoundedRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 4);
 
+    // Add card first (background)
+    container.add(card);
+
     // Ship portrait image
     const portraitKey = `ship_portrait_${ship.id}`;
     if (this.textures.exists(portraitKey)) {
@@ -382,7 +385,7 @@ export class GachaScene extends Phaser.Scene {
       fill: `#${rarity.color.toString(16).padStart(6, '0')}`,
     }).setOrigin(0.5);
 
-    container.add([card, nameText, starsText, rarityText]);
+    container.add([nameText, starsText, rarityText]);
 
     // NEW badge or XP badge for duplicates
     if (result.isNew) {
