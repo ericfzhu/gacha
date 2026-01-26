@@ -4,6 +4,7 @@ import Phaser from 'phaser';
 import { Storage } from '../systems/storage.js';
 import { getShipById, getShipStats, RARITY } from '../data/ships.js';
 import { MAPS, MAP_ORDER, getMapById, getNodeById, getDamageState } from '../data/maps.js';
+import { AudioManager, BGM } from '../systems/audio.js';
 
 // Notion-inspired colors
 const COLORS = {
@@ -43,14 +44,24 @@ export class BattleScene extends Phaser.Scene {
     this.nodeId = data?.nodeId || null;
     this.fleetHp = data?.fleetHp || {};
     this.isBoss = data?.isBoss || false;
+    // Battle speed: 1 = normal, 2 = fast, 3 = very fast
+    // Load saved preference
+    const savedSpeed = localStorage.getItem('battleSpeed');
+    this.battleSpeed = savedSpeed ? parseInt(savedSpeed, 10) : 1;
+    if (this.battleSpeed < 1 || this.battleSpeed > 3) this.battleSpeed = 1;
   }
 
   create() {
+    // Set audio scene reference
+    AudioManager.setScene(this);
+
     // Check for completed repairs
     Storage.checkAndCompleteRepairs();
 
     // If we have map/node data, start battle directly
     if (this.mapId && this.nodeId) {
+      // Play battle music when entering combat
+      AudioManager.playBgm(BGM.BATTLE);
       this.startNodeBattle();
       return;
     }
@@ -59,6 +70,9 @@ export class BattleScene extends Phaser.Scene {
     const width = window.innerWidth;
     const height = window.innerHeight;
     this.scale.resize(width, height);
+
+    // Play menu music for map selection
+    AudioManager.playBgm(BGM.MENU);
 
     // Otherwise show map selection
     this.createBackground();
@@ -461,6 +475,9 @@ export class BattleScene extends Phaser.Scene {
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
+    // Speed toggle button
+    this.createSpeedToggle(width - 80, 30);
+
     // Responsive positioning - use full width with small margins
     const margin = 16;
     const gap = 24; // Gap between the two fleets
@@ -574,6 +591,11 @@ export class BattleScene extends Phaser.Scene {
     else if (victory && playerSunk <= 1) rank = 'A';
     else if (victory) rank = 'B';
     else if (enemySunk > 0) rank = 'C';
+
+    // Play victory music on win
+    if (victory) {
+      AudioManager.playBgm(BGM.VICTORY);
+    }
 
     const rankColors = { S: '#ffc107', A: '#ff9800', B: '#4caf50', C: '#2196f3', D: '#6b7b8b' };
 
@@ -1038,24 +1060,74 @@ export class BattleScene extends Phaser.Scene {
     const hitX = target.display.container.x + cardWidth / 2;
     const hitY = target.display.container.y;
 
+    // Screen shake on critical hit!
+    if (critical) {
+      this.cameras.main.shake(200, 0.01);
+    }
+
     const flash = this.add.rectangle(hitX, hitY, cardWidth, 60, critical ? 0xffc107 : 0xf44336, 0.5);
     this.tweens.add({ targets: flash, alpha: 0, duration: 200, onComplete: () => flash.destroy() });
 
+    // Critical hit gets extra effects
+    if (critical) {
+      // Flash the screen gold briefly
+      this.cameras.main.flash(100, 255, 200, 50, false);
+
+      // Burst particles
+      for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2;
+        const spark = this.add.text(hitX, hitY, '✦', {
+          fontSize: '16px',
+          fill: '#ffc107',
+        }).setOrigin(0.5);
+
+        this.tweens.add({
+          targets: spark,
+          x: hitX + Math.cos(angle) * 60,
+          y: hitY + Math.sin(angle) * 60,
+          alpha: 0,
+          duration: 400,
+          onComplete: () => spark.destroy(),
+        });
+      }
+    }
+
     const dmgText = this.add.text(hitX, hitY - 40, `-${damage}`, {
       fontFamily: 'Arial, sans-serif',
-      fontSize: critical ? '28px' : '20px',
+      fontSize: critical ? '32px' : '20px',
       fill: critical ? '#ffc107' : '#f44336',
       stroke: '#000000',
-      strokeThickness: 3,
+      strokeThickness: critical ? 4 : 3,
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    this.tweens.add({ targets: dmgText, y: hitY - 70, alpha: 0, duration: 800, onComplete: () => dmgText.destroy() });
+    // Critical damage text bounces more dramatically
+    if (critical) {
+      dmgText.setScale(0.5);
+      this.tweens.add({
+        targets: dmgText,
+        scale: 1.2,
+        duration: 150,
+        ease: 'Back.easeOut',
+        onComplete: () => {
+          this.tweens.add({
+            targets: dmgText,
+            scale: 1,
+            y: hitY - 80,
+            alpha: 0,
+            duration: 600,
+            onComplete: () => dmgText.destroy(),
+          });
+        }
+      });
+    } else {
+      this.tweens.add({ targets: dmgText, y: hitY - 70, alpha: 0, duration: 800, onComplete: () => dmgText.destroy() });
+    }
 
     const origX = target.display.container.x;
-    this.tweens.add({ targets: target.display.container, x: origX + 10, duration: 50, yoyo: true, repeat: 3 });
+    this.tweens.add({ targets: target.display.container, x: origX + 10, duration: 50, yoyo: true, repeat: critical ? 5 : 3 });
 
-    await this.delay(400);
+    await this.delay(critical ? 500 : 400);
   }
 
   async animateMiss(target) {
@@ -1097,7 +1169,59 @@ export class BattleScene extends Phaser.Scene {
   }
 
   delay(ms) {
-    return new Promise(r => this.time.delayedCall(ms, r));
+    // Apply battle speed multiplier
+    const adjustedMs = ms / this.battleSpeed;
+    return new Promise(r => this.time.delayedCall(adjustedMs, r));
+  }
+
+  createSpeedToggle(x, y) {
+    const speedLabels = ['1x', '2x', '3x'];
+
+    const container = this.add.container(x, y);
+
+    const bg = this.add.graphics();
+    bg.fillStyle(0x000000, 0.3);
+    bg.fillRoundedRect(-35, -15, 70, 30, 6);
+
+    this.speedText = this.add.text(0, 0, `⚡ ${speedLabels[this.battleSpeed - 1]}`, {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '14px',
+      fill: '#ffffff',
+    }).setOrigin(0.5);
+
+    container.add([bg, this.speedText]);
+
+    const hitArea = this.add.rectangle(x, y, 70, 30, 0x000000, 0).setInteractive();
+
+    hitArea.on('pointerover', () => {
+      bg.clear();
+      bg.fillStyle(0x000000, 0.5);
+      bg.fillRoundedRect(-35, -15, 70, 30, 6);
+    });
+
+    hitArea.on('pointerout', () => {
+      bg.clear();
+      bg.fillStyle(0x000000, 0.3);
+      bg.fillRoundedRect(-35, -15, 70, 30, 6);
+    });
+
+    hitArea.on('pointerdown', () => {
+      // Cycle through speeds: 1 -> 2 -> 3 -> 1
+      this.battleSpeed = (this.battleSpeed % 3) + 1;
+      this.speedText.setText(`⚡ ${speedLabels[this.battleSpeed - 1]}`);
+
+      // Save preference
+      localStorage.setItem('battleSpeed', this.battleSpeed.toString());
+
+      // Quick scale feedback
+      this.tweens.add({
+        targets: container,
+        scaleX: 1.1,
+        scaleY: 1.1,
+        duration: 50,
+        yoyo: true,
+      });
+    });
   }
 
   endBattle(playerFleet, enemyFleet, stage) {
