@@ -5,28 +5,31 @@ import { Storage } from './storage.js';
 import { SHIPS, getShipsByRarity } from '../data/ships.js';
 
 // Grand Prize definitions - Valentine's gift choices
-// These can be customized before giving the game
+// Names and descriptions are configurable via environment variables:
+// VITE_PRIZE1_NAME, VITE_PRIZE1_DESC
+// VITE_PRIZE2_NAME, VITE_PRIZE2_DESC
+// VITE_PRIZE3_NAME, VITE_PRIZE3_DESC
 export const GRAND_PRIZES = {
   prize1: {
     key: 'prize1',
-    name: 'Gift Choice #1',
-    description: 'Your first Valentine\'s gift option!',
+    name: import.meta.env.VITE_PRIZE1_NAME || 'Gift Choice #1',
+    description: import.meta.env.VITE_PRIZE1_DESC || 'Your first Valentine\'s gift option!',
     rate: 2.0, // 2% chance
     tokenCost: 50,
     color: 0xff6b8a, // Pink
   },
   prize2: {
     key: 'prize2',
-    name: 'Gift Choice #2',
-    description: 'Your second Valentine\'s gift option!',
+    name: import.meta.env.VITE_PRIZE2_NAME || 'Gift Choice #2',
+    description: import.meta.env.VITE_PRIZE2_DESC || 'Your second Valentine\'s gift option!',
     rate: 0.5, // 0.5% chance
     tokenCost: 100,
     color: 0x8b5cf6, // Purple
   },
   prize3: {
     key: 'prize3',
-    name: 'Gift Choice #3',
-    description: 'Your third Valentine\'s gift option!',
+    name: import.meta.env.VITE_PRIZE3_NAME || 'Gift Choice #3',
+    description: import.meta.env.VITE_PRIZE3_DESC || 'Your third Valentine\'s gift option!',
     rate: 0.2, // 0.2% chance
     tokenCost: 150,
     color: 0xfbbf24, // Gold
