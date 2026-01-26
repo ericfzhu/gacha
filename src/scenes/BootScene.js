@@ -1,7 +1,18 @@
-// Boot scene - loads assets (KanColle style)
+// Boot scene - loads assets (Notion style)
 
 import Phaser from 'phaser';
 import { SHIPS } from '../data/ships.js';
+
+// Notion-inspired colors
+const COLORS = {
+  bgPrimary: 0xffffff,
+  bgSecondary: 0xf7f6f3,
+  textPrimary: '#37352f',
+  textSecondary: '#787774',
+  textTertiary: '#9b9a97',
+  border: 0xe9e9e7,
+  accent: 0x2eaadc,
+};
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -17,34 +28,36 @@ export class BootScene extends Phaser.Scene {
     const g = this.add.graphics();
 
     // Background
-    g.fillStyle(0x2d1f14, 1);
+    g.fillStyle(COLORS.bgSecondary, 1);
     g.fillRect(0, 0, width, height);
 
-    // Frame
-    g.lineStyle(2, 0x8b7355, 1);
-    g.strokeRect(width / 2 - 200, height / 2 - 80, 400, 160);
+    // Card panel
+    g.fillStyle(COLORS.bgPrimary, 1);
+    g.fillRoundedRect(width / 2 - 200, height / 2 - 80, 400, 160, 8);
+    g.lineStyle(1, COLORS.border, 1);
+    g.strokeRoundedRect(width / 2 - 200, height / 2 - 80, 400, 160, 8);
 
     // Loading bar background
-    g.fillStyle(0x1a1008, 1);
-    g.fillRoundedRect(width / 2 - 150, height / 2 + 20, 300, 20, 4);
+    g.fillStyle(COLORS.border, 1);
+    g.fillRoundedRect(width / 2 - 150, height / 2 + 20, 300, 12, 6);
 
     // Loading bar fill
-    const barFill = this.add.rectangle(width / 2 - 148, height / 2 + 30, 0, 16, 0x8b7355);
+    const barFill = this.add.rectangle(width / 2 - 148, height / 2 + 26, 0, 8, COLORS.accent);
     barFill.setOrigin(0, 0.5);
 
     // Title
-    this.add.text(width / 2, height / 2 - 40, 'FLEET COLLECTION', {
-      fontFamily: 'Georgia, serif',
-      fontSize: '28px',
-      fill: '#f4e4c4',
+    this.add.text(width / 2, height / 2 - 40, 'Fleet Collection', {
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      fontSize: '24px',
+      fill: COLORS.textPrimary,
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
     // Loading text
-    this.add.text(width / 2, height / 2, 'Now Loading...', {
-      fontFamily: 'Georgia, serif',
+    this.add.text(width / 2, height / 2, 'Loading...', {
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '14px',
-      fill: '#8b7355',
+      fill: COLORS.textTertiary,
     }).setOrigin(0.5);
 
     // Progress handler
@@ -71,23 +84,21 @@ export class BootScene extends Phaser.Scene {
   }
 
   createUIAssets() {
-    // Rarity configs (KanColle style colors)
+    // Rarity configs (Notion-inspired colors)
     const rarityConfigs = {
-      N: { bg: 0x4a3828, border: 0x6b5545, accent: 0x8b7355 },
-      R: { bg: 0x3a4858, border: 0x5a7888, accent: 0x7a98b8 },
-      SR: { bg: 0x4a3858, border: 0x7a58a8, accent: 0x9a78c8 },
-      SSR: { bg: 0x4a4828, border: 0xd4a458, accent: 0xffc868 },
+      N: { bg: 0xf7f6f3, border: 0x888888, accent: 0x888888 },
+      R: { bg: 0xf0f7ff, border: 0x44aaff, accent: 0x44aaff },
+      SR: { bg: 0xf5f0ff, border: 0xaa44ff, accent: 0xaa44ff },
+      SSR: { bg: 0xfffbf0, border: 0xffaa00, accent: 0xffaa00 },
     };
 
     for (const [rarity, colors] of Object.entries(rarityConfigs)) {
       // Ship card (100x130)
       const cardGraphics = this.make.graphics({ x: 0, y: 0, add: false });
       cardGraphics.fillStyle(colors.bg, 1);
-      cardGraphics.fillRoundedRect(0, 0, 100, 130, 4);
-      cardGraphics.lineStyle(2, colors.border, 0.8);
-      cardGraphics.strokeRoundedRect(0, 0, 100, 130, 4);
-      cardGraphics.fillStyle(colors.accent, 0.6);
-      cardGraphics.fillRect(0, 0, 100, 4);
+      cardGraphics.fillRoundedRect(0, 0, 100, 130, 6);
+      cardGraphics.lineStyle(2, colors.border, 0.6);
+      cardGraphics.strokeRoundedRect(0, 0, 100, 130, 6);
       cardGraphics.generateTexture(`card_${rarity}`, 100, 130);
       cardGraphics.destroy();
 
@@ -111,29 +122,29 @@ export class BootScene extends Phaser.Scene {
       shipGraphics.destroy();
     }
 
-    // Standard button
+    // Standard button (Notion style)
     const btnGraphics = this.make.graphics({ x: 0, y: 0, add: false });
-    btnGraphics.fillStyle(0x3d2d1d, 1);
-    btnGraphics.fillRoundedRect(0, 0, 180, 44, 4);
-    btnGraphics.lineStyle(1, 0x8b7355, 1);
-    btnGraphics.strokeRoundedRect(0, 0, 180, 44, 4);
+    btnGraphics.fillStyle(0xffffff, 1);
+    btnGraphics.fillRoundedRect(0, 0, 180, 44, 6);
+    btnGraphics.lineStyle(1, 0xe9e9e7, 1);
+    btnGraphics.strokeRoundedRect(0, 0, 180, 44, 6);
     btnGraphics.generateTexture('button', 180, 44);
     btnGraphics.destroy();
 
-    // Panel background
+    // Panel background (Notion style)
     const panelGraphics = this.make.graphics({ x: 0, y: 0, add: false });
-    panelGraphics.fillStyle(0x3d2d1d, 0.98);
-    panelGraphics.fillRoundedRect(0, 0, 280, 380, 6);
-    panelGraphics.lineStyle(2, 0x8b7355, 1);
-    panelGraphics.strokeRoundedRect(0, 0, 280, 380, 6);
+    panelGraphics.fillStyle(0xffffff, 1);
+    panelGraphics.fillRoundedRect(0, 0, 280, 380, 8);
+    panelGraphics.lineStyle(1, 0xe9e9e7, 1);
+    panelGraphics.strokeRoundedRect(0, 0, 280, 380, 8);
     panelGraphics.generateTexture('panel', 280, 380);
     panelGraphics.destroy();
 
-    // Resource icon
+    // Resource icon (fuel green)
     const resourceGraphics = this.make.graphics({ x: 0, y: 0, add: false });
-    resourceGraphics.fillStyle(0xd4a458, 1);
+    resourceGraphics.fillStyle(0x4dab9a, 1);
     resourceGraphics.fillRoundedRect(4, 8, 16, 8, 2);
-    resourceGraphics.fillStyle(0xffc868, 1);
+    resourceGraphics.fillStyle(0x6dcbb8, 1);
     resourceGraphics.fillRoundedRect(6, 10, 12, 4, 1);
     resourceGraphics.generateTexture('resource', 24, 24);
     resourceGraphics.destroy();
