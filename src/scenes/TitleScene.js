@@ -3,6 +3,8 @@
 import Phaser from 'phaser';
 import { Storage } from '../systems/storage.js';
 import { getShipById, RARITY } from '../data/ships.js';
+import { AudioManager, BGM } from '../systems/audio.js';
+import { addButtonFeedback } from '../systems/ui.js';
 
 // Notion-inspired color palette
 const COLORS = {
@@ -43,6 +45,10 @@ export class TitleScene extends Phaser.Scene {
     const width = window.innerWidth;
     const height = window.innerHeight;
     this.scale.resize(width, height);
+
+    // Set audio scene and play port BGM
+    AudioManager.setScene(this);
+    AudioManager.playBgm(BGM.PORT);
 
     this.createBackground();
     this.createTopBar();
@@ -165,7 +171,127 @@ export class TitleScene extends Phaser.Scene {
       const maxH = panelH - 32;
       const scale = Math.min(maxW / portrait.width, maxH / portrait.height);
       portrait.setScale(scale);
+      portrait.setInteractive();
+
+      // Idle breathing animation - subtle scale oscillation
+      this.tweens.add({
+        targets: portrait,
+        scaleX: scale * 1.01,
+        scaleY: scale * 1.01,
+        duration: 2500,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+
+      // Subtle floating animation
+      this.tweens.add({
+        targets: portrait,
+        y: centerY - 3,
+        duration: 3000,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+
+      // Touch/click reaction
+      portrait.on('pointerdown', () => {
+        // Quick scale bounce
+        this.tweens.add({
+          targets: portrait,
+          scaleX: scale * 1.05,
+          scaleY: scale * 1.05,
+          duration: 100,
+          yoyo: true,
+          ease: 'Quad.easeOut',
+        });
+
+        // Show a random message
+        this.showSecretaryMessage(centerX, panelY + panelH - 60, shipData);
+      });
     }
+  }
+
+  showSecretaryMessage(x, y, shipData) {
+    // Remove existing message if any
+    if (this.secretaryMessage) {
+      this.secretaryMessage.destroy();
+    }
+
+    // Time-based and random messages
+    const hour = new Date().getHours();
+    let timeGreeting = '';
+    if (hour >= 5 && hour < 12) {
+      timeGreeting = 'Good morning, Admiral!';
+    } else if (hour >= 12 && hour < 17) {
+      timeGreeting = 'Good afternoon, Admiral!';
+    } else if (hour >= 17 && hour < 21) {
+      timeGreeting = 'Good evening, Admiral!';
+    } else {
+      timeGreeting = "It's late, Admiral...";
+    }
+
+    const messages = [
+      timeGreeting,
+      `${shipData.name}, reporting for duty!`,
+      'Shall we sortie today?',
+      'The fleet is ready!',
+      'I\'ll do my best!',
+      'Leave it to me!',
+      'Admiral, is something wrong?',
+      'I\'m counting on you!',
+    ];
+
+    const message = messages[Math.floor(Math.random() * messages.length)];
+
+    // Create speech bubble
+    const container = this.add.container(x, y);
+
+    const text = this.add.text(0, 0, message, {
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      fontSize: '13px',
+      fill: '#37352f',
+    }).setOrigin(0.5);
+
+    const padding = 12;
+    const bubbleWidth = text.width + padding * 2;
+    const bubbleHeight = text.height + padding;
+
+    const bubble = this.add.graphics();
+    bubble.fillStyle(0xffffff, 0.95);
+    bubble.fillRoundedRect(-bubbleWidth / 2, -bubbleHeight / 2, bubbleWidth, bubbleHeight, 8);
+    bubble.lineStyle(1, 0xe9e9e7, 1);
+    bubble.strokeRoundedRect(-bubbleWidth / 2, -bubbleHeight / 2, bubbleWidth, bubbleHeight, 8);
+
+    // Speech bubble tail
+    bubble.fillStyle(0xffffff, 0.95);
+    bubble.fillTriangle(0, bubbleHeight / 2, -8, bubbleHeight / 2 + 10, 8, bubbleHeight / 2);
+
+    container.add([bubble, text]);
+
+    // Animate in
+    container.setAlpha(0);
+    container.setScale(0.8);
+    this.tweens.add({
+      targets: container,
+      alpha: 1,
+      scale: 1,
+      duration: 200,
+      ease: 'Back.easeOut',
+    });
+
+    // Fade out after delay
+    this.time.delayedCall(3000, () => {
+      this.tweens.add({
+        targets: container,
+        alpha: 0,
+        y: y - 20,
+        duration: 300,
+        onComplete: () => container.destroy(),
+      });
+    });
+
+    this.secretaryMessage = container;
   }
 
   createMenuPanel() {
@@ -259,6 +385,9 @@ export class TitleScene extends Phaser.Scene {
     const hitArea = this.add.rectangle(x + w / 2, y + h / 2, w, h, 0x000000, 0).setInteractive();
 
     if (item.scene) {
+      // Add button press feedback
+      addButtonFeedback(this, container);
+
       hitArea.on('pointerover', () => {
         bg.clear();
         bg.fillStyle(COLORS.bgHover, 1);
@@ -270,7 +399,24 @@ export class TitleScene extends Phaser.Scene {
       });
 
       hitArea.on('pointerdown', () => {
-        this.scene.start(item.scene);
+        // Scale the container down
+        this.tweens.add({
+          targets: container,
+          scaleX: 0.98,
+          scaleY: 0.98,
+          duration: 50,
+        });
+      });
+
+      hitArea.on('pointerup', () => {
+        this.tweens.add({
+          targets: container,
+          scaleX: 1,
+          scaleY: 1,
+          duration: 100,
+          ease: 'Back.easeOut',
+          onComplete: () => this.scene.start(item.scene),
+        });
       });
     }
   }
