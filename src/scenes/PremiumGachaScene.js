@@ -561,10 +561,10 @@ export class PremiumGachaScene extends Phaser.Scene {
     }).setOrigin(0, 0.5));
 
     const consolation = [
-      { name: 'Super Rare Ship', rate: '12.3%', tokens: '+2' },
-      { name: 'Rare Equipment Box', rate: '25.0%', tokens: '+2' },
-      { name: 'Resource Pack (+500 fuel)', rate: '30.0%', tokens: '+1' },
-      { name: 'Supply Crate (+200 fuel)', rate: '30.0%', tokens: '+1' },
+      { name: 'Ultra Rare Ship (SSR)', rate: '5.0%', tokens: '+3' },
+      { name: 'Super Rare Ship (SR)', rate: '20.0%', tokens: '+2' },
+      { name: 'Fuel Reserve (+500)', rate: '36.15%', tokens: '+1' },
+      { name: 'Fuel Canister (+200)', rate: '36.15%', tokens: '+1' },
     ];
 
     consolation.forEach((item, i) => {

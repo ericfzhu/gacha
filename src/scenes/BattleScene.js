@@ -2,9 +2,11 @@
 
 import Phaser from 'phaser';
 import { Storage } from '../systems/storage.js';
-import { getShipById, getShipStats, RARITY } from '../data/ships.js';
+import { getShipById, getShipStats, RARITY, SHIP_TYPES } from '../data/ships.js';
 import { MAPS, MAP_ORDER, getMapById, getNodeById, getDamageState } from '../data/maps.js';
 import { AudioManager, BGM } from '../systems/audio.js';
+import { FORMATIONS, getFormationById } from '../data/formations.js';
+import { SHIP_TYPE_ABBREV } from '../data/equipment.js';
 
 // Notion-inspired colors
 const COLORS = {
@@ -44,11 +46,16 @@ export class BattleScene extends Phaser.Scene {
     this.nodeId = data?.nodeId || null;
     this.fleetHp = data?.fleetHp || {};
     this.isBoss = data?.isBoss || false;
+    // Formation from FormationScene
+    this.formation = data?.formation || Storage.getLastFormation();
+    this.formationData = getFormationById(this.formation);
     // Battle speed: 1 = normal, 2 = fast, 3 = very fast
     // Load saved preference
     const savedSpeed = localStorage.getItem('battleSpeed');
     this.battleSpeed = savedSpeed ? parseInt(savedSpeed, 10) : 1;
     if (this.battleSpeed < 1 || this.battleSpeed > 3) this.battleSpeed = 1;
+    // Night battle state
+    this.inNightBattle = false;
   }
 
   create() {
@@ -548,6 +555,20 @@ export class BattleScene extends Phaser.Scene {
     this.addLog('Enemy fleet detected!');
     await this.delay(800);
 
+    // Air Battle Phase - if either side has carriers
+    const playerCarriers = playerFleet.filter(s => s.currentHp > 0 && s.type === 'Carrier');
+    const enemyCarriers = enemyFleet.filter(s => s.currentHp > 0 && s.type === 'Carrier');
+
+    if (playerCarriers.length > 0 || enemyCarriers.length > 0) {
+      await this.runAirBattlePhase(playerFleet, enemyFleet, playerCarriers, enemyCarriers);
+    }
+
+    if (this.checkBattleEnd(playerFleet, enemyFleet)) {
+      await this.delay(500);
+      this.endNodeBattle(playerFleet, enemyFleet);
+      return;
+    }
+
     await this.showPhase('OPENING PHASE');
     await this.delay(800);
     const openers = allShips.filter(s => s.currentHp > 0 && (s.type === 'Carrier' || s.speed >= 35));
@@ -576,8 +597,341 @@ export class BattleScene extends Phaser.Scene {
       }
     }
 
+    // Night Battle prompt (boss only, if enemies still alive)
+    const enemiesAlive = enemyFleet.filter(s => s.currentHp > 0).length;
+    const playersAlive = playerFleet.filter(s => s.currentHp > 0).length;
+
+    if (this.isBoss && enemiesAlive > 0 && playersAlive > 0) {
+      const continueNight = await this.showNightBattlePrompt();
+      if (continueNight) {
+        await this.runNightBattlePhase(playerFleet, enemyFleet);
+      }
+    }
+
     await this.delay(500);
     this.endNodeBattle(playerFleet, enemyFleet);
+  }
+
+  async runAirBattlePhase(playerFleet, enemyFleet, playerCarriers, enemyCarriers) {
+    await this.showPhase('AIR BATTLE', '#5dade2');
+    await this.delay(800);
+
+    // Calculate fighter power
+    // Formula: sum of (antiAir stat * sqrt(aircraftSlots[0]))
+    let playerFighterPower = 0;
+    let enemyFighterPower = 0;
+
+    playerCarriers.forEach(cv => {
+      const slots = cv.aircraftSlots || [20, 15, 10];
+      const antiAir = cv.attack * 0.5; // Approximate AA from attack stat
+      playerFighterPower += antiAir * Math.sqrt(slots[0]);
+    });
+
+    enemyCarriers.forEach(cv => {
+      const slots = cv.aircraftSlots || [15, 10, 5];
+      const antiAir = cv.attack * 0.5;
+      enemyFighterPower += antiAir * Math.sqrt(slots[0]);
+    });
+
+    // Apply formation AA modifier
+    if (this.formationData) {
+      playerFighterPower *= this.formationData.modifiers.antiAir || 1;
+    }
+
+    // Determine air state
+    let airState = 'Air Parity';
+    let airColor = '#9b9a97';
+    let airMultiplier = 1;
+
+    if (playerFighterPower > 0 || enemyFighterPower > 0) {
+      const ratio = enemyFighterPower > 0 ? playerFighterPower / enemyFighterPower : 10;
+
+      if (ratio >= 3) {
+        airState = 'Air Supremacy';
+        airColor = '#ffc107';
+        airMultiplier = 1.5;
+      } else if (ratio >= 1.5) {
+        airState = 'Air Superiority';
+        airColor = '#4dab9a';
+        airMultiplier = 1.2;
+      } else if (ratio >= 0.67) {
+        airState = 'Air Parity';
+        airColor = '#9b9a97';
+        airMultiplier = 1;
+      } else if (ratio >= 0.33) {
+        airState = 'Air Denial';
+        airColor = '#cb912f';
+        airMultiplier = 0.8;
+      } else {
+        airState = 'Air Incapability';
+        airColor = '#e03e3e';
+        airMultiplier = 0.5;
+      }
+    }
+
+    // Display air state
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const airText = this.add.text(width / 2, height / 2, airState, {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '32px',
+      fill: airColor,
+      fontStyle: 'bold',
+      stroke: '#000000',
+      strokeThickness: 4,
+    }).setOrigin(0.5);
+
+    this.addLog(`Air battle: ${airState}`);
+
+    await this.delay(1200);
+
+    this.tweens.add({
+      targets: airText,
+      alpha: 0,
+      duration: 500,
+      onComplete: () => airText.destroy(),
+    });
+
+    await this.delay(300);
+
+    // Carrier bombing attacks based on air state
+    if (playerCarriers.length > 0 && airMultiplier >= 0.8) {
+      for (const carrier of playerCarriers) {
+        if (carrier.currentHp <= 0) continue;
+        if (this.checkBattleEnd(playerFleet, enemyFleet)) break;
+
+        // Carrier attack with air multiplier
+        const targets = enemyFleet.filter(s => s.currentHp > 0);
+        if (targets.length === 0) break;
+
+        const target = Phaser.Math.RND.pick(targets);
+        const baseDmg = carrier.attack * 1.2 * airMultiplier;
+        const variance = Phaser.Math.FloatBetween(0.9, 1.1);
+        const damage = Math.floor(baseDmg * variance);
+
+        target.currentHp = Math.max(0, target.currentHp - damage);
+        this.addLog(`${carrier.name} air strike >> ${target.name} ${damage} DMG`);
+
+        await this.animateAirStrike(carrier, target, damage);
+        this.updateHpDisplay(target);
+
+        if (target.currentHp <= 0) {
+          this.addLog(`${target.name} SUNK!`);
+          await this.animateSink(target);
+        }
+      }
+    }
+
+    // Enemy carrier attacks
+    if (enemyCarriers.length > 0 && airMultiplier <= 1.2) {
+      for (const carrier of enemyCarriers) {
+        if (carrier.currentHp <= 0) continue;
+        if (this.checkBattleEnd(playerFleet, enemyFleet)) break;
+
+        const targets = playerFleet.filter(s => s.currentHp > 0);
+        if (targets.length === 0) break;
+
+        const target = Phaser.Math.RND.pick(targets);
+        const baseDmg = carrier.attack * 1.2 * (2 - airMultiplier); // Inverse modifier
+        const variance = Phaser.Math.FloatBetween(0.9, 1.1);
+        const damage = Math.floor(baseDmg * variance);
+
+        target.currentHp = Math.max(0, target.currentHp - damage);
+        this.addLog(`${carrier.name} air strike >> ${target.name} ${damage} DMG`);
+
+        await this.animateAirStrike(carrier, target, damage);
+        this.updateHpDisplay(target);
+
+        if (target.currentHp <= 0) {
+          this.addLog(`${target.name} SUNK!`);
+          await this.animateSink(target);
+        }
+      }
+    }
+  }
+
+  async animateAirStrike(attacker, target, damage) {
+    const cardWidth = target.display.cardWidth || 300;
+    const hitX = target.display.container.x + cardWidth / 2;
+    const hitY = target.display.container.y;
+
+    // Plane icon flying across
+    const plane = this.add.text(attacker.display.container.x + 100, attacker.display.container.y, '✈', {
+      fontSize: '24px',
+    }).setOrigin(0.5);
+
+    await new Promise(resolve => {
+      this.tweens.add({
+        targets: plane,
+        x: hitX,
+        y: hitY,
+        duration: 400,
+        onComplete: () => {
+          plane.destroy();
+          resolve();
+        },
+      });
+    });
+
+    // Explosion effect
+    const flash = this.add.rectangle(hitX, hitY, cardWidth, 60, 0xff6600, 0.6);
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 200,
+      onComplete: () => flash.destroy(),
+    });
+
+    // Damage text
+    const dmgText = this.add.text(hitX, hitY - 40, `-${damage}`, {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '20px',
+      fill: '#ff6600',
+      stroke: '#000000',
+      strokeThickness: 3,
+      fontStyle: 'bold',
+    }).setOrigin(0.5);
+
+    this.tweens.add({
+      targets: dmgText,
+      y: hitY - 70,
+      alpha: 0,
+      duration: 800,
+      onComplete: () => dmgText.destroy(),
+    });
+
+    const origX = target.display.container.x;
+    this.tweens.add({
+      targets: target.display.container,
+      x: origX + 10,
+      duration: 50,
+      yoyo: true,
+      repeat: 3,
+    });
+
+    await this.delay(400);
+  }
+
+  async showNightBattlePrompt() {
+    return new Promise(resolve => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      // Responsive sizing
+      const panelW = Math.min(400, width * 0.85);
+      const panelH = Math.min(160, height * 0.25);
+      const titleSize = Math.max(18, Math.min(24, panelW * 0.06));
+      const questionSize = Math.max(12, Math.min(16, panelW * 0.04));
+      const infoSize = Math.max(10, Math.min(12, panelW * 0.03));
+      const btnSize = Math.max(14, Math.min(18, panelW * 0.045));
+      const btnSpacing = panelW * 0.2;
+
+      // Darken screen
+      const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7);
+
+      // Prompt panel
+      const panel = this.add.container(width / 2, height / 2);
+
+      const bg = this.add.graphics();
+      bg.fillStyle(0x1a2634, 0.95);
+      bg.fillRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 8);
+      bg.lineStyle(2, 0x5dade2, 1);
+      bg.strokeRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 8);
+
+      const title = this.add.text(0, -panelH * 0.3, 'NIGHT BATTLE', {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: `${titleSize}px`,
+        fill: '#5dade2',
+        fontStyle: 'bold',
+      }).setOrigin(0.5);
+
+      const question = this.add.text(0, -panelH * 0.08, 'Continue to Night Battle?', {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: `${questionSize}px`,
+        fill: '#ffffff',
+      }).setOrigin(0.5);
+
+      const info = this.add.text(0, panelH * 0.08, '+50% damage, +20% crit chance', {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: `${infoSize}px`,
+        fill: '#9b9a97',
+      }).setOrigin(0.5);
+
+      panel.add([bg, title, question, info]);
+
+      // Yes button
+      const yesBtn = this.add.text(-btnSpacing, panelH * 0.3, '[ YES ]', {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: `${btnSize}px`,
+        fill: '#4caf50',
+        fontStyle: 'bold',
+      }).setOrigin(0.5).setInteractive();
+
+      yesBtn.on('pointerover', () => yesBtn.setStyle({ fill: '#66bb6a' }));
+      yesBtn.on('pointerout', () => yesBtn.setStyle({ fill: '#4caf50' }));
+      yesBtn.on('pointerdown', () => {
+        overlay.destroy();
+        panel.destroy();
+        yesBtn.destroy();
+        noBtn.destroy();
+        resolve(true);
+      });
+
+      // No button
+      const noBtn = this.add.text(btnSpacing, panelH * 0.3, '[ NO ]', {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: `${btnSize}px`,
+        fill: '#f44336',
+        fontStyle: 'bold',
+      }).setOrigin(0.5).setInteractive();
+
+      noBtn.on('pointerover', () => noBtn.setStyle({ fill: '#e57373' }));
+      noBtn.on('pointerout', () => noBtn.setStyle({ fill: '#f44336' }));
+      noBtn.on('pointerdown', () => {
+        overlay.destroy();
+        panel.destroy();
+        yesBtn.destroy();
+        noBtn.destroy();
+        resolve(false);
+      });
+
+      panel.add([yesBtn, noBtn]);
+    });
+  }
+
+  async runNightBattlePhase(playerFleet, enemyFleet) {
+    this.inNightBattle = true;
+
+    // Darken the background
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const nightOverlay = this.add.rectangle(width / 2, height / 2, width, height, 0x0a0a1a, 0.5);
+
+    await this.showPhase('NIGHT BATTLE', '#3f51b5');
+    await this.delay(1000);
+
+    // Night battle - order by luck + level instead of speed
+    const allShips = [...playerFleet, ...enemyFleet].filter(s => s.currentHp > 0);
+    const nightOrder = allShips.sort((a, b) => {
+      const aLuck = (a.baseLuck || 10) + a.level;
+      const bLuck = (b.baseLuck || 10) + b.level;
+      return bLuck - aLuck;
+    });
+
+    for (const attacker of nightOrder) {
+      if (this.checkBattleEnd(playerFleet, enemyFleet)) break;
+      await this.executeAttack(attacker, playerFleet, enemyFleet);
+    }
+
+    // Fade out night overlay
+    this.tweens.add({
+      targets: nightOverlay,
+      alpha: 0,
+      duration: 500,
+      onComplete: () => nightOverlay.destroy(),
+    });
+
+    this.inNightBattle = false;
   }
 
   endNodeBattle(playerFleet, enemyFleet) {
@@ -592,52 +946,211 @@ export class BattleScene extends Phaser.Scene {
     else if (victory) rank = 'B';
     else if (enemySunk > 0) rank = 'C';
 
-    // Play victory music on win
     if (victory) {
       AudioManager.playBgm(BGM.VICTORY);
     }
 
-    const rankColors = { S: '#ffc107', A: '#ff9800', B: '#4caf50', C: '#2196f3', D: '#6b7b8b' };
+    const rankColors = { S: 0xffc107, A: 0xff9800, B: 0x4caf50, C: 0x2196f3, D: 0x6b7b8b };
+    const rankColorsHex = { S: '#ffc107', A: '#ff9800', B: '#4caf50', C: '#2196f3', D: '#6b7b8b' };
 
-    // Update fleet HP from battle results
     playerFleet.forEach(ship => {
       this.fleetHp[ship.id] = ship.currentHp;
     });
 
     const width = window.innerWidth;
     const height = window.innerHeight;
-    this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.85);
 
-    // Result panel
+    // Responsive panel sizing
+    const panelWidth = Math.min(700, width * 0.95);
+    const panelHeight = Math.min(550, height * 0.9);
+    const panelX = (width - panelWidth) / 2;
+    const panelY = (height - panelHeight) / 2;
+
+    // Responsive font sizes
+    const titleSize = Math.max(18, Math.min(28, panelWidth * 0.04));
+    const rankSize = Math.max(48, Math.min(80, panelHeight * 0.15));
+    const labelSize = Math.max(10, Math.min(12, panelWidth * 0.018));
+    const textSize = Math.max(8, Math.min(10, panelWidth * 0.014));
+    const rewardSize = Math.max(12, Math.min(16, panelWidth * 0.023));
+    const btnTextSize = Math.max(12, Math.min(16, panelWidth * 0.023));
+
     const g = this.add.graphics();
-    g.fillStyle(0xffffff, 0.98);
-    g.fillRoundedRect(width / 2 - 250, height / 2 - 220, 500, 440, 8);
-    g.fillStyle(0x1a2634, 1);
-    g.fillRoundedRect(width / 2 - 250, height / 2 - 220, 500, 50, { tl: 8, tr: 8, bl: 0, br: 0 });
-    g.lineStyle(2, victory ? 0x4caf50 : 0xf44336, 1);
-    g.strokeRoundedRect(width / 2 - 250, height / 2 - 220, 500, 440, 8);
 
-    this.add.text(width / 2, height / 2 - 195, victory ? 'VICTORY' : 'DEFEAT', {
+    // Panel background with glow effect for rank
+    if (rank === 'S') {
+      g.fillStyle(rankColors.S, 0.3);
+      g.fillRoundedRect(panelX - 4, panelY - 4, panelWidth + 8, panelHeight + 8, 12);
+    }
+
+    g.fillStyle(0xffffff, 0.98);
+    g.fillRoundedRect(panelX, panelY, panelWidth, panelHeight, 8);
+
+    // Header
+    g.fillStyle(0x1a2634, 1);
+    g.fillRoundedRect(panelX, panelY, panelWidth, 60, { tl: 8, tr: 8, bl: 0, br: 0 });
+
+    g.lineStyle(3, victory ? 0x4caf50 : 0xf44336, 1);
+    g.strokeRoundedRect(panelX, panelY, panelWidth, panelHeight, 8);
+
+    // Victory/Defeat text
+    this.add.text(width / 2, panelY + panelHeight * 0.055, victory ? 'VICTORY' : 'DEFEAT', {
       fontFamily: 'Arial, sans-serif',
-      fontSize: '24px',
+      fontSize: `${titleSize}px`,
       fill: '#ffffff',
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    this.add.text(width / 2, height / 2 - 120, `RANK ${rank}`, {
+    // Large rank display with glow
+    const rankDisplay = this.add.text(width / 2, panelY + panelHeight * 0.2, rank, {
       fontFamily: 'Arial, sans-serif',
-      fontSize: '64px',
-      fill: rankColors[rank],
+      fontSize: `${rankSize}px`,
+      fill: rankColorsHex[rank],
       fontStyle: 'bold',
+      stroke: '#000000',
+      strokeThickness: rank === 'S' ? 4 : 2,
     }).setOrigin(0.5);
 
-    let yOffset = -40;
+    // Animate S rank
+    if (rank === 'S') {
+      this.tweens.add({
+        targets: rankDisplay,
+        scale: 1.1,
+        duration: 500,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+    }
+
+    // XP calculation
+    const xpPerShip = victory ? Math.floor(this.currentMapData.baseXp * (rank === 'S' ? 1.5 : rank === 'A' ? 1.2 : 1)) : 0;
+
+    // Ship Roster Section - responsive positioning
+    const rosterY = panelY + panelHeight * 0.3;
+    this.add.text(panelX + panelWidth * 0.03, rosterY, 'Fleet Status', {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: `${labelSize}px`,
+      fill: '#9b9a97',
+      fontStyle: 'bold',
+    });
+
+    const shipCardWidth = Math.min(100, (panelWidth - panelWidth * 0.1) / playerFleet.length);
+    const shipCardHeight = Math.min(120, panelHeight * 0.22);
+
+    const cardGap = Math.max(5, panelWidth * 0.015);
+    playerFleet.forEach((ship, i) => {
+      const cardX = panelX + panelWidth * 0.04 + i * (shipCardWidth + cardGap);
+      const cardY = rosterY + shipCardHeight * 0.2;
+      const rarity = RARITY[ship.rarity];
+      const damageState = getDamageState(ship.currentHp, ship.maxHp);
+
+      // Card background
+      g.fillStyle(0xf7f6f3, 1);
+      g.fillRoundedRect(cardX, cardY, shipCardWidth, shipCardHeight, 4);
+      g.fillStyle(damageState.color, 1);
+      g.fillRect(cardX, cardY, 3, shipCardHeight);
+
+      // Ship portrait
+      const portraitKey = `ship_portrait_${ship.id}`;
+      if (this.textures.exists(portraitKey)) {
+        const portrait = this.add.image(cardX + shipCardWidth / 2, cardY + shipCardHeight * 0.3, portraitKey);
+        const pScale = Math.min((shipCardWidth - 10) / portrait.width, shipCardHeight * 0.4 / portrait.height);
+        portrait.setScale(pScale);
+        if (ship.currentHp <= 0) portrait.setAlpha(0.3);
+      }
+
+      // Ship name
+      this.add.text(cardX + shipCardWidth / 2, cardY + shipCardHeight * 0.55, ship.name, {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: `${textSize}px`,
+        fill: ship.currentHp <= 0 ? '#9b9a97' : '#37352f',
+        fontStyle: 'bold',
+      }).setOrigin(0.5);
+
+      // HP bar
+      const hpBarWidth = shipCardWidth - 16;
+      const hpPercent = ship.currentHp / ship.maxHp;
+      this.add.rectangle(cardX + 8 + hpBarWidth / 2, cardY + shipCardHeight * 0.68, hpBarWidth, 6, 0xe9e9e7);
+      if (hpPercent > 0) {
+        const hpFill = this.add.rectangle(cardX + 8, cardY + shipCardHeight * 0.68, hpBarWidth * hpPercent, 4, damageState.color);
+        hpFill.setOrigin(0, 0.5);
+      }
+
+      // HP text
+      this.add.text(cardX + shipCardWidth / 2, cardY + shipCardHeight * 0.78, `${ship.currentHp}/${ship.maxHp}`, {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: `${textSize * 0.9}px`,
+        fill: '#787774',
+      }).setOrigin(0.5);
+
+      // XP gain and level up indicator
+      if (victory && ship.currentHp > 0) {
+        const result = Storage.addXpToShip(ship.id, xpPerShip, ship.maxLevel);
+
+        this.add.text(cardX + shipCardWidth / 2, cardY + shipCardHeight * 0.9, `+${xpPerShip} EXP`, {
+          fontFamily: 'Arial, sans-serif',
+          fontSize: `${textSize * 0.9}px`,
+          fill: '#4dab9a',
+        }).setOrigin(0.5);
+
+        if (result && result.leveledUp) {
+          const lvlUp = this.add.text(cardX + shipCardWidth / 2, cardY - 5, 'LEVEL UP!', {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: `${textSize}px`,
+            fill: '#ffc107',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 2,
+          }).setOrigin(0.5);
+
+          this.tweens.add({
+            targets: lvlUp,
+            y: lvlUp.y - 5,
+            duration: 500,
+            yoyo: true,
+            repeat: -1,
+          });
+        }
+      } else if (ship.currentHp <= 0) {
+        this.add.text(cardX + shipCardWidth / 2, cardY + shipCardHeight * 0.9, 'SUNK', {
+          fontFamily: 'Arial, sans-serif',
+          fontSize: `${textSize * 0.9}px`,
+          fill: '#e03e3e',
+          fontStyle: 'bold',
+        }).setOrigin(0.5);
+      }
+    });
+
+    // Rewards Section - responsive
+    const rewardsY = rosterY + shipCardHeight + panelHeight * 0.08;
+    let rewardX = panelX + panelWidth * 0.04;
 
     if (victory) {
-      // XP rewards
-      const xpPerShip = Math.floor(this.currentMapData.baseXp * (rank === 'S' ? 1.5 : rank === 'A' ? 1.2 : 1));
+      this.add.text(panelX + panelWidth * 0.03, rewardsY, 'Rewards', {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: `${labelSize}px`,
+        fill: '#9b9a97',
+        fontStyle: 'bold',
+      });
 
-      // Boss completion - handle map rewards
+      // Fuel reward
+      let fuelReward = 0;
+      if (this.isBoss) {
+        fuelReward = Math.floor(250 * (rank === 'S' ? 1.5 : rank === 'A' ? 1.2 : 1));
+      } else {
+        fuelReward = Math.floor(100 * (rank === 'S' ? 1.5 : 1));
+      }
+      Storage.addCurrency(fuelReward);
+
+      this.add.text(rewardX, rewardsY + panelHeight * 0.045, `⛽ +${fuelReward}`, {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: `${rewardSize}px`,
+        fill: '#4dab9a',
+        fontStyle: 'bold',
+      });
+      rewardX += panelWidth * 0.15;
+
+      // Ticket rewards (boss only)
       if (this.isBoss) {
         const clearResult = Storage.recordMapClear(this.mapId, rank);
         let ticketsEarned = 0;
@@ -651,98 +1164,41 @@ export class BattleScene extends Phaser.Scene {
 
         if (ticketsEarned > 0) {
           Storage.addTickets(ticketsEarned);
-          this.add.text(width / 2, height / 2 + yOffset, `+${ticketsEarned} Premium Tickets! 🎫`, {
+          this.add.text(rewardX, rewardsY + panelHeight * 0.045, `🎫 +${ticketsEarned}`, {
             fontFamily: 'Arial, sans-serif',
-            fontSize: '22px',
+            fontSize: `${rewardSize}px`,
             fill: '#ff9800',
             fontStyle: 'bold',
-          }).setOrigin(0.5);
-          yOffset += 30;
+          });
 
-          if (clearResult.isFirstClear) {
-            this.add.text(width / 2, height / 2 + yOffset, `First Clear: +${this.currentMapData.firstClearTickets}`, {
+          // Bonus breakdown
+          let bonusText = [];
+          if (clearResult.isFirstClear) bonusText.push('First Clear');
+          if (clearResult.isFirstSRank) bonusText.push('S-Rank');
+          if (bonusText.length > 0) {
+            this.add.text(rewardX, rewardsY + panelHeight * 0.08, bonusText.join(' + '), {
               fontFamily: 'Arial, sans-serif',
-              fontSize: '14px',
-              fill: '#ff9800',
-            }).setOrigin(0.5);
-            yOffset += 20;
+              fontSize: `${textSize}px`,
+              fill: '#cb912f',
+            });
           }
-          if (clearResult.isFirstSRank) {
-            this.add.text(width / 2, height / 2 + yOffset, `S-Rank Bonus: +${this.currentMapData.sRankBonus}`, {
-              fontFamily: 'Arial, sans-serif',
-              fontSize: '14px',
-              fill: '#ffc107',
-            }).setOrigin(0.5);
-            yOffset += 20;
-          }
-        } else {
-          this.add.text(width / 2, height / 2 + yOffset, 'Map already cleared', {
-            fontFamily: 'Arial, sans-serif',
-            fontSize: '14px',
-            fill: '#6b7b8b',
-          }).setOrigin(0.5);
-          yOffset += 20;
         }
-
-        // Fuel reward on boss clear
-        const fuelReward = Math.floor(250 * (rank === 'S' ? 1.5 : rank === 'A' ? 1.2 : 1));
-        Storage.addCurrency(fuelReward);
-        this.add.text(width / 2, height / 2 + yOffset, `+${fuelReward} Fuel`, {
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '14px',
-          fill: '#4caf50',
-        }).setOrigin(0.5);
-        yOffset += 30;
-      } else {
-        // Regular node - smaller fuel reward
-        const fuelReward = Math.floor(100 * (rank === 'S' ? 1.5 : 1));
-        Storage.addCurrency(fuelReward);
-        this.add.text(width / 2, height / 2 + yOffset, `+${fuelReward} Fuel`, {
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '14px',
-          fill: '#4caf50',
-        }).setOrigin(0.5);
-        yOffset += 30;
       }
-
-      // Show XP gains
-      this.add.text(width / 2, height / 2 + yOffset, 'EXP Gained:', {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '14px',
-        fill: '#1a1a2e',
-      }).setOrigin(0.5);
-      yOffset += 22;
-
-      playerAlive.forEach(ship => {
-        const result = Storage.addXpToShip(ship.id, xpPerShip, ship.maxLevel);
-        let text = `${ship.name}: +${xpPerShip} EXP`;
-        if (result && result.leveledUp) text += ` LEVEL UP! Lv.${result.newLevel}`;
-        this.add.text(width / 2, height / 2 + yOffset, text, {
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '11px',
-          fill: result && result.leveledUp ? '#ffc107' : '#6b7b8b',
-        }).setOrigin(0.5);
-        yOffset += 18;
-      });
     }
 
-    // Continue button - different action based on result and boss status
+    // Continue button - responsive
     let btnText = '[ CONTINUE ]';
     let btnAction;
 
     if (!victory || this.isBoss) {
-      // Defeat or boss clear - save HP to storage and return to port
       btnText = this.isBoss && victory ? '[ RETURN TO PORT ]' : '[ RETREAT ]';
       btnAction = () => {
-        // Save damaged HP to storage
         Object.entries(this.fleetHp).forEach(([shipId, hp]) => {
           Storage.setShipHp(shipId, hp);
         });
-        // Pass empty data to clear map/node context and show map selection
         this.scene.start('BattleScene', { mapId: null, nodeId: null, fleetHp: {}, isBoss: false });
       };
     } else {
-      // Victory on non-boss node - continue to next node
       btnText = '[ ADVANCE ]';
       btnAction = () => {
         this.scene.start('MapScene', {
@@ -753,16 +1209,39 @@ export class BattleScene extends Phaser.Scene {
       };
     }
 
-    const continueBtn = this.add.text(width / 2, height / 2 + 180, btnText, {
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '18px',
-      fill: '#2196f3',
-      fontStyle: 'bold',
-    }).setOrigin(0.5).setInteractive();
+    const btnWidth = Math.max(140, Math.min(200, panelWidth * 0.3));
+    const btnHeight = Math.max(28, Math.min(36, panelHeight * 0.07));
+    const btnY = panelY + panelHeight - btnHeight - panelHeight * 0.03;
+    const continueBtn = this.add.container(width / 2, btnY);
 
-    continueBtn.on('pointerover', () => continueBtn.setStyle({ fill: '#1976d2' }));
-    continueBtn.on('pointerout', () => continueBtn.setStyle({ fill: '#2196f3' }));
-    continueBtn.on('pointerdown', btnAction);
+    const btnBg = this.add.graphics();
+    btnBg.fillStyle(victory ? 0x2196f3 : 0x6b7b8b, 1);
+    btnBg.fillRoundedRect(-btnWidth / 2, -btnHeight / 2, btnWidth, btnHeight, 6);
+
+    const btnTextObj = this.add.text(0, 0, btnText, {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: `${btnTextSize}px`,
+      fill: '#ffffff',
+      fontStyle: 'bold',
+    }).setOrigin(0.5);
+
+    continueBtn.add([btnBg, btnTextObj]);
+
+    const hit = this.add.rectangle(width / 2, btnY, btnWidth, btnHeight, 0x000000, 0).setInteractive();
+
+    hit.on('pointerover', () => {
+      btnBg.clear();
+      btnBg.fillStyle(victory ? 0x1976d2 : 0x546e7a, 1);
+      btnBg.fillRoundedRect(-btnWidth / 2, -btnHeight / 2, btnWidth, btnHeight, 6);
+    });
+
+    hit.on('pointerout', () => {
+      btnBg.clear();
+      btnBg.fillStyle(victory ? 0x2196f3 : 0x6b7b8b, 1);
+      btnBg.fillRoundedRect(-btnWidth / 2, -btnHeight / 2, btnWidth, btnHeight, 6);
+    });
+
+    hit.on('pointerdown', btnAction);
   }
 
   createBottomBar() {
@@ -948,11 +1427,26 @@ export class BattleScene extends Phaser.Scene {
       fontStyle: 'bold',
     }).setOrigin(0, 0.5);
 
-    // HP bar
+    // HP bar - KanColle style with damage colors
     const hpBarWidth = cardWidth - bannerWidth - 20;
     const hpBarX = textX;
+    const hpPercent = ship.currentHp / ship.maxHp;
+
+    // Determine HP bar color based on damage state (KanColle style)
+    let hpColor;
+    if (hpPercent > 0.75) {
+      hpColor = 0x4caf50; // Green - healthy
+    } else if (hpPercent > 0.5) {
+      hpColor = 0xffc107; // Yellow - light damage
+    } else if (hpPercent > 0.25) {
+      hpColor = 0xff9800; // Orange - medium damage
+    } else {
+      hpColor = 0xf44336; // Red - heavy damage
+    }
+
     const hpBg = this.add.rectangle(hpBarX + hpBarWidth / 2, 10, hpBarWidth, 14, 0xc5d5e5).setOrigin(0.5);
-    const hpBar = this.add.rectangle(hpBarX, 10, hpBarWidth - 2, 12, isPlayer ? 0x4caf50 : 0xf44336).setOrigin(0, 0.5);
+    const hpBarFillWidth = Math.max(0, (hpBarWidth - 2) * hpPercent);
+    const hpBar = this.add.rectangle(hpBarX, 10, hpBarFillWidth, 12, hpColor).setOrigin(0, 0.5);
     const hpText = this.add.text(hpBarX + hpBarWidth / 2, 10, `${ship.currentHp}/${ship.maxHp}`, {
       fontFamily: 'Arial, sans-serif',
       fontSize: '10px',
@@ -961,7 +1455,7 @@ export class BattleScene extends Phaser.Scene {
 
     c.add([bg, name, hpBg, hpBar, hpText]);
     c.sendToBack(bg);
-    return { container: c, hpBar, hpText, bg, cardWidth, cardHeight };
+    return { container: c, hpBar, hpText, bg, cardWidth, cardHeight, hpBarWidth };
   }
 
   async runBattlePhases(playerFleet, enemyFleet, stage) {
@@ -1004,10 +1498,21 @@ export class BattleScene extends Phaser.Scene {
     this.endBattle(playerFleet, enemyFleet, stage);
   }
 
-  async showPhase(phaseName) {
+  async showPhase(phaseName, color = '#ffffff') {
     this.phaseText.setText(phaseName);
+    this.phaseText.setStyle({ fill: color });
     this.phaseText.setAlpha(0);
-    await new Promise(r => this.tweens.add({ targets: this.phaseText, alpha: 1, duration: 300, onComplete: r }));
+    this.phaseText.setScale(1.2);
+    await new Promise(r => {
+      this.tweens.add({
+        targets: this.phaseText,
+        alpha: 1,
+        scale: 1,
+        duration: 400,
+        ease: 'Back.easeOut',
+        onComplete: r,
+      });
+    });
   }
 
   async executeAttack(attacker, playerFleet, enemyFleet, isTorpedo = false) {
@@ -1020,7 +1525,12 @@ export class BattleScene extends Phaser.Scene {
     if (targets.length === 0) return;
 
     const target = Phaser.Math.RND.pick(targets);
-    const hitChance = 90 - target.evasion * 0.5 + attacker.attack * 0.2;
+
+    // Apply formation evasion modifier to target if player
+    const evasionMod = target.isPlayer ? (this.formationData?.modifiers?.evasion || 1) : 1;
+    const modifiedEvasion = target.evasion * evasionMod;
+
+    const hitChance = 90 - modifiedEvasion * 0.5 + attacker.attack * 0.2;
     const hit = Math.random() * 100 < hitChance;
 
     if (!hit) {
@@ -1029,12 +1539,30 @@ export class BattleScene extends Phaser.Scene {
       return;
     }
 
+    // Apply formation modifiers to attacker if player
+    let firepowerMod = 1;
+    let torpedoMod = 1;
+    if (attacker.isPlayer && this.formationData) {
+      firepowerMod = this.formationData.modifiers.firepower || 1;
+      torpedoMod = this.formationData.modifiers.torpedo || 1;
+    }
+
+    // Night battle damage multiplier
+    const nightMod = this.inNightBattle ? 1.5 : 1;
+
     // Enemy damage multiplier for increased difficulty
     const enemyDmgMod = attacker.isPlayer ? 1 : 1.3;
-    const baseDmg = attacker.attack * (isTorpedo ? 1.5 : 1) * enemyDmgMod;
+
+    // Apply formation modifier based on attack type
+    const formationMod = isTorpedo ? torpedoMod : firepowerMod;
+
+    const baseDmg = attacker.attack * (isTorpedo ? 1.5 : 1) * enemyDmgMod * formationMod * nightMod;
     const defMod = 1 - (target.defense / (target.defense + 50));
     const variance = Phaser.Math.FloatBetween(0.8, 1.2);
-    const critical = Math.random() < 0.1;
+
+    // Higher crit chance in night battle (20% vs 10%)
+    const critChance = this.inNightBattle ? 0.2 : 0.1;
+    const critical = Math.random() < critChance;
     let damage = Math.floor(baseDmg * defMod * variance * (critical ? 1.5 : 1));
     damage = Math.max(1, damage);
 
@@ -1043,7 +1571,7 @@ export class BattleScene extends Phaser.Scene {
     const critText = critical ? ' CRITICAL!' : '';
     this.addLog(`${attacker.name} >> ${target.name} ${damage} DMG${critText}`);
 
-    await this.animateAttack(attacker, target, damage, critical);
+    await this.animateAttack(attacker, target, damage, critical, isTorpedo);
     this.updateHpDisplay(target);
 
     if (target.currentHp <= 0) {
@@ -1052,28 +1580,369 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  async animateAttack(attacker, target, damage, critical) {
-    this.tweens.add({ targets: attacker.display.container, scaleX: 1.05, scaleY: 1.05, duration: 100, yoyo: true });
-    await this.delay(200);
-
+  async animateAttack(attacker, target, damage, critical, isTorpedo = false) {
     const cardWidth = target.display.cardWidth || 300;
     const hitX = target.display.container.x + cardWidth / 2;
     const hitY = target.display.container.y;
+    const attackerX = attacker.display.container.x + (attacker.display.cardWidth || 300) / 2;
+    const attackerY = attacker.display.container.y;
 
-    // Screen shake on critical hit!
+    // Ship-type specific attack animations
+    const shipType = attacker.type;
+
+    if (shipType === 'Destroyer' || isTorpedo) {
+      // Torpedo attack - fast projectile with wake trail
+      await this.animateTorpedoAttack(attackerX, attackerY, hitX, hitY, damage, critical, target);
+    } else if (shipType === 'Light Cruiser') {
+      // Rapid fire - multiple small shells
+      await this.animateRapidFireAttack(attackerX, attackerY, hitX, hitY, damage, critical, target);
+    } else if (shipType === 'Heavy Cruiser') {
+      // Heavy shells - medium sized with smoke
+      await this.animateHeavyShellAttack(attackerX, attackerY, hitX, hitY, damage, critical, target);
+    } else if (shipType === 'Battleship') {
+      // Main battery salvo - large shells with screen shake
+      await this.animateBattleshipAttack(attackerX, attackerY, hitX, hitY, damage, critical, target);
+    } else if (shipType === 'Carrier') {
+      // Carrier uses air strike animation (handled separately)
+      await this.animateCarrierAttack(attackerX, attackerY, hitX, hitY, damage, critical, target);
+    } else {
+      // Default attack animation
+      await this.animateDefaultAttack(attackerX, attackerY, hitX, hitY, damage, critical, target, attacker);
+    }
+  }
+
+  async animateTorpedoAttack(startX, startY, hitX, hitY, damage, critical, target) {
+    // Attacker animation
+    this.tweens.add({ targets: target.display.container.parentContainer || {}, scaleX: 1.02, scaleY: 1.02, duration: 80, yoyo: true });
+
+    // Torpedo projectile
+    const torpedo = this.add.text(startX, startY, '▬', {
+      fontSize: '20px',
+      fill: '#00bcd4',
+    }).setOrigin(0.5).setRotation(Math.atan2(hitY - startY, hitX - startX));
+
+    // Wake trail
+    const createWake = () => {
+      const wake = this.add.text(torpedo.x, torpedo.y, '~', {
+        fontSize: '12px',
+        fill: '#ffffff',
+      }).setOrigin(0.5).setAlpha(0.6);
+
+      this.tweens.add({
+        targets: wake,
+        alpha: 0,
+        duration: 300,
+        onComplete: () => wake.destroy(),
+      });
+    };
+
+    // Trail interval
+    const wakeInterval = this.time.addEvent({
+      delay: 50,
+      callback: createWake,
+      repeat: 6,
+    });
+
+    await new Promise(resolve => {
+      this.tweens.add({
+        targets: torpedo,
+        x: hitX,
+        y: hitY,
+        duration: 350,
+        ease: 'Linear',
+        onComplete: () => {
+          torpedo.destroy();
+          wakeInterval.remove();
+          resolve();
+        },
+      });
+    });
+
+    // Water splash explosion
+    const splash = this.add.text(hitX, hitY, '💦', { fontSize: '32px' }).setOrigin(0.5);
+    this.tweens.add({
+      targets: splash,
+      scale: 1.5,
+      alpha: 0,
+      duration: 300,
+      onComplete: () => splash.destroy(),
+    });
+
+    await this.showDamageEffect(hitX, hitY, damage, critical, target, 0x00bcd4);
+  }
+
+  async animateRapidFireAttack(startX, startY, hitX, hitY, damage, critical, target) {
+    // Rapid fire - 3 quick shots
+    for (let i = 0; i < 3; i++) {
+      const offsetY = (i - 1) * 15;
+      const shell = this.add.circle(startX, startY + offsetY, 4, 0xffeb3b);
+
+      // Muzzle flash
+      const flash = this.add.circle(startX + 10, startY + offsetY, 8, 0xffffff, 0.8);
+      this.tweens.add({
+        targets: flash,
+        alpha: 0,
+        scale: 0.5,
+        duration: 100,
+        onComplete: () => flash.destroy(),
+      });
+
+      this.tweens.add({
+        targets: shell,
+        x: hitX + Phaser.Math.Between(-20, 20),
+        y: hitY + offsetY,
+        duration: 150,
+        onComplete: () => shell.destroy(),
+      });
+
+      await this.delay(80);
+    }
+
+    // Impact effects
+    const flash = this.add.rectangle(hitX, hitY, target.display.cardWidth || 300, 60, 0xffeb3b, 0.4);
+    this.tweens.add({ targets: flash, alpha: 0, duration: 150, onComplete: () => flash.destroy() });
+
+    await this.showDamageEffect(hitX, hitY, damage, critical, target, 0xffeb3b);
+  }
+
+  async animateHeavyShellAttack(startX, startY, hitX, hitY, damage, critical, target) {
+    // Heavy cruiser - arcing shell
+    const shell = this.add.circle(startX, startY, 8, 0xff5722);
+
+    // Smoke puff at gun
+    const smoke = this.add.text(startX + 15, startY, '💨', { fontSize: '24px' }).setOrigin(0.5).setAlpha(0.7);
+    this.tweens.add({
+      targets: smoke,
+      x: startX + 40,
+      alpha: 0,
+      duration: 400,
+      onComplete: () => smoke.destroy(),
+    });
+
+    // Arc trajectory
+    const midY = Math.min(startY, hitY) - 60;
+
+    await new Promise(resolve => {
+      this.tweens.add({
+        targets: shell,
+        x: hitX,
+        duration: 400,
+        ease: 'Linear',
+      });
+
+      this.tweens.add({
+        targets: shell,
+        y: midY,
+        duration: 200,
+        ease: 'Quad.easeOut',
+        onComplete: () => {
+          this.tweens.add({
+            targets: shell,
+            y: hitY,
+            duration: 200,
+            ease: 'Quad.easeIn',
+            onComplete: () => {
+              shell.destroy();
+              resolve();
+            },
+          });
+        },
+      });
+    });
+
+    // Explosion
+    const explosion = this.add.text(hitX, hitY, '💥', { fontSize: '36px' }).setOrigin(0.5);
+    this.tweens.add({
+      targets: explosion,
+      scale: 1.3,
+      alpha: 0,
+      duration: 350,
+      onComplete: () => explosion.destroy(),
+    });
+
+    if (critical) {
+      this.cameras.main.shake(150, 0.008);
+    }
+
+    await this.showDamageEffect(hitX, hitY, damage, critical, target, 0xff5722);
+  }
+
+  async animateBattleshipAttack(startX, startY, hitX, hitY, damage, critical, target) {
+    // Battleship - massive salvo with screen shake
+    this.cameras.main.shake(critical ? 300 : 200, critical ? 0.015 : 0.01);
+
+    // Multiple large shells
+    const shells = [];
+    for (let i = 0; i < 3; i++) {
+      const shell = this.add.circle(startX, startY + (i - 1) * 20, 12, 0xe91e63);
+      shells.push(shell);
+
+      // Big muzzle flash
+      const flash = this.add.rectangle(startX + 20, startY + (i - 1) * 20, 30, 15, 0xffffff, 0.9);
+      this.tweens.add({
+        targets: flash,
+        alpha: 0,
+        scaleX: 2,
+        duration: 150,
+        onComplete: () => flash.destroy(),
+      });
+    }
+
+    // Heavy smoke
+    const smokeCloud = this.add.text(startX + 30, startY, '☁️', { fontSize: '40px' }).setOrigin(0.5).setAlpha(0.8);
+    this.tweens.add({
+      targets: smokeCloud,
+      x: startX + 80,
+      alpha: 0,
+      scale: 1.5,
+      duration: 600,
+      onComplete: () => smokeCloud.destroy(),
+    });
+
+    // High arc for battleship shells
+    const midY = Math.min(startY, hitY) - 100;
+
+    await Promise.all(shells.map((shell, i) => new Promise(resolve => {
+      const targetOffsetX = (i - 1) * 25;
+      const delay = i * 50;
+
+      this.time.delayedCall(delay, () => {
+        this.tweens.add({
+          targets: shell,
+          x: hitX + targetOffsetX,
+          duration: 500,
+          ease: 'Linear',
+        });
+
+        this.tweens.add({
+          targets: shell,
+          y: midY,
+          duration: 250,
+          ease: 'Quad.easeOut',
+          onComplete: () => {
+            this.tweens.add({
+              targets: shell,
+              y: hitY,
+              duration: 250,
+              ease: 'Quad.easeIn',
+              onComplete: () => {
+                shell.destroy();
+
+                // Individual impact explosion
+                const boom = this.add.text(hitX + targetOffsetX, hitY, '💥', { fontSize: '28px' }).setOrigin(0.5);
+                this.tweens.add({
+                  targets: boom,
+                  scale: 1.5,
+                  alpha: 0,
+                  duration: 300,
+                  onComplete: () => boom.destroy(),
+                });
+
+                if (i === 2) resolve();
+              },
+            });
+          },
+        });
+      });
+
+      if (i < 2) resolve();
+    })));
+
+    // Big explosion effect
+    if (critical) {
+      this.cameras.main.flash(150, 255, 100, 50, false);
+    }
+
+    const bigExplosion = this.add.text(hitX, hitY, '🔥', { fontSize: '48px' }).setOrigin(0.5);
+    this.tweens.add({
+      targets: bigExplosion,
+      scale: 1.8,
+      alpha: 0,
+      duration: 500,
+      onComplete: () => bigExplosion.destroy(),
+    });
+
+    await this.showDamageEffect(hitX, hitY, damage, critical, target, 0xe91e63);
+  }
+
+  async animateCarrierAttack(startX, startY, hitX, hitY, damage, critical, target) {
+    // Carrier dive bomber attack
+    const plane = this.add.text(startX, startY - 50, '✈️', { fontSize: '24px' }).setOrigin(0.5);
+
+    // Fly up and over
+    await new Promise(resolve => {
+      this.tweens.add({
+        targets: plane,
+        x: hitX,
+        y: hitY - 80,
+        duration: 400,
+        ease: 'Quad.easeOut',
+        onComplete: resolve,
+      });
+    });
+
+    // Dive bomb
+    const bomb = this.add.circle(plane.x, plane.y, 6, 0x333333);
+
+    await new Promise(resolve => {
+      this.tweens.add({
+        targets: bomb,
+        y: hitY,
+        duration: 200,
+        ease: 'Quad.easeIn',
+        onComplete: () => {
+          bomb.destroy();
+          resolve();
+        },
+      });
+
+      // Plane flies away
+      this.tweens.add({
+        targets: plane,
+        x: hitX + 200,
+        y: hitY - 100,
+        duration: 500,
+        onComplete: () => plane.destroy(),
+      });
+    });
+
+    // Explosion
+    const explosion = this.add.text(hitX, hitY, '💥', { fontSize: '40px' }).setOrigin(0.5);
+    this.tweens.add({
+      targets: explosion,
+      scale: 1.5,
+      alpha: 0,
+      duration: 400,
+      onComplete: () => explosion.destroy(),
+    });
+
     if (critical) {
       this.cameras.main.shake(200, 0.01);
     }
 
-    const flash = this.add.rectangle(hitX, hitY, cardWidth, 60, critical ? 0xffc107 : 0xf44336, 0.5);
+    await this.showDamageEffect(hitX, hitY, damage, critical, target, 0xff6600);
+  }
+
+  async animateDefaultAttack(startX, startY, hitX, hitY, damage, critical, target, attacker) {
+    this.tweens.add({ targets: attacker.display.container, scaleX: 1.05, scaleY: 1.05, duration: 100, yoyo: true });
+    await this.delay(200);
+
+    const flash = this.add.rectangle(hitX, hitY, target.display.cardWidth || 300, 60, critical ? 0xffc107 : 0xf44336, 0.5);
     this.tweens.add({ targets: flash, alpha: 0, duration: 200, onComplete: () => flash.destroy() });
 
-    // Critical hit gets extra effects
     if (critical) {
-      // Flash the screen gold briefly
+      this.cameras.main.shake(200, 0.01);
       this.cameras.main.flash(100, 255, 200, 50, false);
+    }
 
-      // Burst particles
+    await this.showDamageEffect(hitX, hitY, damage, critical, target, 0xf44336);
+  }
+
+  async showDamageEffect(hitX, hitY, damage, critical, target, color) {
+    const colorHex = `#${color.toString(16).padStart(6, '0')}`;
+
+    // Critical burst particles
+    if (critical) {
       for (let i = 0; i < 8; i++) {
         const angle = (i / 8) * Math.PI * 2;
         const spark = this.add.text(hitX, hitY, '✦', {
@@ -1095,13 +1964,12 @@ export class BattleScene extends Phaser.Scene {
     const dmgText = this.add.text(hitX, hitY - 40, `-${damage}`, {
       fontFamily: 'Arial, sans-serif',
       fontSize: critical ? '32px' : '20px',
-      fill: critical ? '#ffc107' : '#f44336',
+      fill: critical ? '#ffc107' : colorHex,
       stroke: '#000000',
       strokeThickness: critical ? 4 : 3,
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    // Critical damage text bounces more dramatically
     if (critical) {
       dmgText.setScale(0.5);
       this.tweens.add({
@@ -1144,12 +2012,31 @@ export class BattleScene extends Phaser.Scene {
   }
 
   updateHpDisplay(ship) {
-    const percent = ship.currentHp / ship.maxHp;
-    this.tweens.add({ targets: ship.display.hpBar, scaleX: Math.max(0, percent), duration: 200 });
+    const percent = Math.max(0, ship.currentHp / ship.maxHp);
+    const hpBarWidth = ship.display.hpBarWidth || 100;
+    const newWidth = Math.max(0, (hpBarWidth - 2) * percent);
+
+    // Animate HP bar width change
+    this.tweens.add({
+      targets: ship.display.hpBar,
+      width: newWidth,
+      duration: 200,
+    });
+
     ship.display.hpText.setText(`${Math.max(0, ship.currentHp)}/${ship.maxHp}`);
 
-    if (percent < 0.25) ship.display.hpBar.setFillStyle(0xc62828);
-    else if (percent < 0.5) ship.display.hpBar.setFillStyle(0xf9a825);
+    // Update color based on damage state (KanColle style)
+    let hpColor;
+    if (percent > 0.75) {
+      hpColor = 0x4caf50; // Green - healthy
+    } else if (percent > 0.5) {
+      hpColor = 0xffc107; // Yellow - light damage
+    } else if (percent > 0.25) {
+      hpColor = 0xff9800; // Orange - medium damage
+    } else {
+      hpColor = 0xf44336; // Red - heavy damage
+    }
+    ship.display.hpBar.setFillStyle(hpColor);
   }
 
   async animateSink(ship) {

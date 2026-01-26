@@ -12,6 +12,7 @@ const ASSETS_DIR = path.join(__dirname, '..', 'public', 'assets', 'ships');
 
 // Ship data matching your ships.js
 const SHIPS = [
+  // Destroyers
   { id: 'dd_001', name: 'Fubuki' },
   { id: 'dd_002', name: 'Shirayuki' },
   { id: 'dd_003', name: 'Hatsuyuki' },
@@ -19,12 +20,32 @@ const SHIPS = [
   { id: 'dd_005', name: 'Kisaragi' },
   { id: 'dd_006', name: 'Shimakaze' },
   { id: 'dd_007', name: 'Yukikaze' },
+  { id: 'dd_008', name: 'Ayanami' },
+  { id: 'dd_009', name: 'Akatsuki' },
+  { id: 'dd_010', name: 'Hibiki' },
+  { id: 'dd_011', name: 'Shigure' },
+  { id: 'dd_012', name: 'Yuudachi' },
+  // Light Cruisers
   { id: 'cl_001', name: 'Tenryuu' },
   { id: 'cl_002', name: 'Tatsuta' },
   { id: 'cl_003', name: 'Kuma' },
+  { id: 'cl_004', name: 'Nagara' },
+  { id: 'cl_005', name: 'Sendai' },
+  { id: 'cl_006', name: 'Jintsuu' },
+  { id: 'cl_007', name: 'Naka' },
+  { id: 'cl_008', name: 'Yuubari' },
+  { id: 'cl_009', name: 'Agano' },
+  { id: 'cl_010', name: 'Yahagi' },
+  // Heavy Cruisers
   { id: 'ca_001', name: 'Takao' },
   { id: 'ca_002', name: 'Atago' },
-  { id: 'ca_003', name: 'Tone' },
+  { id: 'ca_003', name: 'Maya' },
+  { id: 'ca_004', name: 'Choukai' },
+  { id: 'ca_005', name: 'Tone' },
+  { id: 'ca_006', name: 'Chikuma' },
+  { id: 'ca_007', name: 'Suzuya' },
+  { id: 'ca_008', name: 'Kumano' },
+  // Battleships
   { id: 'bb_001', name: 'Kongou' },
   { id: 'bb_002', name: 'Hiei' },
   { id: 'bb_003', name: 'Haruna' },
@@ -33,10 +54,18 @@ const SHIPS = [
   { id: 'bb_006', name: 'Mutsu' },
   { id: 'bb_007', name: 'Yamato' },
   { id: 'bb_008', name: 'Musashi' },
+  // Carriers
   { id: 'cv_001', name: 'Houshou' },
-  { id: 'cv_002', name: 'Akagi' },
-  { id: 'cv_003', name: 'Kaga' },
-  { id: 'cv_004', name: 'Shinano' },
+  { id: 'cvl_001', name: 'Ryuujou' },
+  { id: 'cvl_002', name: 'Shouhou' },
+  { id: 'cvl_003', name: 'Zuihou' },
+  { id: 'cv_002', name: 'Hiryuu' },
+  { id: 'cv_003', name: 'Souryuu' },
+  { id: 'cv_004', name: 'Shoukaku' },
+  { id: 'cv_005', name: 'Zuikaku' },
+  { id: 'cv_006', name: 'Akagi' },
+  { id: 'cv_007', name: 'Kaga' },
+  { id: 'cv_008', name: 'Taihou' },
 ];
 
 // Fetch a URL and return the response body

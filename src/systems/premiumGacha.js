@@ -38,28 +38,28 @@ export const GRAND_PRIZES = {
 
 // Consolation prize definitions
 export const CONSOLATION_PRIZES = {
+  shipSSR: {
+    name: 'Ultra Rare Ship',
+    description: 'An ultra rare SSR-rarity ship joins your fleet!',
+    rate: 5.0,
+    tokens: 3,
+  },
   shipSR: {
     name: 'Super Rare Ship',
     description: 'A powerful SR-rarity ship joins your fleet!',
-    rate: 12.3,
+    rate: 20.0,
+    tokens: 2,
+  },
+  fuelLarge: {
+    name: 'Fuel Reserve',
+    description: '+500 fuel for your fleet.',
+    rate: 36.15,
     tokens: 1,
   },
-  equipment: {
-    name: 'Rare Equipment Box',
-    description: 'Contains useful equipment for your ships.',
-    rate: 25.0,
-    tokens: 1,
-  },
-  resources: {
-    name: 'Resource Pack',
-    description: '+500 resources for construction.',
-    rate: 30.0,
-    tokens: 1,
-  },
-  smallResources: {
-    name: 'Supply Crate',
-    description: '+200 resources.',
-    rate: 30.0,
+  fuelSmall: {
+    name: 'Fuel Canister',
+    description: '+200 fuel.',
+    rate: 36.15,
     tokens: 1,
   },
 };
@@ -126,14 +126,16 @@ export const PremiumGacha = {
     Storage.addPityTokens(tokensEarned);
 
     // Apply consolation effects
+    let shipResult = null;
     if (result.type === 'consolation') {
-      this.applyConsolationReward(result.consolation);
+      shipResult = this.applyConsolationReward(result.consolation);
     }
 
     return {
       ...result,
       tokensEarned,
       totalTokens: Storage.getPityTokens(),
+      shipResult, // Contains ship info if a ship was awarded
     };
   },
 
@@ -185,28 +187,58 @@ export const PremiumGacha = {
     };
   },
 
+  // XP bonus for pulling duplicate ships (scales with rarity)
+  DUPLICATE_XP: {
+    N: 50,
+    R: 100,
+    SR: 200,
+    SSR: 500,
+  },
+
   // Apply consolation reward effects
   applyConsolationReward(consolation) {
+    let shipResult = null;
+
     switch (consolation.key) {
+      case 'shipSSR':
+        // Give a random SSR ship
+        const ssrShips = getShipsByRarity('SSR');
+        if (ssrShips.length > 0) {
+          const ship = ssrShips[Math.floor(Math.random() * ssrShips.length)];
+          const isNew = Storage.addShip(ship.id);
+          let xpGained = 0;
+          let levelUp = null;
+          if (!isNew) {
+            xpGained = this.DUPLICATE_XP.SSR;
+            levelUp = Storage.addXpToShip(ship.id, xpGained, 99);
+          }
+          shipResult = { ship, isNew, xpGained, levelUp };
+        }
+        break;
       case 'shipSR':
         // Give a random SR ship
         const srShips = getShipsByRarity('SR');
         if (srShips.length > 0) {
           const ship = srShips[Math.floor(Math.random() * srShips.length)];
-          Storage.addShip(ship.id);
+          const isNew = Storage.addShip(ship.id);
+          let xpGained = 0;
+          let levelUp = null;
+          if (!isNew) {
+            xpGained = this.DUPLICATE_XP.SR;
+            levelUp = Storage.addXpToShip(ship.id, xpGained, 99);
+          }
+          shipResult = { ship, isNew, xpGained, levelUp };
         }
         break;
-      case 'equipment':
-        // Give resources as placeholder for equipment
-        Storage.addCurrency(300);
-        break;
-      case 'resources':
+      case 'fuelLarge':
         Storage.addCurrency(500);
         break;
-      case 'smallResources':
+      case 'fuelSmall':
         Storage.addCurrency(200);
         break;
     }
+
+    return shipResult;
   },
 
   // Exchange tokens for a grand prize

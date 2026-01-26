@@ -7,6 +7,7 @@ import { FleetScene } from './scenes/FleetScene.js';
 import { BattleScene } from './scenes/BattleScene.js';
 import { MapScene } from './scenes/MapScene.js';
 import { DockScene } from './scenes/DockScene.js';
+import { FormationScene } from './scenes/FormationScene.js';
 // Special gift feature scenes
 import { PremiumGachaScene } from './scenes/PremiumGachaScene.js';
 import { ExchangeShopScene } from './scenes/ExchangeShopScene.js';
@@ -33,6 +34,7 @@ const config = {
     BattleScene,
     MapScene,
     DockScene,
+    FormationScene,
     // Special scenes
     PremiumGachaScene,
     ExchangeShopScene,

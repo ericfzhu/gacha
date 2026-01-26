@@ -5,6 +5,7 @@ import { Storage } from '../systems/storage.js';
 import { getShipById, getShipStats, RARITY } from '../data/ships.js';
 import { getDamageState } from '../data/maps.js';
 import { AudioManager, BGM } from '../systems/audio.js';
+import { SHIP_TYPE_ABBREV } from '../data/equipment.js';
 
 // Notion-inspired colors
 const COLORS = {
@@ -37,10 +38,11 @@ export class FleetScene extends Phaser.Scene {
     AudioManager.playBgm(BGM.MENU);
 
     this.createBackground();
-    this.createHeader();
     this.createFleetPanel();
     this.createShipList();
     this.createBottomBar();
+    // Create header LAST so its interactive elements have input priority
+    this.createHeader();
   }
 
   createBackground() {
@@ -59,6 +61,9 @@ export class FleetScene extends Phaser.Scene {
     g.fillRect(0, 0, width, 56);
     g.fillStyle(COLORS.border, 1);
     g.fillRect(0, 55, width, 1);
+
+    // Blocking hit area to prevent clicks passing through to scrolled content
+    this.add.rectangle(width / 2, 28, width, 56, 0x000000, 0).setInteractive();
 
     const backBtn = this.add.text(24, 28, '← Back', {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -166,6 +171,12 @@ export class FleetScene extends Phaser.Scene {
         const damageState = getDamageState(currentHp, stats.hp);
         const isRepairing = Storage.isShipRepairing(shipId);
 
+        // Add rarity glow border
+        const glowBorder = this.add.graphics();
+        glowBorder.lineStyle(2, rarity.color, 0.6);
+        glowBorder.strokeRoundedRect(-halfW + 2, -halfH + 2, slotW - 4, slotH - 4, 6);
+        c.add(glowBorder);
+
         // Portrait takes left portion, full height
         const portraitWidth = slotH * 0.85; // Square-ish based on height
         const portraitX = -halfW + portraitWidth / 2 + 8;
@@ -180,6 +191,20 @@ export class FleetScene extends Phaser.Scene {
           portrait.setScale(scale);
           c.add(portrait);
         }
+
+        // Ship type badge in top-left corner
+        const typeAbbrev = SHIP_TYPE_ABBREV[shipData.type] || '??';
+        const typeBadge = this.add.graphics();
+        typeBadge.fillStyle(rarity.color, 0.9);
+        typeBadge.fillRoundedRect(-halfW + 4, -halfH + 4, 28, 18, 4);
+        c.add(typeBadge);
+
+        c.add(this.add.text(-halfW + 18, -halfH + 13, typeAbbrev, {
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          fontSize: '10px',
+          fill: '#ffffff',
+          fontStyle: 'bold',
+        }).setOrigin(0.5));
 
         // Details on the right side
         const infoX = -halfW + portraitWidth + 20;
@@ -201,19 +226,12 @@ export class FleetScene extends Phaser.Scene {
           fontStyle: 'bold',
         }).setOrigin(0, 0.5));
 
-        // Stars
-        let stars = '';
-        for (let i = 0; i < rarity.stars; i++) stars += '★';
-        c.add(this.add.text(infoX, -halfH + 60, stars, {
-          fontSize: '12px',
-          fill: `#${rarity.color.toString(16).padStart(6, '0')}`,
-        }).setOrigin(0, 0.5));
-
-        // Level
-        c.add(this.add.text(infoX, -halfH + 82, `Lv.${level}`, {
+        // Level - larger and bolder
+        c.add(this.add.text(infoX, -halfH + 62, `Lv.${level}`, {
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          fontSize: '13px',
-          fill: COLORS.textSecondary,
+          fontSize: '16px',
+          fill: COLORS.textPrimary,
+          fontStyle: 'bold',
         }).setOrigin(0, 0.5));
 
         // HP bar

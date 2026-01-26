@@ -4,6 +4,7 @@ import Phaser from 'phaser';
 import { Storage } from '../systems/storage.js';
 import { SHIPS, RARITY, getShipById, getShipStats, getXpForLevel } from '../data/ships.js';
 import { AudioManager, BGM } from '../systems/audio.js';
+import { SHIP_TYPE_ABBREV } from '../data/equipment.js';
 
 // Notion-inspired colors
 const COLORS = {
@@ -37,9 +38,10 @@ export class CollectionScene extends Phaser.Scene {
     AudioManager.playBgm(BGM.MENU);
 
     this.createBackground();
-    this.createHeader();
     this.createShipList();
     this.createDetailPanel();
+    // Create header LAST so its interactive elements have input priority
+    this.createHeader();
   }
 
   createBackground() {
@@ -52,6 +54,10 @@ export class CollectionScene extends Phaser.Scene {
 
   createHeader() {
     const width = window.innerWidth;
+
+    // Create header container with high depth to stay above scrollable content
+    this.headerContainer = this.add.container(0, 0).setDepth(100);
+
     const g = this.add.graphics();
 
     // Taller header to accommodate progress bar
@@ -59,6 +65,12 @@ export class CollectionScene extends Phaser.Scene {
     g.fillRect(0, 0, width, 80);
     g.fillStyle(COLORS.border, 1);
     g.fillRect(0, 79, width, 1);
+
+    this.headerContainer.add(g);
+
+    // Blocking hit area to prevent clicks passing through to scrolled content
+    const headerBlocker = this.add.rectangle(width / 2, 40, width, 80, 0x000000, 0).setInteractive();
+    this.headerContainer.add(headerBlocker);
 
     const backBtn = this.add.text(24, 24, '← Back', {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -70,12 +82,15 @@ export class CollectionScene extends Phaser.Scene {
     backBtn.on('pointerout', () => backBtn.setStyle({ fill: COLORS.textSecondary }));
     backBtn.on('pointerdown', () => this.scene.start('TitleScene'));
 
-    this.add.text(width / 2, 20, 'Ship Collection', {
+    this.headerContainer.add(backBtn);
+
+    const title = this.add.text(width / 2, 20, 'Ship Collection', {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '20px',
       fill: COLORS.textPrimary,
       fontStyle: 'bold',
     }).setOrigin(0.5);
+    this.headerContainer.add(title);
 
     // Calculate collection stats
     const ownedIds = Storage.getOwnedShipIds();
@@ -94,11 +109,12 @@ export class CollectionScene extends Phaser.Scene {
     });
 
     // Main progress text
-    this.add.text(width / 2, 42, `${owned}/${total} (${percent}%)`, {
+    const progressText = this.add.text(width / 2, 42, `${owned}/${total} (${percent}%)`, {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '13px',
       fill: COLORS.textSecondary,
     }).setOrigin(0.5);
+    this.headerContainer.add(progressText);
 
     // Progress bar
     const barWidth = Math.min(300, width * 0.3);
@@ -127,11 +143,12 @@ export class CollectionScene extends Phaser.Scene {
 
     rarities.forEach((r, i) => {
       const x = rarityX - (3 - i) * 70;
-      this.add.text(x, 58, `${r.key}: ${rarityCount[r.key]}/${rarityTotal[r.key]}`, {
+      const rarityText = this.add.text(x, 58, `${r.key}: ${rarityCount[r.key]}/${rarityTotal[r.key]}`, {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         fontSize: '10px',
         fill: r.color,
       }).setOrigin(1, 0.5);
+      this.headerContainer.add(rarityText);
     });
   }
 
@@ -243,6 +260,10 @@ export class CollectionScene extends Phaser.Scene {
     bg.fillRoundedRect(0, 0, w, h, 4);
 
     if (isOwned) {
+      // Rarity glow border
+      bg.lineStyle(2, rarity.color, 0.5);
+      bg.strokeRoundedRect(1, 1, w - 2, h - 2, 4);
+
       bg.fillStyle(rarity.color, 1);
       bg.fillRect(0, 0, 4, h);
     }
@@ -263,6 +284,20 @@ export class CollectionScene extends Phaser.Scene {
         c.add(portrait);
       }
 
+      // Ship type badge
+      const typeAbbrev = SHIP_TYPE_ABBREV[shipData.type] || '??';
+      const typeBadge = this.add.graphics();
+      typeBadge.fillStyle(rarity.color, 0.9);
+      typeBadge.fillRoundedRect(8, 4, 24, 14, 3);
+      c.add(typeBadge);
+
+      c.add(this.add.text(20, 11, typeAbbrev, {
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontSize: '9px',
+        fill: '#ffffff',
+        fontStyle: 'bold',
+      }).setOrigin(0.5));
+
       // Ship name
       c.add(this.add.text(80, h / 2 - 12, shipData.name, {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -279,14 +314,15 @@ export class CollectionScene extends Phaser.Scene {
         fill: `#${rarity.color.toString(16).padStart(6, '0')}`,
       }).setOrigin(0, 0.5));
 
-      // Level on right
-      c.add(this.add.text(w - 16, h / 2 - 8, `Lv.${level}`, {
+      // Level on right - larger and bolder
+      c.add(this.add.text(w - 16, h / 2 - 10, `Lv.${level}`, {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        fontSize: '12px',
-        fill: COLORS.textSecondary,
+        fontSize: '14px',
+        fill: COLORS.textPrimary,
+        fontStyle: 'bold',
       }).setOrigin(1, 0.5));
 
-      // Type
+      // Ship type on right
       c.add(this.add.text(w - 16, h / 2 + 10, shipData.type, {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         fontSize: '10px',
@@ -314,6 +350,8 @@ export class CollectionScene extends Phaser.Scene {
         bg.clear();
         bg.fillStyle(COLORS.bgHover, 1);
         bg.fillRoundedRect(0, 0, w, h, 4);
+        bg.lineStyle(2, rarity.color, 0.7);
+        bg.strokeRoundedRect(1, 1, w - 2, h - 2, 4);
         bg.fillStyle(rarity.color, 1);
         bg.fillRect(0, 0, 4, h);
       });
@@ -321,6 +359,8 @@ export class CollectionScene extends Phaser.Scene {
         bg.clear();
         bg.fillStyle(0xffffff, 1);
         bg.fillRoundedRect(0, 0, w, h, 4);
+        bg.lineStyle(2, rarity.color, 0.5);
+        bg.strokeRoundedRect(1, 1, w - 2, h - 2, 4);
         bg.fillStyle(rarity.color, 1);
         bg.fillRect(0, 0, 4, h);
       });

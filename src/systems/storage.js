@@ -22,6 +22,10 @@ const DEFAULT_SAVE = {
   fleet: [null, null, null, null, null, null],
   // Repair docks - up to 2 ships can repair at once
   repairDocks: [null, null], // [shipId, shipId] or null for empty
+  // Equipment system
+  ownedEquipment: [], // Array of equipment IDs (can have duplicates)
+  shipEquipment: {}, // { shipId: [equipIdx, equipIdx, null] } - indexes into ownedEquipment
+  lastFormation: 'LINE_AHEAD', // Last selected formation
   stats: {
     totalPulls: 0,
     premiumPulls: 0,
@@ -473,5 +477,79 @@ export const Storage = {
     if (!data.collectedResourceNodes) data.collectedResourceNodes = {};
     data.collectedResourceNodes[`${mapId}_${nodeId}`] = true;
     return this.save(data);
+  },
+
+  // Equipment management
+  addEquipment(equipId) {
+    const data = this.load();
+    if (!data.ownedEquipment) data.ownedEquipment = [];
+    data.ownedEquipment.push(equipId);
+    this.save(data);
+    return data.ownedEquipment.length - 1; // Return index of new equipment
+  },
+
+  getOwnedEquipment() {
+    return this.get('ownedEquipment') || [];
+  },
+
+  equipToShip(shipId, slot, equipIdx) {
+    const data = this.load();
+    if (!data.shipEquipment) data.shipEquipment = {};
+    if (!data.shipEquipment[shipId]) data.shipEquipment[shipId] = [null, null, null];
+
+    // Check if equipment is already equipped on another ship
+    for (const [sid, slots] of Object.entries(data.shipEquipment)) {
+      if (sid !== shipId && slots && slots.includes(equipIdx)) {
+        return { success: false, error: 'Equipment already in use' };
+      }
+    }
+
+    data.shipEquipment[shipId][slot] = equipIdx;
+    this.save(data);
+    return { success: true };
+  },
+
+  unequipFromShip(shipId, slot) {
+    const data = this.load();
+    if (!data.shipEquipment || !data.shipEquipment[shipId]) return false;
+    data.shipEquipment[shipId][slot] = null;
+    return this.save(data);
+  },
+
+  getShipEquipment(shipId) {
+    const data = this.load();
+    if (!data.shipEquipment) return [null, null, null];
+    return data.shipEquipment[shipId] || [null, null, null];
+  },
+
+  getUnequippedEquipment() {
+    const data = this.load();
+    if (!data.ownedEquipment) return [];
+
+    // Get all equipped indices
+    const equippedIndices = new Set();
+    if (data.shipEquipment) {
+      Object.values(data.shipEquipment).forEach(slots => {
+        if (slots) {
+          slots.forEach(idx => {
+            if (idx !== null) equippedIndices.add(idx);
+          });
+        }
+      });
+    }
+
+    // Return equipment not in use
+    return data.ownedEquipment
+      .map((id, idx) => ({ id, idx }))
+      .filter(e => !equippedIndices.has(e.idx));
+  },
+
+  // Formation management
+  setLastFormation(formationId) {
+    return this.set('lastFormation', formationId);
+  },
+
+  getLastFormation() {
+    return this.get('lastFormation') || 'LINE_AHEAD';
   },
 };

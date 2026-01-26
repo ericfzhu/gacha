@@ -630,8 +630,8 @@ export class MapScene extends Phaser.Scene {
       // Collect resources and continue
       this.collectResources(node.reward, nodeId);
     } else if (node.type === 'combat' || node.type === 'boss') {
-      // Start battle
-      this.scene.start('BattleScene', {
+      // Go to formation selection before battle
+      this.scene.start('FormationScene', {
         mapId: this.mapId,
         nodeId: nodeId,
         fleetHp: this.fleetHp,
