@@ -550,6 +550,9 @@ export class BattleScene extends Phaser.Scene {
   async runNodeBattlePhases(playerFleet, enemyFleet) {
     const allShips = [...playerFleet, ...enemyFleet];
 
+    // Show battle start banner
+    await this.showBattleStartBanner();
+
     await this.showPhase('DETECTION PHASE');
     await this.delay(1000);
     this.addLog('Enemy fleet detected!');
@@ -934,7 +937,7 @@ export class BattleScene extends Phaser.Scene {
     this.inNightBattle = false;
   }
 
-  endNodeBattle(playerFleet, enemyFleet) {
+  async endNodeBattle(playerFleet, enemyFleet) {
     const playerAlive = playerFleet.filter(s => s.currentHp > 0);
     const enemySunk = enemyFleet.filter(s => s.currentHp <= 0).length;
     const playerSunk = playerFleet.filter(s => s.currentHp <= 0).length;
@@ -945,6 +948,9 @@ export class BattleScene extends Phaser.Scene {
     else if (victory && playerSunk <= 1) rank = 'A';
     else if (victory) rank = 'B';
     else if (enemySunk > 0) rank = 'C';
+
+    // Show victory/defeat banner
+    await this.showResultBanner(rank, victory);
 
     if (victory) {
       AudioManager.playBgm(BGM.VICTORY);
@@ -1571,6 +1577,11 @@ export class BattleScene extends Phaser.Scene {
     const critText = critical ? ' CRITICAL!' : '';
     this.addLog(`${attacker.name} >> ${target.name} ${damage} DMG${critText}`);
 
+    // Show battle cut-in for critical hits from player ships
+    if (critical && attacker.isPlayer) {
+      await this.showBattleCutIn(attacker, isTorpedo);
+    }
+
     await this.animateAttack(attacker, target, damage, critical, isTorpedo);
     this.updateHpDisplay(target);
 
@@ -2042,6 +2053,364 @@ export class BattleScene extends Phaser.Scene {
   async animateSink(ship) {
     await new Promise(r => {
       this.tweens.add({ targets: ship.display.container, alpha: 0.3, y: ship.display.container.y + 20, duration: 500, onComplete: r });
+    });
+  }
+
+  // ========== UI POLISH: BANNERS & CUT-INS ==========
+
+  async showBattleStartBanner() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    // Create banner container
+    const bannerContainer = this.add.container(width / 2, height / 2).setDepth(1000);
+
+    // Dark overlay
+    const overlay = this.add.rectangle(0, 0, width * 2, height * 2, 0x000000, 0.7);
+    bannerContainer.add(overlay);
+
+    // Banner stripe
+    const bannerHeight = 120;
+    const stripe = this.add.rectangle(0, 0, width * 2, bannerHeight, 0x1a2634, 1);
+    bannerContainer.add(stripe);
+
+    // Red accent lines
+    const topLine = this.add.rectangle(0, -bannerHeight / 2 + 3, width * 2, 6, 0xe03e3e, 1);
+    const bottomLine = this.add.rectangle(0, bannerHeight / 2 - 3, width * 2, 6, 0xe03e3e, 1);
+    bannerContainer.add(topLine);
+    bannerContainer.add(bottomLine);
+
+    // Main text
+    const mainText = this.add.text(0, -10, this.isBoss ? 'BOSS BATTLE' : 'BATTLE START', {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '48px',
+      fill: '#ffffff',
+      fontStyle: 'bold',
+    }).setOrigin(0.5).setAlpha(0);
+    bannerContainer.add(mainText);
+
+    // Sub text
+    const subText = this.add.text(0, 35, `${this.mapId} - ${this.isBoss ? 'BOSS' : 'Node ' + this.nodeId}`, {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '18px',
+      fill: '#b0c4de',
+    }).setOrigin(0.5).setAlpha(0);
+    bannerContainer.add(subText);
+
+    // Animation sequence
+    bannerContainer.setScale(1.5);
+    bannerContainer.setAlpha(0);
+
+    await new Promise(resolve => {
+      // Fade in and scale down
+      this.tweens.add({
+        targets: bannerContainer,
+        alpha: 1,
+        scale: 1,
+        duration: 300,
+        ease: 'Back.easeOut',
+      });
+
+      this.tweens.add({
+        targets: [mainText, subText],
+        alpha: 1,
+        duration: 400,
+        delay: 150,
+        onComplete: () => {
+          // Hold for a moment, then fade out
+          this.time.delayedCall(800, () => {
+            this.tweens.add({
+              targets: bannerContainer,
+              alpha: 0,
+              scale: 0.8,
+              duration: 300,
+              onComplete: () => {
+                bannerContainer.destroy();
+                resolve();
+              }
+            });
+          });
+        }
+      });
+    });
+  }
+
+  async showBattleCutIn(attacker, isTorpedo = false) {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    // Determine attack name based on ship type
+    let attackName = 'Critical Hit!';
+    const rarity = RARITY[attacker.rarity];
+
+    if (attacker.type === 'Destroyer') {
+      attackName = isTorpedo ? 'Torpedo Salvo!' : 'Assault!';
+    } else if (attacker.type === 'Light Cruiser') {
+      attackName = 'Rapid Fire!';
+    } else if (attacker.type === 'Heavy Cruiser') {
+      attackName = 'Main Battery!';
+    } else if (attacker.type === 'Battleship') {
+      attackName = 'Full Broadside!';
+    } else if (attacker.type === 'Carrier') {
+      attackName = 'Air Strike!';
+    }
+
+    // Create cut-in container
+    const cutInContainer = this.add.container(0, height / 2).setDepth(1000);
+
+    // Diagonal stripe background
+    const stripeHeight = 160;
+    const stripe = this.add.graphics();
+    stripe.fillStyle(0x1a2634, 0.95);
+    stripe.fillRect(-50, -stripeHeight / 2, width + 100, stripeHeight);
+    // Rarity color accent
+    stripe.fillStyle(rarity.color, 1);
+    stripe.fillRect(-50, -stripeHeight / 2, width + 100, 4);
+    stripe.fillRect(-50, stripeHeight / 2 - 4, width + 100, 4);
+    cutInContainer.add(stripe);
+
+    // Ship portrait
+    const portraitKey = `ship_portrait_${attacker.id}`;
+    let portrait = null;
+    if (this.textures.exists(portraitKey)) {
+      portrait = this.add.image(width * 0.2, 0, portraitKey);
+      const maxSize = stripeHeight - 20;
+      const pScale = Math.min(maxSize / portrait.width, maxSize / portrait.height) * 1.2;
+      portrait.setScale(pScale);
+      portrait.setAlpha(0);
+      cutInContainer.add(portrait);
+    }
+
+    // Ship name
+    const nameText = this.add.text(width * 0.45, -25, attacker.name, {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '36px',
+      fill: '#ffffff',
+      fontStyle: 'bold',
+    }).setOrigin(0, 0.5).setAlpha(0);
+    cutInContainer.add(nameText);
+
+    // Attack name
+    const attackText = this.add.text(width * 0.45, 25, attackName, {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '28px',
+      fill: `#${rarity.color.toString(16).padStart(6, '0')}`,
+      fontStyle: 'bold',
+    }).setOrigin(0, 0.5).setAlpha(0);
+    cutInContainer.add(attackText);
+
+    // Slide in from left
+    cutInContainer.x = -width;
+
+    await new Promise(resolve => {
+      this.tweens.add({
+        targets: cutInContainer,
+        x: 0,
+        duration: 200,
+        ease: 'Cubic.easeOut',
+      });
+
+      this.tweens.add({
+        targets: [portrait, nameText, attackText].filter(x => x),
+        alpha: 1,
+        duration: 150,
+        delay: 100,
+        onComplete: () => {
+          // Flash effect
+          this.cameras.main.flash(100, 255, 255, 255, false);
+
+          // Hold then slide out
+          this.time.delayedCall(500, () => {
+            this.tweens.add({
+              targets: cutInContainer,
+              x: width,
+              duration: 200,
+              ease: 'Cubic.easeIn',
+              onComplete: () => {
+                cutInContainer.destroy();
+                resolve();
+              }
+            });
+          });
+        }
+      });
+    });
+  }
+
+  async showResultBanner(rank, victory) {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    const rankConfig = {
+      S: { color: 0xffd700, accent: 0xffeaa7, label: 'PERFECT' },
+      A: { color: 0xe8e8e8, accent: 0xffffff, label: 'EXCELLENT' },
+      B: { color: 0xcd7f32, accent: 0xdaa520, label: 'GOOD' },
+      C: { color: 0x74b9ff, accent: 0xa8d8ff, label: 'CLEAR' },
+      D: { color: 0x636e72, accent: 0x95a5a6, label: 'CLEAR' },
+    };
+
+    const config = rankConfig[rank] || rankConfig.D;
+    const colorHex = `#${config.color.toString(16).padStart(6, '0')}`;
+    const accentHex = `#${config.accent.toString(16).padStart(6, '0')}`;
+
+    const container = this.add.container(width / 2, height / 2).setDepth(1000);
+
+    // Elegant dark overlay - fades in smoothly
+    const overlay = this.add.rectangle(0, 0, width * 2, height * 2, 0x000000, 0);
+    container.add(overlay);
+
+    await new Promise(resolve => {
+      this.tweens.add({
+        targets: overlay,
+        fillAlpha: 0.85,
+        duration: 400,
+        ease: 'Quad.easeOut',
+        onComplete: resolve,
+      });
+    });
+
+    // Brief anticipation pause
+    await this.delay(200);
+
+    // Single soft light bloom from center (S/A only)
+    if ((rank === 'S' || rank === 'A') && victory) {
+      const bloom = this.add.graphics();
+      bloom.fillStyle(config.color, 0.15);
+      bloom.fillCircle(0, 0, 20);
+      container.add(bloom);
+
+      this.tweens.add({
+        targets: bloom,
+        scale: 15,
+        alpha: 0,
+        duration: 800,
+        ease: 'Quad.easeOut',
+      });
+    }
+
+    // VICTORY/DEFEAT text - elegant fade and slide
+    const resultText = this.add.text(0, -60, victory ? 'VICTORY' : 'DEFEAT', {
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      fontSize: '24px',
+      fill: victory ? '#ffffff' : '#e17055',
+      fontStyle: '600',
+      letterSpacing: 8,
+    }).setOrigin(0.5).setAlpha(0);
+    container.add(resultText);
+
+    this.tweens.add({
+      targets: resultText,
+      alpha: 1,
+      y: -70,
+      duration: 500,
+      ease: 'Quart.easeOut',
+    });
+
+    await this.delay(300);
+
+    // Rank letter - scales from slightly large with gentle overshoot
+    const rankText = this.add.text(0, 20, rank, {
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      fontSize: '140px',
+      fill: colorHex,
+      fontStyle: 'bold',
+    }).setOrigin(0.5).setAlpha(0).setScale(1.2);
+    container.add(rankText);
+
+    await new Promise(resolve => {
+      this.tweens.add({
+        targets: rankText,
+        alpha: 1,
+        scale: 1,
+        duration: 400,
+        ease: 'Back.easeOut',
+        onComplete: resolve,
+      });
+    });
+
+    // Subtle breathing animation on rank
+    this.tweens.add({
+      targets: rankText,
+      scale: 1.02,
+      duration: 1500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    // For S-rank: elegant floating particles (not explosion)
+    if (rank === 'S' && victory) {
+      // Soft glow behind rank
+      const glow = this.add.graphics();
+      glow.fillStyle(config.color, 0.08);
+      glow.fillCircle(0, 20, 100);
+      container.addAt(glow, container.list.indexOf(rankText));
+
+      this.tweens.add({
+        targets: glow,
+        scale: 1.2,
+        alpha: 0.03,
+        duration: 2000,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+
+      // Gentle rising particles
+      for (let i = 0; i < 12; i++) {
+        this.time.delayedCall(i * 100, () => {
+          const px = (Math.random() - 0.5) * 300;
+          const particle = this.add.graphics();
+          particle.fillStyle(config.accent, 0.6);
+          particle.fillCircle(0, 0, 2 + Math.random() * 3);
+          particle.setPosition(px, 150);
+          container.add(particle);
+
+          this.tweens.add({
+            targets: particle,
+            y: -150,
+            alpha: 0,
+            duration: 2000 + Math.random() * 1000,
+            ease: 'Quad.easeOut',
+            onComplete: () => particle.destroy(),
+          });
+        });
+      }
+    }
+
+    await this.delay(200);
+
+    // Label - simple fade
+    const label = this.add.text(0, 100, config.label, {
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      fontSize: '14px',
+      fill: accentHex,
+      letterSpacing: 4,
+    }).setOrigin(0.5).setAlpha(0);
+    container.add(label);
+
+    this.tweens.add({
+      targets: label,
+      alpha: 0.8,
+      duration: 400,
+      ease: 'Quad.easeOut',
+    });
+
+    // Hold - let it breathe
+    await this.delay(1800);
+
+    // Elegant fade out
+    await new Promise(resolve => {
+      this.tweens.add({
+        targets: container,
+        alpha: 0,
+        duration: 500,
+        ease: 'Quad.easeIn',
+        onComplete: () => {
+          container.destroy();
+          resolve();
+        }
+      });
     });
   }
 
