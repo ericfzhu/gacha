@@ -15,5 +15,8 @@
     "phaser": "^3.90.0",
     "vite": "5"
   },
-  "packageManager": "yarn@4.12.0"
+  "packageManager": "yarn@4.12.0",
+  "devDependencies": {
+    "canvas": "^3.2.1"
+  }
 }
