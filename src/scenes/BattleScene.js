@@ -512,7 +512,9 @@ export class BattleScene extends Phaser.Scene {
     const maxShips = Math.max(playerFleet.length, enemyFleet.length);
     const totalRows = maxShips + 1; // +1 for the label row
     const availableHeight = fleetAreaBottom - fleetAreaTop;
-    const rowHeight = Math.min(70, availableHeight / totalRows);
+    // Taller rows for Pokemon mode to fit boats
+    const maxRowHeight = isPokemonMode() ? 105 : 70;
+    const rowHeight = Math.min(maxRowHeight, availableHeight / totalRows);
 
     // Row 0: Fleet labels (same height as ship cards)
     const labelY = fleetAreaTop + rowHeight / 2;
@@ -1341,7 +1343,9 @@ export class BattleScene extends Phaser.Scene {
     const maxShips = Math.max(playerFleet.length, enemyFleet.length);
     const totalRows = maxShips + 1; // +1 for the label row
     const availableHeight = fleetAreaBottom - fleetAreaTop;
-    const rowHeight = Math.min(70, availableHeight / totalRows);
+    // Taller rows for Pokemon mode to fit boats
+    const maxRowHeight = isPokemonMode() ? 105 : 70;
+    const rowHeight = Math.min(maxRowHeight, availableHeight / totalRows);
 
     // Row 0: Fleet labels (same height as ship cards)
     const labelY = fleetAreaTop + rowHeight / 2;
@@ -1400,7 +1404,8 @@ export class BattleScene extends Phaser.Scene {
   createBattleShipDisplay(x, y, ship, isPlayer, cardWidth = 300) {
     const c = this.add.container(x, y);
     const rarity = RARITY[ship.rarity];
-    const cardHeight = 50;
+    // Taller cards for player Pokemon to fit the boats
+    const cardHeight = (isPlayer && isPokemonMode()) ? 90 : 50;
 
     const bg = this.add.graphics();
     bg.fillStyle(isPlayer ? 0xe8f5e9 : 0xffebee, 0.95);
@@ -1408,11 +1413,11 @@ export class BattleScene extends Phaser.Scene {
     bg.lineStyle(2, isPlayer ? 0x4caf50 : 0xf44336, 1);
     bg.strokeRoundedRect(0, -cardHeight / 2, cardWidth, cardHeight, 4);
 
-    // Ship banner image (160x40 aspect ratio like KanColle)
+    // Ship banner image
     const bannerKey = `ship_banner_${ship.id}`;
     const bannerWidth = Math.min(160, cardWidth * 0.45);
     const bannerHeight = 40;
-    const bannerX = 4 + bannerWidth / 2;
+    const bannerX = (isPlayer && isPokemonMode()) ? 4 + 55 : 4 + bannerWidth / 2;
 
     // Add dark background for enemy banners (they have transparent backgrounds)
     if (!isPlayer) {
@@ -1424,14 +1429,77 @@ export class BattleScene extends Phaser.Scene {
       c.add(bannerBg);
     }
 
+    // For Pokemon mode: draw back layer of boat first (behind Pokemon)
+    if (isPlayer && isPokemonMode()) {
+      const boatBack = this.add.graphics();
+      const boatX = bannerX;
+      const boatY = 0; // Center reference
+      const s = 0.22; // Scale factor from title screen boat
+
+      // Hull bottom (behind Pokemon) - scaled from title: y+90 to y+135
+      boatBack.fillStyle(0x654321, 1);
+      boatBack.beginPath();
+      boatBack.moveTo(boatX - 210 * s, boatY + 90 * s);
+      boatBack.lineTo(boatX - 150 * s, boatY + 135 * s);
+      boatBack.lineTo(boatX + 150 * s, boatY + 135 * s);
+      boatBack.lineTo(boatX + 210 * s, boatY + 90 * s);
+      boatBack.closePath();
+      boatBack.fill();
+
+      // Flag mast (behind Pokemon) - scaled from title: x=120, y-150 to y+12
+      boatBack.fillStyle(0x8B4513, 1);
+      boatBack.fillRect(boatX + 120 * s, boatY - 150 * s, 3, 162 * s);
+
+      // Flag triangle (behind Pokemon)
+      boatBack.fillStyle(0xe03e3e, 1);
+      boatBack.beginPath();
+      boatBack.moveTo(boatX + 132 * s, boatY - 135 * s);
+      boatBack.lineTo(boatX + 225 * s, boatY - 90 * s);
+      boatBack.lineTo(boatX + 132 * s, boatY - 45 * s);
+      boatBack.closePath();
+      boatBack.fill();
+
+      c.add(boatBack);
+    }
+
+    // Add Pokemon/ship banner image (middle layer)
     if (this.textures.exists(bannerKey)) {
-      const banner = this.add.image(bannerX, 0, bannerKey);
+      // Pokemon sits higher in boat, same proportion as title screen
+      const banner = this.add.image(bannerX, isPokemonMode() && isPlayer ? -10 : 0, bannerKey);
       const bScale = Math.min(bannerWidth / banner.width, bannerHeight / banner.height);
       banner.setScale(bScale);
       c.add(banner);
     }
 
-    const textX = bannerWidth + 12;
+    // For Pokemon mode: draw front layer of boat (in front of Pokemon)
+    if (isPlayer && isPokemonMode()) {
+      const boatFront = this.add.graphics();
+      const boatX = bannerX;
+      const boatY = 0;
+      const s = 0.22; // Same scale factor
+
+      // Main hull (front, overlaps Pokemon's lower body) - scaled from title
+      boatFront.fillStyle(0x8B4513, 1);
+      boatFront.beginPath();
+      boatFront.moveTo(boatX - 180 * s, boatY);
+      boatFront.lineTo(boatX - 210 * s, boatY + 90 * s);
+      boatFront.lineTo(boatX + 210 * s, boatY + 90 * s);
+      boatFront.lineTo(boatX + 180 * s, boatY);
+      boatFront.closePath();
+      boatFront.fill();
+
+      // Hull stripe
+      boatFront.fillStyle(0xA0522D, 1);
+      boatFront.fillRect(boatX - 165 * s, boatY + 15 * s, 330 * s, 24 * s);
+
+      // Boat rim (top edge)
+      boatFront.fillStyle(0xDEB887, 1);
+      boatFront.fillRect(boatX - 186 * s, boatY - 12 * s, 372 * s, 18 * s);
+
+      c.add(boatFront);
+    }
+
+    const textX = (isPlayer && isPokemonMode()) ? 120 : bannerWidth + 12;
 
     const name = this.add.text(textX, -12, `${getBattleDisplayName(ship)} Lv.${ship.level}`, {
       fontFamily: 'Arial, sans-serif',
