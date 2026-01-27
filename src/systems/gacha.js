@@ -7,12 +7,17 @@ const PULL_COST = 100;
 const PITY_THRESHOLD = 90;
 
 // XP bonus for pulling duplicate ships (scales with rarity)
-const DUPLICATE_XP = {
+const DUPLICATE_XP_BASE = {
   N: 50,
   R: 100,
   SR: 200,
   SSR: 500,
 };
+const DUPLICATE_XP_MULTIPLIER = 5;
+
+export const DUPLICATE_XP = Object.fromEntries(
+  Object.entries(DUPLICATE_XP_BASE).map(([k, v]) => [k, v * DUPLICATE_XP_MULTIPLIER])
+);
 
 export const Gacha = {
   getPullCost() {

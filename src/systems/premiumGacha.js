@@ -3,6 +3,7 @@
 
 import { Storage } from './storage.js';
 import { SHIPS, getShipsByRarity } from '../data/ships.js';
+import { DUPLICATE_XP } from './gacha.js';
 
 // Grand Prize definitions - special gift choices
 // Names and descriptions are configurable via environment variables:
@@ -187,14 +188,6 @@ export const PremiumGacha = {
     };
   },
 
-  // XP bonus for pulling duplicate ships (scales with rarity)
-  DUPLICATE_XP: {
-    N: 50,
-    R: 100,
-    SR: 200,
-    SSR: 500,
-  },
-
   // Apply consolation reward effects
   applyConsolationReward(consolation) {
     let shipResult = null;
@@ -209,7 +202,7 @@ export const PremiumGacha = {
           let xpGained = 0;
           let levelUp = null;
           if (!isNew) {
-            xpGained = this.DUPLICATE_XP.SSR;
+            xpGained = DUPLICATE_XP.SSR;
             levelUp = Storage.addXpToShip(ship.id, xpGained, 99);
           }
           shipResult = { ship, isNew, xpGained, levelUp };
@@ -224,7 +217,7 @@ export const PremiumGacha = {
           let xpGained = 0;
           let levelUp = null;
           if (!isNew) {
-            xpGained = this.DUPLICATE_XP.SR;
+            xpGained = DUPLICATE_XP.SR;
             levelUp = Storage.addXpToShip(ship.id, xpGained, 99);
           }
           shipResult = { ship, isNew, xpGained, levelUp };
