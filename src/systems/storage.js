@@ -14,6 +14,7 @@ const DEFAULT_SAVE = {
     prize3: false, // 0.2% rate - obtained?
   },
   secretCodeRedeemed: false, // Has the secret code been used?
+  artworkMode: 'pokemon', // 'pokemon' for Pokemon sprites, 'anime' for ship girl character art
   // Map completion tracking for ticket rewards
   mapClears: {}, // { mapName: { cleared: true, sRank: true } }
   tutorialComplete: false,
@@ -48,6 +49,10 @@ export const Storage = {
             parsed.ships[id] = { level: 1, xp: 0 };
           });
           delete parsed.collection;
+        }
+        // Migration: convert old 'pixel' artwork mode to 'pokemon'
+        if (parsed.artworkMode === 'pixel') {
+          parsed.artworkMode = 'pokemon';
         }
         return { ...DEFAULT_SAVE, ...parsed };
       }
@@ -551,5 +556,25 @@ export const Storage = {
 
   getLastFormation() {
     return this.get('lastFormation') || 'LINE_AHEAD';
+  },
+
+  // Artwork mode management (pokemon vs anime ship girls)
+  getArtworkMode() {
+    const mode = this.get('artworkMode');
+    // Handle legacy 'pixel' mode - treat as 'pokemon'
+    if (!mode || mode === 'pixel') return 'pokemon';
+    return mode;
+  },
+
+  setArtworkMode(mode) {
+    if (mode !== 'pokemon' && mode !== 'anime') return false;
+    return this.set('artworkMode', mode);
+  },
+
+  toggleArtworkMode() {
+    const current = this.getArtworkMode();
+    const newMode = current === 'pokemon' ? 'anime' : 'pokemon';
+    this.setArtworkMode(newMode);
+    return newMode;
   },
 };

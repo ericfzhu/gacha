@@ -5,6 +5,7 @@ import { Storage } from '../systems/storage.js';
 import { SHIPS, RARITY, getShipById, getShipStats, getXpForLevel } from '../data/ships.js';
 import { AudioManager, BGM } from '../systems/audio.js';
 import { SHIP_TYPE_ABBREV } from '../data/equipment.js';
+import { getDisplayName, isPokemonMode, getShipTypeDisplay } from '../data/theme.js';
 
 // Notion-inspired colors
 const COLORS = {
@@ -84,7 +85,8 @@ export class CollectionScene extends Phaser.Scene {
 
     this.headerContainer.add(backBtn);
 
-    const title = this.add.text(width / 2, 20, 'Ship Collection', {
+    const collectionTitle = isPokemonMode() ? 'Pokedex' : 'Ship Collection';
+    const title = this.add.text(width / 2, 20, collectionTitle, {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '20px',
       fill: COLORS.textPrimary,
@@ -298,8 +300,8 @@ export class CollectionScene extends Phaser.Scene {
         fontStyle: 'bold',
       }).setOrigin(0.5));
 
-      // Ship name
-      c.add(this.add.text(80, h / 2 - 12, shipData.name, {
+      // Ship/Pokemon name
+      c.add(this.add.text(80, h / 2 - 12, getDisplayName(shipData.id, shipData.name), {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         fontSize: '13px',
         fill: COLORS.textPrimary,
@@ -481,8 +483,8 @@ export class CollectionScene extends Phaser.Scene {
     }).setOrigin(0.5));
     currentY += starFontSize + spacing;
 
-    // Ship name
-    this.detailContainer.add(this.add.text(0, currentY, shipData.name, {
+    // Ship/Pokemon name
+    this.detailContainer.add(this.add.text(0, currentY, getDisplayName(shipData.id, shipData.name), {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: `${titleFontSize}px`,
       fill: COLORS.textPrimary,
@@ -491,7 +493,8 @@ export class CollectionScene extends Phaser.Scene {
     currentY += titleFontSize + spacing * 0.5;
 
     // Type and rarity
-    this.detailContainer.add(this.add.text(0, currentY, `${shipData.type} • ${rarity.name}`, {
+    const typeDisplay = getShipTypeDisplay(shipData.type);
+    this.detailContainer.add(this.add.text(0, currentY, `${typeDisplay} • ${rarity.name}`, {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: `${labelFontSize}px`,
       fill: `#${rarity.color.toString(16).padStart(6, '0')}`,

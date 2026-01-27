@@ -4,10 +4,21 @@ import Phaser from 'phaser';
 import { Storage } from '../systems/storage.js';
 import { getShipById, getShipStats, RARITY, SHIP_TYPES } from '../data/ships.js';
 import { getEnemyById, getEnemyStats } from '../data/enemies.js';
-import { MAPS, MAP_ORDER, getMapById, getNodeById, getDamageState } from '../data/maps.js';
+import { MAPS, MAP_ORDER, getMapById, getNodeById, getDamageState, XP_MULTIPLIER } from '../data/maps.js';
 import { AudioManager, BGM } from '../systems/audio.js';
 import { FORMATIONS, getFormationById } from '../data/formations.js';
 import { SHIP_TYPE_ABBREV } from '../data/equipment.js';
+import { getDisplayName, isPokemonMode } from '../data/theme.js';
+
+// Get display name for battle (works for both player ships and enemies)
+function getBattleDisplayName(unit) {
+  // For player ships, use themed name based on ship ID
+  if (unit.isPlayer && unit.id) {
+    return getDisplayName(unit.id, unit.name);
+  }
+  // For enemies or units with just a name property, return as-is
+  return unit.name;
+}
 
 // Notion-inspired colors
 const COLORS = {
@@ -27,10 +38,10 @@ const COLORS = {
 // Reduced to 4 maps for ~30 minute gameplay
 // First clear gives base tickets, S-rank gives +2 bonus
 const STAGES = [
-  { name: '1-1', title: 'Patrol Waters', enemies: ['dd_001', 'dd_002'], enemyLevels: [1, 1], tickets: 20, baseXp: 50 },
-  { name: '1-2', title: 'Coastal Defense', enemies: ['cl_001', 'dd_003', 'dd_004'], enemyLevels: [5, 3, 3], tickets: 25, baseXp: 80 },
-  { name: '2-1', title: 'Fleet Engagement', enemies: ['ca_001', 'cl_002', 'dd_005'], enemyLevels: [10, 8, 6], tickets: 25, baseXp: 120 },
-  { name: '2-2', title: 'Final Battle', enemies: ['bb_001', 'ca_002', 'cl_003'], enemyLevels: [15, 12, 10], tickets: 30, baseXp: 180 },
+  { name: '1-1', title: 'Patrol Waters', enemies: ['dd_001', 'dd_002'], enemyLevels: [1, 1], tickets: 20, baseXp: 250 },
+  { name: '1-2', title: 'Coastal Defense', enemies: ['cl_001', 'dd_003', 'dd_004'], enemyLevels: [5, 3, 3], tickets: 25, baseXp: 400 },
+  { name: '2-1', title: 'Fleet Engagement', enemies: ['ca_001', 'cl_002', 'dd_005'], enemyLevels: [10, 8, 6], tickets: 25, baseXp: 600 },
+  { name: '2-2', title: 'Final Battle', enemies: ['bb_001', 'ca_002', 'cl_003'], enemyLevels: [15, 12, 10], tickets: 30, baseXp: 900 },
 ];
 // Total first-clear tickets: 20+25+25+30 = 100
 // Total S-rank bonuses: 4 maps * 2 = 8
@@ -148,7 +159,7 @@ export class BattleScene extends Phaser.Scene {
 
     damagedShips.forEach((ship, i) => {
       const status = ship.repairing ? '(Repairing)' : `(${ship.currentHp}/${ship.maxHp} HP)`;
-      this.add.text(width / 2, height / 2 + 20 + i * 25, `${ship.shipData.name} ${status}`, {
+      this.add.text(width / 2, height / 2 + 20 + i * 25, `${getDisplayName(ship.shipData.id, ship.shipData.name)} ${status}`, {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         fontSize: '13px',
         fill: '#e03e3e',
@@ -410,7 +421,8 @@ export class BattleScene extends Phaser.Scene {
 
     const textX = bannerWidth + 16;
 
-    c.add(this.add.text(textX, -10, `${shipData.name} Lv.${level}`, {
+    const displayName = getDisplayName(shipData.id, shipData.name);
+    c.add(this.add.text(textX, -10, `${displayName} Lv.${level}`, {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '12px',
       fill: '#37352f',
@@ -717,13 +729,13 @@ export class BattleScene extends Phaser.Scene {
         const damage = Math.floor(baseDmg * variance);
 
         target.currentHp = Math.max(0, target.currentHp - damage);
-        this.addLog(`${carrier.name} air strike >> ${target.name} ${damage} DMG`);
+        this.addLog(`${getBattleDisplayName(carrier)} air strike >> ${getBattleDisplayName(target)} ${damage} DMG`);
 
         await this.animateAirStrike(carrier, target, damage);
         this.updateHpDisplay(target);
 
         if (target.currentHp <= 0) {
-          this.addLog(`${target.name} SUNK!`);
+          this.addLog(`${getBattleDisplayName(target)} SUNK!`);
           await this.animateSink(target);
         }
       }
@@ -744,13 +756,13 @@ export class BattleScene extends Phaser.Scene {
         const damage = Math.floor(baseDmg * variance);
 
         target.currentHp = Math.max(0, target.currentHp - damage);
-        this.addLog(`${carrier.name} air strike >> ${target.name} ${damage} DMG`);
+        this.addLog(`${getBattleDisplayName(carrier)} air strike >> ${getBattleDisplayName(target)} ${damage} DMG`);
 
         await this.animateAirStrike(carrier, target, damage);
         this.updateHpDisplay(target);
 
         if (target.currentHp <= 0) {
-          this.addLog(`${target.name} SUNK!`);
+          this.addLog(`${getBattleDisplayName(target)} SUNK!`);
           await this.animateSink(target);
         }
       }
@@ -1032,12 +1044,13 @@ export class BattleScene extends Phaser.Scene {
       });
     }
 
-    // XP calculation
-    const xpPerShip = victory ? Math.floor(this.currentMapData.baseXp * (rank === 'S' ? 1.5 : rank === 'A' ? 1.2 : 1)) : 0;
+    // XP calculation (with XP_MULTIPLIER for faster progression)
+    const xpPerShip = victory ? Math.floor(this.currentMapData.baseXp * XP_MULTIPLIER * (rank === 'S' ? 1.5 : rank === 'A' ? 1.2 : 1)) : 0;
 
     // Ship Roster Section - responsive positioning
     const rosterY = panelY + panelHeight * 0.3;
-    this.add.text(panelX + panelWidth * 0.03, rosterY, 'Fleet Status', {
+    const rosterLabel = isPokemonMode() ? 'Team Status' : 'Fleet Status';
+    this.add.text(panelX + panelWidth * 0.03, rosterY, rosterLabel, {
       fontFamily: 'Arial, sans-serif',
       fontSize: `${labelSize}px`,
       fill: '#9b9a97',
@@ -1069,8 +1082,9 @@ export class BattleScene extends Phaser.Scene {
         if (ship.currentHp <= 0) portrait.setAlpha(0.3);
       }
 
-      // Ship name
-      this.add.text(cardX + shipCardWidth / 2, cardY + shipCardHeight * 0.55, ship.name, {
+      // Ship/Pokemon name
+      const displayShipName = getDisplayName(ship.id, ship.name);
+      this.add.text(cardX + shipCardWidth / 2, cardY + shipCardHeight * 0.55, displayShipName, {
         fontFamily: 'Arial, sans-serif',
         fontSize: `${textSize}px`,
         fill: ship.currentHp <= 0 ? '#9b9a97' : '#37352f',
@@ -1379,30 +1393,8 @@ export class BattleScene extends Phaser.Scene {
     const width = window.innerWidth;
     const height = window.innerHeight;
     const g = this.add.graphics();
-
-    // KanColle-style ocean gradient
-    for (let y = 0; y < height; y++) {
-      const ratio = y / height;
-      const r = Math.floor(30 + (26 - 30) * ratio);
-      const gVal = Math.floor(144 + (82 - 144) * ratio);
-      const b = Math.floor(255 + (180 - 255) * ratio);
-      g.fillStyle(Phaser.Display.Color.GetColor(r, gVal, b), 1);
-      g.fillRect(0, y, width, 1);
-    }
-
-    // Wave pattern - scale number of waves based on height
-    const numWaves = Math.floor(height / 80);
-    g.lineStyle(1, 0xffffff, 0.1);
-    for (let i = 0; i < numWaves; i++) {
-      const waveY = 100 + i * 80;
-      g.beginPath();
-      for (let x = 0; x < width; x += 5) {
-        const y = waveY + Math.sin((x + i * 50) * 0.02) * 3;
-        if (x === 0) g.moveTo(x, y);
-        else g.lineTo(x, y);
-      }
-      g.strokePath();
-    }
+    g.fillStyle(0x1a3a5c, 1);
+    g.fillRect(0, 0, width, height);
   }
 
   createBattleShipDisplay(x, y, ship, isPlayer, cardWidth = 300) {
@@ -1441,7 +1433,7 @@ export class BattleScene extends Phaser.Scene {
 
     const textX = bannerWidth + 12;
 
-    const name = this.add.text(textX, -12, `${ship.name} Lv.${ship.level}`, {
+    const name = this.add.text(textX, -12, `${getBattleDisplayName(ship)} Lv.${ship.level}`, {
       fontFamily: 'Arial, sans-serif',
       fontSize: '12px',
       fill: '#1a1a2e',
@@ -1558,7 +1550,7 @@ export class BattleScene extends Phaser.Scene {
     const hit = Math.random() * 100 < hitChance;
 
     if (!hit) {
-      this.addLog(`${attacker.name} attacks ${target.name}... MISS!`);
+      this.addLog(`${getBattleDisplayName(attacker)} attacks ${getBattleDisplayName(target)}... MISS!`);
       await this.animateMiss(target);
       return;
     }
@@ -1593,7 +1585,7 @@ export class BattleScene extends Phaser.Scene {
     target.currentHp = Math.max(0, target.currentHp - damage);
 
     const critText = critical ? ' CRITICAL!' : '';
-    this.addLog(`${attacker.name} >> ${target.name} ${damage} DMG${critText}`);
+    this.addLog(`${getBattleDisplayName(attacker)} >> ${getBattleDisplayName(target)} ${damage} DMG${critText}`);
 
     // Show battle cut-in for critical hits from player ships
     if (critical && attacker.isPlayer) {
@@ -1604,7 +1596,7 @@ export class BattleScene extends Phaser.Scene {
     this.updateHpDisplay(target);
 
     if (target.currentHp <= 0) {
-      this.addLog(`${target.name} SUNK!`);
+      this.addLog(`${getBattleDisplayName(target)} SUNK!`);
       await this.animateSink(target);
     }
   }
@@ -2200,7 +2192,7 @@ export class BattleScene extends Phaser.Scene {
     }
 
     // Ship name
-    const nameText = this.add.text(width * 0.45, -25, attacker.name, {
+    const nameText = this.add.text(width * 0.45, -25, getBattleDisplayName(attacker), {
       fontFamily: 'Arial, sans-serif',
       fontSize: '36px',
       fill: '#ffffff',
@@ -2608,8 +2600,8 @@ export class BattleScene extends Phaser.Scene {
       }).setOrigin(0.5);
       yOffset += 30;
 
-      // XP rewards
-      const xpPerShip = Math.floor(stage.baseXp * (rank === 'S' ? 1.5 : rank === 'A' ? 1.2 : 1));
+      // XP rewards (with XP_MULTIPLIER for faster progression)
+      const xpPerShip = Math.floor(stage.baseXp * XP_MULTIPLIER * (rank === 'S' ? 1.5 : rank === 'A' ? 1.2 : 1));
 
       this.add.text(width / 2, height / 2 + yOffset, 'EXP Gained:', {
         fontFamily: 'Arial, sans-serif',
@@ -2620,7 +2612,7 @@ export class BattleScene extends Phaser.Scene {
 
       playerAlive.forEach(ship => {
         const result = Storage.addXpToShip(ship.id, xpPerShip, ship.maxLevel);
-        let text = `${ship.name}: +${xpPerShip} EXP`;
+        let text = `${getBattleDisplayName(ship)}: +${xpPerShip} EXP`;
         if (result && result.leveledUp) text += ` LEVEL UP! Lv.${result.newLevel}`;
         this.add.text(width / 2, height / 2 + yOffset, text, {
           fontFamily: 'Arial, sans-serif',

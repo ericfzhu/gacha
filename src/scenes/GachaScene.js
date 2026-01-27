@@ -5,6 +5,7 @@ import { Gacha } from '../systems/gacha.js';
 import { Storage } from '../systems/storage.js';
 import { RARITY } from '../data/ships.js';
 import { AudioManager, BGM } from '../systems/audio.js';
+import { getDisplayName, isPokemonMode } from '../data/theme.js';
 
 // Notion-inspired colors
 const COLORS = {
@@ -551,9 +552,10 @@ export class GachaScene extends Phaser.Scene {
       container.add(portrait);
     }
 
-    // Ship name - scale font size
+    // Ship/Pokemon name - scale font size
     const baseFontSize = Math.max(9, Math.min(14, 11 * scale));
-    const nameText = this.add.text(0, 35 * scale, ship.name, {
+    const displayName = getDisplayName(ship.id, ship.name);
+    const nameText = this.add.text(0, 35 * scale, displayName, {
       fontFamily: 'Arial, sans-serif',
       fontSize: `${baseFontSize}px`,
       fill: '#1a1a2e',

@@ -5,6 +5,7 @@ import { Storage } from '../systems/storage.js';
 import { getShipById, RARITY } from '../data/ships.js';
 import { AudioManager, BGM } from '../systems/audio.js';
 import { addButtonFeedback } from '../systems/ui.js';
+import { getTerm, getDisplayName, getSecretaryMessages, isPokemonMode } from '../data/theme.js';
 
 // Notion-inspired color palette
 const COLORS = {
@@ -81,7 +82,7 @@ export class TitleScene extends Phaser.Scene {
     g.fillRect(0, 55, width, 1);
 
     // Title
-    this.add.text(24, 28, 'Fleet Collection', {
+    this.add.text(24, 28, getTerm('gameTitle'), {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '20px',
       fill: '#37352f',
@@ -131,7 +132,7 @@ export class TitleScene extends Phaser.Scene {
     g.strokeRoundedRect(panelX, panelY, panelW, panelH, 6);
 
     // Section title
-    this.add.text(panelX + 16, panelY + 20, 'Secretary Ship', {
+    this.add.text(panelX + 16, panelY + 20, getTerm('secretaryShip'), {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '12px',
       fill: '#9b9a97',
@@ -149,7 +150,10 @@ export class TitleScene extends Phaser.Scene {
         this.displaySecretary(panelX, panelY + 40, panelW, panelH - 50, shipData, savedData);
       }
     } else {
-      this.add.text(panelX + panelW / 2, panelY + panelH / 2, 'No Secretary Ship\n\nAssign a ship to Fleet Slot #1', {
+      const noSecretaryMsg = isPokemonMode()
+        ? 'No Partner Pokemon\n\nAssign a Pokemon to Team Slot #1'
+        : 'No Secretary Ship\n\nAssign a ship to Fleet Slot #1';
+      this.add.text(panelX + panelW / 2, panelY + panelH / 2, noSecretaryMsg, {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         fontSize: '14px',
         fill: '#9b9a97',
@@ -162,16 +166,78 @@ export class TitleScene extends Phaser.Scene {
     const centerX = panelX + panelW / 2;
     const centerY = panelY + panelH / 2;
 
-    // Ship portrait - fills the panel
+    // Create container for secretary display
+    const container = this.add.container(centerX, centerY);
+
+    const boatY = panelH * 0.15; // Boat position
+
+    // In Pokemon mode, draw back layer of boat (behind Pokemon)
+    if (isPokemonMode()) {
+      // Water background - fills bottom half
+      const water = this.add.graphics();
+      water.fillStyle(0x4a90d9, 0.2);
+      water.fillRect(-panelW / 2, boatY + 20, panelW, panelH);
+
+      // Water waves
+      water.fillStyle(0x6ab0e8, 0.3);
+      water.fillEllipse(0, boatY + 120, 280, 40);
+      water.fillStyle(0x4a90d9, 0.25);
+      water.fillEllipse(0, boatY + 150, 320, 35);
+      container.add(water);
+
+      // Boat back layer - hull interior and flag (behind Pokemon)
+      const boatBack = this.add.graphics();
+
+      // Hull bottom (visible behind Pokemon)
+      boatBack.fillStyle(0x654321, 1);
+      boatBack.beginPath();
+      boatBack.moveTo(-210, boatY + 90);
+      boatBack.lineTo(-150, boatY + 135);
+      boatBack.lineTo(150, boatY + 135);
+      boatBack.lineTo(210, boatY + 90);
+      boatBack.closePath();
+      boatBack.fill();
+
+      // Cute flag on a small mast (on the right side) - behind Pokemon
+      boatBack.fillStyle(0x8B4513, 1);
+      boatBack.fillRect(120, boatY - 150, 12, 162);
+
+      // Flag (triangle)
+      boatBack.fillStyle(0xe03e3e, 1);
+      boatBack.beginPath();
+      boatBack.moveTo(132, boatY - 135);
+      boatBack.lineTo(225, boatY - 90);
+      boatBack.lineTo(132, boatY - 45);
+      boatBack.closePath();
+      boatBack.fill();
+
+      container.add(boatBack);
+
+      // Animate water waves
+      this.tweens.add({
+        targets: water,
+        alpha: 0.9,
+        duration: 2000,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+    }
+
+    // Ship/Pokemon portrait (middle layer)
     const portraitKey = `ship_portrait_${shipData.id}`;
+    let portrait = null;
+    let scale = 1;
     if (this.textures.exists(portraitKey)) {
-      const portrait = this.add.image(centerX, centerY, portraitKey);
-      // Scale to fill the panel
-      const maxW = panelW - 32;
-      const maxH = panelH - 32;
-      const scale = Math.min(maxW / portrait.width, maxH / portrait.height);
+      // Position Pokemon to sit IN the boat in Pokemon mode
+      const portraitY = isPokemonMode() ? boatY - 40 : 0;
+      portrait = this.add.image(0, portraitY, portraitKey);
+      // Scale to fit - smaller in Pokemon mode to fit in boat
+      const maxW = isPokemonMode() ? panelW * 0.5 : panelW - 32;
+      const maxH = isPokemonMode() ? panelH * 0.4 : panelH - 32;
+      scale = Math.min(maxW / portrait.width, maxH / portrait.height);
       portrait.setScale(scale);
-      portrait.setInteractive();
+      container.add(portrait);
 
       // Idle breathing animation - subtle scale oscillation
       this.tweens.add({
@@ -184,32 +250,61 @@ export class TitleScene extends Phaser.Scene {
         ease: 'Sine.easeInOut',
       });
 
-      // Subtle floating animation
+      // Subtle floating/bobbing animation
+      const baseY = portrait.y;
       this.tweens.add({
         targets: portrait,
-        y: centerY - 3,
-        duration: 3000,
+        y: baseY - (isPokemonMode() ? 5 : 3),
+        duration: isPokemonMode() ? 2000 : 3000,
         yoyo: true,
         repeat: -1,
         ease: 'Sine.easeInOut',
       });
-
-      // Touch/click reaction
-      portrait.on('pointerdown', () => {
-        // Quick scale bounce
-        this.tweens.add({
-          targets: portrait,
-          scaleX: scale * 1.05,
-          scaleY: scale * 1.05,
-          duration: 100,
-          yoyo: true,
-          ease: 'Quad.easeOut',
-        });
-
-        // Show a random message
-        this.showSecretaryMessage(centerX, panelY + panelH - 60, shipData);
-      });
     }
+
+    // In Pokemon mode, draw front layer of boat (in front of Pokemon)
+    if (isPokemonMode()) {
+      const boatFront = this.add.graphics();
+
+      // Main hull - warm wood color (front, overlaps Pokemon's lower body)
+      boatFront.fillStyle(0x8B4513, 1);
+      boatFront.beginPath();
+      boatFront.moveTo(-180, boatY);
+      boatFront.lineTo(-210, boatY + 90);
+      boatFront.lineTo(210, boatY + 90);
+      boatFront.lineTo(180, boatY);
+      boatFront.closePath();
+      boatFront.fill();
+
+      // Hull highlight stripe
+      boatFront.fillStyle(0xA0522D, 1);
+      boatFront.fillRect(-165, boatY + 15, 330, 24);
+
+      // Boat rim (top edge) - in front of Pokemon
+      boatFront.fillStyle(0xDEB887, 1);
+      boatFront.fillRect(-186, boatY - 12, 372, 18);
+
+      container.add(boatFront);
+    }
+
+    // Make container interactive
+    const hitArea = this.add.rectangle(centerX, centerY, panelW, panelH, 0x000000, 0).setInteractive();
+
+    // Touch/click reaction
+    hitArea.on('pointerdown', () => {
+      // Quick scale bounce on container
+      this.tweens.add({
+        targets: container,
+        scaleX: 1.03,
+        scaleY: 1.03,
+        duration: 100,
+        yoyo: true,
+        ease: 'Quad.easeOut',
+      });
+
+      // Show a random message
+      this.showSecretaryMessage(centerX, panelY + panelH - 60, shipData);
+    });
   }
 
   showSecretaryMessage(x, y, shipData) {
@@ -218,30 +313,8 @@ export class TitleScene extends Phaser.Scene {
       this.secretaryMessage.destroy();
     }
 
-    // Time-based and random messages
-    const hour = new Date().getHours();
-    let timeGreeting = '';
-    if (hour >= 5 && hour < 12) {
-      timeGreeting = 'Good morning, Admiral!';
-    } else if (hour >= 12 && hour < 17) {
-      timeGreeting = 'Good afternoon, Admiral!';
-    } else if (hour >= 17 && hour < 21) {
-      timeGreeting = 'Good evening, Admiral!';
-    } else {
-      timeGreeting = "It's late, Admiral...";
-    }
-
-    const messages = [
-      timeGreeting,
-      `${shipData.name}, reporting for duty!`,
-      'Shall we sortie today?',
-      'The fleet is ready!',
-      'I\'ll do my best!',
-      'Leave it to me!',
-      'Admiral, is something wrong?',
-      'I\'m counting on you!',
-    ];
-
+    // Get themed messages based on current mode
+    const messages = getSecretaryMessages(shipData.id, shipData.name);
     const message = messages[Math.floor(Math.random() * messages.length)];
 
     // Create speech bubble
@@ -319,14 +392,14 @@ export class TitleScene extends Phaser.Scene {
       fontStyle: 'bold',
     }).setOrigin(0, 0.5);
 
-    // Menu buttons - Notion style list items
+    // Menu buttons - Notion style list items (themed based on mode)
     const menuItems = [
-      { text: 'Sortie', desc: 'Deploy fleet for combat', scene: 'BattleScene', icon: '\u2694' },
+      { text: getTerm('sortie'), desc: getTerm('sortieDesc'), scene: 'BattleScene', icon: '\u2694' },
       { text: 'Special Gacha', desc: 'Win special gifts!', scene: 'PremiumGachaScene', icon: '\u2764', highlight: true },
-      { text: 'Organize', desc: 'Manage fleet composition', scene: 'FleetScene', icon: '\u2693' },
-      { text: 'Repair Dock', desc: 'Repair damaged ships', scene: 'DockScene', icon: '\u{1F527}' },
-      { text: 'Collection', desc: 'View ship collection', scene: 'CollectionScene', icon: '\u{1F6A2}' },
-      { text: 'Construction', desc: 'Build new ships', scene: 'GachaScene', icon: '\u2699' },
+      { text: getTerm('organize'), desc: getTerm('organizeDesc'), scene: 'FleetScene', icon: '\u2693' },
+      { text: getTerm('repair'), desc: getTerm('repairDesc'), scene: 'DockScene', icon: '\u{1F527}' },
+      { text: getTerm('collection'), desc: getTerm('collectionDesc'), scene: 'CollectionScene', icon: '\u{1F6A2}' },
+      { text: getTerm('construction'), desc: getTerm('constructionDesc'), scene: 'GachaScene', icon: '\u2699' },
       { text: 'Gift Collection', desc: 'View obtained gifts', scene: 'GiftCollectionScene', icon: '\u{1F381}' },
     ];
 
@@ -465,17 +538,17 @@ export class TitleScene extends Phaser.Scene {
     g.fillStyle(COLORS.border, 1);
     g.fillRect(0, height - 48, width, 1);
 
-    // Ship count
+    // Ship/Pokemon count
     const shipCount = Storage.getOwnedShipCount();
-    this.add.text(24, height - 24, `${shipCount} ships`, {
+    this.add.text(24, height - 24, `${shipCount} ${getTerm('shipCount')}`, {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '13px',
       fill: '#9b9a97',
     }).setOrigin(0, 0.5);
 
-    // Fleet status
+    // Fleet/Team status
     const fleet = saveData.fleet.filter(id => id !== null).length;
-    this.add.text(120, height - 24, `Fleet: ${fleet}/6`, {
+    this.add.text(120, height - 24, `${getTerm('fleet')}: ${fleet}/6`, {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '13px',
       fill: '#9b9a97',
@@ -487,5 +560,14 @@ export class TitleScene extends Phaser.Scene {
       fontSize: '12px',
       fill: '#9b9a97',
     }).setOrigin(1, 0.5);
+
+    // Artwork mode indicator
+    const artworkMode = Storage.getArtworkMode();
+    const modeLabel = artworkMode === 'pokemon' ? 'Pokemon Mode' : 'Ship Girls Mode';
+    this.add.text(width / 2, height - 24, `🎨 ${modeLabel}`, {
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      fontSize: '11px',
+      fill: '#9b9a97',
+    }).setOrigin(0.5, 0.5);
   }
 }

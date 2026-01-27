@@ -7,6 +7,7 @@ import { getShipById, getShipStats, RARITY } from '../data/ships.js';
 import { getDamageState } from '../data/maps.js';
 import { FORMATIONS, FORMATION_ORDER, formatModifier } from '../data/formations.js';
 import { AudioManager, BGM } from '../systems/audio.js';
+import { getDisplayName } from '../data/theme.js';
 
 // Notion-inspired colors
 const COLORS = {
@@ -336,7 +337,7 @@ export class FormationScene extends Phaser.Scene {
       const y = panelY + panelH * 0.55;
 
       // Ship name
-      this.add.text(x, y - panelH * 0.15, shipData.name, {
+      this.add.text(x, y - panelH * 0.15, getDisplayName(shipData.id, shipData.name), {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         fontSize: `${nameSize}px`,
         fill: COLORS.textPrimary,

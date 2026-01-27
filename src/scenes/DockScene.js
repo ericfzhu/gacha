@@ -6,6 +6,7 @@ import { Storage } from '../systems/storage.js';
 import { getShipById, getShipStats, RARITY } from '../data/ships.js';
 import { calculateRepairTime, getDamageState } from '../data/maps.js';
 import { AudioManager, BGM } from '../systems/audio.js';
+import { getDisplayName } from '../data/theme.js';
 
 // Notion-inspired colors
 const COLORS = {
@@ -182,7 +183,7 @@ export class DockScene extends Phaser.Scene {
           fill: `#${rarity.color.toString(16).padStart(6, '0')}`,
         });
 
-        this.add.text(infoX, y + 70, shipData.name, {
+        this.add.text(infoX, y + 70, getDisplayName(shipData.id, shipData.name), {
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
           fontSize: '18px',
           fill: COLORS.textPrimary,
@@ -369,7 +370,7 @@ export class DockScene extends Phaser.Scene {
     }
 
     // Ship name
-    this.add.text(x + 65, y + 12, shipData.name, {
+    this.add.text(x + 65, y + 12, getDisplayName(shipData.id, shipData.name), {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '14px',
       fill: COLORS.textPrimary,

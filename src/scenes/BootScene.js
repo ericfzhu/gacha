@@ -4,6 +4,7 @@ import Phaser from 'phaser';
 import { SHIPS } from '../data/ships.js';
 import { ENEMIES } from '../data/enemies.js';
 import { AudioManager, BGM } from '../systems/audio.js';
+import { Storage } from '../systems/storage.js';
 
 // Notion-inspired colors
 const COLORS = {
@@ -26,6 +27,16 @@ export class BootScene extends Phaser.Scene {
     const width = window.innerWidth;
     const height = window.innerHeight;
     this.scale.resize(width, height);
+
+    // Clear texture cache for ship assets (needed when switching artwork modes)
+    SHIPS.forEach(ship => {
+      if (this.textures.exists(`ship_portrait_${ship.id}`)) {
+        this.textures.remove(`ship_portrait_${ship.id}`);
+      }
+      if (this.textures.exists(`ship_banner_${ship.id}`)) {
+        this.textures.remove(`ship_banner_${ship.id}`);
+      }
+    });
 
     const g = this.add.graphics();
 
@@ -67,17 +78,35 @@ export class BootScene extends Phaser.Scene {
       barFill.width = 296 * value;
     });
 
+    // Error handler - log failed assets
+    this.load.on('loaderror', (file) => {
+      console.error('Failed to load asset:', file.key, file.src);
+    });
+
+    // Complete handler
+    this.load.on('complete', () => {
+      console.log('All assets loaded successfully');
+    });
+
+    // Determine artwork mode (pokemon or anime ship girls)
+    // Default is 'pokemon', secret code "KANCOLLE" switches to 'anime'
+    const artworkMode = Storage.getArtworkMode();
+    console.log('Artwork mode:', artworkMode);
+    const shipFolder = artworkMode === 'anime' ? 'ships' : 'ships_pokemon';
+    const bannerFolder = artworkMode === 'anime' ? 'banners' : 'banners_pokemon';
+    console.log('Loading from folders:', shipFolder, bannerFolder);
+
     // Load ship portrait images
     SHIPS.forEach(ship => {
-      this.load.image(`ship_portrait_${ship.id}`, `assets/ships/${ship.id}.png`);
+      this.load.image(`ship_portrait_${ship.id}`, `assets/${shipFolder}/${ship.id}.png`);
     });
 
     // Load ship banner images (for battle/sortie UI)
     SHIPS.forEach(ship => {
-      this.load.image(`ship_banner_${ship.id}`, `assets/banners/${ship.id}.png`);
+      this.load.image(`ship_banner_${ship.id}`, `assets/${bannerFolder}/${ship.id}.png`);
     });
 
-    // Load enemy banner images (for battle UI)
+    // Load enemy banner images (for battle UI) - always use regular banners folder
     ENEMIES.forEach(enemy => {
       this.load.image(`ship_banner_${enemy.id}`, `assets/banners/${enemy.id}.png`);
     });
@@ -88,6 +117,9 @@ export class BootScene extends Phaser.Scene {
     this.load.audio(BGM.BATTLE, 'assets/audio/bgm_battle.mp3');
     this.load.audio(BGM.VICTORY, 'assets/audio/bgm_victory.mp3');
     this.load.audio(BGM.GIFT, 'assets/audio/bgm_gift.mp3');
+
+    // Load background images
+    this.load.image('ocean_bg', 'assets/ocean_bg.webp');
 
     // Create UI assets
     this.createUIAssets();

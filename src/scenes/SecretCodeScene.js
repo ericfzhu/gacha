@@ -13,6 +13,9 @@ const TEST_CODES = {
   'FUEL100K': { type: 'fuel', amount: 100000, message: '+100,000 Fuel!' },
   'TICKETS500': { type: 'tickets', amount: 500, message: '+500 Premium Tickets!' },
   'RESETGAME': { type: 'reset', message: 'Game Reset!' },
+  'KANCOLLE': { type: 'artwork', message: 'Artwork mode switched!' },
+  'POKEMON': { type: 'artwork_pokemon', message: 'Pokemon mode enabled!' },
+  'ANIME': { type: 'artwork_anime', message: 'Ship girl artwork enabled!' },
 };
 
 // Notion-inspired colors
@@ -223,6 +226,16 @@ export class SecretCodeScene extends Phaser.Scene {
       } else if (testCode.type === 'reset') {
         Storage.reset();
         this.showTestCodeSuccess(testCode.message, '🔄');
+      } else if (testCode.type === 'artwork') {
+        const newMode = Storage.toggleArtworkMode();
+        const modeLabel = newMode === 'pokemon' ? 'Pokemon' : 'Ship Girls';
+        this.showArtworkModeChange(modeLabel);
+      } else if (testCode.type === 'artwork_pokemon') {
+        Storage.setArtworkMode('pokemon');
+        this.showArtworkModeChange('Pokemon');
+      } else if (testCode.type === 'artwork_anime') {
+        Storage.setArtworkMode('anime');
+        this.showArtworkModeChange('Ship Girls');
       }
       return;
     }
@@ -268,6 +281,31 @@ export class SecretCodeScene extends Phaser.Scene {
 
     this.time.delayedCall(1500, () => {
       this.messageText.setText('');
+    });
+  }
+
+  showArtworkModeChange(modeLabel) {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    this.cameras.main.flash(300, 46, 170, 220);
+
+    // Show success message
+    this.messageText.setText(`🎨 Switched to: ${modeLabel}`);
+    this.messageText.setStyle({ fill: COLORS.accent });
+
+    // Clear input
+    this.inputText = '';
+    this.updateDisplay();
+
+    // Show restart notice
+    this.time.delayedCall(1000, () => {
+      this.messageText.setText('Restarting to apply changes...');
+
+      // Restart the game to reload assets with new artwork mode
+      this.time.delayedCall(1500, () => {
+        this.scene.start('BootScene');
+      });
     });
   }
 

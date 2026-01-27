@@ -6,6 +6,7 @@ import { Storage } from '../systems/storage.js';
 import { getShipById, getShipStats, RARITY } from '../data/ships.js';
 import { MAPS, getMapById, getNodeById, getDamageState } from '../data/maps.js';
 import { AudioManager, BGM } from '../systems/audio.js';
+import { getDisplayName } from '../data/theme.js';
 
 // Notion-inspired colors
 const COLORS = {
@@ -135,9 +136,8 @@ export class MapScene extends Phaser.Scene {
     g.lineStyle(1, COLORS.border, 1);
     g.strokeRoundedRect(panelX, panelY, panelW, panelH, 6);
 
-    // Ocean background inside panel
-    g.fillStyle(COLORS.ocean, 1);
-    g.fillRoundedRect(panelX + 10, panelY + 10, panelW - 20, panelH - 20, 4);
+    // Create realistic ocean inside the map panel
+    this.createMapOcean(panelX + 10, panelY + 10, panelW - 20, panelH - 20);
 
     // Calculate node bounds for scaling
     const nodes = Object.values(this.mapData.nodes);
@@ -549,7 +549,7 @@ export class MapScene extends Phaser.Scene {
       const y = panelY + 50 + index * 65;
 
       // Ship name
-      this.add.text(panelX + 16, y, shipData.name, {
+      this.add.text(panelX + 16, y, getDisplayName(shipData.id, shipData.name), {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         fontSize: '13px',
         fill: COLORS.textPrimary,
@@ -696,5 +696,11 @@ export class MapScene extends Phaser.Scene {
 
     // Explicitly clear map/node data to show sortie selection
     this.scene.start('BattleScene', { mapId: null, nodeId: null, fleetHp: {}, isBoss: false });
+  }
+
+  createMapOcean(x, y, w, h) {
+    const g = this.add.graphics();
+    g.fillStyle(0x1a3a5c, 1);
+    g.fillRoundedRect(x, y, w, h, 4);
   }
 }

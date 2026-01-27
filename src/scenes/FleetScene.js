@@ -6,6 +6,7 @@ import { getShipById, getShipStats, RARITY } from '../data/ships.js';
 import { getDamageState } from '../data/maps.js';
 import { AudioManager, BGM } from '../systems/audio.js';
 import { SHIP_TYPE_ABBREV } from '../data/equipment.js';
+import { getDisplayName, getTerm, getShipTypeDisplay, isPokemonMode } from '../data/theme.js';
 
 // Notion-inspired colors
 const COLORS = {
@@ -75,7 +76,8 @@ export class FleetScene extends Phaser.Scene {
     backBtn.on('pointerout', () => backBtn.setStyle({ fill: COLORS.textSecondary }));
     backBtn.on('pointerdown', () => this.scene.start('TitleScene'));
 
-    this.add.text(width / 2, 28, 'Organize Fleet', {
+    const pageTitle = isPokemonMode() ? 'Organize Team' : 'Organize Fleet';
+    this.add.text(width / 2, 28, pageTitle, {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '20px',
       fill: COLORS.textPrimary,
@@ -218,8 +220,8 @@ export class FleetScene extends Phaser.Scene {
           fontStyle: 'bold',
         }).setOrigin(0, 0.5));
 
-        // Ship name
-        c.add(this.add.text(infoX, -halfH + 40, shipData.name, {
+        // Ship/Pokemon name
+        c.add(this.add.text(infoX, -halfH + 40, getDisplayName(shipId, shipData.name), {
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
           fontSize: '14px',
           fill: COLORS.textPrimary,
@@ -232,6 +234,19 @@ export class FleetScene extends Phaser.Scene {
           fontSize: '16px',
           fill: COLORS.textPrimary,
           fontStyle: 'bold',
+        }).setOrigin(0, 0.5));
+
+        // Stats display
+        c.add(this.add.text(infoX, -halfH + 82, `ATK:${stats.attack}  DEF:${stats.defense}`, {
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          fontSize: '10px',
+          fill: COLORS.textTertiary,
+        }).setOrigin(0, 0.5));
+
+        c.add(this.add.text(infoX, -halfH + 96, `SPD:${stats.speed}  EVA:${stats.evasion}`, {
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          fontSize: '10px',
+          fill: COLORS.textTertiary,
         }).setOrigin(0, 0.5));
 
         // HP bar
@@ -482,8 +497,8 @@ export class FleetScene extends Phaser.Scene {
       fill: `#${rarity.color.toString(16).padStart(6, '0')}`,
     }).setOrigin(0, 0.5);
 
-    // Ship name
-    const nameText = this.add.text(x + 50, y + 28, shipData.name, {
+    // Ship/Pokemon name
+    const nameText = this.add.text(x + 50, y + 28, getDisplayName(shipId, shipData.name), {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '13px',
       fill: inFleet || !canAssign ? COLORS.textTertiary : COLORS.textPrimary,
@@ -507,6 +522,14 @@ export class FleetScene extends Phaser.Scene {
       fill: isRepairing ? '#2eaadc' : hpColor,
     }).setOrigin(0, 0.5);
 
+    // Stats display
+    const statsStr = `ATK:${stats.attack}  DEF:${stats.defense}  SPD:${stats.speed}  EVA:${stats.evasion}`;
+    const statsText = this.add.text(x + 270, y + 20, statsStr, {
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      fontSize: '10px',
+      fill: COLORS.textTertiary,
+    }).setOrigin(0, 0.5);
+
     // Status text
     let statusText = 'Assign →';
     let statusColor = COLORS.accent;
@@ -528,7 +551,7 @@ export class FleetScene extends Phaser.Scene {
     }).setOrigin(1, 0.5);
 
     // Add all to container
-    this.shipListContainer.add([bg, starsText, nameText, levelText, hpText, statusTextObj]);
+    this.shipListContainer.add([bg, starsText, nameText, levelText, hpText, statsText, statusTextObj]);
 
     if (canAssign) {
       const hit = this.add.rectangle(x + itemWidth / 2, y + 20, itemWidth, 40, 0x000000, 0).setInteractive();
