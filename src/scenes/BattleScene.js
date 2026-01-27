@@ -512,8 +512,8 @@ export class BattleScene extends Phaser.Scene {
     const maxShips = Math.max(playerFleet.length, enemyFleet.length);
     const totalRows = maxShips + 1; // +1 for the label row
     const availableHeight = fleetAreaBottom - fleetAreaTop;
-    // Taller rows for Pokemon mode to fit boats
-    const maxRowHeight = isPokemonMode() ? 105 : 70;
+    // Taller rows for Pokemon mode to fit boats, and for enemy visibility
+    const maxRowHeight = isPokemonMode() ? 105 : 80;
     const rowHeight = Math.min(maxRowHeight, availableHeight / totalRows);
 
     // Row 0: Fleet labels (same height as ship cards)
@@ -1343,8 +1343,8 @@ export class BattleScene extends Phaser.Scene {
     const maxShips = Math.max(playerFleet.length, enemyFleet.length);
     const totalRows = maxShips + 1; // +1 for the label row
     const availableHeight = fleetAreaBottom - fleetAreaTop;
-    // Taller rows for Pokemon mode to fit boats
-    const maxRowHeight = isPokemonMode() ? 105 : 70;
+    // Taller rows for Pokemon mode to fit boats, and for enemy visibility
+    const maxRowHeight = isPokemonMode() ? 105 : 80;
     const rowHeight = Math.min(maxRowHeight, availableHeight / totalRows);
 
     // Row 0: Fleet labels (same height as ship cards)
@@ -1404,8 +1404,8 @@ export class BattleScene extends Phaser.Scene {
   createBattleShipDisplay(x, y, ship, isPlayer, cardWidth = 300) {
     const c = this.add.container(x, y);
     const rarity = RARITY[ship.rarity];
-    // Taller cards for player Pokemon to fit the boats
-    const cardHeight = (isPlayer && isPokemonMode()) ? 90 : 50;
+    // Taller cards for player Pokemon to fit the boats, and taller enemy cards for better visibility
+    const cardHeight = (isPlayer && isPokemonMode()) ? 90 : (isPlayer ? 50 : 70);
 
     const bg = this.add.graphics();
     bg.fillStyle(isPlayer ? 0xe8f5e9 : 0xffebee, 0.95);
@@ -1416,7 +1416,7 @@ export class BattleScene extends Phaser.Scene {
     // Ship banner image
     const bannerKey = `ship_banner_${ship.id}`;
     const bannerWidth = Math.min(160, cardWidth * 0.45);
-    const bannerHeight = 40;
+    const bannerHeight = isPlayer ? 40 : 60;
     const bannerX = (isPlayer && isPokemonMode()) ? 4 + 55 : 4 + bannerWidth / 2;
 
     // Add dark background for enemy banners (they have transparent backgrounds)

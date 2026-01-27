@@ -21,8 +21,9 @@ const DEFAULT_SAVE = {
   // Ships now stored as objects with level, xp, and HP
   ships: {}, // { shipId: { level: 1, xp: 0, currentHp: null, repairEndTime: null } }
   fleet: [null, null, null, null, null, null],
-  // Repair docks - up to 2 ships can repair at once
-  repairDocks: [null, null], // [shipId, shipId] or null for empty
+  // Repair docks - starts with 2, can purchase up to 5
+  ownedDocks: 2,
+  repairDocks: [null, null, null, null, null], // [shipId, ...] or null for empty
   // Equipment system
   ownedEquipment: [], // Array of equipment IDs (can have duplicates)
   shipEquipment: {}, // { shipId: [equipIdx, equipIdx, null] } - indexes into ownedEquipment
@@ -361,17 +362,51 @@ export const Storage = {
   },
 
   // Repair dock management
+  getOwnedDockCount() {
+    return this.get('ownedDocks') || 2;
+  },
+
+  getDockPurchaseCost(currentCount) {
+    // Cost increases: 500, 1000, 2000 for docks 3, 4, 5
+    const costs = [0, 0, 500, 1000, 2000];
+    return costs[currentCount] || 0;
+  },
+
+  purchaseDock() {
+    const data = this.load();
+    const currentDocks = data.ownedDocks || 2;
+    if (currentDocks >= 5) return { success: false, error: 'Maximum docks reached' };
+
+    const cost = this.getDockPurchaseCost(currentDocks);
+    if (data.currency < cost) return { success: false, error: 'Not enough fuel' };
+
+    data.currency -= cost;
+    data.ownedDocks = currentDocks + 1;
+    this.save(data);
+    return { success: true, newCount: data.ownedDocks };
+  },
+
   getRepairDocks() {
-    return this.get('repairDocks') || [null, null];
+    const data = this.load();
+    const ownedCount = data.ownedDocks || 2;
+    const docks = data.repairDocks || [null, null, null, null, null];
+    return docks.slice(0, ownedCount);
   },
 
   startRepair(shipId, repairEndTime) {
     const data = this.load();
     if (!data.ships[shipId]) return { success: false, error: 'Ship not found' };
 
-    // Find empty dock
-    if (!data.repairDocks) data.repairDocks = [null, null];
-    const emptyDock = data.repairDocks.findIndex(d => d === null);
+    // Find empty dock within owned docks
+    if (!data.repairDocks) data.repairDocks = [null, null, null, null, null];
+    const ownedCount = data.ownedDocks || 2;
+    let emptyDock = -1;
+    for (let i = 0; i < ownedCount; i++) {
+      if (data.repairDocks[i] === null) {
+        emptyDock = i;
+        break;
+      }
+    }
     if (emptyDock === -1) return { success: false, error: 'No empty docks' };
 
     // Check if already repairing

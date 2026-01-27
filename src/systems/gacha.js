@@ -13,7 +13,7 @@ const DUPLICATE_XP_BASE = {
   SR: 200,
   SSR: 500,
 };
-const DUPLICATE_XP_MULTIPLIER = 5;
+const DUPLICATE_XP_MULTIPLIER = 20;
 
 export const DUPLICATE_XP = Object.fromEntries(
   Object.entries(DUPLICATE_XP_BASE).map(([k, v]) => [k, v * DUPLICATE_XP_MULTIPLIER])

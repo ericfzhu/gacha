@@ -119,7 +119,9 @@ export class DockScene extends Phaser.Scene {
     g.lineStyle(1, COLORS.border, 1);
     g.strokeRoundedRect(panelX, panelY, panelW, panelH, 6);
 
-    this.add.text(panelX + 16, panelY + 20, 'Repair Docks', {
+    const ownedDocks = Storage.getOwnedDockCount();
+
+    this.add.text(panelX + 16, panelY + 20, `Repair Docks (${ownedDocks}/5)`, {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       fontSize: '12px',
       fill: COLORS.textTertiary,
@@ -129,15 +131,66 @@ export class DockScene extends Phaser.Scene {
     const repairDocks = Storage.getRepairDocks();
     this.dockContainers = [];
 
-    for (let i = 0; i < 2; i++) {
-      const y = panelY + 60 + i * 200;
-      this.createDockSlot(panelX + 20, y, i, repairDocks[i], panelW - 40);
+    // Calculate slot height based on owned docks
+    const maxSlots = 5;
+    const availableH = panelH - 100; // Leave room for header and purchase button
+    const slotHeight = Math.min(180, availableH / ownedDocks - 10);
+
+    for (let i = 0; i < ownedDocks; i++) {
+      const y = panelY + 50 + i * (slotHeight + 10);
+      this.createDockSlot(panelX + 20, y, i, repairDocks[i], panelW - 40, slotHeight);
+    }
+
+    // Add purchase button if less than 5 docks
+    if (ownedDocks < 5) {
+      const cost = Storage.getDockPurchaseCost(ownedDocks);
+      this.createPurchaseDockButton(panelX + panelW / 2, panelY + panelH - 35, cost);
     }
   }
 
-  createDockSlot(x, y, dockIndex, shipId, slotWidth = 460) {
+  createPurchaseDockButton(x, y, cost) {
     const container = this.add.container(x, y);
-    const slotHeight = 180;
+
+    const bg = this.add.graphics();
+    bg.fillStyle(COLORS.success, 1);
+    bg.fillRoundedRect(-80, -18, 160, 36, 4);
+
+    const text = this.add.text(0, 0, `Buy Dock (${cost}⛽)`, {
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      fontSize: '14px',
+      fill: '#ffffff',
+      fontStyle: 'bold',
+    }).setOrigin(0.5);
+
+    const hitArea = this.add.rectangle(0, 0, 160, 36, 0x000000, 0).setInteractive();
+
+    container.add([bg, text, hitArea]);
+
+    hitArea.on('pointerover', () => {
+      bg.clear();
+      bg.fillStyle(0x3dba89, 1);
+      bg.fillRoundedRect(-80, -18, 160, 36, 4);
+    });
+
+    hitArea.on('pointerout', () => {
+      bg.clear();
+      bg.fillStyle(COLORS.success, 1);
+      bg.fillRoundedRect(-80, -18, 160, 36, 4);
+    });
+
+    hitArea.on('pointerdown', () => {
+      const result = Storage.purchaseDock();
+      if (result.success) {
+        this.scene.restart();
+      } else {
+        this.showMessage(result.error);
+      }
+    });
+  }
+
+  createDockSlot(x, y, dockIndex, shipId, slotWidth = 460, slotHeight = 180) {
+    const container = this.add.container(x, y);
+    const scale = slotHeight / 180; // Scale factor for positioning
 
     const bg = this.add.graphics();
     bg.fillStyle(COLORS.bgSecondary, 1);
@@ -146,9 +199,9 @@ export class DockScene extends Phaser.Scene {
     container.add(bg);
 
     // Dock number
-    this.add.text(x + 16, y + 20, `Dock #${dockIndex + 1}`, {
+    this.add.text(x + 16, y + 12 * scale, `Dock #${dockIndex + 1}`, {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      fontSize: '14px',
+      fontSize: `${Math.max(10, 14 * scale)}px`,
       fill: COLORS.textSecondary,
       fontStyle: 'bold',
     });
@@ -167,47 +220,47 @@ export class DockScene extends Phaser.Scene {
         // Ship portrait
         const portraitKey = `ship_portrait_${shipId}`;
         if (this.textures.exists(portraitKey)) {
-          const portrait = this.add.image(x + 80, y + 95, portraitKey);
-          const maxSize = 120;
+          const portrait = this.add.image(x + 60 * scale, y + slotHeight / 2, portraitKey);
+          const maxSize = Math.min(100 * scale, slotHeight - 20);
           const pScale = Math.min(maxSize / portrait.width, maxSize / portrait.height);
           portrait.setScale(pScale);
         }
 
         // Ship info (positioned to right of portrait)
-        const infoX = x + 160;
+        const infoX = x + 120 * scale;
         let stars = '';
         for (let s = 0; s < rarity.stars; s++) stars += '★';
 
-        this.add.text(infoX, y + 50, stars, {
-          fontSize: '11px',
+        this.add.text(infoX, y + 35 * scale, stars, {
+          fontSize: `${Math.max(8, 11 * scale)}px`,
           fill: `#${rarity.color.toString(16).padStart(6, '0')}`,
         });
 
-        this.add.text(infoX, y + 70, getDisplayName(shipData.id, shipData.name), {
+        this.add.text(infoX, y + 50 * scale, getDisplayName(shipData.id, shipData.name), {
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          fontSize: '18px',
+          fontSize: `${Math.max(12, 16 * scale)}px`,
           fill: COLORS.textPrimary,
           fontStyle: 'bold',
         });
 
-        this.add.text(infoX, y + 95, `Lv.${savedData.level} ${shipData.type}`, {
+        this.add.text(infoX, y + 70 * scale, `Lv.${savedData.level} ${shipData.type}`, {
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          fontSize: '13px',
+          fontSize: `${Math.max(10, 12 * scale)}px`,
           fill: COLORS.textSecondary,
         });
 
         // HP status
         const damageState = getDamageState(currentHp, maxHp);
-        this.add.text(infoX, y + 120, `HP: ${currentHp}/${maxHp}`, {
+        this.add.text(infoX, y + 88 * scale, `HP: ${currentHp}/${maxHp}`, {
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          fontSize: '13px',
+          fontSize: `${Math.max(10, 12 * scale)}px`,
           fill: `#${damageState.color.toString(16).padStart(6, '0')}`,
         });
 
         // Timer
-        const timerText = this.add.text(x + slotWidth - 16, y + 80, '', {
+        const timerText = this.add.text(x + slotWidth - 16, y + slotHeight * 0.4, '', {
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          fontSize: '24px',
+          fontSize: `${Math.max(16, 20 * scale)}px`,
           fill: COLORS.accent,
           fontStyle: 'bold',
         }).setOrigin(1, 0.5);
@@ -220,7 +273,7 @@ export class DockScene extends Phaser.Scene {
 
           // Instant repair button
           const instantCost = Math.ceil(timeRemaining / 30000) * 10; // 10 fuel per 30 seconds
-          this.createInstantRepairButton(x + slotWidth - 130, y + 130, shipId, instantCost);
+          this.createInstantRepairButton(x + slotWidth - 130, y + slotHeight * 0.7, shipId, instantCost);
         } else {
           timerText.setText('Complete!');
           timerText.setStyle({ fill: COLORS.success });
@@ -231,15 +284,15 @@ export class DockScene extends Phaser.Scene {
       }
     } else {
       // Empty dock
-      this.add.text(x + slotWidth / 2, y + slotHeight / 2, 'Empty Dock', {
+      this.add.text(x + slotWidth / 2, y + slotHeight / 2 - 10 * scale, 'Empty Dock', {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        fontSize: '16px',
+        fontSize: `${Math.max(12, 14 * scale)}px`,
         fill: COLORS.textTertiary,
       }).setOrigin(0.5);
 
-      this.add.text(x + slotWidth / 2, y + slotHeight / 2 + 25, 'Select a damaged ship to repair', {
+      this.add.text(x + slotWidth / 2, y + slotHeight / 2 + 10 * scale, 'Select a damaged ship to repair', {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        fontSize: '12px',
+        fontSize: `${Math.max(10, 11 * scale)}px`,
         fill: COLORS.textTertiary,
       }).setOrigin(0.5);
     }
