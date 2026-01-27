@@ -2,8 +2,8 @@
 // Each map has nodes that players navigate through before reaching the boss
 // 10 maps total with gradual difficulty scaling
 
-// XP multiplier for faster progression (20x = complete game quickly)
-export const XP_MULTIPLIER = 20;
+// XP multiplier for progression
+export const XP_MULTIPLIER = 1;
 
 export const MAPS = {
   '1-1': {

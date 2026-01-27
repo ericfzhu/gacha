@@ -55,6 +55,16 @@ export const Storage = {
         if (parsed.artworkMode === 'pixel') {
           parsed.artworkMode = 'pokemon';
         }
+        // Migration: expand repairDocks array to 5 slots
+        if (parsed.repairDocks && parsed.repairDocks.length < 5) {
+          while (parsed.repairDocks.length < 5) {
+            parsed.repairDocks.push(null);
+          }
+        }
+        // Migration: ensure ownedDocks exists
+        if (parsed.ownedDocks === undefined) {
+          parsed.ownedDocks = 2;
+        }
         return { ...DEFAULT_SAVE, ...parsed };
       }
     } catch (e) {

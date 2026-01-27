@@ -250,7 +250,7 @@ export const SHIPS = [
 
 // Calculate XP needed for a level
 export function getXpForLevel(level) {
-  return Math.floor(100 * Math.pow(level, 1.5));
+  return Math.floor(2 * Math.pow(level, 1.5));
 }
 
 // Calculate total XP needed to reach a level
