@@ -264,8 +264,8 @@ export class PremiumGachaScene extends Phaser.Scene {
 
     // Grand prize cards - fixed size, result area gets remaining space
     const prizes = Object.values(GRAND_PRIZES);
-    const cardHeight = 90;
-    const cardSpacing = 8;
+    const cardHeight = 140;
+    const cardSpacing = 12;
     const cardStartY = 120 + cardHeight / 2;
 
     prizes.forEach((prize, i) => {
@@ -320,53 +320,46 @@ export class PremiumGachaScene extends Phaser.Scene {
 
     // Color accent bar
     bg.fillStyle(prize.color, obtained ? 0.5 : 1);
-    bg.fillRect(-cardWidth / 2, -cardHeight / 2, 4, cardHeight);
+    bg.fillRect(-cardWidth / 2, -cardHeight / 2, 6, cardHeight);
 
     // Scale text positions based on card height
-    const topY = -cardHeight / 2 + 18;
-    const midY = 0;
-    const bottomY = cardHeight / 2 - 18;
+    const topY = -cardHeight / 2 + 24;
+    const bottomY = cardHeight / 2 - 24;
 
-    // Prize name
-    const nameText = this.add.text(-cardWidth / 2 + 16, topY, prize.name, {
+    // Description (centered, larger text)
+    const descText = this.add.text(0, 0, prize.description, {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      fontSize: '14px',
+      fontSize: '16px',
       fill: obtained ? COLORS.success : COLORS.textPrimary,
       fontStyle: 'bold',
-    }).setOrigin(0, 0.5);
-
-    // Description
-    const descText = this.add.text(-cardWidth / 2 + 16, midY, prize.description, {
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      fontSize: '11px',
-      fill: COLORS.textTertiary,
-      wordWrap: { width: cardWidth - 140 },
-    }).setOrigin(0, 0.5);
+      wordWrap: { width: cardWidth - 60 },
+      align: 'center',
+    }).setOrigin(0.5);
 
     // Rate and token cost
-    const rateText = this.add.text(-cardWidth / 2 + 16, bottomY, `Drop Rate: ${prize.rate}%`, {
+    const rateText = this.add.text(-cardWidth / 2 + 20, bottomY, `Drop Rate: ${prize.rate}%`, {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      fontSize: '10px',
+      fontSize: '12px',
       fill: COLORS.special,
     }).setOrigin(0, 0.5);
 
-    const costText = this.add.text(cardWidth / 2 - 16, bottomY, `Exchange: ${prize.tokenCost} tokens`, {
+    const costText = this.add.text(cardWidth / 2 - 20, bottomY, `Exchange: ${prize.tokenCost} tokens`, {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      fontSize: '10px',
+      fontSize: '12px',
       fill: COLORS.warning,
     }).setOrigin(1, 0.5);
 
     // Status badge
     const statusText = obtained ? '✓ Obtained' : 'Available';
     const statusColor = obtained ? COLORS.success : COLORS.specialLight;
-    const badge = this.add.text(cardWidth / 2 - 16, topY, statusText, {
+    const badge = this.add.text(cardWidth / 2 - 20, topY, statusText, {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      fontSize: '11px',
+      fontSize: '13px',
       fill: statusColor,
       fontStyle: 'bold',
     }).setOrigin(1, 0.5);
 
-    container.add([bg, nameText, descText, rateText, costText, badge]);
+    container.add([bg, descText, rateText, costText, badge]);
   }
 
   createBottomBar() {
