@@ -29,3 +29,12 @@ Original prompt: I'd like you to go through this project, and make it as close i
 - Generated and integrated a unique original portrait for all ten master ships under `public/assets/ship-sprites/`; organization, port, battle, repair, construction, and collection now consume ship-specific art.
 - Verified the repaired map, Ship Library, animation intro, and completed battle result through Computer in Chrome.
 - Automated follow-up verification also passed: all five route segments matched their node coordinates, the battle advanced from live animation to result, all owned ships used unique sprite paths, and the browser console remained clean.
+
+## 2026-07-14 sortie and special-gacha repair
+
+- Fixed the non-functional World 2 tab by connecting world filters to the existing 2-1 map and synchronizing the selected operation with the launch panel.
+- Made sortie launch readiness explicit: a missing, heavily damaged, or repairing fleet member now disables launch and displays the exact repair/organization requirement instead of appearing unresponsive.
+- Restored the original Special Gacha loop as a first-class sidebar view: one/ten ticket draws, rare ship and fuel consolation rewards, grand gifts, earned exchange tokens, and guaranteed gift exchanges.
+- Restored the one-time `ILOVEYOU` secret transmission for 50 special tickets, including persisted redemption state and duplicate-redemption protection.
+- Playwright verification passed from fresh state: selected World 2, launched 2-1 at `start`, redeemed 50 tickets, completed a special pull (55 -> 54 tickets), received an exchange token, and observed zero browser errors.
+- Visually inspected the World 2 selection and fully animated Special Gacha result captures; final production build passed.

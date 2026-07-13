@@ -77,6 +77,12 @@ export const MAPS = [
   },
 ];
 
+export const SPECIAL_GACHA_PRIZES = [
+  { key: 'prize1', name: import.meta.env?.VITE_PRIZE1_NAME || 'Gift Choice #1', description: import.meta.env?.VITE_PRIZE1_DESC || 'Your first special gift option.', rate: 2, tokenCost: 50 },
+  { key: 'prize2', name: import.meta.env?.VITE_PRIZE2_NAME || 'Gift Choice #2', description: import.meta.env?.VITE_PRIZE2_DESC || 'Your second special gift option.', rate: 0.5, tokenCost: 100 },
+  { key: 'prize3', name: import.meta.env?.VITE_PRIZE3_NAME || 'Gift Choice #3', description: import.meta.env?.VITE_PRIZE3_DESC || 'Your third special gift option.', rate: 0.2, tokenCost: 150 },
+];
+
 export const QUESTS = [
   {
     id: 'daily_sortie_3',

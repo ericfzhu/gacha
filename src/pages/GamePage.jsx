@@ -12,13 +12,16 @@ import {
   getReachableNodes,
   instantRepair,
   normalizeState,
+  premiumGachaPull,
+  redeemSecretCode,
   resupplyFleet,
   retreatSortie,
   startRepair,
   startSortie,
   tickExpeditions,
+  exchangeGrandPrize,
 } from '../lib/gameEngine.js';
-import { EXPEDITIONS, FORMATIONS, MAPS, QUESTS, SHIPS, SHIP_TYPES } from '../lib/gameData.js';
+import { EXPEDITIONS, FORMATIONS, MAPS, QUESTS, SHIPS, SHIP_TYPES, SPECIAL_GACHA_PRIZES } from '../lib/gameData.js';
 
 const NAV_GROUPS = [
   {
@@ -34,6 +37,7 @@ const NAV_GROUPS = [
     items: [
       { id: 'fleet', label: 'Organization', icon: '☷' },
       { id: 'construction', label: 'Factory', icon: '⚙' },
+      { id: 'special', label: 'Special Gacha', icon: '✦' },
       { id: 'dock', label: 'Repair Dock', icon: '⚒' },
     ],
   },
@@ -345,8 +349,19 @@ function SortieView({ state, formation, setFormation, onStart, onAdvance, onRetr
   const run = state.sortie.currentRun;
   const map = run ? MAPS.find((item) => item.id === run.mapId) : null;
   const reachable = getReachableNodes(state);
+  const [selectedWorld, setSelectedWorld] = useState('1');
   const [selectedMap, setSelectedMap] = useState(MAPS[0].id);
-  const selected = MAPS.find((item) => item.id === selectedMap) || MAPS[0];
+  const worldMaps = MAPS.filter((item) => item.id.startsWith(`${selectedWorld}-`));
+  const selected = worldMaps.find((item) => item.id === selectedMap) || worldMaps[0];
+  const fleetIds = state.fleets[state.fleets.activeFleetId].filter(Boolean);
+  const blockedShip = fleetIds.map((shipId) => ({ ship: getShip(shipId), inst: state.ships[shipId] })).find(({ ship, inst }) => !ship || !inst || inst.currentHp <= ship.hp * 0.25 || (inst.repairEndTime && Date.now() < inst.repairEndTime));
+  const blocker = !fleetIds.length ? 'Assign at least one ship to the active fleet.' : blockedShip ? `${blockedShip.ship?.name || 'A fleet member'} must be repaired before departure.` : '';
+
+  const selectWorld = (world) => {
+    const firstMap = MAPS.find((item) => item.id.startsWith(`${world}-`));
+    setSelectedWorld(world);
+    if (firstMap) setSelectedMap(firstMap.id);
+  };
 
   if (run && map) {
     return (
@@ -362,13 +377,15 @@ function SortieView({ state, formation, setFormation, onStart, onAdvance, onRetr
   return (
     <div className="sortie-setup">
       <Panel title="Operation Area" eyebrow="Select a combat zone" className="map-select-panel">
-        <div className="world-tabs"><button className="active">World 1</button><button>World 2</button><button disabled>Event</button></div>
+        <div className="world-tabs"><button className={selectedWorld === '1' ? 'active' : ''} onClick={() => selectWorld('1')}>World 1</button><button className={selectedWorld === '2' ? 'active' : ''} onClick={() => selectWorld('2')}>World 2</button><button disabled>Event</button></div>
         <div className="map-cards">
-          {MAPS.map((item, index) => (
+          {worldMaps.map((item) => {
+            const index = MAPS.findIndex((map) => map.id === item.id);
+            return (
             <button className={`map-card ${selectedMap === item.id ? 'selected' : ''}`} onClick={() => setSelectedMap(item.id)} key={item.id}>
               <span className="map-number">{item.id}</span><i className={`map-thumb map-thumb-${index + 1}`} /><div><h3>{item.name}</h3><p>Fleet area {item.id} · Base EXP {item.baseExp}</p></div><span className="clear-stamp">{state.sortie.mapClears[item.id] ? 'CLEARED' : 'NEW'}</span>
             </button>
-          ))}
+          );})}
         </div>
       </Panel>
       <Panel title="Formation" eyebrow="Choose an engagement posture" className="formation-panel">
@@ -377,9 +394,38 @@ function SortieView({ state, formation, setFormation, onStart, onAdvance, onRetr
           <div><span>Operation</span><b>{selected.id} {selected.name}</b></div>
           <div><span>Active ships</span><b>{state.fleets[state.fleets.activeFleetId].filter(Boolean).length} / 6</b></div>
           <div><span>Formation</span><b>{FORMATIONS[formation].name}</b></div>
-          <button className="sortie-launch" onClick={() => onStart(selected.id)}>Begin Sortie <span>›</span></button>
+          {blocker && <p className="preflight-warning">⚠ {blocker}</p>}
+          <button className="sortie-launch" disabled={Boolean(blocker) || !selected} onClick={() => selected && onStart(selected.id)}>{blocker ? 'Fleet Not Ready' : `Begin Sortie ${selected?.id || ''}`} <span>›</span></button>
         </div>
       </Panel>
+    </div>
+  );
+}
+
+function SpecialGachaView({ state, result, onPull, onRedeem, onExchange }) {
+  const [code, setCode] = useState('');
+  const pulls = result?.pulls || [];
+  const submitCode = (event) => { event.preventDefault(); if (code.trim()) { onRedeem(code); setCode(''); } };
+  return (
+    <div className="special-layout">
+      <Panel title="Special Gift Gacha" eyebrow="Limited ticket draw" className="special-draw-panel">
+        <div className="special-machine">
+          <span className="special-spark">✦</span><h2>Special Gacha</h2><p>Grand gifts, rare ships, and fleet supplies await.</p>
+          <div className="special-currency"><b>🎫 {state.resources.tickets}</b><span>Special tickets</span><b>✧ {state.resources.pityTokens}</b><span>Exchange tokens</span></div>
+          <div className="special-pull-actions"><button disabled={state.resources.tickets < 1} onClick={() => onPull(1)}>Pull ×1 <small>1 ticket</small></button><button disabled={state.resources.tickets < 10} onClick={() => onPull(10)}>Pull ×10 <small>10 tickets</small></button></div>
+        </div>
+        <div className="special-results">
+          {pulls.length ? pulls.map((pull, index) => { const ship = getShip(pull.shipId); return <motion.article key={`${pull.type}-${pull.prizeKey || pull.shipId || index}-${index}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * .05 }} className={`special-result type-${pull.type}`}>{ship ? <ShipPortrait ship={ship} size="small"/> : <span>{pull.type === 'grandPrize' ? '🎁' : '⛽'}</span>}<div><b>{pull.type === 'grandPrize' ? pull.name : ship ? `${pull.rarity} ${ship.name}` : `${pull.name} +${pull.amount}`}</b><small>{pull.type === 'ship' ? (pull.isNew ? 'New ship acquired' : 'Duplicate converted to XP') : `+${pull.tokensEarned} exchange token${pull.tokensEarned === 1 ? '' : 's'}`}</small></div></motion.article>; }) : <div className="special-empty"><span>🎁</span><p>Your latest special draw will appear here.</p></div>}
+        </div>
+      </Panel>
+      <div className="special-side">
+        <Panel title="Grand Gift Exchange" eyebrow="Guaranteed rewards">
+          <div className="gift-list">{SPECIAL_GACHA_PRIZES.map((prize) => { const obtained = state.gacha.grandPrizes[prize.key]; return <article key={prize.key} className={obtained ? 'obtained' : ''}><span>🎁</span><div><h3>{prize.name}</h3><p>{prize.description}</p><small>Natural draw rate {prize.rate}%</small></div><button disabled={obtained || state.resources.pityTokens < prize.tokenCost} onClick={() => onExchange(prize.key)}>{obtained ? 'Obtained' : `${prize.tokenCost} ✧`}</button></article>; })}</div>
+        </Panel>
+        <Panel title="Secret Code" eyebrow="Admiralty transmission">
+          <form className="secret-code" onSubmit={submitCode}><p>{state.gacha.secretCodeRedeemed ? 'The one-time transmission has already been claimed.' : 'Enter the original secret phrase to receive 50 special tickets.'}</p><div><input aria-label="Secret code" value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="ENTER CODE" maxLength={20} autoComplete="off"/><button disabled={!code.trim() || state.gacha.secretCodeRedeemed}>Redeem</button></div></form>
+        </Panel>
+      </div>
     </div>
   );
 }
@@ -508,6 +554,7 @@ export default function GamePage() {
   const [battleView, setBattleView] = useState(null);
   const [formation, setFormation] = useState('LINE_AHEAD');
   const [constructionResult, setConstructionResult] = useState(null);
+  const [specialResult, setSpecialResult] = useState(null);
   const [now, setNow] = useState(Date.now());
   const [loaded, setLoaded] = useState(false);
 
@@ -548,10 +595,11 @@ export default function GamePage() {
       sortie: run ? { mapId: run.mapId, currentNode: run.currentNode, reachableNodes: getReachableNodes(state), formation: run.formationId } : null,
       battle: battleView ? { result: battleView.result, mapId: battleView.mapId, nodeId: battleView.nodeId, drop: battleView.drop } : null,
       constructionResult,
+      specialResult,
     });
     window.advanceTime = (ms) => { const target = now + ms; setNow(target); setState((prev) => tickExpeditions(autoRepairTick(prev, target), target)); };
     return () => { delete window.render_game_to_text; delete window.advanceTime; };
-  }, [tab, status, state, activeFleet, run, battleView, constructionResult, now]);
+  }, [tab, status, state, activeFleet, run, battleView, constructionResult, specialResult, now]);
 
   const applyResult = (result, success) => { if (result.error) { setStatus(result.error); return false; } setState(result.state); setStatus(success); return true; };
   const handleResupply = () => { setState((prev) => resupplyFleet(prev)); setStatus('1st Fleet resupplied. Fuel and ammunition are at operational levels.'); };
@@ -560,6 +608,9 @@ export default function GamePage() {
   const handleQuest = (id) => { const result = claimQuest(state, id); applyResult(result, 'Quest rewards received.'); };
   const handleExpedition = (id) => { const result = dispatchExpedition(state, id); applyResult(result, 'Expedition fleet dispatched.'); };
   const handleConstruction = () => { const result = constructionPull(state); if (applyResult(result, 'Construction completed. A new vessel has launched.')) setConstructionResult(result.result); };
+  const handlePremiumPull = (count) => { const result = premiumGachaPull(state, count); if (applyResult(result, `${count} special draw${count === 1 ? '' : 's'} completed.`)) setSpecialResult(result.result); };
+  const handleSecretCode = (code) => { const result = redeemSecretCode(state, code); applyResult(result, result.error || 'Secret transmission accepted · 50 special tickets received.'); };
+  const handleGiftExchange = (prizeKey) => { const result = exchangeGrandPrize(state, prizeKey); applyResult(result, result.error || `${result.result?.name} secured through the exchange.`); };
   const handleRepair = (id) => { const result = startRepair(state, id); applyResult(result, result.error || `Repair started · ETA ${result.etaMin} minutes.`); };
   const handleInstant = (id) => { const result = instantRepair(state, id); applyResult(result, 'High-speed repair completed.'); };
 
@@ -591,6 +642,7 @@ export default function GamePage() {
                 {tab === 'quests' && <QuestView state={state} onClaim={handleQuest} />}
                 {tab === 'expeditions' && <ExpeditionView state={state} now={now} onDispatch={handleExpedition} />}
                 {tab === 'construction' && <ConstructionView state={state} result={constructionResult} onConstruct={handleConstruction} />}
+                {tab === 'special' && <SpecialGachaView state={state} result={specialResult} onPull={handlePremiumPull} onRedeem={handleSecretCode} onExchange={handleGiftExchange} />}
                 {tab === 'dock' && <DockView state={state} now={now} onRepair={handleRepair} onInstant={handleInstant} />}
               </motion.div>
             </AnimatePresence>

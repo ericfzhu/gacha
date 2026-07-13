@@ -59,6 +59,7 @@ export function createDefaultGameState() {
       standardPity: 0,
       premiumPulls: 0,
       grandPrizes: { prize1: false, prize2: false, prize3: false },
+      secretCodeRedeemed: false,
     },
     ships: starterShips(),
     ownedShipIds: Object.keys(starterShips()),

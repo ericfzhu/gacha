@@ -1,5 +1,5 @@
 import { createDefaultGameState } from './defaultGameState.js';
-import { ENEMIES, EXPEDITIONS, FORMATIONS, MAPS, QUESTS, SHIPS, SHIP_TYPES } from './gameData.js';
+import { ENEMIES, EXPEDITIONS, FORMATIONS, MAPS, QUESTS, SHIPS, SHIP_TYPES, SPECIAL_GACHA_PRIZES } from './gameData.js';
 
 const RNG_MOD = 2147483647;
 const RNG_A = 48271;
@@ -658,6 +658,83 @@ export function constructionPull(inputState) {
   }
 
   return { state, result: { shipId: rolled.id, rarity, isNew, pity: state.gacha.standardPity } };
+}
+
+export function redeemSecretCode(inputState, rawCode) {
+  const state = clone(inputState);
+  const code = String(rawCode || '').trim().toUpperCase();
+  if (code !== 'ILOVEYOU') return { state, error: "That code wasn't recognized." };
+  if (state.gacha.secretCodeRedeemed) return { state, error: 'This secret code has already been redeemed.' };
+  state.gacha.secretCodeRedeemed = true;
+  state.resources.tickets += 50;
+  return { state, result: { tickets: 50 } };
+}
+
+function awardPremiumShip(state, rarity, rng) {
+  const pool = getRarityPool(rarity);
+  const ship = pool[Math.floor(rng() * pool.length)];
+  const isNew = !state.ownedShipIds.includes(ship.id);
+  ensureShipInstance(state, ship.id);
+  if (!isNew) state.ships[ship.id].xp += rarity === 'SSR' ? 500 : 250;
+  return { shipId: ship.id, rarity, isNew };
+}
+
+export function premiumGachaPull(inputState, requestedCount = 1) {
+  const state = clone(inputState);
+  const count = requestedCount === 10 ? 10 : 1;
+  if (state.resources.tickets < count) return { state, error: `You need ${count} special ticket${count === 1 ? '' : 's'}.` };
+
+  const rng = makeRng(seedFrom('special-gacha', Date.now(), state.gacha.premiumPulls, state.resources.tickets));
+  const pulls = [];
+  for (let index = 0; index < count; index += 1) {
+    state.resources.tickets -= 1;
+    state.gacha.premiumPulls += 1;
+    const roll = rng() * 100;
+    let cumulative = 0;
+    let reward = null;
+    const redistributedRate = SPECIAL_GACHA_PRIZES.reduce((total, prize) => total + (state.gacha.grandPrizes[prize.key] ? prize.rate : 0), 0);
+
+    for (const prize of SPECIAL_GACHA_PRIZES) {
+      if (state.gacha.grandPrizes[prize.key]) continue;
+      cumulative += prize.rate;
+      if (roll < cumulative) {
+        state.gacha.grandPrizes[prize.key] = true;
+        reward = { type: 'grandPrize', prizeKey: prize.key, name: prize.name, tokensEarned: 5 };
+        break;
+      }
+    }
+
+    if (!reward) {
+      cumulative += 5;
+      if (roll < cumulative) reward = { type: 'ship', ...awardPremiumShip(state, 'SSR', rng), tokensEarned: 3 };
+      else {
+        cumulative += 20 + redistributedRate;
+        if (roll < cumulative) reward = { type: 'ship', ...awardPremiumShip(state, 'SR', rng), tokensEarned: 2 };
+        else if (roll < cumulative + 36.15) {
+          state.resources.fuel += 500;
+          reward = { type: 'resource', resource: 'fuel', amount: 500, name: 'Fuel Reserve', tokensEarned: 1 };
+        } else {
+          state.resources.fuel += 200;
+          reward = { type: 'resource', resource: 'fuel', amount: 200, name: 'Fuel Canister', tokensEarned: 1 };
+        }
+      }
+    }
+
+    state.resources.pityTokens += reward.tokensEarned;
+    pulls.push(reward);
+  }
+  return { state, result: { pulls } };
+}
+
+export function exchangeGrandPrize(inputState, prizeKey) {
+  const state = clone(inputState);
+  const prize = SPECIAL_GACHA_PRIZES.find((item) => item.key === prizeKey);
+  if (!prize) return { state, error: 'Gift choice not found.' };
+  if (state.gacha.grandPrizes[prizeKey]) return { state, error: 'That gift choice is already secured.' };
+  if (state.resources.pityTokens < prize.tokenCost) return { state, error: `You need ${prize.tokenCost - state.resources.pityTokens} more exchange tokens.` };
+  state.resources.pityTokens -= prize.tokenCost;
+  state.gacha.grandPrizes[prizeKey] = true;
+  return { state, result: { prizeKey, name: prize.name } };
 }
 
 export function autoRepairTick(inputState, now = Date.now()) {

@@ -1,0 +1,26 @@
+{
+  "sortie": {
+    "mapId": "2-1",
+    "currentNode": "start",
+    "reachableNodes": [
+      "A"
+    ],
+    "formation": "LINE_AHEAD"
+  },
+  "gacha": {
+    "tickets": 54,
+    "pityTokens": 1,
+    "result": {
+      "pulls": [
+        {
+          "type": "resource",
+          "resource": "fuel",
+          "amount": 200,
+          "name": "Fuel Canister",
+          "tokensEarned": 1
+        }
+      ]
+    }
+  },
+  "errors": []
+}
