@@ -1,0 +1,47 @@
+{
+  "routes": [
+    {
+      "x1": "10",
+      "y1": "76",
+      "x2": "32",
+      "y2": "49"
+    },
+    {
+      "x1": "32",
+      "y1": "49",
+      "x2": "56",
+      "y2": "26"
+    },
+    {
+      "x1": "32",
+      "y1": "49",
+      "x2": "58",
+      "y2": "70"
+    },
+    {
+      "x1": "56",
+      "y1": "26",
+      "x2": "86",
+      "y2": "48"
+    },
+    {
+      "x1": "58",
+      "y1": "70",
+      "x2": "86",
+      "y2": "48"
+    }
+  ],
+  "battle": {
+    "result": "PLAYER_WIN",
+    "mapId": "1-1",
+    "nodeId": "A",
+    "drop": null
+  },
+  "ownedImages": [
+    "/assets/ship-sprites/dd_001.webp",
+    "/assets/ship-sprites/dd_002.webp",
+    "/assets/ship-sprites/cl_001.webp",
+    "/assets/ship-sprites/cl_002.webp"
+  ],
+  "errors": []
+}

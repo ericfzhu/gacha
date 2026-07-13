@@ -40,6 +40,7 @@ const NAV_GROUPS = [
   {
     label: 'Records',
     items: [
+      { id: 'collection', label: 'Ship Library', icon: '▦' },
       { id: 'quests', label: 'Quests', icon: '✓' },
       { id: 'combat', label: 'Battle Record', icon: '★' },
     ],
@@ -140,6 +141,16 @@ function ShipEmblem({ ship, small = false }) {
   );
 }
 
+function ShipPortrait({ ship, size = 'medium', alt = true }) {
+  if (!ship?.id) return <ShipEmblem ship={ship || { type: SHIP_TYPES.DD }} small={size === 'small'} />;
+  return (
+    <div className={`ship-portrait size-${size}`}>
+      <img src={`/assets/ship-sprites/${ship.id}.webp`} alt={alt ? `${ship.name} ship portrait` : ''} />
+      <span>{TYPE_CODES[ship.type] || 'FS'}</span>
+    </div>
+  );
+}
+
 function HpBar({ value, max }) {
   const damage = getDamage(value, max);
   return (
@@ -166,7 +177,7 @@ function FleetStrip({ fleet, state, onOpenFleet }) {
               <span className="fleet-number">{index + 1}</span>
               {ship ? (
                 <>
-                  <ShipEmblem ship={ship} small />
+                  <ShipPortrait ship={ship} size="small" />
                   <div><strong>{ship.name}</strong><small>Lv {inst.level}</small></div>
                   <HpBar value={inst.currentHp} max={ship.hp} />
                 </>
@@ -189,15 +200,15 @@ function PortView({ state, fleet, setTab, onResupply }) {
       <div className="port-horizon" />
       <motion.img
         className="flagship-art"
-        src="/assets/original/aster-vale.png"
-        alt="Aster Vale, original fleet flagship"
+        src={`/assets/ship-sprites/${flagship.id}.webp`}
+        alt={`${flagship.name}, fleet flagship`}
         initial={{ opacity: 0, x: 18 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.35, bounce: 0 }}
       />
       <div className="flagship-plaque">
         <p>FLAGSHIP · {flagship.type.toUpperCase()}</p>
-        <h2>Aster Vale</h2>
+        <h2>{flagship.name}</h2>
         <div className="flagship-stats"><span>Lv {inst?.level || 1}</span><span>Cond {inst?.morale || 49}</span><span>HP {inst?.currentHp || flagship.hp}/{flagship.hp}</span></div>
       </div>
       <div className="speech-card">
@@ -251,7 +262,7 @@ function FleetView({ state, setState, onResupply }) {
             return (
               <div className={`formation-slot ${ship ? '' : 'empty'}`} key={index}>
                 <span className="slot-index">{index + 1}</span>
-                {ship ? <><ShipEmblem ship={ship} /><div className="slot-info"><h3>{ship.name}</h3><p>{ship.type} · Lv {inst.level} · Cond {inst.morale}</p><HpBar value={inst.currentHp} max={ship.hp} /></div><div className="supply-meter"><span>F {inst.supply.fuel}/{ship.maxFuel}</span><span>A {inst.supply.ammo}/{ship.maxAmmo}</span></div><button className="remove-button" onClick={() => toggleShip(shipId)}>Remove</button></> : <p>Select a ship from the reserve roster below</p>}
+                {ship ? <><ShipPortrait ship={ship} size="small" /><div className="slot-info"><h3>{ship.name}</h3><p>{ship.type} · Lv {inst.level} · Cond {inst.morale}</p><HpBar value={inst.currentHp} max={ship.hp} /></div><div className="supply-meter"><span>F {inst.supply.fuel}/{ship.maxFuel}</span><span>A {inst.supply.ammo}/{ship.maxAmmo}</span></div><button className="remove-button" onClick={() => toggleShip(shipId)}>Remove</button></> : <p>Select a ship from the reserve roster below</p>}
               </div>
             );
           })}
@@ -266,7 +277,7 @@ function FleetView({ state, setState, onResupply }) {
             const damage = getDamage(inst.currentHp, ship.hp);
             return (
               <button className={`roster-card ${selected ? 'selected' : ''}`} key={shipId} onClick={() => toggleShip(shipId)}>
-                <ShipEmblem ship={ship} />
+                <ShipPortrait ship={ship} size="small" />
                 <div><span className="rarity-tag">{ship.rarity}</span><h3>{ship.name}</h3><p>{ship.type} · Lv {inst.level}</p><small className={damage.className}>{damage.label}</small></div>
                 <span className="roster-check">{selected ? '✓' : '+'}</span>
               </button>
@@ -297,13 +308,17 @@ function SortieMap({ map, run, reachable, onAdvance }) {
   return (
     <div className="sortie-map">
       <div className="map-grid" />
-      {Object.values(map.nodes).flatMap((node) => (node.next || []).map((target) => {
-        const [x1, y1] = MAP_POSITIONS[node.id];
-        const [x2, y2] = MAP_POSITIONS[target];
-        const length = Math.hypot(x2 - x1, y2 - y1);
-        const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
-        return <span className="map-route" key={`${node.id}-${target}`} style={{ left: `${x1}%`, top: `${y1}%`, width: `${length}%`, transform: `rotate(${angle}deg)` }} />;
-      }))}
+      <svg className="map-routes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <filter id="route-glow"><feGaussianBlur stdDeviation="0.7" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+        </defs>
+        {Object.values(map.nodes).flatMap((node) => (node.next || []).map((target) => {
+          const [x1, y1] = MAP_POSITIONS[node.id];
+          const [x2, y2] = MAP_POSITIONS[target];
+          const isTravelled = visited.has(node.id) && visited.has(target);
+          return <line className={isTravelled ? 'travelled' : ''} key={`${node.id}-${target}`} x1={x1} y1={y1} x2={x2} y2={y2} vectorEffect="non-scaling-stroke" />;
+        }))}
+      </svg>
       {Object.values(map.nodes).map((node) => {
         const [x, y] = MAP_POSITIONS[node.id];
         const canReach = reachable.includes(node.id);
@@ -369,32 +384,97 @@ function SortieView({ state, formation, setFormation, onStart, onAdvance, onRetr
   );
 }
 
+function parseBattleEvent(line) {
+  const [phase = 'Engagement', detail = line] = line.split(': ');
+  const hit = detail.match(/^(.*?) hit (.*?) for (\d+)(.*)$/);
+  const miss = detail.match(/^(.*?) missed (.*)$/);
+  if (hit) return { phase, attacker: hit[1], target: hit[2], damage: Number(hit[3]), critical: hit[4].includes('CRIT'), line };
+  if (miss) return { phase, attacker: miss[1], target: miss[2], damage: 0, miss: true, line };
+  return { phase, attacker: '', target: '', damage: 0, line };
+}
+
 function CombatView({ battle, run, onContinue, onReturn }) {
   const players = battle?.playerUnits || [];
   const enemies = battle?.enemyUnits || [];
+  const events = useMemo(() => (battle?.log || []).map(parseBattleEvent), [battle]);
+  const [eventIndex, setEventIndex] = useState(-1);
+  const [finished, setFinished] = useState(!battle);
+
+  useEffect(() => {
+    if (!battle) return undefined;
+    setEventIndex(-1);
+    setFinished(false);
+    const timers = [window.setTimeout(() => setEventIndex(0), 1100)];
+    events.forEach((_, index) => timers.push(window.setTimeout(() => setEventIndex(index), 1100 + index * 900)));
+    timers.push(window.setTimeout(() => setFinished(true), 1400 + events.length * 900));
+    return () => timers.forEach(window.clearTimeout);
+  }, [battle, events]);
+
+  const currentEvent = eventIndex >= 0 ? events[eventIndex] : null;
+  const playerAttacking = currentEvent && !currentEvent.attacker.startsWith('Enemy ');
+  const shownLog = finished ? events : events.slice(0, Math.max(0, eventIndex + 1));
+
   return (
-    <div className="combat-stage">
+    <div className={`combat-stage ${finished ? 'battle-finished' : 'battle-playing'}`}>
       <div className="combat-sky" />
       <div className="combat-water" />
-      <div className="battle-title"><small>{battle ? `${battle.mapId} · NODE ${battle.nodeId}` : 'COMBAT RECORD'}</small><h2>{resultLabel(battle?.result)}</h2></div>
+      <AnimatePresence initial={false} mode="wait">
+        <motion.div className="battle-title" key={finished ? 'result' : currentEvent?.phase || 'contact'} initial={{ opacity: 0, scale: .96, filter: 'blur(4px)' }} animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }} exit={{ opacity: 0, y: -8 }} transition={{ duration: .3, bounce: 0 }}>
+          <small>{battle ? `${battle.mapId} · NODE ${battle.nodeId}` : 'COMBAT RECORD'}</small>
+          <h2>{finished ? resultLabel(battle?.result) : currentEvent?.phase || 'Enemy in sight'}</h2>
+        </motion.div>
+      </AnimatePresence>
       <div className="combat-fleet player-fleet">
         <h3>1ST FLEET</h3>
-        {players.map((unit, index) => <div className="combat-unit" key={`${unit.id}-${index}`}><ShipEmblem ship={getShip(unit.id) || { type: unit.type }} small /><div><b>{unit.name}</b><HpBar value={unit.hp} max={unit.maxHp} /></div></div>)}
+        {players.map((unit, index) => {
+          const ship = getShip(unit.id);
+          const isAttacker = currentEvent?.attacker === unit.name;
+          const isTarget = currentEvent?.target === unit.name;
+          return <motion.div className={`combat-unit ${isAttacker ? 'attacking' : ''} ${isTarget ? 'hit' : ''}`} key={`${unit.id}-${index}`} initial={{ opacity: 0, x: -70 }} animate={{ opacity: 1, x: isAttacker ? 18 : 0 }} transition={{ delay: index * .1, duration: .3, bounce: 0 }}><ShipPortrait ship={ship || { type: unit.type }} size="battle" /><div><b>{unit.name}</b><HpBar value={finished ? unit.hp : unit.maxHp} max={unit.maxHp} /></div>{isTarget && currentEvent.damage > 0 && <motion.strong className="damage-burst" initial={{ opacity: 0, scale: .25, y: 8, filter: 'blur(4px)' }} animate={{ opacity: 1, scale: 1, y: -14, filter: 'blur(0px)' }}>-{currentEvent.damage}</motion.strong>}</motion.div>;
+        })}
         {!players.length && <p>Complete a sortie engagement to create a battle record.</p>}
       </div>
       <div className="combat-versus">VS</div>
       <div className="combat-fleet enemy-fleet">
         <h3>ABYSSAL FORCE</h3>
-        {enemies.map((unit, index) => <div className="combat-unit enemy" key={`${unit.id}-${index}`}><div className="enemy-emblem">☠</div><div><b>{unit.name.replace('Enemy ', '')}</b><HpBar value={unit.hp} max={unit.maxHp} /></div></div>)}
+        {enemies.map((unit, index) => {
+          const isAttacker = currentEvent?.attacker === unit.name;
+          const isTarget = currentEvent?.target === unit.name;
+          return <motion.div className={`combat-unit enemy ${isAttacker ? 'attacking' : ''} ${isTarget ? 'hit' : ''}`} key={`${unit.id}-${index}`} initial={{ opacity: 0, x: 70 }} animate={{ opacity: 1, x: isAttacker ? -18 : 0 }} transition={{ delay: index * .1, duration: .3, bounce: 0 }}><div className="enemy-emblem">☠</div><div><b>{unit.name.replace('Enemy ', '')}</b><HpBar value={finished ? unit.hp : unit.maxHp} max={unit.maxHp} /></div>{isTarget && currentEvent.damage > 0 && <motion.strong className="damage-burst" initial={{ opacity: 0, scale: .25, y: 8, filter: 'blur(4px)' }} animate={{ opacity: 1, scale: 1, y: -14, filter: 'blur(0px)' }}>-{currentEvent.damage}</motion.strong>}</motion.div>;
+        })}
       </div>
+      {currentEvent && !finished && !currentEvent.miss && <motion.div key={`shot-${eventIndex}`} className={`battle-projectile ${playerAttacking ? 'from-player' : 'from-enemy'}`} initial={{ opacity: 0, x: playerAttacking ? '-28vw' : '28vw', scaleX: .25 }} animate={{ opacity: [0, 1, 1, 0], x: playerAttacking ? '28vw' : '-28vw', scaleX: 1 }} transition={{ duration: .65, ease: 'easeIn' }}><i /></motion.div>}
+      {currentEvent?.miss && !finished && <motion.div key={`miss-${eventIndex}`} className="miss-callout" initial={{ opacity: 0, scale: .25, filter: 'blur(4px)' }} animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}>MISS</motion.div>}
       <div className="battle-log">
-        <div className="phase-ribbon">BATTLE REPORT</div>
-        <div>{(battle?.log || []).slice(-7).map((line, index) => <p key={`${line}-${index}`}>{line}</p>)}{!battle && <p>No engagement data available.</p>}</div>
-        {battle?.drop && <p className="drop-report">★ New ship joined the fleet: {getShip(battle.drop)?.name || battle.drop}</p>}
+        <div className="phase-ribbon">{finished ? 'BATTLE REPORT' : 'LIVE COMBAT FEED'}</div>
+        <div>{shownLog.slice(-7).map((event, index) => <motion.p key={`${event.line}-${index}`} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}>{event.line}</motion.p>)}{!battle && <p>No engagement data available.</p>}</div>
+        {finished && battle?.drop && <p className="drop-report">★ New ship joined the fleet: {getShip(battle.drop)?.name || battle.drop}</p>}
         <div className="battle-actions">
-          {run && !battle?.mapCleared && battle?.result !== 'ENEMY_WIN' ? <button className="kc-action gold" onClick={onContinue}>Continue operation</button> : <button className="kc-action" onClick={onReturn}>Return to port</button>}
+          {!finished ? <button className="kc-action" onClick={() => setFinished(true)}>Skip animation</button> : run && !battle?.mapCleared && battle?.result !== 'ENEMY_WIN' ? <button className="kc-action gold" onClick={onContinue}>Continue operation</button> : <button className="kc-action" onClick={onReturn}>Return to port</button>}
         </div>
       </div>
+    </div>
+  );
+}
+
+function CollectionView({ state }) {
+  const owned = state.ownedShipIds.map(getShip).filter(Boolean);
+  const [filter, setFilter] = useState('ALL');
+  const [selectedId, setSelectedId] = useState(owned[0]?.id || null);
+  const filtered = filter === 'ALL' ? owned : owned.filter((ship) => TYPE_CODES[ship.type] === filter);
+  const selected = filtered.find((ship) => ship.id === selectedId) || filtered[0] || null;
+  const inst = selected ? state.ships[selected.id] : null;
+  return (
+    <div className="collection-layout">
+      <Panel title="Ship Library" eyebrow={`${owned.length} of ${SHIPS.length} vessels acquired`} className="collection-index">
+        <div className="collection-filters">{['ALL', 'DD', 'CL', 'CA', 'BB', 'CV'].map((type) => <button className={filter === type ? 'active' : ''} key={type} onClick={() => setFilter(type)}>{type}</button>)}</div>
+        <div className="collection-grid">
+          {filtered.map((ship) => <button className={`collection-card ${selected?.id === ship.id ? 'selected' : ''}`} key={ship.id} onClick={() => setSelectedId(ship.id)}><img src={`/assets/ship-sprites/${ship.id}.webp`} alt={`${ship.name} portrait`} /><span className="collection-rarity">{ship.rarity}</span><div><b>{ship.name}</b><small>{TYPE_CODES[ship.type]} · Lv {state.ships[ship.id].level}</small></div></button>)}
+        </div>
+      </Panel>
+      <Panel title={selected?.name || 'No ships'} eyebrow={selected ? `${selected.rarity} · ${selected.type}` : 'Collection empty'} className="collection-detail">
+        {selected && <><div className="collection-hero"><img src={`/assets/ship-sprites/${selected.id}.webp`} alt={`${selected.name} full portrait`} /><div className="collection-nameplate"><span>NO. {String(SHIPS.indexOf(selected) + 1).padStart(3, '0')}</span><h2>{selected.name}</h2><p>{selected.type}</p></div></div><div className="collection-stats"><div><span>LEVEL</span><b>{inst.level}</b></div><div><span>HP</span><b>{inst.currentHp}/{selected.hp}</b></div><div><span>FIREPOWER</span><b>{selected.fp}</b></div><div><span>TORPEDO</span><b>{selected.torp}</b></div><div><span>ARMOR</span><b>{selected.armor}</b></div><div><span>MORALE</span><b>{inst.morale}</b></div></div></>}
+      </Panel>
     </div>
   );
 }
@@ -409,11 +489,11 @@ function ExpeditionView({ state, now, onDispatch }) {
 
 function ConstructionView({ state, result, onConstruct }) {
   const resultShip = getShip(result?.shipId);
-  return <div className="construction-layout"><Panel title="Naval Arsenal" eyebrow="New ship construction"><div className="arsenal-machine"><div className="gear gear-one">⚙</div><div className="gear gear-two">⚙</div><div className="blueprint"><span>STANDARD RECIPE</span><h3>Fleet Vessel</h3><div className="recipe-grid"><b>120<small>Fuel</small></b><b>80<small>Ammo</small></b><b>150<small>Steel</small></b><b>40<small>Bauxite</small></b></div></div><button className="construct-button" onClick={onConstruct}><span>⚒</span> Commence construction</button><p className="pity-line">High-rarity guarantee progress: <b>{state.gacha.standardPity}/90</b></p></div></Panel><Panel title="Latest Launch" eyebrow="Construction record"><AnimatePresence mode="wait" initial={false}>{resultShip ? <motion.div className="construction-result" key={resultShip.id} initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, y: 8 }}><ShipEmblem ship={resultShip}/><span className="rarity-large">{result.rarity}</span><h2>{resultShip.name}</h2><p>{resultShip.type}</p><strong>{result.isNew ? 'NEW SHIP ACQUIRED' : 'DUPLICATE · XP CONVERTED'}</strong></motion.div> : <div className="construction-empty"><span>⚓</span><p>Your next completed vessel will appear here.</p></div>}</AnimatePresence></Panel></div>;
+  return <div className="construction-layout"><Panel title="Naval Arsenal" eyebrow="New ship construction"><div className="arsenal-machine"><div className="gear gear-one">⚙</div><div className="gear gear-two">⚙</div><div className="blueprint"><span>STANDARD RECIPE</span><h3>Fleet Vessel</h3><div className="recipe-grid"><b>120<small>Fuel</small></b><b>80<small>Ammo</small></b><b>150<small>Steel</small></b><b>40<small>Bauxite</small></b></div></div><button className="construct-button" onClick={onConstruct}><span>⚒</span> Commence construction</button><p className="pity-line">High-rarity guarantee progress: <b>{state.gacha.standardPity}/90</b></p></div></Panel><Panel title="Latest Launch" eyebrow="Construction record"><AnimatePresence mode="wait" initial={false}>{resultShip ? <motion.div className="construction-result" key={resultShip.id} initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, y: 8 }}><ShipPortrait ship={resultShip} size="launch"/><span className="rarity-large">{result.rarity}</span><h2>{resultShip.name}</h2><p>{resultShip.type}</p><strong>{result.isNew ? 'NEW SHIP ACQUIRED' : 'DUPLICATE · XP CONVERTED'}</strong></motion.div> : <div className="construction-empty"><span>⚓</span><p>Your next completed vessel will appear here.</p></div>}</AnimatePresence></Panel></div>;
 }
 
 function DockView({ state, now, onRepair, onInstant }) {
-  return <div className="view-stack"><Panel title="Repair Docks" eyebrow={`${state.docks.owned} docks available`}><div className="dock-slots">{Array.from({ length: state.docks.owned }).map((_, index) => { const shipId = state.docks.slots[index]; const ship = getShip(shipId); const inst = state.ships[shipId]; return <div className={`dock-slot ${ship ? 'occupied' : ''}`} key={index}><span className="dock-number">DOCK {index + 1}</span>{ship ? <><ShipEmblem ship={ship}/><div><h3>{ship.name}</h3><p>Repairing heavy damage</p><time>{formatDuration(inst.repairEndTime - now)}</time></div><button className="kc-action gold" onClick={() => onInstant(shipId)}>Use bucket</button></> : <><span className="dock-empty-icon">⚒</span><p>Repair berth available</p></>}</div>; })}</div></Panel><Panel title="Damage Report" eyebrow="Ships requiring attention"><div className="damage-list">{state.ownedShipIds.map((shipId) => { const ship = getShip(shipId); const inst = state.ships[shipId]; const damage = getDamage(inst.currentHp, ship.hp); const repairing = inst.repairEndTime && now < inst.repairEndTime; return <article key={shipId}><ShipEmblem ship={ship} small/><div><h3>{ship.name}</h3><p className={damage.className}>{damage.label}</p></div><HpBar value={inst.currentHp} max={ship.hp}/><button className="kc-action" disabled={damage.label === 'Ready' || repairing} onClick={() => onRepair(shipId)}>{repairing ? 'In dock' : 'Repair'}</button></article>; })}</div></Panel></div>;
+  return <div className="view-stack"><Panel title="Repair Docks" eyebrow={`${state.docks.owned} docks available`}><div className="dock-slots">{Array.from({ length: state.docks.owned }).map((_, index) => { const shipId = state.docks.slots[index]; const ship = getShip(shipId); const inst = state.ships[shipId]; return <div className={`dock-slot ${ship ? 'occupied' : ''}`} key={index}><span className="dock-number">DOCK {index + 1}</span>{ship ? <><ShipPortrait ship={ship} size="small"/><div><h3>{ship.name}</h3><p>Repairing heavy damage</p><time>{formatDuration(inst.repairEndTime - now)}</time></div><button className="kc-action gold" onClick={() => onInstant(shipId)}>Use bucket</button></> : <><span className="dock-empty-icon">⚒</span><p>Repair berth available</p></>}</div>; })}</div></Panel><Panel title="Damage Report" eyebrow="Ships requiring attention"><div className="damage-list">{state.ownedShipIds.map((shipId) => { const ship = getShip(shipId); const inst = state.ships[shipId]; const damage = getDamage(inst.currentHp, ship.hp); const repairing = inst.repairEndTime && now < inst.repairEndTime; return <article key={shipId}><ShipPortrait ship={ship} size="small"/><div><h3>{ship.name}</h3><p className={damage.className}>{damage.label}</p></div><HpBar value={inst.currentHp} max={ship.hp}/><button className="kc-action" disabled={damage.label === 'Ready' || repairing} onClick={() => onRepair(shipId)}>{repairing ? 'In dock' : 'Repair'}</button></article>; })}</div></Panel></div>;
 }
 
 export default function GamePage() {
@@ -476,7 +556,7 @@ export default function GamePage() {
   const applyResult = (result, success) => { if (result.error) { setStatus(result.error); return false; } setState(result.state); setStatus(success); return true; };
   const handleResupply = () => { setState((prev) => resupplyFleet(prev)); setStatus('1st Fleet resupplied. Fuel and ammunition are at operational levels.'); };
   const handleStartSortie = (mapId) => { const result = startSortie(state, mapId, formation); if (applyResult(result, `Operation ${mapId} commenced.`)) setTab('sortie'); };
-  const handleAdvanceNode = (nodeId) => { const result = advanceSortieNode(state, nodeId); if (!applyResult(result, `Fleet advanced to node ${nodeId}.`)) return; if (result.event?.type === 'battle') { setBattleView(result.event); setTab('combat'); setStatus(`${resultLabel(result.event.result)} at node ${nodeId}.`); } else if (result.event?.type === 'resource') setStatus(`Supplies recovered at node ${nodeId}.`); };
+  const handleAdvanceNode = (nodeId) => { const result = advanceSortieNode(state, nodeId); if (!applyResult(result, `Fleet advanced to node ${nodeId}.`)) return; if (result.event?.type === 'battle') { setBattleView(result.event); setTab('combat'); setStatus(`Enemy contact at node ${nodeId}. Battle underway.`); } else if (result.event?.type === 'resource') setStatus(`Supplies recovered at node ${nodeId}.`); };
   const handleQuest = (id) => { const result = claimQuest(state, id); applyResult(result, 'Quest rewards received.'); };
   const handleExpedition = (id) => { const result = dispatchExpedition(state, id); applyResult(result, 'Expedition fleet dispatched.'); };
   const handleConstruction = () => { const result = constructionPull(state); if (applyResult(result, 'Construction completed. A new vessel has launched.')) setConstructionResult(result.result); };
@@ -505,6 +585,7 @@ export default function GamePage() {
               <motion.div key={tab} className="tab-view" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18, bounce: 0 }}>
                 {tab === 'port' && <PortView state={state} fleet={activeFleet} setTab={setTab} onResupply={handleResupply} />}
                 {tab === 'fleet' && <FleetView state={state} setState={setState} onResupply={handleResupply} />}
+                {tab === 'collection' && <CollectionView state={state} />}
                 {tab === 'sortie' && <SortieView state={state} formation={formation} setFormation={setFormation} onStart={handleStartSortie} onAdvance={handleAdvanceNode} onRetreat={() => { setState((prev) => retreatSortie(prev)); setStatus('Fleet returned safely to port.'); setTab('port'); }} />}
                 {tab === 'combat' && <CombatView battle={battleView} run={run} onContinue={() => setTab('sortie')} onReturn={() => setTab('port')} />}
                 {tab === 'quests' && <QuestView state={state} onClaim={handleQuest} />}

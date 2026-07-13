@@ -19,3 +19,13 @@ Original prompt: I'd like you to go through this project, and make it as close i
 - Add a full equipment/loadout system and remodel progression using the existing design specification.
 - Add original per-ship portraits beyond the new Aster Vale flagship; current roster and combat UI intentionally use neutral naval emblems instead of the repository's copyrighted character art.
 - Extend battle presentation into timed air, shelling, torpedo, and optional night-battle phases rather than presenting the resolved combat report immediately.
+
+## 2026-07-14 follow-up
+
+- Reproduced the user's broken map and immediate battle-result transition using Computer in the live Chrome app.
+- Replaced aspect-ratio-dependent HTML route segments with an SVG route layer; Computer verification confirms every route now connects node center to node center and travelled routes highlight correctly.
+- Added a staged battle playback driven by the resolver log: fleet entrances, phase title changes, attacker motion, tracer projectiles, hit shake, damage numbers, miss callouts, progressive combat feed, skip control, and delayed result/actions.
+- Added a Ship Library tab with owned-ship filtering, portrait grid, detail view, levels, HP, combat stats, and morale.
+- Generated and integrated a unique original portrait for all ten master ships under `public/assets/ship-sprites/`; organization, port, battle, repair, construction, and collection now consume ship-specific art.
+- Verified the repaired map, Ship Library, animation intro, and completed battle result through Computer in Chrome.
+- Automated follow-up verification also passed: all five route segments matched their node coordinates, the battle advanced from live animation to result, all owned ships used unique sprite paths, and the browser console remained clean.
