@@ -74,6 +74,8 @@ const TYPE_CODES = {
   [SHIP_TYPES.CV]: 'CV',
 };
 
+const PORT_CUTOUT_IDS = new Set(['dd_001', 'dd_002', 'cl_001', 'cl_002']);
+
 function formatDuration(ms) {
   const total = Math.max(0, Math.floor(ms / 1000));
   const h = Math.floor(total / 3600);
@@ -198,13 +200,15 @@ function PortView({ state, fleet, setTab, onResupply }) {
   const flagshipId = fleet.find(Boolean);
   const flagship = getShip(flagshipId) || SHIPS[0];
   const inst = state.ships[flagshipId] || state.ships[state.ownedShipIds[0]];
+  const hasPortCutout = PORT_CUTOUT_IDS.has(flagship.id) || flagship.id === 'bb_001';
+  const flagshipSrc = flagship.id === 'bb_001' ? '/assets/original/aster-vale-clean.png' : hasPortCutout ? `/assets/port-sprites/${flagship.id}.png` : `/assets/ship-sprites/${flagship.id}.webp`;
 
   return (
     <div className="port-scene">
       <div className="port-horizon" />
       <motion.img
-        className="flagship-art"
-        src={`/assets/ship-sprites/${flagship.id}.webp`}
+        className={`flagship-art ${hasPortCutout ? 'clean-cutout' : 'soft-portrait'}`}
+        src={flagshipSrc}
         alt={`${flagship.name}, fleet flagship`}
         initial={{ opacity: 0, x: 18 }}
         animate={{ opacity: 1, x: 0 }}

@@ -38,3 +38,11 @@ Original prompt: I'd like you to go through this project, and make it as close i
 - Restored the one-time `ILOVEYOU` secret transmission for 50 special tickets, including persisted redemption state and duplicate-redemption protection.
 - Playwright verification passed from fresh state: selected World 2, launched 2-1 at `start`, redeemed 50 tickets, completed a special pull (55 -> 54 tickets), received an exchange token, and observed zero browser errors.
 - Visually inspected the World 2 selection and fully animated Special Gacha result captures; final production build passed.
+
+## 2026-07-14 Home Port sprite cleanup
+
+- Traced the dark rectangle and faint lines to the combination of background-bearing portrait art, `mix-blend-mode: multiply`, a rectangular image outline, and a horizontal mask.
+- Generated clean chroma-key edits for the four starter flagships, removed the key with soft-matte despill and edge contraction, and saved transparent port-specific cutouts under `public/assets/port-sprites/`.
+- Added a cleaned transparent Aster Vale cutout under `public/assets/original/aster-vale-clean.png` for the battleship flagship case.
+- Removed multiply compositing and the rectangular outline; port-specific cutouts now render normally with a restrained drop shadow, while unconverted acquired ships retain a softened fallback treatment.
+- Playwright visual verification at 1280×720 confirms Vesper is cleanly composited over the harbor with no rectangular background or fringe, zero console errors, and a passing production build.
