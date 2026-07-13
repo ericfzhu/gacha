@@ -1,0 +1,11 @@
+name = "fleet-collection-api"
+main = "worker/index.js"
+compatibility_date = "2026-02-18"
+
+[vars]
+ALLOW_DEV_AUTH = "false"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "fleet-collection"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"

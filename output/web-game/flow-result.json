@@ -1,0 +1,22 @@
+{
+  "launched": {
+    "mapId": "1-1",
+    "currentNode": "start",
+    "reachableNodes": [
+      "A"
+    ],
+    "formation": "LINE_AHEAD"
+  },
+  "battle": {
+    "result": "PLAYER_WIN",
+    "mapId": "1-1",
+    "nodeId": "A",
+    "drop": null
+  },
+  "fleetCounts": {
+    "before": 4,
+    "afterRemove": 3,
+    "afterAdd": 4
+  },
+  "errors": []
+}
