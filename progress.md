@@ -46,3 +46,12 @@ Original prompt: I'd like you to go through this project, and make it as close i
 - Added a cleaned transparent Aster Vale cutout under `public/assets/original/aster-vale-clean.png` for the battleship flagship case.
 - Removed multiply compositing and the rectangular outline; port-specific cutouts now render normally with a restrained drop shadow, while unconverted acquired ships retain a softened fallback treatment.
 - Playwright visual verification at 1280×720 confirms Vesper is cleanly composited over the harbor with no rectangular background or fringe, zero console errors, and a passing production build.
+
+## 2026-07-14 expanded roster and campaign
+
+- Restored the full 49-vessel roster from the earlier draft, adapted every ship to the current stat and rarity model, and generated 39 new original class-specific portraits so all 49 ships have distinct art.
+- Expanded sortie progression to six named worlds with four operations each (24 maps total), escalating enemies, rewards, branching routes, and boss nodes.
+- Repositioned the Home Port flagship plaque above the 1st Fleet strip so the flagship name and status remain fully visible at 1280×720.
+- Production build and data integrity checks pass: 49 unique ship IDs, 49 unique sprite files, 24 maps, and exactly four maps in each world.
+- Full Playwright flow passed with no console errors or failed requests: World 6 selection, 6-4 launch and retreat, construction, acquired-ship library rendering, 1-1 launch, map advance, and battle animation.
+- Computer Use verification in Chrome confirmed the Home Port layout, 6-1 through 6-4 selection, functional Begin Sortie 6-4, navigable map nodes, visible live battle animation, and the 4-of-49 owned ship library.

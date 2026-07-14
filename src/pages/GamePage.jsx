@@ -21,7 +21,7 @@ import {
   tickExpeditions,
   exchangeGrandPrize,
 } from '../lib/gameEngine.js';
-import { EXPEDITIONS, FORMATIONS, MAPS, QUESTS, SHIPS, SHIP_TYPES, SPECIAL_GACHA_PRIZES } from '../lib/gameData.js';
+import { EXPEDITIONS, FORMATIONS, MAPS, QUESTS, SHIPS, SHIP_TYPES, SPECIAL_GACHA_PRIZES, WORLD_NAMES } from '../lib/gameData.js';
 
 const NAV_GROUPS = [
   {
@@ -381,13 +381,13 @@ function SortieView({ state, formation, setFormation, onStart, onAdvance, onRetr
   return (
     <div className="sortie-setup">
       <Panel title="Operation Area" eyebrow="Select a combat zone" className="map-select-panel">
-        <div className="world-tabs"><button className={selectedWorld === '1' ? 'active' : ''} onClick={() => selectWorld('1')}>World 1</button><button className={selectedWorld === '2' ? 'active' : ''} onClick={() => selectWorld('2')}>World 2</button><button disabled>Event</button></div>
+        <div className="world-tabs">{Object.entries(WORLD_NAMES).map(([world, name]) => <button className={selectedWorld === world ? 'active' : ''} onClick={() => selectWorld(world)} key={world}><b>World {world}</b><small>{name}</small></button>)}<button disabled><b>Event</b><small>Locked</small></button></div>
         <div className="map-cards">
           {worldMaps.map((item) => {
             const index = MAPS.findIndex((map) => map.id === item.id);
             return (
             <button className={`map-card ${selectedMap === item.id ? 'selected' : ''}`} onClick={() => setSelectedMap(item.id)} key={item.id}>
-              <span className="map-number">{item.id}</span><i className={`map-thumb map-thumb-${index + 1}`} /><div><h3>{item.name}</h3><p>Fleet area {item.id} · Base EXP {item.baseExp}</p></div><span className="clear-stamp">{state.sortie.mapClears[item.id] ? 'CLEARED' : 'NEW'}</span>
+              <span className="map-number">{item.id}</span><i className={`map-thumb map-thumb-${(index % 3) + 1}`} /><div><h3>{item.name}</h3><p>{item.worldName} · Base EXP {item.baseExp}</p></div><span className="clear-stamp">{state.sortie.mapClears[item.id] ? 'CLEARED' : 'NEW'}</span>
             </button>
           );})}
         </div>
