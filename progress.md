@@ -78,3 +78,9 @@ Original prompt: I'd like you to go through this project, and make it as close i
 - Enlarged the 1st Fleet preview to 2.52 times the command-group height, including larger ship portraits, names, health bars, and empty berths.
 - Isolated the flagship sprite inside a solid RGB(49, 95, 105) panel with its own heading, dialogue, and nameplate.
 - Chromium geometry and visual verification confirmed the art is fully contained, the showcase has no background image, the columns do not overlap, and the browser reported zero console errors.
+
+## 2026-07-14 flagship inner backdrop
+
+- Added a dedicated inset frame around the Home Port flagship sprite.
+- Matched the inset to the Home Port base harbor blue (#4f8792), while retaining the darker outer showcase for clear visual separation.
+- Added a restrained inner outline and layered inset shadow; Chromium verification confirmed the sprite remains fully contained and the portrait well renders cleanly at 1280×720.

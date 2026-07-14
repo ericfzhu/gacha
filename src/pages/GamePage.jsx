@@ -235,14 +235,16 @@ function PortView({ state, fleet, setTab, onResupply, supplyNotice }) {
       </section>
       <section className="flagship-showcase" aria-label="Fleet flagship">
         <div className="showcase-heading"><span>01</span><div><small>ACTIVE FLAGSHIP</small><b>1ST FLEET</b></div></div>
-        <motion.img
-          className={`flagship-art ${hasPortCutout ? 'clean-cutout' : 'soft-portrait'}`}
-          src={flagshipSrc}
-          alt={`${flagship.name}, fleet flagship`}
-          initial={{ opacity: 0, x: 18 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.35, bounce: 0 }}
-        />
+        <div className="flagship-art-frame">
+          <motion.img
+            className={`flagship-art ${hasPortCutout ? 'clean-cutout' : 'soft-portrait'}`}
+            src={flagshipSrc}
+            alt={`${flagship.name}, fleet flagship`}
+            initial={{ opacity: 0, x: 18 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.35, bounce: 0 }}
+          />
+        </div>
         <div className="speech-card">
           <span className="speech-corner" />
           <p>Admiral, the harbor is calm and the fleet is standing by. Shall we begin today&apos;s operations?</p>
