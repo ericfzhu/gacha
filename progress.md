@@ -84,3 +84,9 @@ Original prompt: I'd like you to go through this project, and make it as close i
 - Added a dedicated inset frame around the Home Port flagship sprite.
 - Matched the inset to the Home Port base harbor blue (#4f8792), while retaining the darker outer showcase for clear visual separation.
 - Added a restrained inner outline and layered inset shadow; Chromium verification confirmed the sprite remains fully contained and the portrait well renders cleanly at 1280×720.
+
+## 2026-07-14 flagship backdrop color correction
+
+- Corrected the inset interpretation: it now uses the Home Port banner's exact beige gradient (#f4f1e8 to #dcd8ce), not the harbor blue.
+- Retained the teal only on the outer flagship showcase, producing a clear framed-paper treatment around the transparent sprite.
+- Visually verified the corrected beige backdrop in Chromium at 1280×720.
