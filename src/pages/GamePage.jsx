@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../lib/apiClient.js';
 import { createDefaultGameState } from '../lib/defaultGameState.js';
@@ -196,7 +196,7 @@ function FleetStrip({ fleet, state, onOpenFleet }) {
   );
 }
 
-function PortView({ state, fleet, setTab, onResupply }) {
+function PortView({ state, fleet, setTab, onResupply, supplyNotice }) {
   const flagshipId = fleet.find(Boolean);
   const flagship = getShip(flagshipId) || SHIPS[0];
   const inst = state.ships[flagshipId] || state.ships[state.ownedShipIds[0]];
@@ -231,6 +231,20 @@ function PortView({ state, fleet, setTab, onResupply }) {
         <button className="command-hex" onClick={() => setTab('construction')}><span>⚙</span><b>ARSENAL</b><small>Build ships</small></button>
         <button className="command-hex" onClick={() => setTab('quests')}><span>✓</span><b>QUESTS</b><small>Review orders</small></button>
       </div>
+      <AnimatePresence initial={false}>
+        {supplyNotice && (
+          <motion.div
+            className="supply-notice"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+            role="status"
+          >
+            <span>◉</span><div><b>SUPPLY REPORT</b><small>{supplyNotice}</small></div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <FleetStrip fleet={fleet} state={state} onOpenFleet={() => setTab('fleet')} />
     </div>
   );
@@ -559,6 +573,10 @@ export default function GamePage() {
   const [formation, setFormation] = useState('LINE_AHEAD');
   const [constructionResult, setConstructionResult] = useState(null);
   const [specialResult, setSpecialResult] = useState(null);
+  const [supplyNotice, setSupplyNotice] = useState('');
+  const [editingCommander, setEditingCommander] = useState(false);
+  const [commanderDraft, setCommanderDraft] = useState('');
+  const supplyNoticeTimer = useRef(null);
   const [now, setNow] = useState(Date.now());
   const [loaded, setLoaded] = useState(false);
 
@@ -593,6 +611,7 @@ export default function GamePage() {
       coordinateSystem: 'UI screen; origin top-left; x right; y down',
       mode: tab,
       status,
+      commanderName: state.profile.commanderName,
       resources: state.resources,
       activeFleetId: state.fleets.activeFleetId,
       activeFleet: activeFleet.filter(Boolean).map((shipId) => { const ship = getShip(shipId); const inst = state.ships[shipId]; return { id: shipId, name: ship?.name, level: inst?.level, hp: inst?.currentHp, maxHp: ship?.hp, morale: inst?.morale, supply: inst?.supply }; }),
@@ -606,7 +625,43 @@ export default function GamePage() {
   }, [tab, status, state, activeFleet, run, battleView, constructionResult, specialResult, now]);
 
   const applyResult = (result, success) => { if (result.error) { setStatus(result.error); return false; } setState(result.state); setStatus(success); return true; };
-  const handleResupply = () => { setState((prev) => resupplyFleet(prev)); setStatus('1st Fleet resupplied. Fuel and ammunition are at operational levels.'); };
+  const handleResupply = () => {
+    const next = resupplyFleet(state);
+    const fuelSpent = state.resources.fuel - next.resources.fuel;
+    const ammoSpent = state.resources.ammo - next.resources.ammo;
+    const fleetIds = activeFleet.filter(Boolean);
+    const supplied = fleetIds.filter((shipId) => {
+      const master = getShip(shipId);
+      const inst = next.ships[shipId];
+      return master && inst?.supply?.fuel === master.maxFuel && inst?.supply?.ammo === master.maxAmmo;
+    }).length;
+    const stillLow = Math.max(0, fleetIds.length - supplied);
+    const message = fuelSpent || ammoSpent
+      ? `${supplied} ships replenished · −${fuelSpent} fuel · −${ammoSpent} ammo${stillLow ? ` · ${stillLow} awaiting resources` : ''}`
+      : stillLow
+        ? `Unable to replenish ${stillLow} ships · more fuel or ammunition required`
+        : 'All active ships are already fully supplied.';
+    setState(next);
+    setSupplyNotice(message);
+    setStatus(message);
+    window.clearTimeout(supplyNoticeTimer.current);
+    supplyNoticeTimer.current = window.setTimeout(() => setSupplyNotice(''), 4200);
+  };
+  const openCommanderEditor = () => {
+    setCommanderDraft(state.profile.commanderName || '');
+    setEditingCommander(true);
+  };
+  const saveCommanderName = (event) => {
+    event.preventDefault();
+    const commanderName = commanderDraft.trim().slice(0, 24);
+    if (!commanderName) return;
+    const next = { ...state, profile: { ...state.profile, commanderName } };
+    setState(next);
+    setSaveState('saving');
+    apiClient.saveGameState(next).then(() => setSaveState('saved')).catch(() => setSaveState('local'));
+    setStatus(`Commander profile updated to ${commanderName}.`);
+    setEditingCommander(false);
+  };
   const handleStartSortie = (mapId) => { const result = startSortie(state, mapId, formation); if (applyResult(result, `Operation ${mapId} commenced.`)) setTab('sortie'); };
   const handleAdvanceNode = (nodeId) => { const result = advanceSortieNode(state, nodeId); if (!applyResult(result, `Fleet advanced to node ${nodeId}.`)) return; if (result.event?.type === 'battle') { setBattleView(result.event); setTab('combat'); setStatus(`Enemy contact at node ${nodeId}. Battle underway.`); } else if (result.event?.type === 'resource') setStatus(`Supplies recovered at node ${nodeId}.`); };
   const handleQuest = (id) => { const result = claimQuest(state, id); applyResult(result, 'Quest rewards received.'); };
@@ -623,9 +678,17 @@ export default function GamePage() {
   return (
     <div className="kc-shell">
       <header className="kc-topbar">
-        <button className="kc-brand" onClick={() => setTab('port')}><span className="brand-anchor">⚓</span><span><b>FLEET COLLECTION</b><small>Yokosuka Naval District</small></span></button>
-        <ResourceBar resources={state.resources} />
-        <div className="admiral-card"><div><b>ADM. ERIC</b><span>HQ Lv {state.profile.hqLevel} · {state.profile.rank}</span></div><button onClick={() => navigate('/')} aria-label="Return to title">☰</button></div>
+        <button className="kc-brand" onClick={() => setTab('port')}><span className="brand-anchor">⚓</span><span><b>GACHA</b><small>Yokosuka Naval District</small></span></button>
+        <div className="topbar-utilities">
+          <ResourceBar resources={state.resources} />
+          <div className="admiral-card">
+            <button className="commander-profile" onClick={openCommanderEditor} aria-label="Change username">
+              <span><b>{state.profile.commanderName}</b><small>HQ Lv {state.profile.hqLevel} · {state.profile.rank}</small></span>
+              <i>✎</i>
+            </button>
+            <button className="title-menu-button" onClick={() => navigate('/')} aria-label="Return to title">☰</button>
+          </div>
+        </div>
       </header>
       <div className="kc-body">
         <aside className="kc-sidebar">
@@ -638,7 +701,7 @@ export default function GamePage() {
           <div className="kc-content">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div key={tab} className="tab-view" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18, bounce: 0 }}>
-                {tab === 'port' && <PortView state={state} fleet={activeFleet} setTab={setTab} onResupply={handleResupply} />}
+                {tab === 'port' && <PortView state={state} fleet={activeFleet} setTab={setTab} onResupply={handleResupply} supplyNotice={supplyNotice} />}
                 {tab === 'fleet' && <FleetView state={state} setState={setState} onResupply={handleResupply} />}
                 {tab === 'collection' && <CollectionView state={state} />}
                 {tab === 'sortie' && <SortieView state={state} formation={formation} setFormation={setFormation} onStart={handleStartSortie} onAdvance={handleAdvanceNode} onRetreat={() => { setState((prev) => retreatSortie(prev)); setStatus('Fleet returned safely to port.'); setTab('port'); }} />}
@@ -653,6 +716,20 @@ export default function GamePage() {
           </div>
         </main>
       </div>
+      <AnimatePresence initial={false}>
+        {editingCommander && (
+          <motion.div className="profile-editor-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={(event) => { if (event.target === event.currentTarget) setEditingCommander(false); }}>
+            <motion.form className="profile-editor" onSubmit={saveCommanderName} initial={{ opacity: 0, y: 8, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8 }} transition={{ type: 'spring', duration: 0.3, bounce: 0 }}>
+              <p>COMMAND PROFILE</p>
+              <h2>Set your username</h2>
+              <label htmlFor="commander-name">Commander name</label>
+              <input id="commander-name" autoFocus maxLength={24} value={commanderDraft} onChange={(event) => setCommanderDraft(event.target.value)} placeholder="Enter a name" />
+              <small>{commanderDraft.trim().length}/24 characters</small>
+              <div><button type="button" onClick={() => setEditingCommander(false)}>Cancel</button><button className="save" type="submit" disabled={!commanderDraft.trim()}>Save profile</button></div>
+            </motion.form>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

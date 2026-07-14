@@ -1,0 +1,22 @@
+{
+  "layout": {
+    "artOnRight": true,
+    "fleetOnLeft": true,
+    "fleetColumns": 2,
+    "fleetRows": 3,
+    "speechClearsCommands": true,
+    "brand": "GACHA"
+  },
+  "fullSupplyNotice": "All active ships are already fully supplied.",
+  "paidSupplyNotice": "4 ships replenished · −5 fuel · −7 ammo",
+  "fuelDelta": 5,
+  "ammoDelta": 7,
+  "username": "Captain Nova",
+  "persistedUsername": "Captain Nova",
+  "errors": [],
+  "failedRequests": [
+    "GET https://fonts.gstatic.com/s/barlowcondensed/v13/HTxwL3I-JCGChYJ8VI-L6OO_au7B46r2z3bWuYMBYro.woff2 net::ERR_ABORTED",
+    "GET https://fonts.gstatic.com/s/notosans/v42/o-0bIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjc5a7du3mhPy0.woff2 net::ERR_ABORTED",
+    "GET https://fonts.gstatic.com/s/barlowcondensed/v13/HTxwL3I-JCGChYJ8VI-L6OO_au7B4873z3bWuYMBYro.woff2 net::ERR_ABORTED"
+  ]
+}

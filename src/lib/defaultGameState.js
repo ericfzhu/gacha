@@ -37,7 +37,7 @@ export function createDefaultGameState() {
   return {
     version: 2,
     profile: {
-      commanderName: 'Admiral',
+      commanderName: 'Commander',
       hqLevel: 1,
       hqXp: 0,
       rank: 'Admiral Cadet',

@@ -33,25 +33,29 @@ button:active:not(:disabled) { transform: scale(.96); }
 .kc-shell { height: 100%; min-width: 900px; background: #a7b6b2; display: flex; flex-direction: column; }
 .kc-topbar { height: 74px; flex: 0 0 74px; display: flex; align-items: center; gap: 18px; padding: 0 20px; color: #f3f0e6; background: linear-gradient(180deg, #2d5963 0%, #1b3d49 100%); box-shadow: 0 3px 9px rgba(10, 27, 34, .4); position: relative; z-index: 20; }
 .kc-topbar::after { content: ''; position: absolute; inset: auto 0 0; height: 2px; background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); }
-.kc-brand { min-width: 222px; display: flex; align-items: center; gap: 12px; padding: 4px; color: inherit; background: transparent; border: 0; text-align: left; cursor: pointer; transition-property: opacity, transform; transition-duration: .16s; }
+.kc-brand { min-width: 188px; display: flex; align-items: center; gap: 12px; padding: 4px; color: inherit; background: transparent; border: 0; text-align: left; cursor: pointer; transition-property: opacity, transform; transition-duration: .16s; }
 .kc-brand:hover { opacity: .85; }
 .brand-anchor { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.35); border-radius: 50%; font-size: 25px; background: rgba(7, 24, 31, .24); box-shadow: inset 0 0 0 3px rgba(255,255,255,.08); }
 .kc-brand b, .kc-brand small { display: block; }
-.kc-brand b { font: 700 18px/1 'Barlow Condensed', sans-serif; letter-spacing: .13em; }
+.kc-brand b { font: 700 22px/1 'Barlow Condensed', sans-serif; letter-spacing: .18em; }
 .kc-brand small { margin-top: 6px; color: #b7d2d2; font-size: 10px; letter-spacing: .08em; }
-.resource-bar { flex: 1; display: grid; grid-template-columns: repeat(4, minmax(108px, 1fr)) repeat(2, minmax(90px, .75fr)); max-width: 900px; height: 48px; background: rgba(12, 36, 44, .4); border-radius: 7px; box-shadow: inset 0 1px 4px rgba(3, 18, 24, .35), 0 1px rgba(255,255,255,.12); overflow: hidden; }
+.topbar-utilities { min-width: 0; margin-left: auto; display: flex; align-items: center; justify-content: flex-end; gap: 16px; }
+.resource-bar { width: min(750px, 60vw); display: grid; grid-template-columns: repeat(4, minmax(96px, 1fr)) repeat(2, minmax(82px, .72fr)); height: 48px; background: rgba(12, 36, 44, .4); border-radius: 7px; box-shadow: inset 0 1px 4px rgba(3, 18, 24, .35), 0 1px rgba(255,255,255,.12); overflow: hidden; }
 .resource-chip { min-width: 0; display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 6px; padding: 0 10px; border-right: 1px solid rgba(231, 244, 240, .14); font-variant-numeric: tabular-nums; }
 .resource-chip:last-child { border-right: 0; }
 .resource-icon { width: 24px; height: 24px; display: grid; place-items: center; color: #fff; font-size: 12px; border-radius: 50%; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
 .resource-fuel { background: #87a66d; }.resource-ammo { background: #9d7658; }.resource-steel { background: #718690; }.resource-bauxite { background: #c28964; }.bucket-icon { background: #7aa1ac; }.ticket-icon { background: #b79a59; }
 .resource-name { color: #aac1c3; font-size: 9px; text-transform: uppercase; letter-spacing: .06em; }
 .resource-chip strong { color: #fff; font: 600 16px 'Barlow Condensed', sans-serif; letter-spacing: .04em; }
-.admiral-card { min-width: 178px; display: flex; align-items: center; justify-content: flex-end; gap: 12px; text-align: right; }
-.admiral-card b, .admiral-card span { display: block; }
-.admiral-card b { font: 600 15px 'Barlow Condensed', sans-serif; letter-spacing: .08em; }
-.admiral-card span { color: #b5cdcd; font-size: 10px; margin-top: 4px; }
-.admiral-card button { width: 42px; height: 42px; color: #e8efea; background: rgba(7, 26, 33, .28); border: 1px solid rgba(255,255,255,.2); border-radius: 7px; cursor: pointer; transition-property: background-color, transform; transition-duration: .16s; }
-.admiral-card button:hover { background: rgba(7, 26, 33, .5); }
+.admiral-card { min-width: 194px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; text-align: right; }
+.commander-profile { min-width: 144px; min-height: 44px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 4px 8px; color: inherit; background: transparent; border: 0; border-radius: 6px; cursor: pointer; text-align: right; transition-property: background-color, transform; transition-duration: .16s; }
+.commander-profile:hover { background: rgba(255,255,255,.08); }
+.commander-profile span, .commander-profile b, .commander-profile small { display: block; }
+.commander-profile b { max-width: 122px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px 'Barlow Condensed', sans-serif; letter-spacing: .08em; }
+.commander-profile small { margin-top: 4px; color: #b5cdcd; font-size: 10px; }
+.commander-profile i { color: #d8c17f; font-size: 12px; font-style: normal; opacity: .75; }
+.title-menu-button { width: 42px; height: 42px; color: #e8efea; background: rgba(7,26,33,.28); border: 1px solid rgba(255,255,255,.2); border-radius: 7px; cursor: pointer; transition-property: background-color, transform; transition-duration: .16s; }
+.title-menu-button:hover { background: rgba(7,26,33,.5); }
 
 .kc-body { flex: 1; min-height: 0; display: flex; }
 .kc-sidebar { width: 214px; flex: 0 0 214px; position: relative; padding: 21px 14px 15px; color: #d8e2dd; background: linear-gradient(90deg, #19323c, #224650 92%, #152f39); box-shadow: inset -2px 0 rgba(255,255,255,.07), 4px 0 12px rgba(18,38,44,.2); display: flex; flex-direction: column; z-index: 10; }
@@ -89,20 +93,34 @@ button:active:not(:disabled) { transform: scale(.96); }
 .port-scene { height: max(700px, calc(100vh - 136px)); min-height: 700px; position: relative; overflow: hidden; background-image: linear-gradient(180deg, rgba(225,239,233,.06), rgba(16,54,65,.08)), url('/assets/ocean_bg.webp'); background-size: cover; background-position: center 52%; }
 .port-scene::before { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgba(16,48,57,.42) 0%, rgba(30,60,64,.08) 38%, rgba(223,236,230,.04) 70%, rgba(11,33,41,.23) 100%), linear-gradient(0deg, rgba(11,39,48,.35), transparent 42%); }
 .port-horizon { position: absolute; left: 0; right: 0; bottom: 0; height: 40%; background: linear-gradient(transparent, rgba(13,55,68,.3)); }
-.flagship-art { position: absolute; z-index: 2; right: clamp(6%, 8vw, 11%); bottom: -5%; height: 103%; width: auto; max-width: 54%; object-fit: contain; object-position: bottom center; filter: drop-shadow(0 10px 12px rgba(7,27,34,.4)); outline: 1px solid rgba(255,255,255,.1); outline-offset: -1px; }
-.flagship-plaque { position: absolute; z-index: 6; right: 3.5%; bottom: 160px; width: 235px; padding: 13px 16px; color: #f4f0e4; background: linear-gradient(120deg, rgba(24,57,66,.92), rgba(46,85,91,.82)); border-left: 4px solid var(--gold); box-shadow: 0 8px 20px rgba(12,32,36,.3); transform: skewX(-4deg); }
+.flagship-art { position: absolute; z-index: 2; right: clamp(1%, 3vw, 5%); bottom: -5%; height: 103%; width: auto; max-width: 52%; object-fit: contain; object-position: bottom center; filter: drop-shadow(0 10px 12px rgba(7,27,34,.4)); outline: 1px solid rgba(255,255,255,.1); outline-offset: -1px; }
+.flagship-plaque { position: absolute; z-index: 6; right: 2.5%; bottom: 24px; width: 235px; padding: 13px 16px; color: #f4f0e4; background: linear-gradient(120deg, rgba(24,57,66,.92), rgba(46,85,91,.82)); border-left: 4px solid var(--gold); box-shadow: 0 8px 20px rgba(12,32,36,.3); transform: skewX(-4deg); }
 .flagship-plaque > * { transform: skewX(4deg); }.flagship-plaque p, .flagship-plaque h2 { margin: 0; }.flagship-plaque p { color: #b9cfca; font: 600 9px 'Barlow Condensed'; letter-spacing: .18em; }.flagship-plaque h2 { font: 700 28px 'Barlow Condensed'; letter-spacing: .04em; }.flagship-stats { display: flex; gap: 10px; margin-top: 5px; color: #e7d8b3; font: 600 11px 'Barlow Condensed'; font-variant-numeric: tabular-nums; }
-.speech-card { position: absolute; z-index: 5; left: 29%; top: 29px; width: min(360px, 31vw); padding: 14px 18px; color: #455350; background: rgba(249,246,237,.94); border-radius: 7px; box-shadow: 0 5px 16px rgba(17,45,50,.22); font-size: 12px; line-height: 1.65; text-wrap: pretty; }
+.speech-card { position: absolute; z-index: 5; left: 30px; top: 210px; width: 402px; padding: 14px 18px; color: #455350; background: rgba(249,246,237,.94); border-radius: 7px; box-shadow: 0 5px 16px rgba(17,45,50,.22); font-size: 12px; line-height: 1.65; text-wrap: pretty; }
 .speech-card p { margin: 0; }.speech-corner { position: absolute; right: -13px; top: 24px; width: 25px; height: 25px; background: inherit; transform: rotate(45deg); border-radius: 2px; }
-.port-command-grid { position: absolute; z-index: 5; left: 36px; top: 38px; width: 270px; display: grid; grid-template-columns: repeat(2, 128px); gap: 12px; }
+.port-command-grid { position: absolute; z-index: 5; left: 30px; top: 30px; width: 402px; display: grid; grid-template-columns: repeat(3, 126px); gap: 10px; }
 .command-hex { min-height: 100px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #e8efea; background: linear-gradient(155deg, rgba(45,88,94,.96), rgba(25,56,65,.97)); border: 1px solid rgba(215,235,228,.42); border-radius: 12px 5px 12px 5px; box-shadow: inset 0 0 0 3px rgba(255,255,255,.05), 0 7px 15px rgba(10,33,41,.3); cursor: pointer; transition-property: transform, filter, box-shadow; transition-duration: .18s; }
 .command-hex::after { content: ''; position: absolute; inset: 5px; border: 1px solid rgba(255,255,255,.12); border-radius: 8px 3px 8px 3px; pointer-events: none; }.command-hex:hover { filter: brightness(1.12); box-shadow: inset 0 0 0 3px rgba(255,255,255,.07), 0 9px 19px rgba(10,33,41,.38); transform: translateY(-2px); }.command-hex.primary { color: #fff8e6; background: linear-gradient(155deg, #b97655, #87493c); border-color: #ebc985; }
 .command-hex > span { font-size: 23px; line-height: 1; }.command-hex b { margin-top: 7px; font: 700 15px 'Barlow Condensed'; letter-spacing: .09em; }.command-hex small { margin-top: 3px; color: #a9c1be; font-size: 9px; }.command-hex.primary small { color: #efd4b0; }
-.fleet-strip { position: absolute; z-index: 6; left: 28px; right: 28px; bottom: 22px; height: 148px; padding: 12px; color: #eef1e9; background: rgba(17,48,57,.9); border-radius: 8px; box-shadow: 0 8px 22px rgba(8,26,32,.32), inset 0 0 0 1px rgba(255,255,255,.13); backdrop-filter: blur(6px); }
+.fleet-strip { position: absolute; z-index: 6; left: 28px; bottom: 22px; width: min(500px, 47%); height: 258px; padding: 12px; color: #eef1e9; background: rgba(17,48,57,.9); border-radius: 8px; box-shadow: 0 8px 22px rgba(8,26,32,.32), inset 0 0 0 1px rgba(255,255,255,.13); backdrop-filter: blur(6px); }
 .fleet-strip-title { height: 28px; display: flex; align-items: center; justify-content: space-between; padding: 0 5px; }.fleet-strip-title > span { font: 700 13px 'Barlow Condensed'; letter-spacing: .1em; text-transform: uppercase; }
-.fleet-strip-list { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; height: 92px; }
+.fleet-strip-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(3, 1fr); gap: 7px; height: 204px; }
 .fleet-mini { min-width: 0; position: relative; display: grid; grid-template-columns: 40px 1fr; grid-template-rows: 1fr 23px; column-gap: 7px; padding: 7px 8px; background: linear-gradient(155deg, rgba(255,255,255,.13), rgba(255,255,255,.05)); border-radius: 5px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.11); }
 .fleet-mini > .ship-emblem { grid-row: 1 / 3; }.fleet-mini > div strong, .fleet-mini > div small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.fleet-mini > div strong { font: 600 12px 'Barlow Condensed'; }.fleet-mini > div small { color: #a8c0bc; font-size: 9px; }.fleet-number { position: absolute; left: 4px; top: 3px; z-index: 2; color: #e9d29d; font: 700 9px 'Barlow Condensed'; }.fleet-mini .hp-line { grid-column: 2; }.fleet-mini.empty { display: flex; align-items: center; justify-content: center; color: #76938f; border: 1px dashed rgba(255,255,255,.15); }.empty-slot { font-size: 10px; }
+.supply-notice { position: absolute; z-index: 8; left: 30px; top: 244px; width: 402px; min-height: 52px; display: flex; align-items: center; gap: 11px; padding: 9px 13px; color: #eef4ec; background: #24565b; border-left: 4px solid #d6ba70; border-radius: 5px; box-shadow: 0 8px 18px rgba(10,31,36,.25); }
+.supply-notice > span { width: 28px; height: 28px; display: grid; place-items: center; color: #fff; background: #82a16c; border-radius: 50%; }
+.supply-notice b,.supply-notice small { display: block; }.supply-notice b { font: 700 10px 'Barlow Condensed'; letter-spacing: .13em; }.supply-notice small { margin-top: 3px; color: #bdd0cb; font-size: 9px; line-height: 1.4; }
+
+.profile-editor-backdrop { position: fixed; z-index: 70; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(7,27,35,.66); backdrop-filter: blur(5px); }
+.profile-editor { width: min(420px, 92vw); padding: 24px; color: var(--ink); background: var(--paper); border-radius: 12px; box-shadow: 0 22px 55px rgba(3,17,23,.42), inset 0 0 0 1px rgba(255,255,255,.8); }
+.profile-editor p,.profile-editor h2 { margin: 0; }.profile-editor p { color: #74827e; font: 600 9px 'Barlow Condensed'; letter-spacing: .17em; }.profile-editor h2 { margin-top: 3px; font: 700 26px 'Barlow Condensed'; text-wrap: balance; }
+.profile-editor label { display: block; margin: 20px 0 6px; color: #62706d; font-size: 11px; font-weight: 600; }
+.profile-editor input { width: 100%; height: 48px; padding: 0 13px; color: #263b40; background: #fffdf7; border: 1px solid #c9c2b4; border-radius: 6px; font: 600 17px 'Barlow Condensed'; letter-spacing: .04em; }
+.profile-editor input:focus { outline: 3px solid rgba(197,154,73,.3); border-color: #9d8252; }
+.profile-editor > small { display: block; margin-top: 6px; color: #8a918d; font-size: 9px; text-align: right; font-variant-numeric: tabular-nums; }
+.profile-editor > div { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.profile-editor > div button { min-width: 104px; min-height: 42px; color: #5e6b68; background: #ded9cd; border: 0; border-radius: 5px; cursor: pointer; transition-property: filter, transform, opacity; transition-duration: .16s; }
+.profile-editor > div button.save { color: #fff; background: #47777b; }.profile-editor > div button:disabled { opacity: .4; cursor: not-allowed; }
 
 /* Shared ship pieces */
 .ship-emblem { width: 62px; height: 62px; flex: 0 0 62px; position: relative; display: grid; place-items: center; overflow: hidden; color: #f2ead8; background: radial-gradient(circle at 35% 30%, #769ca0, #315866 70%); border: 2px solid #d3c4a3; border-radius: 50%; box-shadow: inset 0 0 0 3px rgba(255,255,255,.12), 0 3px 5px rgba(24,39,43,.25); outline: 1px solid rgba(0,0,0,.1); }
@@ -140,18 +158,24 @@ button:active:not(:disabled) { transform: scale(.96); }
   .resource-name { display: none; }
   .resource-chip { grid-template-columns: 27px 1fr; }
   .resource-chip strong { text-align: right; }
+  .resource-bar { width: 54vw; grid-template-columns: repeat(6,minmax(64px,1fr)); }
+  .admiral-card { min-width: 166px; }
+  .commander-profile { min-width: 116px; }
   .sortie-setup { grid-template-columns: 1fr; }
   .formation-picker { grid-template-columns: repeat(4, 1fr); }
-  .port-command-grid { width: 235px; grid-template-columns: repeat(2, 112px); }
+  .port-command-grid { width: 330px; grid-template-columns: repeat(3, 104px); }
   .command-hex { min-height: 92px; }
-  .speech-card { left: 286px; }
+  .speech-card { left: 30px; width: 330px; }
+  .fleet-strip { width: 52%; }
+  .supply-notice { width: 330px; }
   .construction-layout { grid-template-columns: 1fr; }
 }
 
 @media (max-height: 820px) {
   .port-scene { height: calc(100vh - 136px); min-height: 560px; }
-  .port-command-grid { top: 24px; }.command-hex { min-height: 82px; }.fleet-strip { height: 130px; }.fleet-strip-list { height: 75px; }.speech-card { top: 20px; }
-  .flagship-plaque { bottom: 160px; }
+  .port-command-grid { top: 20px; }.command-hex { min-height: 82px; }.fleet-strip { height: 238px; bottom: 16px; }.fleet-strip-list { height: 184px; }.speech-card { top: 200px; }
+  .flagship-plaque { bottom: 20px; }
+  .supply-notice { top: 200px; }
   .combat-stage { height: calc(100vh - 136px); min-height: 560px; }.combat-unit { min-height: 48px; padding-block: 4px; }.combat-fleet { top: 100px; gap: 4px; }.battle-log { bottom: 12px; }
 }
 

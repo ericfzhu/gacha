@@ -55,3 +55,12 @@ Original prompt: I'd like you to go through this project, and make it as close i
 - Production build and data integrity checks pass: 49 unique ship IDs, 49 unique sprite files, 24 maps, and exactly four maps in each world.
 - Full Playwright flow passed with no console errors or failed requests: World 6 selection, 6-4 launch and retreat, construction, acquired-ship library rendering, 1-1 launch, map advance, and battle animation.
 - Computer Use verification in Chrome confirmed the Home Port layout, 6-1 through 6-4 selection, functional Begin Sortie 6-4, navigable map nodes, visible live battle animation, and the 4-of-49 owned ship library.
+
+## 2026-07-14 Home Port and profile controls
+
+- Rebuilt the Home Port composition with the flagship art anchored on the right and the six active fleet slots arranged as a compact two-column by three-row panel on the left.
+- Reflowed the six command buttons into a three-column grid and moved the speech panel below them so the controls, dialogue, fleet panel, and flagship no longer overlap at 1280×720.
+- Changed the top-left product mark to GACHA and grouped the resource bar plus profile controls into a right-aligned header utility area.
+- Replaced the hard-coded ADM. ERIC label with a persisted commander name and an accessible profile editor supporting up to 24 characters.
+- Added visible Supply reports for already-full fleets, successful resource deductions, and insufficient-resource states.
+- Browser verification passed: 2×3 fleet grid, right-side flagship, non-overlapping dialogue, exact 5-fuel/7-ammo replenishment, persisted Captain Nova username, and zero console errors.
