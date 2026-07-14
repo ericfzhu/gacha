@@ -40,13 +40,21 @@ button:active:not(:disabled) { transform: scale(.96); }
 .kc-brand b { font: 700 22px/1 'Barlow Condensed', sans-serif; letter-spacing: .18em; }
 .kc-brand small { margin-top: 6px; color: #b7d2d2; font-size: 10px; letter-spacing: .08em; }
 .topbar-utilities { min-width: 0; margin-left: auto; display: flex; align-items: center; justify-content: flex-end; gap: 16px; }
-.resource-bar { width: min(750px, 60vw); display: grid; grid-template-columns: repeat(4, minmax(96px, 1fr)) repeat(2, minmax(82px, .72fr)); height: 48px; background: rgba(12, 36, 44, .4); border-radius: 7px; box-shadow: inset 0 1px 4px rgba(3, 18, 24, .35), 0 1px rgba(255,255,255,.12); overflow: hidden; }
-.resource-chip { min-width: 0; display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 6px; padding: 0 10px; border-right: 1px solid rgba(231, 244, 240, .14); font-variant-numeric: tabular-nums; }
+.resource-bar { width: min(750px, 60vw); display: grid; grid-template-columns: minmax(440px,1fr) 96px 96px; height: 60px; background: rgba(12,36,44,.4); border-radius: 7px; box-shadow: inset 0 1px 4px rgba(3,18,24,.35), 0 1px rgba(255,255,255,.12); overflow: hidden; }
+.resource-materials { min-width: 0; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); grid-template-rows: repeat(2,1fr); }
+.resource-chip { min-width: 0; display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 6px; padding: 0 10px; border-right: 1px solid rgba(231,244,240,.14); font-variant-numeric: tabular-nums; }
+.resource-materials .resource-chip { border-bottom: 1px solid rgba(231,244,240,.1); }
+.resource-materials .resource-chip:nth-child(2n) { border-right: 0; }
+.resource-materials .resource-chip:nth-child(n+3) { border-bottom: 0; }
 .resource-chip:last-child { border-right: 0; }
-.resource-icon { width: 24px; height: 24px; display: grid; place-items: center; color: #fff; font-size: 12px; border-radius: 50%; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.resource-icon { width: 18px; height: 18px; display: grid; place-items: center; color: #fff; font-size: 9px; border-radius: 50%; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
 .resource-fuel { background: #87a66d; }.resource-ammo { background: #9d7658; }.resource-steel { background: #718690; }.resource-bauxite { background: #c28964; }.bucket-icon { background: #7aa1ac; }.ticket-icon { background: #b79a59; }
 .resource-name { color: #aac1c3; font-size: 9px; text-transform: uppercase; letter-spacing: .06em; }
-.resource-chip strong { color: #fff; font: 600 16px 'Barlow Condensed', sans-serif; letter-spacing: .04em; }
+.resource-chip strong { min-width: 38px; color: #fff; font: 600 14px 'Barlow Condensed', sans-serif; letter-spacing: .04em; text-align: right; }
+.resource-chip.compact { grid-template-columns: 28px 1fr; grid-template-rows: repeat(2,1fr); column-gap: 7px; padding: 7px 9px; border-left: 1px solid rgba(231,244,240,.14); border-right: 0; }
+.resource-chip.compact .resource-icon { grid-row: 1 / 3; width: 26px; height: 26px; font-size: 11px; }
+.resource-chip.compact .resource-name { align-self: end; white-space: nowrap; }
+.resource-chip.compact strong { align-self: start; min-width: 0; text-align: left; font-size: 16px; }
 .admiral-card { min-width: 194px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; text-align: right; }
 .commander-profile { min-width: 144px; min-height: 44px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 4px 8px; color: inherit; background: transparent; border: 0; border-radius: 6px; cursor: pointer; text-align: right; transition-property: background-color, transform; transition-duration: .16s; }
 .commander-profile:hover { background: rgba(255,255,255,.08); }
@@ -156,9 +164,12 @@ button:active:not(:disabled) { transform: scale(.96); }
 
 @media (max-width: 1150px) {
   .resource-name { display: none; }
-  .resource-chip { grid-template-columns: 27px 1fr; }
+  .resource-chip { grid-template-columns: 20px 1fr; padding-inline: 7px; }
   .resource-chip strong { text-align: right; }
-  .resource-bar { width: 54vw; grid-template-columns: repeat(6,minmax(64px,1fr)); }
+  .resource-bar { width: 52vw; grid-template-columns: minmax(280px,1fr) 74px 74px; }
+  .resource-chip.compact { grid-template-columns: 24px 1fr; padding-inline: 6px; }
+  .resource-chip.compact .resource-name { display: block; font-size: 7px; }
+  .resource-chip.compact .resource-icon { width: 22px; height: 22px; }
   .admiral-card { min-width: 166px; }
   .commander-profile { min-width: 116px; }
   .sortie-setup { grid-template-columns: 1fr; }

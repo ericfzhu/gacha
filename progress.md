@@ -64,3 +64,9 @@ Original prompt: I'd like you to go through this project, and make it as close i
 - Replaced the hard-coded ADM. ERIC label with a persisted commander name and an accessible profile editor supporting up to 24 characters.
 - Added visible Supply reports for already-full fleets, successful resource deductions, and insufficient-resource states.
 - Browser verification passed: 2×3 fleet grid, right-side flagship, non-overlapping dialogue, exact 5-fuel/7-ammo replenishment, persisted Captain Nova username, and zero console errors.
+
+## 2026-07-14 resource header reflow
+
+- Rebuilt the header resource bar so Fuel, Ammo, Steel, and Bauxite form a true two-column by two-row material grid.
+- Gave Buckets and Orders separate full-height cells with dedicated icon, label, and value rows.
+- Chromium overflow verification at 1280×720 confirmed all six cells are unclipped: material cells are 279px wide, special-resource cells are 96px wide, and the browser reported zero console errors.

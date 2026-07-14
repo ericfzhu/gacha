@@ -125,13 +125,15 @@ function Panel({ title, eyebrow, actions, children, className = '' }) {
 function ResourceBar({ resources }) {
   return (
     <div className="resource-bar" aria-label="Fleet resources">
-      {RESOURCE_META.map(([key, label, icon]) => (
-        <div className="resource-chip" key={key}>
-          <span className={`resource-icon resource-${key}`}>{icon}</span>
-          <span className="resource-name">{label}</span>
-          <strong>{Number(resources[key] || 0).toLocaleString()}</strong>
-        </div>
-      ))}
+      <div className="resource-materials">
+        {RESOURCE_META.map(([key, label, icon]) => (
+          <div className="resource-chip" key={key}>
+            <span className={`resource-icon resource-${key}`}>{icon}</span>
+            <span className="resource-name">{label}</span>
+            <strong>{Number(resources[key] || 0).toLocaleString()}</strong>
+          </div>
+        ))}
+      </div>
       <div className="resource-chip compact"><span className="resource-icon bucket-icon">♨</span><span className="resource-name">Buckets</span><strong>{resources.buckets}</strong></div>
       <div className="resource-chip compact"><span className="resource-icon ticket-icon">☆</span><span className="resource-name">Orders</span><strong>{resources.tickets}</strong></div>
     </div>
