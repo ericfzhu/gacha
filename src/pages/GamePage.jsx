@@ -208,46 +208,51 @@ function PortView({ state, fleet, setTab, onResupply, supplyNotice }) {
   return (
     <div className="port-scene">
       <div className="port-horizon" />
-      <motion.img
-        className={`flagship-art ${hasPortCutout ? 'clean-cutout' : 'soft-portrait'}`}
-        src={flagshipSrc}
-        alt={`${flagship.name}, fleet flagship`}
-        initial={{ opacity: 0, x: 18 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.35, bounce: 0 }}
-      />
-      <div className="flagship-plaque">
-        <p>FLAGSHIP · {flagship.type.toUpperCase()}</p>
-        <h2>{flagship.name}</h2>
-        <div className="flagship-stats"><span>Lv {inst?.level || 1}</span><span>Cond {inst?.morale || 49}</span><span>HP {inst?.currentHp || flagship.hp}/{flagship.hp}</span></div>
-      </div>
-      <div className="speech-card">
-        <span className="speech-corner" />
-        <p>Admiral, the harbor is calm and the fleet is standing by. Shall we begin today&apos;s operations?</p>
-      </div>
-      <div className="port-command-grid">
-        <button className="command-hex primary" onClick={() => setTab('sortie')}><span>⚔</span><b>SORTIE</b><small>Deploy fleet</small></button>
-        <button className="command-hex" onClick={() => setTab('fleet')}><span>☷</span><b>ORGANIZE</b><small>Form fleet</small></button>
-        <button className="command-hex" onClick={onResupply}><span>◉</span><b>SUPPLY</b><small>Replenish</small></button>
-        <button className="command-hex" onClick={() => setTab('dock')}><span>⚒</span><b>DOCK</b><small>Repair ships</small></button>
-        <button className="command-hex" onClick={() => setTab('construction')}><span>⚙</span><b>ARSENAL</b><small>Build ships</small></button>
-        <button className="command-hex" onClick={() => setTab('quests')}><span>✓</span><b>QUESTS</b><small>Review orders</small></button>
-      </div>
-      <AnimatePresence initial={false}>
-        {supplyNotice && (
-          <motion.div
-            className="supply-notice"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
-            role="status"
-          >
-            <span>◉</span><div><b>SUPPLY REPORT</b><small>{supplyNotice}</small></div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <FleetStrip fleet={fleet} state={state} onOpenFleet={() => setTab('fleet')} />
+      <section className="port-dashboard" aria-label="Fleet command and preview">
+        <div className="port-command-grid">
+          <button className="command-hex primary" onClick={() => setTab('sortie')}><span>⚔</span><b>SORTIE</b><small>Deploy fleet</small></button>
+          <button className="command-hex" onClick={() => setTab('fleet')}><span>☷</span><b>ORGANIZE</b><small>Form fleet</small></button>
+          <button className="command-hex" onClick={onResupply}><span>◉</span><b>SUPPLY</b><small>Replenish</small></button>
+          <button className="command-hex" onClick={() => setTab('dock')}><span>⚒</span><b>DOCK</b><small>Repair ships</small></button>
+          <button className="command-hex" onClick={() => setTab('construction')}><span>⚙</span><b>ARSENAL</b><small>Build ships</small></button>
+          <button className="command-hex" onClick={() => setTab('quests')}><span>✓</span><b>QUESTS</b><small>Review orders</small></button>
+        </div>
+        <AnimatePresence initial={false}>
+          {supplyNotice && (
+            <motion.div
+              className="supply-notice"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+              role="status"
+            >
+              <span>◉</span><div><b>SUPPLY REPORT</b><small>{supplyNotice}</small></div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <FleetStrip fleet={fleet} state={state} onOpenFleet={() => setTab('fleet')} />
+      </section>
+      <section className="flagship-showcase" aria-label="Fleet flagship">
+        <div className="showcase-heading"><span>01</span><div><small>ACTIVE FLAGSHIP</small><b>1ST FLEET</b></div></div>
+        <motion.img
+          className={`flagship-art ${hasPortCutout ? 'clean-cutout' : 'soft-portrait'}`}
+          src={flagshipSrc}
+          alt={`${flagship.name}, fleet flagship`}
+          initial={{ opacity: 0, x: 18 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.35, bounce: 0 }}
+        />
+        <div className="speech-card">
+          <span className="speech-corner" />
+          <p>Admiral, the harbor is calm and the fleet is standing by. Shall we begin today&apos;s operations?</p>
+        </div>
+        <div className="flagship-plaque">
+          <p>FLAGSHIP · {flagship.type.toUpperCase()}</p>
+          <h2>{flagship.name}</h2>
+          <div className="flagship-stats"><span>Lv {inst?.level || 1}</span><span>Cond {inst?.morale || 49}</span><span>HP {inst?.currentHp || flagship.hp}/{flagship.hp}</span></div>
+        </div>
+      </section>
     </div>
   );
 }

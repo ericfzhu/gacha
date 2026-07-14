@@ -70,3 +70,11 @@ Original prompt: I'd like you to go through this project, and make it as close i
 - Rebuilt the header resource bar so Fuel, Ammo, Steel, and Bauxite form a true two-column by two-row material grid.
 - Gave Buckets and Orders separate full-height cells with dedicated icon, label, and value rows.
 - Chromium overflow verification at 1280×720 confirmed all six cells are unclipped: material cells are 279px wide, special-resource cells are 96px wide, and the browser reported zero console errors.
+
+## 2026-07-14 Home Port column composition
+
+- Rebuilt Home Port as two explicit columns: a left command-and-fleet dashboard and a right flagship showcase.
+- Grouped the six operational buttons and 1st Fleet preview under one parent with perfectly aligned widths.
+- Enlarged the 1st Fleet preview to 2.52 times the command-group height, including larger ship portraits, names, health bars, and empty berths.
+- Isolated the flagship sprite inside a solid RGB(49, 95, 105) panel with its own heading, dialogue, and nameplate.
+- Chromium geometry and visual verification confirmed the art is fully contained, the showcase has no background image, the columns do not overlap, and the browser reported zero console errors.
