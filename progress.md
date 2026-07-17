@@ -90,3 +90,13 @@ Original prompt: I'd like you to go through this project, and make it as close i
 - Corrected the inset interpretation: it now uses the Home Port banner's exact beige gradient (#f4f1e8 to #dcd8ce), not the harbor blue.
 - Retained the teal only on the outer flagship showcase, producing a clear framed-paper treatment around the transparent sprite.
 - Visually verified the corrected beige backdrop in Chromium at 1280×720.
+
+## 2026-07-17 mobile UI
+
+- Replaced the fixed 900px desktop canvas behavior with a dedicated breakpoint for screens up to 700px.
+- Added a two-row mobile header: compact brand/profile controls above a readable 2×2 material grid and dedicated Buckets/Orders cells.
+- Replaced the desktop sidebar with a fixed, horizontally scrollable bottom navigation rail using 72px touch targets.
+- Reflowed Home Port into a stacked flagship showcase followed by compact 3×2 commands and a scaled 2×3 fleet preview.
+- Added mobile layouts for Organization, Sortie, Ship Library, construction, special gacha, repair, quests, expeditions, combat, settings, and the title screen.
+- Added automatic content scroll reset on tab changes; the mobile library now opens on its ship grid before the detail card.
+- Chromium E2E at 390×844 passed across Home Port, Sortie, Organization, Ship Library, and title: document/content width remained exactly 390px and zero console errors were recorded.

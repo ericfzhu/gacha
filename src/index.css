@@ -337,3 +337,230 @@ button:active:not(:disabled) { transform: scale(.96); }
   .collection-detail { order: -1; }
   .collection-hero { height: 380px; }
 }
+
+/* Mobile command UI */
+@media (max-width: 700px) {
+  html, body, #root { min-width: 0; }
+  .kc-shell { min-width: 0; height: 100svh; }
+
+  .kc-topbar {
+    height: 128px;
+    flex: 0 0 128px;
+    display: grid;
+    grid-template-columns: minmax(0,1fr) auto;
+    grid-template-rows: 48px 60px;
+    gap: 6px 8px;
+    padding: 7px 10px;
+  }
+  .kc-brand { grid-column: 1; grid-row: 1; min-width: 0; width: max-content; gap: 8px; }
+  .brand-anchor { width: 36px; height: 36px; font-size: 19px; }
+  .kc-brand b { font-size: 19px; }
+  .kc-brand small { display: none; }
+  .topbar-utilities { display: contents; }
+  .admiral-card { grid-column: 2; grid-row: 1; min-width: 0; gap: 5px; }
+  .commander-profile { min-width: 0; max-width: 126px; min-height: 40px; padding-inline: 6px; }
+  .commander-profile b { max-width: 86px; font-size: 13px; }
+  .commander-profile small { display: none; }
+  .commander-profile i { font-size: 10px; }
+  .title-menu-button { width: 40px; height: 40px; }
+  .resource-bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    height: 60px;
+    grid-template-columns: minmax(0,1fr) 62px 62px;
+  }
+  .resource-chip { grid-template-columns: 16px minmax(0,1fr) auto; gap: 3px; padding-inline: 5px; }
+  .resource-materials .resource-name { display: block; font-size: 7px; letter-spacing: .02em; }
+  .resource-chip strong { min-width: 26px; font-size: 12px; }
+  .resource-icon { width: 14px; height: 14px; font-size: 7px; }
+  .resource-chip.compact { grid-template-columns: 20px 1fr; column-gap: 4px; padding: 7px 5px; }
+  .resource-chip.compact .resource-icon { width: 20px; height: 20px; font-size: 9px; }
+  .resource-chip.compact .resource-name { font-size: 6px; }
+  .resource-chip.compact strong { font-size: 14px; }
+
+  .kc-body { min-height: 0; display: block; }
+  .kc-main { width: 100%; height: 100%; padding-bottom: 68px; }
+  .kc-sidebar {
+    width: auto;
+    height: 68px;
+    position: fixed;
+    z-index: 60;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 2px;
+    padding: 5px 6px max(5px, env(safe-area-inset-bottom));
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    box-shadow: 0 -5px 18px rgba(8,27,33,.34), inset 0 1px rgba(255,255,255,.08);
+  }
+  .kc-sidebar::-webkit-scrollbar { display: none; }
+  .kc-sidebar::before, .sidebar-rivet, .sidebar-footer, .kc-sidebar nav > p { display: none; }
+  .kc-sidebar nav { flex: 0 0 auto; display: flex; margin: 0; }
+  .kc-sidebar nav button {
+    width: 72px;
+    min-width: 72px;
+    min-height: 56px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 3px 4px;
+    border-radius: 7px;
+    font-size: 9px;
+    line-height: 1.1;
+    text-align: center;
+  }
+  .kc-sidebar nav button > span { width: auto; font-size: 17px; line-height: 1; }
+  .kc-sidebar nav button i { display: none; }
+
+  .section-titlebar { height: 54px; flex: 0 0 54px; padding: 0 12px; }
+  .section-titlebar > div { gap: 9px; }
+  .section-titlebar > div > span { width: 32px; height: 32px; }
+  .section-titlebar h1 { font-size: 18px; }
+  .section-titlebar p { display: none; }
+  .kc-content { overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .tab-view { min-height: 100%; }
+  .view-stack { padding: 10px; gap: 10px; }
+  .kc-panel { border-radius: 7px; }
+  .kc-panel-heading { min-height: 58px; gap: 8px; padding: 10px 12px; }
+  .kc-panel-heading h2 { font-size: 19px; }
+  .kc-panel-heading .kc-action { padding-inline: 10px; font-size: 10px; }
+
+  .port-scene {
+    height: auto !important;
+    min-height: 0 !important;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 10px 14px;
+    overflow: visible;
+  }
+  .flagship-showcase {
+    order: 1;
+    width: 100%;
+    height: 420px;
+    position: relative;
+    inset: auto;
+    flex: 0 0 420px;
+    border-radius: 10px;
+  }
+  .port-dashboard {
+    order: 2;
+    width: 100%;
+    position: relative;
+    inset: auto;
+    display: grid;
+    grid-template-rows: 132px 384px;
+    gap: 10px;
+  }
+  .port-command-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; }
+  .command-hex { border-radius: 9px 4px 9px 4px; }
+  .command-hex::after { inset: 3px; }
+  .command-hex > span { font-size: 17px; }
+  .command-hex b { margin-top: 4px; font-size: 12px; }
+  .command-hex small { margin-top: 1px; font-size: 7px; }
+  .fleet-strip { padding: 10px; border-radius: 9px; }
+  .fleet-strip-title { height: 31px; }
+  .fleet-strip-title > span { font-size: 14px; }
+  .fleet-strip-list { height: calc(100% - 31px); gap: 6px; }
+  .fleet-mini { grid-template-columns: 42px minmax(0,1fr); grid-template-rows: 1fr 22px; gap: 5px; padding: 7px 6px; }
+  .fleet-mini > .ship-portrait.size-small { width: 40px; height: 52px; }
+  .fleet-mini > div strong { font-size: 13px; }
+  .fleet-mini > div small { font-size: 8px; }
+  .fleet-mini .hp-line { gap: 3px; }
+  .fleet-mini .hp-line b { min-width: 27px; font-size: 8px; }
+  .fleet-mini .hp-track { height: 5px; }
+  .empty-slot { font-size: 9px; }
+  .supply-notice { top: 138px; min-height: 48px; padding: 7px 9px; }
+  .showcase-heading { left: 14px; top: 12px; }
+  .showcase-heading > span { width: 34px; height: 34px; }
+  .flagship-art-frame { left: 9px; right: 9px; top: 54px; bottom: 9px; border-radius: 7px; }
+  .flagship-showcase .flagship-art { height: 96%; }
+  .flagship-showcase .flagship-art.clean-cutout { height: 99%; }
+  .speech-card { left: 13px; top: 66px; width: 176px; padding: 10px 12px; font-size: 9px; }
+  .flagship-plaque { left: 13px; bottom: 13px; width: 205px; padding: 10px 13px; }
+  .flagship-plaque h2 { font-size: 24px; }
+  .flagship-stats { gap: 7px; font-size: 9px; }
+
+  .fleet-tabs { overflow-x: auto; padding: 10px 10px 0; }
+  .fleet-formation-list { padding: 6px 10px 12px; }
+  .formation-slot { min-height: 100px; flex-wrap: wrap; gap: 7px; padding: 8px; }
+  .formation-slot .slot-index { width: 18px; font-size: 16px; }
+  .formation-slot .slot-info { min-width: 150px; flex: 1; }
+  .formation-slot .supply-meter { width: auto; margin-left: 72px; display: flex; gap: 12px; }
+  .formation-slot .remove-button { margin-left: auto; }
+  .roster-grid { grid-template-columns: 1fr; padding: 10px; }
+
+  .sortie-setup { padding: 10px; grid-template-columns: 1fr; gap: 10px; }
+  .world-tabs { flex-wrap: nowrap; overflow-x: auto; padding: 10px 10px 6px; scrollbar-width: none; }
+  .world-tabs::-webkit-scrollbar { display: none; }
+  .world-tabs button { min-width: 84px; }
+  .map-cards { grid-template-columns: 1fr; padding: 6px 10px 12px; }
+  .map-card { min-height: 84px; grid-template-columns: 44px minmax(0,1fr) auto; gap: 7px; }
+  .map-thumb { display: none; }
+  .map-number { width: 40px; height: 40px; font-size: 16px; }
+  .formation-picker { grid-template-columns: repeat(2,1fr); padding: 10px; }
+  .formation-picker button { min-height: 92px; }
+  .preflight-card { margin: 0 10px 10px; }
+  .sortie-map { height: 430px; min-height: 430px; }
+  .route-status { min-height: 64px; gap: 8px; padding: 8px 10px; flex-wrap: wrap; }
+  .route-status span:last-child { width: 100%; margin-left: 0; }
+
+  .collection-layout { min-height: 0; padding: 10px; grid-template-columns: 1fr; gap: 10px; }
+  .collection-detail { order: initial; }
+  .collection-hero { height: 330px; min-height: 330px; }
+  .collection-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; padding: 8px 10px 12px; }
+  .collection-card { min-height: 202px; }
+  .collection-card img { height: 160px; }
+  .collection-filters { overflow-x: auto; padding-inline: 10px; }
+
+  .construction-layout, .special-layout { padding: 10px; grid-template-columns: 1fr; gap: 10px; }
+  .arsenal-machine { min-height: 400px; padding: 26px 12px; }
+  .blueprint, .construct-button { width: 100%; }
+  .blueprint { padding: 20px 14px; }
+  .recipe-grid { grid-template-columns: repeat(2,1fr); }
+  .construction-result, .construction-empty { min-height: 380px; }
+  .special-machine { padding: 22px 12px; }
+  .special-pull-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
+  .special-pull-actions button { min-width: 0; }
+  .special-results { grid-template-columns: 1fr; }
+  .special-currency { grid-template-columns: auto 1fr; }
+  .gift-list article { grid-template-columns: 32px minmax(0,1fr) auto; }
+
+  .dock-slots { grid-template-columns: 1fr; padding: 10px; }
+  .damage-list { padding: 10px; }
+  .damage-list article { grid-template-columns: 40px minmax(0,1fr) auto; gap: 8px; }
+  .damage-list article > .hp-line { grid-column: 2 / 4; }
+
+  .quest-list { padding: 10px; }
+  .quest-row { grid-template-columns: 34px minmax(0,1fr); gap: 8px; }
+  .quest-reward, .quest-row > .kc-action { grid-column: 2; }
+  .expedition-grid { grid-template-columns: 1fr; padding: 10px; }
+
+  .combat-stage { height: 690px; min-height: 690px; }
+  .battle-title { top: 18px; }
+  .battle-title h2 { font-size: 28px; }
+  .combat-fleet { top: 92px; width: 46%; gap: 4px; }
+  .player-fleet { left: 2%; }
+  .enemy-fleet { right: 2%; }
+  .combat-unit { min-height: 46px; gap: 5px; padding: 5px; }
+  .combat-unit b { margin-bottom: 4px; font-size: 10px; }
+  .combat-unit .ship-portrait.size-battle { width: 34px; height: 42px; }
+  .enemy-emblem { width: 32px; height: 32px; flex-basis: 32px!important; }
+  .combat-versus { top: 300px; width: 48px; height: 48px; font-size: 15px; }
+  .battle-log { width: calc(100% - 20px); bottom: 12px; min-height: 175px; }
+  .battle-log > div:not(.phase-ribbon):not(.battle-actions) { columns: 1; }
+
+  .title-character { right: -32%; height: 92%; opacity: .5; }
+  .title-card { width: calc(100% - 28px); left: 14px; top: 14%; padding: 30px 24px 24px; }
+  .title-card h1 { font-size: 44px; }
+  .title-crest { width: 60px; height: 60px; margin-top: -60px; font-size: 28px; }
+  .settings-modal { width: 100%; }
+  .settings-options > div, .settings-options > label { min-height: 64px; }
+}

@@ -586,6 +586,7 @@ export default function GamePage() {
   const [editingCommander, setEditingCommander] = useState(false);
   const [commanderDraft, setCommanderDraft] = useState('');
   const supplyNoticeTimer = useRef(null);
+  const contentRef = useRef(null);
   const [now, setNow] = useState(Date.now());
   const [loaded, setLoaded] = useState(false);
 
@@ -611,6 +612,10 @@ export default function GamePage() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  useEffect(() => {
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  }, [tab]);
 
   const activeFleet = useMemo(() => state.fleets[state.fleets.activeFleetId] || [], [state]);
   const run = state.sortie.currentRun;
@@ -707,7 +712,7 @@ export default function GamePage() {
         </aside>
         <main className={`kc-main tab-${tab}`}>
           <div className="section-titlebar"><div><span>{activeNav?.icon}</span><div><small>NAVAL DISTRICT</small><h1>{activeNav?.label}</h1></div></div><p>{status}</p></div>
-          <div className="kc-content">
+          <div className="kc-content" ref={contentRef}>
             <AnimatePresence mode="wait" initial={false}>
               <motion.div key={tab} className="tab-view" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18, bounce: 0 }}>
                 {tab === 'port' && <PortView state={state} fleet={activeFleet} setTab={setTab} onResupply={handleResupply} supplyNotice={supplyNotice} />}
