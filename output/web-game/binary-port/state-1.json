@@ -1,0 +1,1 @@
+{"coordinateSystem":"diagnostic canvas: origin top-left, +x right, +y down","phase":"wasm ready","probe":{"passed":true,"x0":225,"steps":2,"status":1,"trace":[{"pc":"0x003323c0","instruction":"0x52801c20","status":0},{"pc":"0x003323c4","instruction":"0xd65f03c0","status":1}]},"elf":null,"error":null}

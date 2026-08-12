@@ -29,6 +29,8 @@ export default function HomePage() {
         <div className="title-rule"><i/><span>★</span><i/></div>
         <div className="title-actions">
           <button id="start-game" className="title-start" onClick={() => navigate('/game')}><span>ENTER NAVAL DISTRICT</span><b>›</b></button>
+          <button id="start-puzzle" className="title-puzzle" onClick={() => navigate('/puzzle')}><span>PLAY ORB BATTLE LAB</span><b>◉</b></button>
+          <button id="start-binary-port" className="title-binary-port" onClick={() => navigate('/binary-port')}><span>OPEN BINARY PORT LAB</span><b>⌁</b></button>
           <button className="title-settings" onClick={() => setSettingsOpen(true)}><span>⚙</span> Settings</button>
         </div>
         <small className="title-version">DISTRICT CLIENT 2.0 · ORIGINAL FLEET ART</small>

@@ -1,5 +1,47 @@
 Original prompt: I'd like you to go through this project, and make it as close in gameplay and UI to the game "Kantai Collection" as possible, though with custom battleship sprites
 
+Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
+
+## 2026-08-13 libpad binary-port runtime
+
+- Chose a hybrid architecture: freestanding C AArch64 interpreter compiled to WebAssembly, with JavaScript handling ELF loading, browser integration, and diagnostics.
+- Added `src/binary-port/arm64_core.c` with the initial ARMv8-A decoder: wide immediates, ADR/ADRP, direct/register/conditional branches, add/sub forms and flags, logical/bitfield operations, scaled loads/stores, register pairs, stack handling, and `svc` trapping.
+- Added `src/binary-port/elf64.js` and `arm64Runtime.js` to parse AArch64 ELF64 files, map PT_LOAD segments into biased Wasm linear memory, inspect guest strings, trace instructions, and expose syscall snapshots.
+- Added `scripts/build-arm64-wasm.sh`, `scripts/test-arm64-core.mjs`, and npm scripts `wasm:build` / `wasm:test`.
+- Verified against the exact APK SHA-256 `785ffa641837c528864cfbeb9716e340c9d948ba3a37bca3193b5cd32dda89d8`: mapped both PT_LOAD segments, found the 10,998,120-byte custom protected section, and executed the real function at VA `0x3323c0` (`mov w0,#225; ret`).
+- Verified two resident address/stack helpers (3 and 10 guest instructions respectively).
+- Executed the real first constructor from VA `0x332cf0` for 967 guest instructions until its first raw Linux syscall. The trap is `openat` (56), and the guest pathname decrypts to `/proc/self/maps`.
+- Added `/binary-port` with a local `libpad.so` file picker and canvas diagnostics. Browser verification mapped the full 27,149,688-byte file, reproduced the constructor boundary, and reported zero console errors.
+- Build and Wasm tests pass. Visual artifacts are under `output/web-game/binary-port-final/`.
+
+### Binary-port next steps
+
+- Add a virtual file-descriptor table and service `openat`, `read`, `lseek`, `close`, `mmap`, `mprotect`, and `munmap` traps.
+- Generate a consistent virtual `/proc/self/maps`, then resume the constructor across successive syscalls.
+- Add the remaining ARM64 scalar, floating-point, NEON, atomic, and memory-ordering instructions as they are encountered.
+- Map companion `lib__6dba__.so`, `libopenal.so`, and protection asset `assets/6dba/data1.dat` into the virtual filesystem.
+- Reach and capture the first decrypted anonymous mmap module, then implement synthetic ELF/libc/JNI imports and intercept `RegisterNatives`.
+
+## 2026-08-13 Orb Battle Lab
+
+- Began a separate `/puzzle` browser route so the existing naval game remains intact.
+- Added a deterministic 6×5 puzzle engine with free-path orb dragging, path swapping, match grouping, cascades, elemental damage, heart healing, enemy counters, a no-turn-cost active skill, leader/helper combo multipliers, and 5+ orb mass attacks.
+- Added the required `render_game_to_text`, `advanceTime`, reset, and fullscreen integration points for deterministic browser testing.
+- Added responsive, touch-safe canvas presentation plus a title-screen entry point; the existing naval game remains unchanged.
+- Production build passes. A fixed-board engine check confirmed connected match grouping and repeated skyfall cascades; the resolver remained intentionally mid-cascade after four simulated seconds.
+- Playwright desktop flow passed: Tide Shift changed four orbs without consuming a turn; a controlled one-cell drag produced the expected board swap, one combo, 1,660 elemental damage, and enemy counters changing from 2/3 to 1/2.
+- Verified the five-second move timer automatically releases and commits an active drag.
+- Pure engine scenarios passed heart healing, five-orb mass attacks against both enemies, victory, and defeat.
+- Inspected ready, active, resolved desktop, and resolved mobile canvas captures. The mobile canvas fits a 390×844 viewport with no horizontal overflow; both desktop and mobile runs reported zero console errors.
+- Corrected Heart rendering to use a filled pink orb with an inset heart glyph so all six orb types have equal visual weight and hit clarity.
+
+### Orb Battle Lab handoff
+
+- Browser route: `/puzzle`; title-screen entry: `PLAY ORB BATTLE LAB`.
+- Engine: `src/puzzle/puzzleEngine.js`; canvas/UI: `src/pages/PuzzlePage.jsx`; responsive styles: `src/index.css`.
+- Test artifacts: `output/web-game/puzzle-ready`, `output/web-game/puzzle-started`, and `output/web-game/puzzle-e2e`.
+- Optional next steps: add dungeon waves and downloaded content schemas, additional active/leader skills, enhanced/locked/hazard orb states, and a formal Vitest suite around the pure engine.
+
 ## 2026-07-14
 
 - Audited the in-progress React/Pixi migration and preserved the existing dirty worktree.

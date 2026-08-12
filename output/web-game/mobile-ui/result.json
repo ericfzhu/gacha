@@ -1,0 +1,18 @@
+{
+  "metrics": {
+    "viewportWidth": 390,
+    "documentWidth": 390,
+    "contentClientWidth": 390,
+    "contentScrollWidth": 390,
+    "bottomNavVisible": true,
+    "navButtonMinWidth": 72,
+    "topbarHeight": 128
+  },
+  "modes": {
+    "sortieMode": "sortie",
+    "organizationMode": "fleet",
+    "libraryMode": "collection"
+  },
+  "titleWidth": 390,
+  "errors": []
+}

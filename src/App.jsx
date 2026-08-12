@@ -2,6 +2,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import HomePage from './pages/HomePage.jsx';
 import GamePage from './pages/GamePage.jsx';
+import PuzzlePage from './pages/PuzzlePage.jsx';
+import BinaryPortPage from './pages/BinaryPortPage.jsx';
 
 export default function App() {
   const location = useLocation();
@@ -20,6 +22,8 @@ export default function App() {
           <Routes location={location}>
             <Route path="/" element={<HomePage />} />
             <Route path="/game" element={<GamePage />} />
+            <Route path="/puzzle" element={<PuzzlePage />} />
+            <Route path="/binary-port" element={<BinaryPortPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </motion.div>

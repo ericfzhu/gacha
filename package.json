@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "wasm:build": "bash scripts/build-arm64-wasm.sh",
+    "wasm:test": "npm run wasm:build && node scripts/test-arm64-core.mjs",
     "api:dev": "wrangler dev",
     "api:deploy": "wrangler deploy",
     "db:migrate": "wrangler d1 execute fleet-collection --file worker/schema.sql"
