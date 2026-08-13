@@ -2,6 +2,23 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 enemy definition setup and turn boundary
+
+- Ported `_setupEnemyAttackSub`'s type-128 materialization: definition `+0x10`
+  supplies the packed duration, positive `+0x14` is multiplied by 100 into
+  basis points, and nonpositive chance defaults to 10,000.
+- Recovered `_setupEnemyAttack`'s readiness check at `sMONSTER+0x120`, plus the
+  selected/prepared indices at `+0x670/+0x7d8` and AI state at `+0x7dc`.
+  Added explicit definition queues at this decoded boundary: an admitted skill
+  action replaces the normal hit, while an empty queue retains normal attacks.
+- Existing fall/orb lifetimes now advance before action setup, preserving the
+  full duration of an effect activated by that action. Six enemy-AI anchors
+  bring the exact restored-image inspector to 77 gameplay symbols.
+- Positive `sENEMYSKILL+0x44` attack-with-skill records are explicitly rejected
+  until their downstream damage path is decoded; zero-valued full records run.
+- Next: decode the downloaded enemy-AI condition/weight records that choose the
+  definition index, and add further high-impact `_doEnemySkill` dispatch types.
+
 ## 2026-08-14 black-fall dispatch correction
 
 - Cross-checked both `_setupEnemyAttackSub` and `_doEnemySkill` jump tables and

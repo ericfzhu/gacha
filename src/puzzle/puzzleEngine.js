@@ -33,6 +33,7 @@ import {
   tracePadPointerCells,
 } from './padCoreRules.js';
 import {
+  decodePadEnemySkillDefinition,
   decodePadEnemySkillRuntime,
   normalizePadEnemySkillRecord,
 } from './padEnemySkills.js';
@@ -122,6 +123,7 @@ export class PuzzleEngine {
     passiveEnhancementFallsEnabled = true,
     lockFallRules = [],
     lockFallSeed = seed,
+    enemySkillQueues = [],
   } = {}) {
     if (![columns, rows].every(Number.isInteger) || columns < 1 || columns > 15 || rows < 1 || rows > 15) {
       throw new Error('PAD board dimensions must be integers from 1 through 15.');
@@ -146,6 +148,13 @@ export class PuzzleEngine {
     this.passiveEnhancementFallsEnabled = Boolean(passiveEnhancementFallsEnabled);
     this.setLockFallRules(lockFallRules);
     this.lockFallSeed = Number(lockFallSeed) >>> 0;
+    this.enemySkillQueues = ENEMY_TEMPLATE.map(() => ({ records: [], position: 0, repeat: false }));
+    if (!Array.isArray(enemySkillQueues)) throw new Error('PAD enemy skill queues must be an array.');
+    enemySkillQueues.forEach((queue, enemyIndex) => {
+      if (queue !== null && queue !== undefined) {
+        this.setEnemySkillQueue(enemyIndex, queue.definitions || queue, { repeat: queue.repeat });
+      }
+    });
     this.rng = createPadRng(seed);
     this.orbSerial = 0;
     this.visualTime = 0;
@@ -170,6 +179,8 @@ export class PuzzleEngine {
     this.lastBombDamage = 0;
     this.lastThornDamage = 0;
     this.lastEnemySkill = null;
+    this.lastEnemyActions = [];
+    this.enemySkillQueues.forEach((queue) => { queue.position = 0; });
     this.pendingComboDrops = 0;
     this.comboDropBonusCount = 0;
     this.turnNailCount = 0;
@@ -752,12 +763,29 @@ export class PuzzleEngine {
 
   resolveEnemyTurn() {
     let total = 0;
+    this.lastEnemyActions = [];
+    // Native _incEneTurn advances existing statuses before _setupEnemyAttack
+    // admits monsters whose sMONSTER+0x120 counter has reached zero. Keeping
+    // this order prevents a newly executed enemy skill from losing a turn
+    // immediately on the same action boundary.
+    this.advanceBlackOrbCountdowns();
+    if (this.blackFallRule?.active && this.blackFallRule.turnsRemaining !== null) {
+      this.blackFallRule.turnsRemaining = Math.max(0, this.blackFallRule.turnsRemaining - 1);
+      if (this.blackFallRule.turnsRemaining === 0) this.blackFallRule.active = false;
+    }
     this.enemies.forEach((enemy, index) => {
       if (enemy.hp <= 0) return;
       enemy.counter -= 1;
       if (enemy.counter <= 0) {
         enemy.counter = enemy.maxCounter;
+        const skill = this.takeEnemySkill(index);
+        if (skill) {
+          this.applyEnemySkillRecord(skill);
+          this.lastEnemyActions.push({ enemy: index, kind: 'skill', skill: { ...skill } });
+          return;
+        }
         total += enemy.attack;
+        this.lastEnemyActions.push({ enemy: index, kind: 'attack', damage: enemy.attack });
         this.floatingText.push({ kind: 'enemy', value: enemy.attack, enemy: index, age: 0 });
       }
     });
@@ -765,11 +793,18 @@ export class PuzzleEngine {
       this.player.hp = Math.max(0, this.player.hp - total);
       this.message = `Enemies attacked for ${total.toLocaleString()} damage.`;
     }
-    this.advanceBlackOrbCountdowns();
-    if (this.blackFallRule?.active && this.blackFallRule.turnsRemaining !== null) {
-      this.blackFallRule.turnsRemaining = Math.max(0, this.blackFallRule.turnsRemaining - 1);
-      if (this.blackFallRule.turnsRemaining === 0) this.blackFallRule.active = false;
+  }
+
+  takeEnemySkill(enemyIndex) {
+    const queue = this.enemySkillQueues[enemyIndex];
+    if (!queue?.records.length) return null;
+    if (queue.position >= queue.records.length) {
+      if (!queue.repeat) return null;
+      queue.position = 0;
     }
+    const skill = queue.records[queue.position];
+    queue.position += 1;
+    return skill;
   }
 
   advanceBlackOrbCountdowns() {
@@ -906,6 +941,29 @@ export class PuzzleEngine {
 
   applyEnemySkillRuntime(skillDefinition, monsterRuntime) {
     return this.applyEnemySkillRecord(decodePadEnemySkillRuntime(skillDefinition, monsterRuntime));
+  }
+
+  applyEnemySkillDefinition(skillDefinition) {
+    return this.applyEnemySkillRecord(decodePadEnemySkillDefinition(skillDefinition));
+  }
+
+  setEnemySkillQueue(enemyIndex, skillDefinitions, { repeat = false } = {}) {
+    const index = Math.trunc(Number(enemyIndex));
+    if (index < 0 || index >= ENEMY_TEMPLATE.length) {
+      throw new RangeError(`PAD enemy index must be between 0 and ${ENEMY_TEMPLATE.length - 1}.`);
+    }
+    if (!Array.isArray(skillDefinitions)) throw new TypeError('PAD enemy skill queue must be an array of definition records.');
+    const records = skillDefinitions.map((definition) => decodePadEnemySkillDefinition(definition));
+    if (records.some((record) => !record.supported)) {
+      throw new Error('PAD enemy skill queue contains a definition type that is not implemented.');
+    }
+    if (records.some((record) => record.attackWithSkillValue === null)) {
+      throw new RangeError('PAD scheduled enemy-skill definitions require the native +0x44 attack-with-skill field.');
+    }
+    if (records.some((record) => record.attackWithSkillValue > 0)) {
+      throw new Error('PAD attack-with-skill actions are not implemented at this scheduler boundary.');
+    }
+    this.enemySkillQueues[index] = { records, position: 0, repeat: Boolean(repeat) };
   }
 
   setEnhancedFallAwakenings(counts) {
@@ -1414,6 +1472,10 @@ export class PuzzleEngine {
       lastBombDamage: this.lastBombDamage,
       lastThornDamage: this.lastThornDamage,
       lastEnemySkill: this.lastEnemySkill ? { ...this.lastEnemySkill } : null,
+      lastEnemyActions: this.lastEnemyActions.map((action) => ({
+        ...action,
+        skill: action.skill ? { ...action.skill } : undefined,
+      })),
       leaderPairMultiplier: this.lastLeaderMultiplier,
       player: { ...this.player },
       party: this.party.map(({ id, name, attribute, secondaryAttribute, tertiaryAttribute, secondaryAttributeChanged = false, attack, recovery, damageCap, helper = false, leaderSkill = null }) => ({
@@ -1431,7 +1493,19 @@ export class PuzzleEngine {
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,
-      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter }) => ({ id, name, attribute, hp, maxHp, counter, maxCounter })),
+      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter }, index) => ({
+        id,
+        name,
+        attribute,
+        hp,
+        maxHp,
+        counter,
+        maxCounter,
+        queuedEnemySkills: Math.max(
+          0,
+          (this.enemySkillQueues[index]?.records.length || 0) - (this.enemySkillQueues[index]?.position || 0),
+        ),
+      })),
       skill: { ...this.skill, ready: this.skill.cooldown === 0 },
       message: this.message,
     };

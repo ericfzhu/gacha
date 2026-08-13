@@ -63,6 +63,12 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['orb-state', 'doBlockSwap2', '_ZN9cGAMEMAIN13_doBlockSwap2EiiiiP10sBLOCKFLAG', 0x6af838],
   ['orb-state', 'doBlockSwap3', '_ZN9cGAMEMAIN13_doBlockSwap3EPKN9sSAVEDATA11sSKILLDATA210sSKILLDATAE', 0x6aea98],
   ['board', 'setupDungeons', '_ZN9cGAMEMAIN14_setupDungeonsEv', 0x65ac0c],
+  ['enemy-ai', 'chooseEnemyAi', '_ZN9cGAMEMAIN14_chooseEnemyAiEP8sMONSTER', 0x61dd68],
+  ['enemy-ai', 'setupEnemyAiTime', '_ZN9cGAMEMAIN17_setupEnemyAiTimeEP8sMONSTERPK10sENESKILLS', 0x61f5ac],
+  ['enemy-ai', 'setupEnemyAttackSub', '_ZN9cGAMEMAIN20_setupEnemyAttackSubEP8sMONSTERPK10sENESKILLS', 0x61fd78],
+  ['enemy-ai', 'doEnemyAi', '_ZN9cGAMEMAIN10_doEnemyAiEP8sMONSTER', 0x622544],
+  ['enemy-ai', 'setupEnemyAttack', '_ZN9cGAMEMAIN17_setupEnemyAttackEv', 0x622f64],
+  ['enemy-ai', 'resetEnemyAtkLeft', '_ZN9cGAMEMAIN18_resetEnemyAtkLeftEP8sMONSTER', 0x6408f0],
   ['match', 'checkCombos', '_ZN9cGAMEMAIN12_checkCombosEii', 0x659d24],
   ['match', 'checkFlood', '_ZN9cGAMEMAIN11_checkFloodEiiiRi', 0x666724],
   ['match', 'checkFlood4bomb', '_ZN9cGAMEMAIN16_checkFlood4bombEiiiRi', 0x6668e4],
@@ -219,6 +225,7 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     },
     enemySkillRuntime: {
       definitionTypeOffset: 'sENEMYSKILL+0x04 (signed int16)',
+      definitionAttackWithSkillOffset: 'sENEMYSKILL+0x44 (signed int32)',
       monsterDurationOffset: 'sMONSTER+0x678 (packed low 10 bits)',
       monsterChanceOffset: 'sMONSTER+0x67c (signed low 16 bits)',
       blackFallType: BLACK_FALL_ENEMY_SKILL_TYPE,
@@ -228,6 +235,13 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       setupEntry: blackFallSetupEntry === null ? null : hex(blackFallSetupEntry),
       setupTarget: blackFallSetupTarget === null ? null : hex(blackFallSetupTarget),
       setupMatches21_9: blackFallSetupMatches,
+    },
+    enemyTurn: {
+      attackCounterOffset: 'sMONSTER+0x120',
+      selectedSkillIndexOffset: 'sMONSTER+0x670',
+      preparedSkillIndexOffset: 'sMONSTER+0x7d8',
+      aiStateOffset: 'sMONSTER+0x7dc',
+      readyCondition: 'counter <= 0',
     },
     symbols,
   };
@@ -260,6 +274,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     for (const [key, value] of Object.entries(report.layout)) console.log(`  ${key.padEnd(23)} ${value}`);
     console.log('\n[enemy skill runtime]');
     for (const [key, value] of Object.entries(report.enemySkillRuntime)) {
+      console.log(`  ${key.padEnd(23)} ${value}`);
+    }
+    console.log('\n[enemy turn]');
+    for (const [key, value] of Object.entries(report.enemyTurn)) {
       console.log(`  ${key.padEnd(23)} ${value}`);
     }
   }

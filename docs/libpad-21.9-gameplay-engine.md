@@ -605,6 +605,32 @@ records directly, and `PuzzleEngine.applyEnemySkillRuntime` or
 `applyEnemySkillRecord` installs the decoded effect. Unsupported skill types
 are reported without mutating the board-rule state.
 
+Definition setup is browser-accessible without first constructing a 2,896-byte
+monster record. `decodePadEnemySkillDefinition` reproduces the type-128 setup
+entry, including its nonpositive-chance default, and
+`PuzzleEngine.applyEnemySkillDefinition` executes that materialized record.
+For turn-driven use, `setEnemySkillQueue(enemyIndex, definitions)` supplies the
+already-selected definition sequence at the native AI boundary. Enemy AI choice
+itself remains data-driven: `_doEnemyAi` stores its selected definition index at
+`sMONSTER+0x670`, but its condition records come from the downloaded enemy data
+set and are not fabricated by the browser port.
+
+The action boundary is recovered independently. `_setupEnemyAttack`
+(`0x622f64`) reads the counter object at `sMONSTER+0x120` and only admits a live
+enemy when its value is at or below zero; it then clears the prepared index at
+`+0x7d8` before AI setup. `_doEnemyAi` (`0x622544`) uses the selection at
+`+0x670` and packed AI state at `+0x7dc`, while `_resetEnemyAtkLeft`
+(`0x6408f0`) restores the base attack interval. The browser decrements one per
+completed player turn, resets on an admitted action, executes the next supplied
+definition instead of a normal hit, and otherwise falls back to the enemy's
+ordinary attack. Existing status countdowns advance before action setup, so a
+newly activated fall effect retains its full authored duration on that turn.
+`_setupSkillWithAttack` separately reads signed definition field `+0x44` and
+stores it at `sMONSTER+0x7e8`. Because its downstream damage interpretation is
+not yet ported, scheduled records must include that field and currently require
+it to be nonpositive; positive attack-with-skill records are rejected rather
+than silently losing their accompanying hit.
+
 The last `_checkPassiveSkill4Block` branch handles enhanced and weakened
 skyfalls for natural types. `_countPassiveSkills` at `0x63fa28` is called with
 attribute-specific skill IDs `14, 15, 16, 17, 18, 29`; each matching awakening

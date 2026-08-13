@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
+  decodePadEnemySkillDefinition,
   decodePadEnemySkillRuntime,
 } from '../src/puzzle/padEnemySkills.js';
 import {
@@ -269,6 +270,32 @@ assert.deepEqual(decodePadEnemySkillRuntime(blackFallSkillDefinition, blackFallM
   supported: false,
 });
 new DataView(blackFallSkillDefinition.buffer).setInt16(4, PAD_ENEMY_SKILL_BLACK_FALL, true);
+const authoredBlackFallDefinition = new Uint8Array(0x48);
+const authoredBlackFallView = new DataView(authoredBlackFallDefinition.buffer);
+authoredBlackFallView.setInt16(0x04, PAD_ENEMY_SKILL_BLACK_FALL, true);
+authoredBlackFallView.setInt32(0x10, 3, true);
+authoredBlackFallView.setInt32(0x14, 75, true);
+assert.deepEqual(decodePadEnemySkillDefinition(authoredBlackFallDefinition), {
+  type: 128,
+  kind: 'blackFall',
+  supported: true,
+  durationTurns: 3,
+  chanceBasisPoints: 7_500,
+  packedDuration: 3,
+  rawChance: 7_500,
+  definitionDuration: 3,
+  definitionChancePercent: 75,
+  attackWithSkillValue: 0,
+});
+authoredBlackFallView.setInt32(0x14, 0, true);
+assert.equal(decodePadEnemySkillDefinition(authoredBlackFallDefinition).chanceBasisPoints, 10_000);
+authoredBlackFallView.setInt32(0x14, 75, true);
+authoredBlackFallView.setInt32(0x44, 1, true);
+assert.throws(
+  () => new PuzzleEngine({ enemySkillQueues: [[authoredBlackFallDefinition]] }),
+  /attack-with-skill actions are not implemented/,
+);
+authoredBlackFallView.setInt32(0x44, 0, true);
 assert.deepEqual(padResolveEnhancementFall(21_900, 0, Array(6).fill(0)), {
   state: 394_448_415,
   enhancementPower: 0,
@@ -918,6 +945,48 @@ blackFallEngine.setOrbState(0, 0, {
 });
 assert.equal(blackFallEngine.board[0][0].blockFlags, 0x1000);
 assert.equal(blackFallEngine.board[0][0].enhancementPower, 0);
+
+const scheduledSkillEngine = new PuzzleEngine({
+  enemySkillQueues: [{ definitions: [authoredBlackFallDefinition] }],
+});
+scheduledSkillEngine.enemies[0].counter = 1;
+scheduledSkillEngine.enemies[1].counter = 99;
+const scheduledHp = scheduledSkillEngine.player.hp;
+scheduledSkillEngine.resolveEnemyTurn();
+assert.equal(scheduledSkillEngine.player.hp, scheduledHp);
+assert.deepEqual(scheduledSkillEngine.blackFallRule, {
+  active: true,
+  chanceBasisPoints: 7_500,
+  turnsRemaining: 3,
+  skipInitialCountdown: true,
+});
+assert.deepEqual(scheduledSkillEngine.snapshot().lastEnemyActions, [{
+  enemy: 0,
+  kind: 'skill',
+  skill: {
+    type: 128,
+    kind: 'blackFall',
+    supported: true,
+    durationTurns: 3,
+    chanceBasisPoints: 7_500,
+    packedDuration: 3,
+    rawChance: 7_500,
+    definitionDuration: 3,
+    definitionChancePercent: 75,
+    attackWithSkillValue: 0,
+  },
+}]);
+assert.equal(scheduledSkillEngine.snapshot().enemies[0].queuedEnemySkills, 0);
+scheduledSkillEngine.resolveEnemyTurn();
+assert.equal(scheduledSkillEngine.blackFallRule.turnsRemaining, 2);
+assert.deepEqual(scheduledSkillEngine.lastEnemyActions, []);
+scheduledSkillEngine.resolveEnemyTurn();
+assert.equal(scheduledSkillEngine.player.hp, scheduledHp - scheduledSkillEngine.enemies[0].attack);
+assert.deepEqual(scheduledSkillEngine.lastEnemyActions, [{
+  enemy: 0,
+  kind: 'attack',
+  damage: scheduledSkillEngine.enemies[0].attack,
+}]);
 assert.equal(blackFallEngine.board[0][0].nail, false);
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);

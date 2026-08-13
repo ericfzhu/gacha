@@ -6,6 +6,13 @@ export const PAD_ENEMY_SKILL_RUNTIME_LAYOUT = Object.freeze({
   monsterChanceOffset: 0x67c,
 });
 
+export const PAD_ENEMY_SKILL_DEFINITION_LAYOUT = Object.freeze({
+  typeOffset: 0x04,
+  parameter0Offset: 0x10,
+  parameter1Offset: 0x14,
+  attackWithSkillOffset: 0x44,
+});
+
 function asBytes(value, label) {
   if (value instanceof Uint8Array) return value;
   if (value instanceof ArrayBuffer) return new Uint8Array(value);
@@ -17,6 +24,63 @@ function requireLength(bytes, minimum, label) {
   if (bytes.byteLength < minimum) {
     throw new RangeError(`${label} requires at least ${minimum} bytes; received ${bytes.byteLength}.`);
   }
+}
+
+function decodeBlackFallRuntime(type, packedDuration, rawChance) {
+  const durationTurns = (((packedDuration & 0x03ff) << 22) >> 22);
+  const chanceBasisPoints = (rawChance << 16) >> 16;
+  return Object.freeze({
+    type,
+    kind: 'blackFall',
+    supported: durationTurns > 0,
+    durationTurns,
+    chanceBasisPoints,
+    packedDuration,
+    rawChance,
+  });
+}
+
+// _setupEnemyAttackSub's type-128 entry at 0x6211a0 copies the first authored
+// parameter to sMONSTER+0x678. A positive second parameter is converted from a
+// percentage to basis points; zero or a negative value selects the native
+// 10000-basis-point default at 0x621f20.
+export function decodePadEnemySkillDefinition(skillDefinition) {
+  const definitionBytes = asBytes(skillDefinition, 'PAD enemy-skill definition');
+  requireLength(
+    definitionBytes,
+    PAD_ENEMY_SKILL_DEFINITION_LAYOUT.parameter1Offset + 4,
+    'PAD enemy-skill definition',
+  );
+  const definition = new DataView(
+    definitionBytes.buffer,
+    definitionBytes.byteOffset,
+    definitionBytes.byteLength,
+  );
+  const type = definition.getInt16(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.typeOffset, true);
+  if (type !== PAD_ENEMY_SKILL_BLACK_FALL) {
+    return Object.freeze({ type, kind: 'unsupported', supported: false });
+  }
+  const definitionDuration = definition.getInt32(
+    PAD_ENEMY_SKILL_DEFINITION_LAYOUT.parameter0Offset,
+    true,
+  );
+  const definitionChancePercent = definition.getInt32(
+    PAD_ENEMY_SKILL_DEFINITION_LAYOUT.parameter1Offset,
+    true,
+  );
+  const rawChance = definitionChancePercent >= 1
+    ? Math.imul(definitionChancePercent, 100) >>> 0
+    : 10_000;
+  const attackWithSkillValue = definitionBytes.byteLength
+      >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+    ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+    : null;
+  return Object.freeze({
+    ...decodeBlackFallRuntime(type, definitionDuration & 0xffff, rawChance),
+    definitionDuration,
+    definitionChancePercent,
+    attackWithSkillValue,
+  });
 }
 
 // _doEnemySkill's second jump table dispatches signed type 128 to 0x62a854.
@@ -48,18 +112,8 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
     return Object.freeze({ type, kind: 'unsupported', supported: false });
   }
   const packedDuration = monster.getUint16(PAD_ENEMY_SKILL_RUNTIME_LAYOUT.monsterDurationOffset, true);
-  const durationTurns = ((packedDuration & 0x03ff) << 22) >> 22;
   const rawChance = monster.getUint32(PAD_ENEMY_SKILL_RUNTIME_LAYOUT.monsterChanceOffset, true);
-  const chanceBasisPoints = (rawChance << 16) >> 16;
-  return Object.freeze({
-    type,
-    kind: 'blackFall',
-    supported: true,
-    durationTurns,
-    chanceBasisPoints,
-    packedDuration,
-    rawChance,
-  });
+  return decodeBlackFallRuntime(type, packedDuration, rawChance);
 }
 
 export function normalizePadEnemySkillRecord(record) {

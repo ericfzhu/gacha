@@ -524,6 +524,19 @@ try {
     engine.resolveEnemyTurn();
     const blackFallAfterExpiry = engine.snapshot().boardState[0][0];
     const blackFallRuleAfterExpiry = { ...engine.blackFallRule };
+    const scheduledBlackFallDefinition = new Uint8Array(0x48);
+    const scheduledBlackFallView = new DataView(scheduledBlackFallDefinition.buffer);
+    scheduledBlackFallView.setInt16(0x04, 128, true);
+    scheduledBlackFallView.setInt32(0x10, 3, true);
+    scheduledBlackFallView.setInt32(0x14, 75, true);
+    engine.setBlackFallRule(null);
+    engine.setEnemySkillQueue(0, [scheduledBlackFallDefinition]);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    const scheduledBlackFallHp = engine.player.hp;
+    engine.resolveEnemyTurn();
+    const scheduledBlackFall = engine.snapshot();
+    engine.setEnemySkillQueue(0, []);
     engine.setBlackFallRule(null);
     engine.reset();
     const initialBoard = engine.snapshot().board;
@@ -557,6 +570,7 @@ try {
       enhancedFallPower, enhancedFallRuleState, weakenedFallPower, weakenedFallRuleState,
       blackFallSkillApplied, blackFallOrb, blackFallRuleState, blackFallAfterFresh, blackFallTurnsAfterFresh,
       blackFallAfterExpiry, blackFallRuleAfterExpiry,
+      scheduledBlackFallHp, scheduledBlackFall,
       initialBoard, initialBoardState,
     };
   }) : null;
@@ -659,6 +673,12 @@ try {
     poisonBlockSample.blackFallAfterExpiry.blindCountdown !== 0 ||
     poisonBlockSample.blackFallRuleAfterExpiry.active !== false ||
     poisonBlockSample.blackFallRuleAfterExpiry.turnsRemaining !== 0 ||
+    poisonBlockSample.scheduledBlackFall.player.hp !== poisonBlockSample.scheduledBlackFallHp ||
+    poisonBlockSample.scheduledBlackFall.blackFallRule?.turnsRemaining !== 3 ||
+    poisonBlockSample.scheduledBlackFall.blackFallRule?.chanceBasisPoints !== 7_500 ||
+    poisonBlockSample.scheduledBlackFall.lastEnemyActions?.[0]?.kind !== 'skill' ||
+    poisonBlockSample.scheduledBlackFall.lastEnemyActions?.[0]?.skill?.type !== 128 ||
+    poisonBlockSample.scheduledBlackFall.enemies?.[0]?.queuedEnemySkills !== 0 ||
     JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
       'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',
     ]) || poisonBlockSample.initialBoardState !== 79_238_434
