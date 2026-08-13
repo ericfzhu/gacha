@@ -31,6 +31,8 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['orb-state', 'doPoisonBlockN', '_ZN9cGAMEMAIN15_doPoisonBlockNEiib', 0x626bf0],
   ['orb-state', 'doPoisonBlocks', '_ZN9cGAMEMAIN15_doPoisonBlocksEiib', 0x626e78],
   ['orb-state', 'doPoisonBlockN2', '_ZN9cGAMEMAIN16_doPoisonBlockN2EijjbbPt', 0x61c344],
+  ['orb-state', 'doBitReplace', '_ZN9cGAMEMAIN13_doBitReplaceEPKtiRiP10sBLOCKFLAG', 0x6adf2c],
+  ['orb-state', 'doBlockSwapMain', '_ZN9cGAMEMAIN16_doBlockSwapMainEP6sBLOCKiRiP10sBLOCKFLAG', 0x6ae028],
   ['board', 'setupDungeons', '_ZN9cGAMEMAIN14_setupDungeonsEv', 0x65ac0c],
   ['match', 'checkCombos', '_ZN9cGAMEMAIN12_checkCombosEii', 0x659d24],
   ['match', 'checkFlood', '_ZN9cGAMEMAIN11_checkFloodEiiiRi', 0x666724],

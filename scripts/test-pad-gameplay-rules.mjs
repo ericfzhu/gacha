@@ -22,6 +22,7 @@ import {
   padNativeRecoveryPower,
   padOrbMatchMultiplier,
   padPoisonDamage,
+  padResolveBitReplacements,
   padSecondaryAttributeAttack,
   padSelectPoisonBlockCandidates,
   padSelectPoisonBlockTypes,
@@ -179,6 +180,35 @@ assert.equal(padCountBlockBits([[7, 8, 8, 6]], 1 << 6), 1);
 assert.equal(padCountBlockBits([[7, 8, 8, 6]], 0), 0);
 assert.equal(padCountNonPoisonBlocks(maskedChangeBoard), 29);
 assert.equal(padCountNonPoisonBlocks(maskedChangeBoard, true), 23);
+assert.deepEqual(padResolveBitReplacements(
+  21_900,
+  [0b1111],
+  [[4, 4, 4, 4]],
+  -1,
+  [0b0010],
+  8,
+), {
+  state: 1_929_471_377,
+  effectFlags: 9,
+  assignments: [
+    { row: 0, column: 0, type: 0 },
+    { row: 0, column: 2, type: 5 },
+    { row: 0, column: 3, type: 2 },
+  ],
+});
+assert.deepEqual(padResolveBitReplacements(21_900, [0b101], [[0, 1, 2]], 7, null, 4), {
+  state: 21_900,
+  effectFlags: 6,
+  assignments: [
+    { row: 0, column: 0, type: 7 },
+    { row: 0, column: 2, type: 7 },
+  ],
+});
+assert.deepEqual(padResolveBitReplacements(21_900, [0b1], [[0]], 6), {
+  state: 21_900,
+  effectFlags: 4,
+  assignments: [{ row: 0, column: 0, type: 6 }],
+});
 assert.deepEqual(padGetRandomBlock(21_900), { state: 3_803_934_822, type: 1 });
 assert.deepEqual(padGetRandomBlock(21_900, 1), { state: 3_803_934_822, type: 2 });
 assert.deepEqual(padGetRandomBlock(21_900, -1, true, true), { state: 3_803_934_822, type: 1 });
@@ -742,6 +772,24 @@ assert.equal(blockCountEngine.countBlockBits(1 << 8), 1);
 assert.equal(blockCountEngine.countBlockBits(1 << 9), 1);
 assert.equal(blockCountEngine.countNonPoisonBlocks(), 28);
 assert.equal(blockCountEngine.countNonPoisonBlocks(true), 22);
+const bitReplaceEngine = new PuzzleEngine({ seed: 21_900 });
+bitReplaceEngine.setBoardFromCodes(['DDDDHD', 'GLDHRG', 'HBGDGL', 'DLGHHB', 'HBGGLD']);
+bitReplaceEngine.setRngState(21_900);
+bitReplaceEngine.setOrbState(0, 1, { locked: true });
+bitReplaceEngine.setOrbState(0, 2, { enhancementPower: 0.5 });
+assert.equal(bitReplaceEngine.doBitReplace([0b1111, 0, 0, 0, 0], -1, 8), 9);
+assert.equal(bitReplaceEngine.rng.state, 1_929_471_377);
+assert.deepEqual(bitReplaceEngine.board[0].slice(0, 4).map((orb) => orb.type), [
+  'fire', 'dark', 'heart', 'wood',
+]);
+assert.equal(bitReplaceEngine.board[0][2].enhancementPower, 0.5);
+bitReplaceEngine.setOrbState(0, 0, { blockFlags: 0xa8000, enhancementPower: 0.5 });
+assert.equal(bitReplaceEngine.doBitReplace([0b11, 0, 0, 0, 0], 7, 4), 6);
+assert.equal(bitReplaceEngine.rng.state, 1_929_471_377);
+assert.equal(bitReplaceEngine.board[0][0].type, 'poison');
+assert.equal(bitReplaceEngine.board[0][0].blockFlags, 0x80000);
+assert.equal(bitReplaceEngine.board[0][0].enhancementPower, 0);
+assert.equal(bitReplaceEngine.board[0][1].type, 'dark');
 assert.equal(specialLockEngine.doLockDropBits(0x3c0, 4, 0xbeef), true);
 for (let column = 0; column < 4; column += 1) {
   const orb = specialLockEngine.board[0][column];

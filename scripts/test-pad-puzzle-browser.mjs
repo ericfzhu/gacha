@@ -319,6 +319,17 @@ try {
       nonPoison: engine.countNonPoisonBlocks(),
       nonPoisonNoHeart: engine.countNonPoisonBlocks(true),
     };
+    engine.setBoardFromCodes(['DDDDHD', 'GLDHRG', 'HBGDGL', 'DLGHHB', 'HBGGLD']);
+    engine.setRngState(21_900);
+    engine.setOrbState(0, 1, { locked: true });
+    engine.setOrbState(0, 2, { enhancementPower: 0.5 });
+    const randomReplaceFlags = engine.doBitReplace([0b1111, 0, 0, 0, 0], -1, 8);
+    const randomReplaceState = engine.rng.state;
+    const randomReplaceTypes = engine.board[0].slice(0, 4).map((orb) => orb.type);
+    engine.setOrbState(0, 0, { blockFlags: 0xa8000, enhancementPower: 0.5 });
+    const poisonReplaceFlags = engine.doBitReplace([0b11, 0, 0, 0, 0], 7, 4);
+    const poisonReplaceState = engine.rng.state;
+    const poisonReplaceOrb = engine.snapshot().boardState[0][0];
     engine.reset();
     engine.start();
     return {
@@ -326,6 +337,8 @@ try {
       beforeMortal, afterMortal, bulkStartState, bulkChanged, bulkEndState, bulkPoison, bulkLockedType,
       maskedDryCount, maskedDryState, maskedAttempted, maskedEndState, maskedTypes,
       mappedAttempted, selectedRows: [...selectedRows], mappedTypes, blockCounts,
+      randomReplaceFlags, randomReplaceState, randomReplaceTypes,
+      poisonReplaceFlags, poisonReplaceState, poisonReplaceOrb,
     };
   }) : null;
   const advanceLcg = (state, count) => {
@@ -350,7 +363,14 @@ try {
     JSON.stringify(poisonBlockSample.mappedTypes) !== JSON.stringify(['jammer', 'jammer', 'poison', 'poison']) ||
     JSON.stringify(poisonBlockSample.blockCounts) !== JSON.stringify({
       poisonMask: 2, mortalMask: 1, bombMask: 1, nonPoison: 28, nonPoisonNoHeart: 22,
-    })
+    }) || poisonBlockSample.randomReplaceFlags !== 9 ||
+    poisonBlockSample.randomReplaceState !== 1_929_471_377 ||
+    JSON.stringify(poisonBlockSample.randomReplaceTypes) !== JSON.stringify(['fire', 'dark', 'heart', 'wood']) ||
+    poisonBlockSample.poisonReplaceFlags !== 6 ||
+    poisonBlockSample.poisonReplaceState !== poisonBlockSample.randomReplaceState ||
+    poisonBlockSample.poisonReplaceOrb.code !== 'P' ||
+    poisonBlockSample.poisonReplaceOrb.blockFlags !== 0x80000 ||
+    poisonBlockSample.poisonReplaceOrb.enhancementPower !== 0
   )) throw new Error(`Poison-block mismatch: ${JSON.stringify(poisonBlockSample)}`);
   if (renderAtlasSheet) {
     const sheet = page.locator('#pad-atlas-sheet');

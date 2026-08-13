@@ -2,6 +2,28 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 bit-replacement executor
+
+- Recovered `_doBitReplace` at `0x6adf2c` and `_doBlockSwapMain` at `0x6ae028`.
+  The shared `int&` is an effect-category bitset (ordinary/Bomb 1, poison 2,
+  jammer 4), not a changed-cell counter.
+- Ported row-mask traversal, locked-cell rejection, fixed destinations, and the
+  negative-destination path that consumes one saved LCG step per unlocked cell
+  and chooses among natural types 0..5. Natural types retain enhancement;
+  special types clear enhancement and flags `0x28000` while preserving burst.
+- The browser API intentionally implements the null-`sBLOCKFLAG` gameplay path.
+  Non-null passive-skill resistance is deferred until its flag construction and
+  wrapper calls are recovered, rather than guessed.
+- Added pure, engine, RNG, lock, flag-preservation, and browser fixtures and
+  expanded the exact restored-binary inspector to 46 gameplay anchors.
+- Verification passed: pure rules, production build, exact binary anchors,
+  exhaustive browser mechanics, generic tap-turn/text-state progression,
+  console checks, and screenshot inspection. The generic client also exposed a
+  remaining Google Fonts `@import`; it was removed in separate commit `21e5690`
+  with local condensed-font fallbacks so offline runs are clean.
+- Next: recover public `_doBlockSwap4`/`_doBlockSwap5` wrapper contracts and
+  the non-null `sBLOCKFLAG` passive-resistance path.
+
 ## 2026-08-14 native board-mask queries
 
 - Recovered `_countBlockBits` at `0x651fa4` and completed the already anchored

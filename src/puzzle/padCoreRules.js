@@ -109,6 +109,24 @@ export function createPadRng(seed = 0) {
       state = selected.state;
       return selected;
     },
+    resolveBitReplacements(
+      selectedRows,
+      boardTypes,
+      destinationType,
+      lockedRows = null,
+      initialEffectFlags = 0,
+    ) {
+      const resolved = padResolveBitReplacements(
+        state,
+        selectedRows,
+        boardTypes,
+        destinationType,
+        lockedRows,
+        initialEffectFlags,
+      );
+      state = resolved.state;
+      return resolved;
+    },
     getRandomBlock(excludedType = -1, includeJammer = false, includeHeart = true) {
       const result = padGetRandomBlock(state, excludedType, includeJammer, includeHeart);
       state = result.state;
@@ -342,6 +360,49 @@ export function padCountNonPoisonBlocks(boardTypes, excludeHeart = false) {
     });
   });
   return count;
+}
+
+// _doBitReplace (0x6adf2c) walks caller-supplied uint16 row masks and delegates
+// each active cell to _doBlockSwapMain (0x6ae028). The shared integer is not a
+// changed-cell count: it accumulates native effect categories (natural/bomb=1,
+// poison=2, jammer=4). A negative destination independently rolls one of the
+// six natural types for each unlocked selected cell and consumes one saved LCG
+// step per successful attempt.
+export function padResolveBitReplacements(
+  state,
+  selectedRows,
+  boardTypes,
+  destinationType,
+  lockedRows = null,
+  initialEffectFlags = 0,
+) {
+  const rows = Array.isArray(boardTypes) ? boardTypes.length : 0;
+  const columns = rows > 0 && Array.isArray(boardTypes[0]) ? boardTypes[0].length : 0;
+  const validBoard = rows > 0 && columns > 0
+    && boardTypes.every((row) => Array.isArray(row) && row.length === columns);
+  let savedState = Number(state) >>> 0;
+  let effectFlags = Number(initialEffectFlags) | 0;
+  const assignments = [];
+  if (!validBoard) return { state: savedState, effectFlags, assignments };
+  const requestedType = Math.trunc(Number(destinationType) || 0);
+  for (let row = 0; row < rows; row += 1) {
+    const selectedBits = Number(selectedRows?.[row] ?? 0) & 0xffff;
+    const lockedBits = Number(lockedRows?.[row] ?? 0) & 0xffff;
+    for (let column = 0; column < columns; column += 1) {
+      const bit = 1 << column;
+      if ((selectedBits & bit) === 0 || (lockedBits & bit) !== 0) continue;
+      let type = requestedType;
+      if (type < 0) {
+        const roll = padLcgStep(savedState);
+        savedState = roll.state;
+        type = Math.floor(roll.value * 6 / 0x10000);
+      }
+      if (type < 0 || type > 9) continue;
+      effectFlags |= type === 6 ? 4 : type === 7 || type === 8 ? 2 : 1;
+      assignments.push({ row, column, type });
+    }
+  }
+  return { state: savedState, effectFlags, assignments };
 }
 
 // The same native routine builds its candidates from numeric block types

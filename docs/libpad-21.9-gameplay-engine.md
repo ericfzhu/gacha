@@ -306,6 +306,26 @@ cells count regardless of block flags. `padCountBlockBits`,
 `padCountNonPoisonBlocks`, and their `PuzzleEngine` methods expose the same
 eligibility counts used by the native skill paths.
 
+The first replacement executor is `_doBitReplace(uint16_t const *rows, int
+destinationType, int &effectFlags, sBLOCKFLAG *)` at `0x6adf2c`. It visits set
+column bits in row-major order and sends each active cell through
+`_doBlockSwapMain` at `0x6ae028`. Locked cells reject the write. A negative
+destination consumes one saved LCG step for every unlocked selected cell and
+maps the returned 16 bits uniformly to one of natural types `0..5`; a fixed
+destination consumes no RNG. Natural replacements retain enhancement power.
+Types `6..9` clear enhancement power and block flag bits `0x28000`, but preserve
+independent flags such as burst `0x80000`.
+
+The referenced integer is an accumulated presentation-category mask rather
+than a changed-cell count: ordinary colors and Bomb OR bit `1`, Poison/Mortal
+Poison OR bit `2`, and Jammer OR bit `4`; existing bits are preserved. The
+browser's `padResolveBitReplacements` and `PuzzleEngine.doBitReplace` implement
+the deterministic null-`sBLOCKFLAG` gameplay path, including lock rejection,
+per-cell random destinations, saved RNG state, category accumulation, and
+special-orb state clearing. Passive-skill resistance carried by a non-null
+`sBLOCKFLAG` remains part of the surrounding swap-family recovery rather than
+being guessed into this primitive.
+
 The enemy inverse is `_doBlockMinus(bool, uint32 mask, float, int)` at
 `0x61caa0`. Only cells whose type bit is in the mask and whose current power is
 non-negative are eligible; applying the effect stores the negated binary32
