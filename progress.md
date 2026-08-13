@@ -2,6 +2,26 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 enemy resurrection
+
+- Identified enemy skill type `52` as resurrection: late handler `0x6297ac`,
+  setup `0x620350`, and condition `0x61a9d0`. Definition `+0x10` is the signed
+  percentage of the selected monster's max HP to restore.
+- The condition scans all native monster slots for an unavailable/dead target.
+  Setup counts the same candidates, consumes one ordinary LCG draw even when
+  only one exists, selects by native slot order, and stores the slot index at
+  runtime `+0x678` and revive percentage at `+0x67c`.
+- Execution rechecks the target is unavailable/dead, reconstructs protected
+  int64 max HP, and writes `izMathRoundD(maxHP * percent / 100)` as current HP.
+  The browser decoder, materializer, new-AI condition, RNG stream, HP restore,
+  floating feedback, and enemy-turn state snapshot now reproduce that path.
+- Enemy turns snapshot which monsters were alive at their start, so a monster
+  revived midway through the phase cannot immediately take an extra action.
+  Pure fixtures cover raw runtime records, exact rounding, rejection, preserved
+  countdown, seed-21900 selection, and the two-draw AI/setup sequence.
+- Exact restored-table inspection and browser regression cover the new type.
+- Next: continue the neighboring enemy-status audit.
+
 ## 2026-08-14 enemy attribute absorption
 
 - Identified enemy skill type `53` as attribute-damage absorption: late handler

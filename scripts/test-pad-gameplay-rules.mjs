@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
+  PAD_ENEMY_SKILL_REVIVE_ENEMY,
   PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
   PAD_ENEMY_SKILL_BIND_LEADER_HELPER,
   PAD_ENEMY_SKILL_HEAL_PLAYER,
@@ -27,6 +28,7 @@ import {
   padEnemySkillAttack,
   padEnemySkillPlayerHeal,
   padEnemySkillPlayerHpCondition,
+  padEnemySkillReviveHp,
 } from '../src/puzzle/padEnemySkills.js';
 import {
   decodePadEnemyAiMonsterDefinition,
@@ -326,6 +328,8 @@ assert.equal(padEnemySkillPlayerHeal(12_000, -50), -6_000);
 assert.equal(padEnemySkillPlayerHeal(0x7fffffff, 200), 0x7fffffff);
 assert.equal(padEnemySkillPlayerHpCondition(3_059, 12_000, 25), true);
 assert.equal(padEnemySkillPlayerHpCondition(3_060, 12_000, 25), false);
+assert.equal(padEnemySkillReviveHp(76_001, 50), 38_001);
+assert.equal(padEnemySkillReviveHp(76_000, 37), 28_120);
 authoredBlackFallView.setInt32(0x44, 0, true);
 
 const enemyAiMonsterDefinition = new Uint8Array(0x2ec);
@@ -708,6 +712,46 @@ assert.deepEqual(
     attackWithSkillValue: 0,
   },
 );
+const enemyAiReviveEnemyDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiReviveEnemyView = new DataView(enemyAiReviveEnemyDefinition.buffer);
+enemyAiReviveEnemyView.setUint32(0x00, 9_022, true);
+enemyAiReviveEnemyView.setInt16(0x04, PAD_ENEMY_SKILL_REVIVE_ENEMY, true);
+enemyAiReviveEnemyView.setInt32(0x10, 37, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiReviveEnemyDefinition), {
+  type: 52,
+  kind: 'reviveEnemy',
+  supported: true,
+  revivePercent: 37,
+  attackWithSkillValue: 0,
+});
+const reviveEnemyMonsterRuntime = new Uint8Array(0x680);
+const reviveEnemyMonsterRuntimeView = new DataView(reviveEnemyMonsterRuntime.buffer);
+reviveEnemyMonsterRuntimeView.setInt32(0x678, 1, true);
+reviveEnemyMonsterRuntimeView.setInt32(0x67c, 37, true);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiReviveEnemyDefinition, reviveEnemyMonsterRuntime),
+  {
+    type: 52,
+    kind: 'reviveEnemy',
+    supported: true,
+    targetEnemyIndex: 1,
+    revivePercent: 37,
+    setupMaterialized: true,
+    attackWithSkillValue: 0,
+  },
+);
+const reviveRuntimeEngine = new PuzzleEngine({ seed: 21_900 });
+reviveRuntimeEngine.setRngState(21_900);
+reviveRuntimeEngine.enemies[1].hp = 0;
+reviveRuntimeEngine.enemies[1].counter = 1;
+assert.equal(reviveRuntimeEngine.applyEnemySkillRuntime(
+  enemyAiReviveEnemyDefinition,
+  reviveEnemyMonsterRuntime,
+), true);
+assert.equal(reviveRuntimeEngine.enemies[1].hp, 28_120);
+assert.equal(reviveRuntimeEngine.enemies[1].counter, 1);
+assert.equal(reviveRuntimeEngine.lastEnemySkill.revivedHp, 28_120);
+assert.equal(reviveRuntimeEngine.rng.state, 21_900);
 const enemyAiBindLeaderHelperDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiBindLeaderHelperView = new DataView(enemyAiBindLeaderHelperDefinition.buffer);
 enemyAiBindLeaderHelperView.setUint32(0x00, 9_020, true);
@@ -2108,6 +2152,42 @@ rejectedHealPlayerEngine.player.hp = 3_060;
 rejectedHealPlayerEngine.setRngState(21_900);
 assert.equal(rejectedHealPlayerEngine.takeEnemySkill(0), null);
 assert.equal(rejectedHealPlayerEngine.rng.state, 21_900);
+const reviveEnemyMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(reviveEnemyMonsterDefinition.buffer).setUint32(0xec, 9_022, true);
+const selectedReviveEnemyEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: reviveEnemyMonsterDefinition,
+    skillDefinitions: [enemyAiReviveEnemyDefinition],
+  }],
+});
+selectedReviveEnemyEngine.enemies[1].hp = 0;
+selectedReviveEnemyEngine.enemies[1].counter = 1;
+selectedReviveEnemyEngine.setRngState(21_900);
+selectedReviveEnemyEngine.enemies[0].counter = 1;
+selectedReviveEnemyEngine.resolveEnemyTurn();
+const selectedReviveEnemyState = selectedReviveEnemyEngine.snapshot();
+assert.equal(selectedReviveEnemyState.lastEnemyActions[0].skill.type, 52);
+assert.equal(selectedReviveEnemyState.lastEnemyActions[0].skill.skillId, 9_022);
+assert.equal(selectedReviveEnemyState.lastEnemyActions[0].skill.targetEnemyIndex, 1);
+assert.equal(selectedReviveEnemyState.lastEnemySkill.revivedHp, 28_120);
+assert.equal(selectedReviveEnemyState.enemies[1].hp, 28_120);
+assert.equal(selectedReviveEnemyState.enemies[1].counter, 1);
+assert.equal(selectedReviveEnemyState.enemies[0].enemyAiBudget, 80);
+assert.equal(
+  selectedReviveEnemyEngine.rng.state,
+  padLcgStep(padLcgStep(21_900).state).state,
+);
+const rejectedReviveEnemyEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: reviveEnemyMonsterDefinition,
+    skillDefinitions: [enemyAiReviveEnemyDefinition],
+  }],
+});
+rejectedReviveEnemyEngine.setRngState(21_900);
+assert.equal(rejectedReviveEnemyEngine.takeEnemySkill(0), null);
+assert.equal(rejectedReviveEnemyEngine.rng.state, 21_900);
 const bindLeaderHelperMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(bindLeaderHelperMonsterDefinition.buffer).setUint32(0xec, 9_020, true);
 const selectedBindLeaderHelperEngine = new PuzzleEngine({

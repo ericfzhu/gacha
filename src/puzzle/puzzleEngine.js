@@ -33,6 +33,7 @@ import {
   tracePadPointerCells,
 } from './padCoreRules.js';
 import {
+  PAD_ENEMY_SKILL_REVIVE_ENEMY,
   PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
   PAD_ENEMY_SKILL_BIND_LEADER_HELPER,
   PAD_ENEMY_SKILL_HEAL_PLAYER,
@@ -59,6 +60,7 @@ import {
   normalizePadEnemySkillRecord,
   padEnemySkillAttack,
   padEnemySkillPlayerHeal,
+  padEnemySkillReviveHp,
 } from './padEnemySkills.js';
 import {
   decodePadEnemyAiMonsterDefinition,
@@ -825,6 +827,7 @@ export class PuzzleEngine {
   resolveEnemyTurn() {
     let total = 0;
     this.lastEnemyActions = [];
+    const aliveAtTurnStart = this.enemies.map((enemy) => enemy.hp > 0);
     // Native _incEneTurn advances existing statuses before _setupEnemyAttack
     // admits monsters whose sMONSTER+0x120 counter has reached zero. Keeping
     // this order prevents a newly executed enemy skill from losing a turn
@@ -836,7 +839,7 @@ export class PuzzleEngine {
       if (this.blackFallRule.turnsRemaining === 0) this.blackFallRule.active = false;
     }
     this.enemies.forEach((enemy, index) => {
-      if (enemy.hp <= 0) return;
+      if (!aliveAtTurnStart[index] || enemy.hp <= 0) return;
       enemy.counter -= 1;
       if (enemy.counter <= 0) {
         enemy.counter = enemy.maxCounter;
@@ -892,6 +895,7 @@ export class PuzzleEngine {
         present: member.present !== false,
         bindTurns: Math.max(0, Math.trunc(Number(member.bindTurns) || 0)),
       })),
+      enemies: this.enemies.map((candidate) => ({ hp: candidate.hp })),
       aiBudget: pool.aiBudget,
       blackFallActive: Boolean(this.blackFallRule?.active),
       rngState: this.rng.state,
@@ -973,6 +977,25 @@ export class PuzzleEngine {
 
   materializeEnemySkillRecord(record) {
     const skill = normalizePadEnemySkillRecord(record);
+    if (skill.supported && skill.kind === 'reviveEnemy' && !skill.setupMaterialized) {
+      const candidates = this.enemies
+        .map((enemy, index) => ({ enemy, index }))
+        .filter(({ enemy }) => Number(enemy.hp) <= 0);
+      if (candidates.length === 0) {
+        return Object.freeze({
+          ...record,
+          targetEnemyIndex: -1,
+          setupMaterialized: true,
+        });
+      }
+      const roll = this.rng.nextUint16();
+      const candidateIndex = Math.imul(roll, candidates.length) >>> 16;
+      return Object.freeze({
+        ...record,
+        targetEnemyIndex: candidates[candidateIndex].index,
+        setupMaterialized: true,
+      });
+    }
     if (skill.supported && skill.kind === 'attributeAbsorb' && !skill.setupMaterialized) {
       return Object.freeze({
         ...record,
@@ -1176,6 +1199,20 @@ export class PuzzleEngine {
     const materialized = this.materializeEnemySkillRecord(record);
     const skill = normalizePadEnemySkillRecord(materialized);
     this.lastEnemySkill = skill;
+    if (skill.supported && skill.kind === 'reviveEnemy') {
+      const target = this.enemies[skill.targetEnemyIndex];
+      if (!target || target.hp > 0) return false;
+      const revivedHp = padEnemySkillReviveHp(target.maxHp, skill.revivePercent);
+      target.hp = revivedHp;
+      this.lastEnemySkill = Object.freeze({ ...skill, revivedHp: target.hp });
+      if (target.hp > 0) {
+        this.floatingText.push({
+          kind: 'revive', value: target.hp, enemy: skill.targetEnemyIndex, age: 0,
+        });
+      }
+      this.message = `${target.name} revived with ${target.hp.toLocaleString()} HP.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'attributeAbsorb') {
       const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
       if (!enemy) return false;
@@ -1340,6 +1377,7 @@ export class PuzzleEngine {
       const definition = definitionsById.get(slot.skillId);
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
       if (![
+        PAD_ENEMY_SKILL_REVIVE_ENEMY,
         PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
         PAD_ENEMY_SKILL_BIND_LEADER_HELPER,
         PAD_ENEMY_SKILL_HEAL_PLAYER,

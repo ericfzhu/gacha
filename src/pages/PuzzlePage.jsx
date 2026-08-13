@@ -500,8 +500,8 @@ function render(ctx, engine) {
     ctx.globalAlpha = Math.max(0, 1 - t);
     ctx.textAlign = 'center';
     ctx.font = '900 22px "Barlow Condensed", sans-serif';
-    ctx.fillStyle = item.kind === 'heal' ? '#83ef9d' : item.kind === 'poison' ? '#d995ef' : item.kind === 'bomb' ? '#ffb45f' : item.kind === 'thorn' || item.kind === 'nail' ? '#e4edf3' : item.kind === 'enemy' ? '#ff8b7f' : ORB_BY_ID[item.attribute]?.highlight || '#fff';
-    ctx.fillText(`${item.kind === 'heal' || item.kind === 'absorb' ? '+' : '-'}${item.value.toLocaleString()}`, x, y);
+    ctx.fillStyle = item.kind === 'heal' || item.kind === 'revive' ? '#83ef9d' : item.kind === 'poison' ? '#d995ef' : item.kind === 'bomb' ? '#ffb45f' : item.kind === 'thorn' || item.kind === 'nail' ? '#e4edf3' : item.kind === 'enemy' ? '#ff8b7f' : ORB_BY_ID[item.attribute]?.highlight || '#fff';
+    ctx.fillText(`${item.kind === 'heal' || item.kind === 'absorb' || item.kind === 'revive' ? '+' : '-'}${item.value.toLocaleString()}`, x, y);
     ctx.globalAlpha = 1;
   });
 

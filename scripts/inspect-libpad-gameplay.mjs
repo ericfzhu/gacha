@@ -24,6 +24,10 @@ const HEAL_PLAYER_ENEMY_SKILL_TYPE = 55;
 const HEAL_PLAYER_HANDLER = 0x629900;
 const HEAL_PLAYER_SETUP_HANDLER = 0x620040;
 const HEAL_PLAYER_CONDITION_HANDLER = 0x61aa74;
+const REVIVE_ENEMY_SKILL_TYPE = 52;
+const REVIVE_ENEMY_HANDLER = 0x6297ac;
+const REVIVE_ENEMY_SETUP_HANDLER = 0x620350;
+const REVIVE_ENEMY_CONDITION_HANDLER = 0x61a9d0;
 const ATTRIBUTE_ABSORB_ENEMY_SKILL_TYPE = 53;
 const ATTRIBUTE_ABSORB_HANDLER = 0x6298ac;
 const ATTRIBUTE_ABSORB_SETUP_HANDLER = 0x61ffe8;
@@ -260,6 +264,21 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : healPlayerSetupTarget === HEAL_PLAYER_SETUP_HANDLER;
   const healPlayerConditionMatches = healPlayerConditionTarget === null
     ? null : healPlayerConditionTarget === HEAL_PLAYER_CONDITION_HANDLER;
+  const reviveEnemyDispatchTarget = resolveEnemySkillTarget(
+    REVIVE_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const reviveEnemySetupTarget = resolveEnemySkillTarget(
+    REVIVE_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const reviveEnemyConditionTarget = resolveEnemySkillTarget(
+    REVIVE_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const reviveEnemyDispatchMatches = reviveEnemyDispatchTarget === null
+    ? null : reviveEnemyDispatchTarget === REVIVE_ENEMY_HANDLER;
+  const reviveEnemySetupMatches = reviveEnemySetupTarget === null
+    ? null : reviveEnemySetupTarget === REVIVE_ENEMY_SETUP_HANDLER;
+  const reviveEnemyConditionMatches = reviveEnemyConditionTarget === null
+    ? null : reviveEnemyConditionTarget === REVIVE_ENEMY_CONDITION_HANDLER;
   const attributeAbsorbDispatchTarget = resolveEnemySkillTarget(
     ATTRIBUTE_ABSORB_ENEMY_SKILL_TYPE,
     ENEMY_SKILL_DISPATCH_TABLE,
@@ -912,6 +931,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       healPlayerDispatchMatches21_9: healPlayerDispatchMatches,
       healPlayerSetupMatches21_9: healPlayerSetupMatches,
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
+      reviveEnemyDispatchMatches21_9: reviveEnemyDispatchMatches,
+      reviveEnemySetupMatches21_9: reviveEnemySetupMatches,
+      reviveEnemyConditionMatches21_9: reviveEnemyConditionMatches,
       attributeAbsorbDispatchMatches21_9: attributeAbsorbDispatchMatches,
       attributeAbsorbSetupMatches21_9: attributeAbsorbSetupMatches,
       attributeAbsorbConditionMatches21_9: attributeAbsorbConditionMatches,
@@ -996,6 +1018,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       monsterBindTargetMaskOffset: 'sMONSTER+0x674 (type 54 uint16 party mask)',
       monsterBindSetupDurationOffset: 'sMONSTER+0x678 (type 54 signed int32; execution rerolls)',
       monsterChanceOffset: 'sMONSTER+0x67c (signed low 16 bits)',
+      monsterReviveTargetOffset: 'sMONSTER+0x678 (type 52 signed enemy index)',
+      monsterRevivePercentOffset: 'sMONSTER+0x67c (type 52 signed HP percent)',
       blackFallType: BLACK_FALL_ENEMY_SKILL_TYPE,
       dispatchEntry: blackFallDispatchEntry === null ? null : hex(blackFallDispatchEntry),
       dispatchTarget: blackFallDispatchTarget === null ? null : hex(blackFallDispatchTarget),
@@ -1012,6 +1036,16 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       healPlayerConditionTarget: healPlayerConditionTarget === null
         ? null : hex(healPlayerConditionTarget),
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
+      reviveEnemyType: REVIVE_ENEMY_SKILL_TYPE,
+      reviveEnemyDispatchTarget: reviveEnemyDispatchTarget === null
+        ? null : hex(reviveEnemyDispatchTarget),
+      reviveEnemyDispatchMatches21_9: reviveEnemyDispatchMatches,
+      reviveEnemySetupTarget: reviveEnemySetupTarget === null
+        ? null : hex(reviveEnemySetupTarget),
+      reviveEnemySetupMatches21_9: reviveEnemySetupMatches,
+      reviveEnemyConditionTarget: reviveEnemyConditionTarget === null
+        ? null : hex(reviveEnemyConditionTarget),
+      reviveEnemyConditionMatches21_9: reviveEnemyConditionMatches,
       attributeAbsorbType: ATTRIBUTE_ABSORB_ENEMY_SKILL_TYPE,
       attributeAbsorbDispatchTarget: attributeAbsorbDispatchTarget === null
         ? null : hex(attributeAbsorbDispatchTarget),
@@ -1261,6 +1295,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || blackFallDispatchMatches === false || blackFallSetupMatches === false
     || healPlayerDispatchMatches === false || healPlayerSetupMatches === false
     || healPlayerConditionMatches === false
+    || reviveEnemyDispatchMatches === false || reviveEnemySetupMatches === false
+    || reviveEnemyConditionMatches === false
     || attributeAbsorbDispatchMatches === false || attributeAbsorbSetupMatches === false
     || attributeAbsorbConditionMatches === false
     || bindLeaderHelperDispatchMatches === false || bindLeaderHelperSetupMatches === false

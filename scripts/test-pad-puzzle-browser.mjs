@@ -19,6 +19,7 @@ const renderNailState = process.argv.includes('--nail-render');
 const renderBlackFallState = process.argv.includes('--black-fall-render');
 const renderBindState = process.argv.includes('--bind-render');
 const renderAttributeAbsorbState = process.argv.includes('--attribute-absorb-render');
+const renderReviveState = process.argv.includes('--revive-render');
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 980, height: 900 } });
 const consoleMessages = [];
@@ -945,6 +946,24 @@ try {
     engine.setRngState(21_900);
     const rejectedHealPlayerSkill = engine.takeEnemySkill(0);
     const rejectedHealPlayerState = engine.snapshot();
+    const reviveEnemyMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(reviveEnemyMonsterDefinition.buffer).setUint32(0xec, 9_022, true);
+    const reviveEnemyDefinition = sourceToPoisonDefinition.slice();
+    const reviveEnemyView = new DataView(reviveEnemyDefinition.buffer);
+    reviveEnemyView.setUint32(0x00, 9_022, true);
+    reviveEnemyView.setInt16(0x04, 52, true);
+    reviveEnemyView.setInt32(0x10, 37, true);
+    engine.setEnemyAiDefinitionPool(0, reviveEnemyMonsterDefinition, [reviveEnemyDefinition]);
+    engine.enemies[1].hp = 0;
+    engine.enemies[1].counter = 1;
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.resolveEnemyTurn();
+    const selectedReviveEnemyAi = engine.snapshot();
+    engine.setEnemyAiDefinitionPool(0, reviveEnemyMonsterDefinition, [reviveEnemyDefinition]);
+    engine.setRngState(21_900);
+    const rejectedReviveEnemySkill = engine.takeEnemySkill(0);
+    const rejectedReviveEnemyState = engine.snapshot();
     const bindLeaderHelperMonsterDefinition = enemyAiMonsterDefinition.slice();
     new DataView(bindLeaderHelperMonsterDefinition.buffer).setUint32(0xec, 9_020, true);
     const bindLeaderHelperDefinition = sourceToPoisonDefinition.slice();
@@ -1068,6 +1087,7 @@ try {
       rejectedScaledSourceToPoisonSkill, rejectedScaledSourceToPoisonState,
       selectedSourceToMortalPoisonAi, selectedSourceToMortalPoisonCount,
       selectedHealPlayerAi, rejectedHealPlayerSkill, rejectedHealPlayerState,
+      selectedReviveEnemyAi, rejectedReviveEnemySkill, rejectedReviveEnemyState,
       selectedBindLeaderHelperAi,
       rejectedBindLeaderHelperSkill, rejectedBindLeaderHelperState,
       selectedAttributeAbsorbAi, attributeAbsorbDamageState,
@@ -1305,6 +1325,16 @@ try {
     poisonBlockSample.selectedHealPlayerAi.enemies?.[0]?.enemyAiBudget !== 80 ||
     poisonBlockSample.rejectedHealPlayerSkill !== null ||
     poisonBlockSample.rejectedHealPlayerState.rngState !== 21_900 ||
+    poisonBlockSample.selectedReviveEnemyAi.lastEnemyActions?.[0]?.skill?.type !== 52 ||
+    poisonBlockSample.selectedReviveEnemyAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_022 ||
+    poisonBlockSample.selectedReviveEnemyAi.lastEnemyActions?.[0]?.skill?.targetEnemyIndex !== 1 ||
+    poisonBlockSample.selectedReviveEnemyAi.lastEnemySkill?.revivedHp !== 28_120 ||
+    poisonBlockSample.selectedReviveEnemyAi.enemies?.[1]?.hp !== 28_120 ||
+    poisonBlockSample.selectedReviveEnemyAi.enemies?.[1]?.counter !== 1 ||
+    poisonBlockSample.selectedReviveEnemyAi.rngState !== advanceLcg(21_900, 2) ||
+    poisonBlockSample.selectedReviveEnemyAi.enemies?.[0]?.enemyAiBudget !== 80 ||
+    poisonBlockSample.rejectedReviveEnemySkill !== null ||
+    poisonBlockSample.rejectedReviveEnemyState.rngState !== 21_900 ||
     poisonBlockSample.selectedBindLeaderHelperAi.lastEnemyActions?.[0]?.skill?.type !== 54 ||
     poisonBlockSample.selectedBindLeaderHelperAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_020 ||
     poisonBlockSample.selectedBindLeaderHelperAi.lastEnemyActions?.[0]?.skill?.targetMask !== 0x21 ||
@@ -1590,10 +1620,36 @@ try {
     || attributeAbsorbRenderState.attributeAbsorbMask !== 0x03
   )) throw new Error(`Attribute-absorb render-state mismatch: ${JSON.stringify(attributeAbsorbRenderState)}`);
   if (attributeAbsorbRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
+  const reviveRenderState = renderReviveState ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    engine.reset();
+    engine.start();
+    engine.enemies[1].hp = 0;
+    const applied = engine.applyEnemySkillRecord({
+      type: 52,
+      kind: 'reviveEnemy',
+      supported: true,
+      targetEnemyIndex: 1,
+      revivePercent: 37,
+      setupMaterialized: true,
+    }, 0);
+    return {
+      applied,
+      enemy: engine.snapshot().enemies[1],
+      floatingText: engine.floatingText.map((item) => ({ ...item })),
+    };
+  }) : null;
+  if (reviveRenderState && (
+    reviveRenderState.applied !== true
+    || reviveRenderState.enemy?.hp !== 28_120
+    || reviveRenderState.floatingText?.[0]?.kind !== 'revive'
+    || reviveRenderState.floatingText?.[0]?.value !== 28_120
+  )) throw new Error(`Revive render-state mismatch: ${JSON.stringify(reviveRenderState)}`);
+  if (reviveRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

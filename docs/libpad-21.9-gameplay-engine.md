@@ -647,6 +647,37 @@ gate. An eligible fallback retains its authored `sENEAI+5` weight without
 scaling. The browser selector exposes this as `probabilityScale` while keeping
 the already decoded condition-owned RNG state transitions intact.
 
+Enemy skill type `52` resurrects one unavailable or dead enemy monster. Its
+late dispatch entry targets `0x6297ac`, setup targets `0x620350`, and AI
+condition targets `0x61a9d0`. Signed definition integer `+0x10` is the
+percentage of the target's max HP restored by the skill.
+
+The condition walks the native monster array at its `0xb50`-byte stride and
+admits the skill when at least one slot has its unavailable bit set or its
+protected int64 current HP is at most zero. Setup repeats that scan, initializes
+runtime `sMONSTER+0x678` to `-1`, and, when candidates exist, consumes one
+ordinary LCG draw. It maps the high 16-bit result uniformly over candidate
+count, walks candidates in native slot order, stores the chosen real slot index
+at `+0x678`, and copies definition `+0x10` to runtime `+0x67c`. The draw is
+spent even when there is exactly one candidate.
+
+Execution bounds-checks the stored index and refuses to overwrite a target that
+has become available and alive. It reconstructs the target's protected int64
+max HP, converts both operands to binary64, computes `maxHP * percent / 100`,
+and calls `izMathRoundD` (`0x36b2ec`), whose half values round away from zero.
+The result is written back through the target's protected current-HP pair while
+the remainder of the handler restores its presentation state. The compact
+browser state has no separate unavailable-slot representation, so it uses
+`hp <= 0` as the candidate boundary and applies the same percentage and
+rounding path. Its enemy-phase loop also preserves the alive set captured at
+phase start, preventing a newly resurrected target from acting in that same
+phase.
+
+An immediate new-AI resurrection therefore consumes two ordinary RNG draws:
+one probability test and one target selection. A failed no-target condition
+consumes neither. Materialized runtime records expose `targetEnemyIndex` from
+`+0x678` and `revivePercent` from `+0x67c` directly, without rerolling.
+
 Enemy skill type `53` grants one enemy attribute-damage absorption. Its late
 dispatch entry targets `0x6298ac`, setup targets `0x61ffe8`, and AI condition
 targets `0x61ae34`. Signed definition integers `+0x10/+0x14` form the inclusive

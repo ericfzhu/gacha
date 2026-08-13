@@ -1,3 +1,4 @@
+export const PAD_ENEMY_SKILL_REVIVE_ENEMY = 52;
 export const PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB = 53;
 export const PAD_ENEMY_SKILL_BIND_LEADER_HELPER = 54;
 export const PAD_ENEMY_SKILL_HEAL_PLAYER = 55;
@@ -84,6 +85,15 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
     ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
     : null;
+  if (type === PAD_ENEMY_SKILL_REVIVE_ENEMY) {
+    return Object.freeze({
+      type,
+      kind: 'reviveEnemy',
+      supported: true,
+      revivePercent: definition.getInt32(0x10, true),
+      attackWithSkillValue,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB) {
     requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
     const durationMin = definition.getInt32(0x10, true);
@@ -338,6 +348,16 @@ export function padEnemySkillPlayerHpCondition(currentHp, maxHp, thresholdPercen
   return rounded <= Math.trunc(Number(thresholdPercent) || 0);
 }
 
+// Type 52's late handler reconstructs the target monster's protected int64
+// max HP, multiplies it by the signed +0x10 percentage in binary64, divides by
+// 100, and calls izMathRoundD (halves away from zero) before writing current HP.
+export function padEnemySkillReviveHp(maxHp, revivePercent) {
+  const maximum = Math.max(0, Math.trunc(Number(maxHp) || 0));
+  const percent = Math.trunc(Number(revivePercent) || 0);
+  const scaled = maximum * percent / 100;
+  return Math.trunc(scaled + (scaled < 0 ? -0.5 : 0.5));
+}
+
 // _doEnemySkill's second jump table dispatches signed type 128 to 0x62a854.
 // That handler reads the selected definition type at +0x04, the active
 // monster's packed duration at +0x678, and its chance parameter at +0x67c.
@@ -363,6 +383,21 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
   );
   const monster = new DataView(monsterBytes.buffer, monsterBytes.byteOffset, monsterBytes.byteLength);
   const type = definition.getInt16(PAD_ENEMY_SKILL_RUNTIME_LAYOUT.definitionTypeOffset, true);
+  if (type === PAD_ENEMY_SKILL_REVIVE_ENEMY) {
+    requireLength(definitionBytes, 0x14, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'reviveEnemy',
+      supported: true,
+      targetEnemyIndex: monster.getInt32(0x678, true),
+      revivePercent: monster.getInt32(0x67c, true),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB) {
     requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
     const durationMin = definition.getInt32(0x10, true);
@@ -428,6 +463,20 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
 
 export function normalizePadEnemySkillRecord(record) {
   const type = Math.trunc(Number(record?.type));
+  if (type === PAD_ENEMY_SKILL_REVIVE_ENEMY || record?.kind === 'reviveEnemy') {
+    const targetPresent = record?.targetEnemyIndex !== undefined
+      && record?.targetEnemyIndex !== null;
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_REVIVE_ENEMY,
+      kind: 'reviveEnemy',
+      supported: true,
+      revivePercent: Math.trunc(Number(record?.revivePercent) || 0),
+      ...(targetPresent
+        ? { targetEnemyIndex: Math.trunc(Number(record.targetEnemyIndex) || 0) }
+        : {}),
+      setupMaterialized: Boolean(record?.setupMaterialized || targetPresent),
+    });
+  }
   if (type === PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB || record?.kind === 'attributeAbsorb') {
     const durationMin = Math.trunc(Number(record?.durationMin) || 0);
     const durationMax = Math.trunc(Number(record?.durationMax) || 0);
