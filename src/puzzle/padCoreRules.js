@@ -25,6 +25,18 @@ export function padComboMultiplier(combos) {
   return 1 + PAD_EXTRA_COMBO_BONUS * Math.max(0, combos - 1);
 }
 
+// Leader effects are data, not a global part of the combo formula. The full
+// binary dispatches saved leader-skill records through _applyLeaderSkill; this
+// compact fallback supports its common threshold-based attack multiplier form.
+export function padComboLeaderMultiplier(combos, leaderSkill) {
+  if (leaderSkill?.type !== 'comboAttack' || !Array.isArray(leaderSkill.thresholds)) return 1;
+  return leaderSkill.thresholds.reduce((multiplier, threshold) => {
+    const minimum = Math.max(0, Math.trunc(Number(threshold.combos) || 0));
+    const candidate = Math.max(0, Number(threshold.multiplier) || 0);
+    return combos >= minimum ? Math.max(multiplier, candidate) : multiplier;
+  }, 1);
+}
+
 export function padAttributeMultiplier(attacker, defender) {
   if ((attacker === 'fire' && defender === 'wood') ||
       (attacker === 'wood' && defender === 'water') ||

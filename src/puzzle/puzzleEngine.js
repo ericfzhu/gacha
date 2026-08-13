@@ -7,6 +7,7 @@ import {
   padApplyAttackMultipliers,
   padAttributeMultiplier,
   padBombDamage,
+  padComboLeaderMultiplier,
   padDamageAfterDefense,
   padNativeBaseAttackPower,
   padNativeRecoveryPower,
@@ -38,13 +39,21 @@ const NATURAL_ORB_TYPES = ORB_TYPES.slice(0, 6);
 export const ORB_BY_ID = Object.freeze(Object.fromEntries(ORB_TYPES.map((orb) => [orb.id, orb])));
 export const ORB_BY_CODE = Object.freeze(Object.fromEntries(ORB_TYPES.map((orb) => [orb.code, orb])));
 
+const DEMO_COMBO_LEADER = Object.freeze({
+  type: 'comboAttack',
+  thresholds: Object.freeze([
+    Object.freeze({ combos: 4, multiplier: 2 }),
+    Object.freeze({ combos: 7, multiplier: 3.5 }),
+  ]),
+});
+
 const PARTY = Object.freeze([
-  { id: 'ember', name: 'Ember', attribute: 'fire', secondaryAttribute: 'dark', attack: 890, recovery: 140 },
+  { id: 'ember', name: 'Ember', attribute: 'fire', secondaryAttribute: 'dark', attack: 890, recovery: 140, leaderSkill: DEMO_COMBO_LEADER },
   { id: 'marina', name: 'Marina', attribute: 'water', secondaryAttribute: 'light', attack: 940, recovery: 155 },
   { id: 'briar', name: 'Briar', attribute: 'wood', secondaryAttribute: 'fire', attack: 850, recovery: 145 },
   { id: 'sol', name: 'Sol', attribute: 'light', secondaryAttribute: 'light', attack: 910, recovery: 130 },
   { id: 'nyx', name: 'Nyx', attribute: 'dark', secondaryAttribute: 'water', attack: 900, recovery: 120 },
-  { id: 'helper', name: 'Helper', attribute: 'fire', secondaryAttribute: 'wood', tertiaryAttribute: 'light', attack: 980, recovery: 130, helper: true },
+  { id: 'helper', name: 'Helper', attribute: 'fire', secondaryAttribute: 'wood', tertiaryAttribute: 'light', attack: 980, recovery: 130, helper: true, leaderSkill: DEMO_COMBO_LEADER },
 ]);
 
 const ENEMY_TEMPLATE = Object.freeze([
@@ -68,12 +77,6 @@ function makeRng(seed) {
 
 function copyEnemies() {
   return ENEMY_TEMPLATE.map((enemy) => ({ ...enemy, hp: enemy.maxHp, counter: enemy.maxCounter }));
-}
-
-function leaderMultiplier(combos) {
-  if (combos >= 7) return 3.5;
-  if (combos >= 4) return 2;
-  return 1;
 }
 
 export class PuzzleEngine {
@@ -416,8 +419,9 @@ export class PuzzleEngine {
   }
 
   resolvePlayerTurn() {
-    const leader = leaderMultiplier(this.comboCount);
-    const leaderPair = leader * leader;
+    const leader = padComboLeaderMultiplier(this.comboCount, this.party[0]?.leaderSkill);
+    const helper = padComboLeaderMultiplier(this.comboCount, this.party[5]?.leaderSkill);
+    const leaderPair = leader * helper;
     this.lastLeaderMultiplier = leaderPair;
     this.lastComboCount = this.comboCount;
 
@@ -463,7 +467,7 @@ export class PuzzleEngine {
         const matches = byType.get(lane.attribute) || [];
         if (!lane.attack || !matches.length) return;
         const matchAttack = padNativeBaseAttackPower(lane.attack, matches, this.comboCount);
-        const raw = padApplyAttackMultipliers(matchAttack, [leader, leader]);
+        const raw = padApplyAttackMultipliers(matchAttack, [leader, helper]);
         const isMassAttack = matches.some((match) => match.size >= 5);
         const target = isMassAttack ? -1 : this.chooseAttackTarget(lane.attribute, raw);
         this.enemies.forEach((enemy, enemyIndex) => {
@@ -567,7 +571,7 @@ export class PuzzleEngine {
       lastThornDamage: this.lastThornDamage,
       leaderPairMultiplier: this.lastLeaderMultiplier,
       player: { ...this.player },
-      party: this.party.map(({ id, name, attribute, secondaryAttribute, tertiaryAttribute, secondaryAttributeChanged = false, attack, recovery, helper = false }) => ({
+      party: this.party.map(({ id, name, attribute, secondaryAttribute, tertiaryAttribute, secondaryAttributeChanged = false, attack, recovery, helper = false, leaderSkill = null }) => ({
         id,
         name,
         attribute,
@@ -577,6 +581,7 @@ export class PuzzleEngine {
         attack,
         recovery,
         helper,
+        leaderSkill,
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,

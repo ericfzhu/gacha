@@ -7,6 +7,7 @@ import {
   padAttributeMultiplier,
   padBombDamage,
   padComboMultiplier,
+  padComboLeaderMultiplier,
   padDamageAfterDefense,
   padEnhancedOrbMultiplier,
   padMatchPower,
@@ -110,6 +111,11 @@ assert.equal(padOrbMatchMultiplier(3), 1);
 assert.equal(padOrbMatchMultiplier(5), 1.5);
 assert.equal(padComboMultiplier(1), 1);
 assert.equal(padComboMultiplier(7), 2.5);
+const comboLeader = { type: 'comboAttack', thresholds: [{ combos: 4, multiplier: 2 }, { combos: 7, multiplier: 3.5 }] };
+assert.equal(padComboLeaderMultiplier(3, comboLeader), 1);
+assert.equal(padComboLeaderMultiplier(4, comboLeader), 2);
+assert.equal(padComboLeaderMultiplier(7, comboLeader), 3.5);
+assert.equal(padComboLeaderMultiplier(12, null), 1);
 assert.equal(padMatchPower(1000, [3, 5]), 2500);
 assert.equal(padNativeBaseAttackPower(101, [3, 4], 2), 285);
 assert.equal(padNativeBaseAttackPower(1, [3, 3], 2), 3);

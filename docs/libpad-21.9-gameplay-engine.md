@@ -221,6 +221,10 @@ positive floating results with AArch64 `fcvtzs` at observed state boundaries.
 The current pure JS harness implements the classic match/combo, elemental,
 defense, recovery, targeting, mass-attack, and enemy-turn core. The exact binary
 path remains authoritative for the very large modern skill/passive matrix.
+Leader attack scaling is attached to the leader and helper card records rather
+than hidden in the global combo formula, mirroring `_applyLeaderSkill`'s
+data-driven role. The demo party uses a compact combo-threshold leader effect;
+custom test parties without those records receive no implicit leader bonus.
 
 Numeric staging is preserved in the classic harness rather than collapsing the
 formula into one floating expression. `_calcCharge` adds each match's integer
