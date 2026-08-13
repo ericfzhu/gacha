@@ -222,6 +222,18 @@ board walk. `PuzzleEngine.setBlockPowup` exposes that same state transition and
 returns the native-style affected-cell count. The routine's optional sound and
 effect allocation remain presentation work rather than puzzle state.
 
+Lock creation is similarly concrete. `_doLockDropBits(uint32 mask, int limit,
+uint16 seed)` at `0x62676c` gathers unlocked masked cells in row-major order.
+Unlike the enemy power and burst routines, it does not consume saved gameplay
+RNG: it shuffles from the supplied seed's low 16 bits, advancing a temporary
+LCG once for each index from one onward and swapping with
+`floor(random16 * i / 65536)`. Its signed limit is applied after the full
+shuffle. The return value reports whether any eligible cell existed, even when
+the limit is zero or negative. Selected cells gain flag `0x800`. Natural types
+retain `sBLOCK+8`; special types 6 through 9 clear that float and flags
+`0x28000` while retaining the new lock. `PuzzleEngine.doLockDropBits` mirrors
+that behavior and retains the relevant raw `sBLOCK.flags` bits as `blockFlags`.
+
 The enemy inverse is `_doBlockMinus(bool, uint32 mask, float, int)` at
 `0x61caa0`. Only cells whose type bit is in the mask and whose current power is
 non-negative are eligible; applying the effect stores the negated binary32

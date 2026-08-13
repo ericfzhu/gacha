@@ -134,6 +134,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       blockEnhancementOffset: 'sBLOCK+0x08 (signed float32)',
       blockBurstDescriptorOffset: 'sBLOCK+0x0c (uint8; damage percent in low 7 bits)',
       blockBurstFlag: 'sBLOCK.flags & 0x80000',
+      blockLockedFlag: 'sBLOCK.flags & 0x800',
+      specialLockClearedFlags: 'sBLOCK.flags & ~0x28000',
       erasedBlockMarker: 'sBLOCK.flags & 0x40000',
       matchEnhancementAccumulator: 'float32(1.0 + sequential sum of marked sBLOCK+0x08 values)',
     },

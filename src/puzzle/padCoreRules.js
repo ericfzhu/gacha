@@ -139,6 +139,20 @@ export function padShuffleBurDropCandidates(state, candidates) {
   return padShuffleBlockMinusCandidates(state, candidates);
 }
 
+// _doLockDropBits (0x62676c) receives a caller-supplied uint16 seed and never
+// updates the saved game-work RNG. Its forward swaps use [0, i), like the
+// enemy-debuff shuffle, but begin directly from that 16-bit seed.
+export function padShuffleLockDropCandidates(seed, candidates) {
+  let localState = Number(seed) & 0xffff;
+  const shuffled = [...candidates];
+  for (let index = 1; index < shuffled.length; index += 1) {
+    localState = padLcgStep(localState).state;
+    const target = (((localState >>> 16) * index) >>> 16);
+    [shuffled[index], shuffled[target]] = [shuffled[target], shuffled[index]];
+  }
+  return shuffled;
+}
+
 // The same native routine builds its candidates from numeric block types
 // 0..5, optionally extends the range through jammer type 6, removes the type
 // supplied in w1, and can suppress heart type 5. It returns the first element

@@ -230,6 +230,39 @@ try {
     burDropSample.remainingCount !== 2 || burDropSample.finalState !== stepLcg(burDropSample.applyState) ||
     burDropSample.activeCount !== 4 || burDropSample.clearHighBitCount !== 2
   )) throw new Error(`Burst-drop mismatch: ${JSON.stringify(burDropSample)}`);
+  const lockDropSample = showOrbStates ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    engine.reset();
+    engine.setBoardFromCodes(['RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
+    engine.setOrbState(0, 1, { locked: true });
+    engine.setOrbState(0, 2, { enhancementPower: 0.25 });
+    const startState = engine.rng.state;
+    const zeroResult = engine.doLockDropBits(0b11, 0, 21_900);
+    const zeroLocked = engine.snapshot().boardState[0].filter((orb) => orb.locked).length;
+    const applyResult = engine.doLockDropBits(0b11, 2, 21_900);
+    const naturalState = engine.snapshot().boardState[0];
+    const endState = engine.rng.state;
+    engine.setBoardFromCodes(['JPMXHD', 'GLDHRG', 'HBGDGL', 'DLGHHB', 'HBGGLD']);
+    for (let column = 0; column < 4; column += 1) {
+      engine.setOrbState(0, column, { blockFlags: 0x28000, enhancementPower: 0.5 });
+    }
+    const specialResult = engine.doLockDropBits(0x3c0, 4, 0xbeef);
+    const specialState = engine.snapshot().boardState[0].slice(0, 4);
+    engine.reset();
+    engine.start();
+    return { startState, zeroResult, zeroLocked, applyResult, naturalState, endState, specialResult, specialState };
+  }) : null;
+  if (lockDropSample && (
+    lockDropSample.zeroResult !== true || lockDropSample.zeroLocked !== 1 ||
+    lockDropSample.applyResult !== true || lockDropSample.endState !== lockDropSample.startState ||
+    lockDropSample.naturalState.filter((orb) => orb.locked).length !== 3 ||
+    !lockDropSample.naturalState[2].locked || lockDropSample.naturalState[2].enhancementPower !== 0.25 ||
+    !lockDropSample.naturalState[3].locked || lockDropSample.specialResult !== true ||
+    lockDropSample.specialState.some((orb) => (
+      !orb.locked || (orb.blockFlags & 0x800) !== 0x800 ||
+      (orb.blockFlags & 0x28000) !== 0 || orb.enhancementPower !== 0
+    ))
+  )) throw new Error(`Lock-drop mismatch: ${JSON.stringify(lockDropSample)}`);
   if (renderAtlasSheet) {
     const sheet = page.locator('#pad-atlas-sheet');
     await page.evaluate(() => {
@@ -441,9 +474,9 @@ try {
     moveDeadline.drag !== null || moveDeadline.turn !== 1 || moveDeadline.phase !== 'detect'
   )) throw new Error(`Move deadline mismatch: ${JSON.stringify(moveDeadline)}`);
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

@@ -24,6 +24,7 @@ import {
   padShuffleBlockCandidates,
   padShuffleBlockMinusCandidates,
   padShuffleBurDropCandidates,
+  padShuffleLockDropCandidates,
   padTertiaryAttributeAttack,
   padLcgStep,
   padThornDamage,
@@ -71,6 +72,7 @@ assert.deepEqual(padShuffleBurDropCandidates(21_900, []), {
   state: 394_448_415,
   candidates: [],
 });
+assert.deepEqual(padShuffleLockDropCandidates(21_900, [0, 2, 3]), [2, 3, 0]);
 assert.deepEqual(padGetRandomBlock(21_900), { state: 3_803_934_822, type: 1 });
 assert.deepEqual(padGetRandomBlock(21_900, 1), { state: 3_803_934_822, type: 2 });
 assert.deepEqual(padGetRandomBlock(21_900, -1, true, true), { state: 3_803_934_822, type: 1 });
@@ -520,6 +522,36 @@ assert.deepEqual(
 const noBurDropCandidatesState = burDropEngine.rng.state;
 assert.equal(burDropEngine.doMakeBurDrop(true, 0b11, 1, 6), 0);
 assert.equal(burDropEngine.rng.state, padLcgStep(noBurDropCandidatesState).state);
+
+const lockDropEngine = new PuzzleEngine({ seed: 7 });
+lockDropEngine.setBoardFromCodes(['RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
+lockDropEngine.setOrbState(0, 1, { locked: true });
+lockDropEngine.setOrbState(0, 2, { enhancementPower: 0.25 });
+const lockDropRngState = lockDropEngine.rng.state;
+assert.equal(lockDropEngine.doLockDropBits(0b11, 0, 21_900), true);
+assert.equal(lockDropEngine.board[0].filter((orb) => orb.locked).length, 1);
+assert.equal(lockDropEngine.doLockDropBits(0b11, 2, 21_900), true);
+assert.equal(lockDropEngine.rng.state, lockDropRngState);
+assert.equal(lockDropEngine.board[0][2].locked, true);
+assert.equal(lockDropEngine.board[0][2].enhancementPower, 0.25);
+assert.equal(lockDropEngine.board[0][3].locked, true);
+assert.equal(lockDropEngine.board[0].filter((orb) => orb.locked).length, 3);
+assert.equal(lockDropEngine.doLockDropBits(0b11, 10, 0), true);
+assert.equal(lockDropEngine.doLockDropBits(0b11, 10, 0), false);
+
+const specialLockEngine = new PuzzleEngine({ seed: 8 });
+specialLockEngine.setBoardFromCodes(['JPMXHD', 'GLDHRG', 'HBGDGL', 'DLGHHB', 'HBGGLD']);
+for (let column = 0; column < 4; column += 1) {
+  specialLockEngine.setOrbState(0, column, { blockFlags: 0x28000, enhancementPower: 0.5 });
+}
+assert.equal(specialLockEngine.doLockDropBits(0x3c0, 4, 0xbeef), true);
+for (let column = 0; column < 4; column += 1) {
+  const orb = specialLockEngine.board[0][column];
+  assert.equal(orb.locked, true);
+  assert.equal(orb.blockFlags & 0x800, 0x800);
+  assert.equal(orb.blockFlags & 0x28000, 0);
+  assert.equal(orb.enhancementPower, 0);
+}
 
 const thornEngine = new PuzzleEngine({ seed: 5 });
 thornEngine.setBoardFromCodes(['RBGHLD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD']);

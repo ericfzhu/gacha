@@ -16,6 +16,7 @@ import {
   padNativeRecoveryPower,
   padPoisonDamage,
   padSecondaryAttributeAttack,
+  padShuffleLockDropCandidates,
   padTertiaryAttributeAttack,
   padThornDamage,
   tracePadPointerCells,
@@ -38,6 +39,9 @@ export const ORB_TYPES = Object.freeze([
 ]);
 
 const NATURAL_ORB_TYPES = ORB_TYPES.slice(0, 6);
+const PAD_BLOCK_LOCKED_FLAG = 0x800;
+const PAD_BLOCK_SPECIAL_LOCK_CLEAR_FLAGS = 0x28000;
+const PAD_BLOCK_BURST_FLAG = 0x80000;
 
 export const ORB_BY_ID = Object.freeze(Object.fromEntries(ORB_TYPES.map((orb) => [orb.id, orb])));
 export const ORB_BY_CODE = Object.freeze(Object.fromEntries(ORB_TYPES.map((orb) => [orb.code, orb])));
@@ -153,14 +157,26 @@ export class PuzzleEngine {
       ? descriptorInput & 0x7f
       : Math.max(0, Math.min(0x7f, Math.trunc(Number(state.thornPercent) || 0)));
     const thornDescriptor = (descriptorInput & 0x80) | thornPercent;
+    const requestedBlockFlags = Number(state.blockFlags) >>> 0;
+    const locked = state.locked === undefined
+      ? (requestedBlockFlags & PAD_BLOCK_LOCKED_FLAG) !== 0
+      : Boolean(state.locked);
+    const thornActive = state.thornActive === undefined
+      ? thornDescriptor !== 0 || (requestedBlockFlags & PAD_BLOCK_BURST_FLAG) !== 0
+      : Boolean(state.thornActive);
+    const blockFlags = (requestedBlockFlags
+      & ~(PAD_BLOCK_LOCKED_FLAG | PAD_BLOCK_BURST_FLAG))
+      | (locked ? PAD_BLOCK_LOCKED_FLAG : 0)
+      | (thornActive ? PAD_BLOCK_BURST_FLAG : 0);
     return {
       id: ++this.orbSerial,
       type,
-      locked: false,
       ...state,
+      blockFlags,
       enhancementPower,
       enhanced: enhancementPower > 0,
-      thornActive: state.thornActive === undefined ? thornDescriptor !== 0 : Boolean(state.thornActive),
+      locked,
+      thornActive,
       thornDescriptor,
       thornPercent,
     };
@@ -596,11 +612,26 @@ export class PuzzleEngine {
       : Math.max(0, Math.min(0xff, Math.trunc(Number(state.thornDescriptor) || 0))) & 0x80;
     const thornDescriptor = descriptorHighBit | thornPercent;
     const thornStateChanged = state.thornPercent !== undefined || state.thornDescriptor !== undefined;
+    const sourceBlockFlags = state.blockFlags === undefined
+      ? Number(orb.blockFlags) >>> 0
+      : Number(state.blockFlags) >>> 0;
     const thornActive = state.thornActive === undefined
-      ? thornStateChanged ? thornDescriptor !== 0 : Boolean(orb.thornActive)
+      ? thornStateChanged
+        ? thornDescriptor !== 0
+        : state.blockFlags === undefined
+          ? Boolean(orb.thornActive)
+          : (sourceBlockFlags & PAD_BLOCK_BURST_FLAG) !== 0
       : Boolean(state.thornActive);
     const specialType = ['jammer', 'poison', 'mortalPoison', 'bomb'].includes(orb.type);
-    const locked = state.locked === undefined ? orb.locked : Boolean(state.locked);
+    const locked = state.locked === undefined
+      ? state.blockFlags === undefined
+        ? orb.locked
+        : (sourceBlockFlags & PAD_BLOCK_LOCKED_FLAG) !== 0
+      : Boolean(state.locked);
+    const blockFlags = (sourceBlockFlags
+      & ~(PAD_BLOCK_LOCKED_FLAG | PAD_BLOCK_BURST_FLAG))
+      | (locked ? PAD_BLOCK_LOCKED_FLAG : 0)
+      | (thornActive ? PAD_BLOCK_BURST_FLAG : 0);
     const currentEnhancementPower = normalizeEnhancementPower(
       orb.enhancementPower === undefined ? (orb.enhanced ? PAD_ENHANCED_ORB_BONUS : 0) : orb.enhancementPower,
     );
@@ -620,6 +651,7 @@ export class PuzzleEngine {
       ...orb,
       enhancementPower,
       enhanced: enhancementPower > 0,
+      blockFlags,
       locked,
       thornActive,
       thornDescriptor,
@@ -668,7 +700,8 @@ export class PuzzleEngine {
     const candidates = [];
     this.board.forEach((row, rowIndex) => row.forEach((orb, columnIndex) => {
       const type = ORB_TYPES.findIndex((candidate) => candidate.id === orb.type);
-      if (type >= 0 && (mask & (1 << type)) !== 0 && !orb.thornActive) {
+      if (type >= 0 && (mask & (1 << type)) !== 0
+        && ((Number(orb.blockFlags) >>> 0) & PAD_BLOCK_BURST_FLAG) === 0) {
         candidates.push({ row: rowIndex, column: columnIndex });
       }
     }));
@@ -678,12 +711,39 @@ export class PuzzleEngine {
         | (clearDescriptorHighBit ? 0 : 0x80);
       selected.forEach(({ row, column }) => {
         const orb = this.board[row][column];
+        orb.blockFlags = (Number(orb.blockFlags) >>> 0) | PAD_BLOCK_BURST_FLAG;
         orb.thornActive = true;
         orb.thornDescriptor = thornDescriptor;
         orb.thornPercent = thornDescriptor & 0x7f;
       });
     }
     return selected.length;
+  }
+
+  doLockDropBits(typeMask, limit, seed) {
+    const mask = Number(typeMask) >>> 0;
+    const candidates = [];
+    this.board.forEach((row, rowIndex) => row.forEach((orb, columnIndex) => {
+      const type = ORB_TYPES.findIndex((candidate) => candidate.id === orb.type);
+      if (type >= 0 && (mask & (1 << type)) !== 0
+        && ((Number(orb.blockFlags) >>> 0) & PAD_BLOCK_LOCKED_FLAG) === 0) {
+        candidates.push({ row: rowIndex, column: columnIndex, type });
+      }
+    }));
+    if (candidates.length === 0) return false;
+    const capped = Math.min(candidates.length, Math.trunc(Number(limit) || 0));
+    const selected = padShuffleLockDropCandidates(seed, candidates).slice(0, Math.max(0, capped));
+    selected.forEach(({ row, column, type }) => {
+      const orb = this.board[row][column];
+      orb.locked = true;
+      orb.blockFlags = (Number(orb.blockFlags) >>> 0) | PAD_BLOCK_LOCKED_FLAG;
+      if (type >= 6 && type <= 9) {
+        orb.blockFlags &= ~PAD_BLOCK_SPECIAL_LOCK_CLEAR_FLAGS;
+        orb.enhancementPower = 0;
+        orb.enhanced = false;
+      }
+    });
+    return true;
   }
 
   isCell(row, column) {
@@ -702,6 +762,7 @@ export class PuzzleEngine {
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({
         code: ORB_BY_ID[orb.type].code,
+        blockFlags: orb.blockFlags,
         enhancementPower: orb.enhancementPower,
         enhanced: orb.enhanced,
         locked: orb.locked,
