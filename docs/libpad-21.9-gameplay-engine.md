@@ -647,6 +647,43 @@ gate. An eligible fallback retains its authored `sENEAI+5` weight without
 scaling. The browser selector exposes this as `probabilityScale` while keeping
 the already decoded condition-owned RNG state transitions intact.
 
+Enemy skill type `54` binds the leader, helper, or both. Its late dispatch
+entry targets `0x628fe0`, setup targets `0x621008`, and AI condition targets
+`0x61aa5c`. Authored byte `+0x10` bit 0 selects party index 0 (leader) and bit
+1 selects party index 5 (helper). Signed integers `+0x14/+0x18` are the
+inclusive minimum and maximum bind duration.
+
+The condition admits the skill only when at least one authored target is a
+valid, present card whose signed-byte bind timer is zero; it consumes no RNG.
+An admitted immediate AI probability check still consumes one ordinary LCG
+draw. Setup then consumes another draw to choose an inclusive duration, clears
+the runtime mask at `sMONSTER+0x674`, and sets party-mask bit 0 and/or 5 for
+the still-present, still-unbound targets. It stores that setup duration at
+`sMONSTER+0x678` (and mirrors its low 16 bits in the runtime record).
+
+The type-54 execution handler deliberately does not reuse the stored setup
+duration: it consumes another ordinary LCG draw and rerolls the same inclusive
+range before calling `_doBind` (`0x616de4`). Thus an AI-selected bind with no
+resistance checks consumes three draws: probability, setup duration, execution
+duration. Seed 21900 with range 2–4 produces setup duration 4 and executed
+duration 3, leaving RNG state `919597584`.
+
+`_doBind` visits targets in native order `[0, 5, 1, 2, 3, 4]`. An already-bound
+target extends without a resistance roll and caps at 99. An unbound card gains
+50 resistance points from Bind Resist and 100 from Super Bind Resist, with
+eligible team-badge resistance added by the native caller. Positive resistance
+consumes one LCG draw mapped to integer 0–99; the target resists when
+`resistance >= roll`, preserving the binary's inclusive comparison (so a
+nominal 50-point check blocks rolls 0 through 50). The browser exposes the card
+flags and optional numeric badge contribution at this primitive boundary.
+
+Bound browser cards do not attack or contribute team recovery. A bound leader
+or helper contributes leader multiplier 1, and bind timers decrement after the
+player resolution so an enemy-applied duration covers the following player
+actions. Snapshot state exposes target/setup masks, both duration rolls,
+applied/resisted masks, and per-card timers; the canvas dims bound cards and
+labels the remaining duration.
+
 Enemy skill type `55` heals the player. Its late dispatch entry targets
 `0x629900`, setup targets `0x620040`, and AI condition targets `0x61aa74`.
 Definition `+0x10` is a signed player-current-HP percentage threshold;

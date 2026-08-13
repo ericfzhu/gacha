@@ -17,6 +17,7 @@ const testPointerIdentity = process.argv.includes('--pointer-identity');
 const testMoveDeadline = process.argv.includes('--move-deadline');
 const renderNailState = process.argv.includes('--nail-render');
 const renderBlackFallState = process.argv.includes('--black-fall-render');
+const renderBindState = process.argv.includes('--bind-render');
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 980, height: 900 } });
 const consoleMessages = [];
@@ -943,6 +944,35 @@ try {
     engine.setRngState(21_900);
     const rejectedHealPlayerSkill = engine.takeEnemySkill(0);
     const rejectedHealPlayerState = engine.snapshot();
+    const bindLeaderHelperMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(bindLeaderHelperMonsterDefinition.buffer).setUint32(0xec, 9_020, true);
+    const bindLeaderHelperDefinition = sourceToPoisonDefinition.slice();
+    const bindLeaderHelperView = new DataView(bindLeaderHelperDefinition.buffer);
+    bindLeaderHelperView.setUint32(0x00, 9_020, true);
+    bindLeaderHelperView.setInt16(0x04, 54, true);
+    bindLeaderHelperView.setUint8(0x10, 3);
+    bindLeaderHelperView.setInt32(0x14, 2, true);
+    bindLeaderHelperView.setInt32(0x18, 4, true);
+    engine.party[0].bindTurns = 0;
+    engine.party[5].bindTurns = 0;
+    engine.setEnemyAiDefinitionPool(
+      0,
+      bindLeaderHelperMonsterDefinition,
+      [bindLeaderHelperDefinition],
+    );
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedBindLeaderHelperAi = engine.snapshot();
+    engine.setEnemyAiDefinitionPool(
+      0,
+      bindLeaderHelperMonsterDefinition,
+      [bindLeaderHelperDefinition],
+    );
+    engine.setRngState(21_900);
+    const rejectedBindLeaderHelperSkill = engine.takeEnemySkill(0);
+    const rejectedBindLeaderHelperState = engine.snapshot();
     engine.setEnemyAiDefinitionPool(0, null);
     engine.setBlackFallRule(null);
     engine.reset();
@@ -1001,6 +1031,8 @@ try {
       rejectedScaledSourceToPoisonSkill, rejectedScaledSourceToPoisonState,
       selectedSourceToMortalPoisonAi, selectedSourceToMortalPoisonCount,
       selectedHealPlayerAi, rejectedHealPlayerSkill, rejectedHealPlayerState,
+      selectedBindLeaderHelperAi,
+      rejectedBindLeaderHelperSkill, rejectedBindLeaderHelperState,
       initialBoard, initialBoardState,
     };
   }) : null;
@@ -1234,6 +1266,18 @@ try {
     poisonBlockSample.selectedHealPlayerAi.enemies?.[0]?.enemyAiBudget !== 80 ||
     poisonBlockSample.rejectedHealPlayerSkill !== null ||
     poisonBlockSample.rejectedHealPlayerState.rngState !== 21_900 ||
+    poisonBlockSample.selectedBindLeaderHelperAi.lastEnemyActions?.[0]?.skill?.type !== 54 ||
+    poisonBlockSample.selectedBindLeaderHelperAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_020 ||
+    poisonBlockSample.selectedBindLeaderHelperAi.lastEnemyActions?.[0]?.skill?.targetMask !== 0x21 ||
+    poisonBlockSample.selectedBindLeaderHelperAi.lastEnemyActions?.[0]?.skill?.setupDurationTurns !== 4 ||
+    poisonBlockSample.selectedBindLeaderHelperAi.lastEnemySkill?.durationTurns !== 3 ||
+    poisonBlockSample.selectedBindLeaderHelperAi.lastEnemySkill?.boundMask !== 0x21 ||
+    poisonBlockSample.selectedBindLeaderHelperAi.party?.[0]?.bindTurns !== 3 ||
+    poisonBlockSample.selectedBindLeaderHelperAi.party?.[5]?.bindTurns !== 3 ||
+    poisonBlockSample.selectedBindLeaderHelperAi.rngState !== advanceLcg(21_900, 3) ||
+    poisonBlockSample.selectedBindLeaderHelperAi.enemies?.[0]?.enemyAiBudget !== 80 ||
+    poisonBlockSample.rejectedBindLeaderHelperSkill !== null ||
+    poisonBlockSample.rejectedBindLeaderHelperState.rngState !== 21_900 ||
     JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
       'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',
     ]) || poisonBlockSample.initialBoardState !== 79_238_434
@@ -1474,10 +1518,20 @@ try {
     !orb.blind || !orb.blindFresh || orb.blindCountdown !== 1 || (orb.blockFlags & 0x11000) !== 0x11000
   ))) throw new Error(`Black-fall render-state mismatch: ${JSON.stringify(blackFallRenderState)}`);
   if (blackFallRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
+  const bindRenderState = renderBindState ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    engine.party[0].bindTurns = 3;
+    engine.party[5].bindTurns = 3;
+    return engine.snapshot().party;
+  }) : null;
+  if (bindRenderState && (
+    bindRenderState[0]?.bindTurns !== 3 || bindRenderState[5]?.bindTurns !== 3
+  )) throw new Error(`Bind render-state mismatch: ${JSON.stringify(bindRenderState)}`);
+  if (bindRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

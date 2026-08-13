@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
+  PAD_ENEMY_SKILL_BIND_LEADER_HELPER,
   PAD_ENEMY_SKILL_HEAL_PLAYER,
   PAD_ENEMY_SKILL_BLACK_FALL,
   PAD_ENEMY_SKILL_SOURCE_TO_POISON,
@@ -706,6 +707,55 @@ assert.deepEqual(
     attackWithSkillValue: 0,
   },
 );
+const enemyAiBindLeaderHelperDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiBindLeaderHelperView = new DataView(enemyAiBindLeaderHelperDefinition.buffer);
+enemyAiBindLeaderHelperView.setUint32(0x00, 9_020, true);
+enemyAiBindLeaderHelperView.setInt16(0x04, PAD_ENEMY_SKILL_BIND_LEADER_HELPER, true);
+enemyAiBindLeaderHelperView.setUint8(0x10, 3);
+enemyAiBindLeaderHelperView.setInt32(0x14, 2, true);
+enemyAiBindLeaderHelperView.setInt32(0x18, 4, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiBindLeaderHelperDefinition), {
+  type: 54,
+  kind: 'bindLeaderHelper',
+  supported: true,
+  targetFlags: 3,
+  durationMin: 2,
+  durationMax: 4,
+  attackWithSkillValue: 0,
+});
+const bindLeaderHelperMonsterRuntime = new Uint8Array(0x680);
+const bindLeaderHelperMonsterRuntimeView = new DataView(bindLeaderHelperMonsterRuntime.buffer);
+bindLeaderHelperMonsterRuntimeView.setUint16(0x674, 0x21, true);
+bindLeaderHelperMonsterRuntimeView.setInt32(0x678, 4, true);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(
+    enemyAiBindLeaderHelperDefinition,
+    bindLeaderHelperMonsterRuntime,
+  ),
+  {
+    type: 54,
+    kind: 'bindLeaderHelper',
+    supported: true,
+    targetFlags: 3,
+    durationMin: 2,
+    durationMax: 4,
+    targetMask: 0x21,
+    setupDurationTurns: 4,
+    setupMaterialized: true,
+    attackWithSkillValue: 0,
+  },
+);
+const bindRuntimeEngine = new PuzzleEngine({ seed: 21_900 });
+bindRuntimeEngine.setRngState(21_900);
+assert.equal(bindRuntimeEngine.applyEnemySkillRuntime(
+  enemyAiBindLeaderHelperDefinition,
+  bindLeaderHelperMonsterRuntime,
+), true);
+assert.equal(bindRuntimeEngine.party[0].bindTurns, 2);
+assert.equal(bindRuntimeEngine.party[5].bindTurns, 2);
+assert.equal(bindRuntimeEngine.lastEnemySkill.setupDurationTurns, 4);
+assert.equal(bindRuntimeEngine.lastEnemySkill.durationTurns, 2);
+assert.equal(bindRuntimeEngine.rng.state, padLcgStep(21_900).state);
 const enemyAiPoisonBlockNCountedDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiPoisonBlockNCountedView = new DataView(enemyAiPoisonBlockNCountedDefinition.buffer);
 enemyAiPoisonBlockNCountedView.setUint32(0x00, 9_015, true);
@@ -2014,6 +2064,87 @@ rejectedHealPlayerEngine.player.hp = 3_060;
 rejectedHealPlayerEngine.setRngState(21_900);
 assert.equal(rejectedHealPlayerEngine.takeEnemySkill(0), null);
 assert.equal(rejectedHealPlayerEngine.rng.state, 21_900);
+const bindLeaderHelperMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(bindLeaderHelperMonsterDefinition.buffer).setUint32(0xec, 9_020, true);
+const selectedBindLeaderHelperEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: bindLeaderHelperMonsterDefinition,
+    skillDefinitions: [enemyAiBindLeaderHelperDefinition],
+  }],
+});
+selectedBindLeaderHelperEngine.setRngState(21_900);
+selectedBindLeaderHelperEngine.enemies[0].counter = 1;
+selectedBindLeaderHelperEngine.enemies[1].counter = 99;
+selectedBindLeaderHelperEngine.resolveEnemyTurn();
+const selectedBindLeaderHelperState = selectedBindLeaderHelperEngine.snapshot();
+assert.equal(selectedBindLeaderHelperState.lastEnemyActions[0].skill.type, 54);
+assert.equal(selectedBindLeaderHelperState.lastEnemyActions[0].skill.skillId, 9_020);
+assert.equal(selectedBindLeaderHelperState.lastEnemyActions[0].skill.targetMask, 0x21);
+assert.equal(selectedBindLeaderHelperState.lastEnemyActions[0].skill.setupDurationTurns, 4);
+assert.equal(selectedBindLeaderHelperState.lastEnemySkill.durationTurns, 3);
+assert.equal(selectedBindLeaderHelperState.lastEnemySkill.boundMask, 0x21);
+assert.equal(selectedBindLeaderHelperState.lastEnemySkill.resistedMask, 0);
+assert.equal(selectedBindLeaderHelperState.party[0].bindTurns, 3);
+assert.equal(selectedBindLeaderHelperState.party[5].bindTurns, 3);
+assert.equal(selectedBindLeaderHelperState.enemies[0].enemyAiBudget, 80);
+assert.equal(
+  selectedBindLeaderHelperEngine.rng.state,
+  padLcgStep(padLcgStep(padLcgStep(21_900).state).state).state,
+);
+const rejectedBindLeaderHelperEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: bindLeaderHelperMonsterDefinition,
+    skillDefinitions: [enemyAiBindLeaderHelperDefinition],
+  }],
+});
+rejectedBindLeaderHelperEngine.party[0].bindTurns = 1;
+rejectedBindLeaderHelperEngine.party[5].bindTurns = 1;
+rejectedBindLeaderHelperEngine.setRngState(21_900);
+assert.equal(rejectedBindLeaderHelperEngine.takeEnemySkill(0), null);
+assert.equal(rejectedBindLeaderHelperEngine.rng.state, 21_900);
+const resistedBindLeaderHelperEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: bindLeaderHelperMonsterDefinition,
+    skillDefinitions: [enemyAiBindLeaderHelperDefinition],
+  }],
+});
+resistedBindLeaderHelperEngine.party[0].bindResist = true;
+resistedBindLeaderHelperEngine.setRngState(21_900);
+resistedBindLeaderHelperEngine.enemies[0].counter = 1;
+resistedBindLeaderHelperEngine.enemies[1].counter = 99;
+resistedBindLeaderHelperEngine.resolveEnemyTurn();
+const resistedBindLeaderHelperState = resistedBindLeaderHelperEngine.snapshot();
+assert.equal(resistedBindLeaderHelperState.lastEnemySkill.durationTurns, 3);
+assert.equal(resistedBindLeaderHelperState.lastEnemySkill.boundMask, 0x20);
+assert.equal(resistedBindLeaderHelperState.lastEnemySkill.resistedMask, 0x01);
+assert.equal(resistedBindLeaderHelperState.party[0].bindTurns, 0);
+assert.equal(resistedBindLeaderHelperState.party[5].bindTurns, 3);
+assert.equal(
+  resistedBindLeaderHelperEngine.rng.state,
+  padLcgStep(padLcgStep(padLcgStep(padLcgStep(21_900).state).state).state).state,
+);
+const extendedBindEngine = new PuzzleEngine({ seed: 21_900 });
+extendedBindEngine.party[0].bindTurns = 98;
+const extendedBindRngState = extendedBindEngine.rng.state;
+assert.deepEqual(extendedBindEngine.doBind(1, 3), {
+  boundMask: 1,
+  resistedMask: 0,
+  durationTurns: 3,
+});
+assert.equal(extendedBindEngine.party[0].bindTurns, 99);
+assert.equal(extendedBindEngine.rng.state, extendedBindRngState);
+const bindTurnEngine = new PuzzleEngine({ seed: 21_900 });
+bindTurnEngine.party[0].bindTurns = 2;
+bindTurnEngine.party[5].bindTurns = 2;
+bindTurnEngine.comboCount = 4;
+bindTurnEngine.turnMatches = [];
+bindTurnEngine.resolvePlayerTurn();
+assert.equal(bindTurnEngine.lastLeaderMultiplier, 1);
+assert.equal(bindTurnEngine.party[0].bindTurns, 1);
+assert.equal(bindTurnEngine.party[5].bindTurns, 1);
 const poisonFamilySwapEngine = new PuzzleEngine({ seed: 21_900 });
 poisonFamilySwapEngine.setBoardFromCodes([
   'PMBBBB', 'BBBBBB', 'BBBBBB', 'BBBBBB', 'BBBBBB',

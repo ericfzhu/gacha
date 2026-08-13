@@ -307,6 +307,16 @@ function drawParty(ctx, engine) {
     ctx.font = '600 9px "Noto Sans", sans-serif';
     ctx.fillStyle = '#dce4ef';
     ctx.fillText(member.attack, x, 328);
+    if (Number(member.bindTurns || 0) > 0) {
+      roundedRect(ctx, x - 29, 284, 58, 54, 12);
+      ctx.fillStyle = 'rgba(12, 15, 24, .72)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(227, 126, 236, .82)';
+      ctx.stroke();
+      ctx.font = '900 11px "Barlow Condensed", sans-serif';
+      ctx.fillStyle = '#f2b8ff';
+      ctx.fillText(`BIND ${member.bindTurns}`, x, 315);
+    }
   });
 }
 

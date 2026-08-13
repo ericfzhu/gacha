@@ -2,6 +2,29 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 leader/helper bind skill
+
+- Mapped enemy skill type `54` to late handler `0x628fe0`, setup `0x621008`,
+  condition `0x61aa5c`, and the shared `_doBind` routine at `0x616de4`.
+  Authored target bits select leader and helper; setup materializes party mask
+  bits `0`/`5` only for present, currently unbound cards.
+- Reproduced the native duration quirk: setup rolls inclusive `+0x14..+0x18`
+  and stores it, but execution deliberately advances the ordinary LCG again and
+  rerolls the actual duration. With the AI probability roll, seed 21900 spends
+  three draws and produces setup duration 4 followed by actual duration 3.
+- Added per-card bind timers, native target order `[leader, helper, subs]`,
+  extension capped at 99, ordinary/Super Bind Resist, and the native inclusive
+  resistance check. A resistance check alone consumes an additional LCG draw;
+  already-bound targets extend without rolling resistance.
+- Bound cards no longer attack or contribute recovery, and bound leader/helper
+  skills contribute multiplier 1. The canvas dims bound cards and displays the
+  remaining turns; timers advance after player resolution.
+- Raw definition/runtime decoding, new-AI eligibility, exact restored-table and
+  symbol anchors, pure RNG/resistance fixtures, exhaustive browser regression,
+  generic input-client smoke test, production build, and visual inspection pass.
+- Next: continue the neighboring enemy-skill audit, prioritizing type `53` and
+  its party-status behavior.
+
 ## 2026-08-14 enemy player-heal skill
 
 - Mapped enemy skill type `55` to late handler `0x629900`, setup `0x620040`,
@@ -17,8 +40,7 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
   a failed HP condition consumes none.
 - The exact inspector now asserts the type-55 dispatch/setup/condition entries,
   both player HP methods, and both math helpers against the restored image.
-- Next: return to type `54` as a dedicated party-bind subsystem with per-card
-  eligibility and bind timers.
+- Next: continue the neighboring condition/effect audit.
 
 ## 2026-08-14 source-color poison writers and scaled AI conditions
 

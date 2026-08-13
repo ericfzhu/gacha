@@ -1,3 +1,4 @@
+export const PAD_ENEMY_SKILL_BIND_LEADER_HELPER = 54;
 export const PAD_ENEMY_SKILL_HEAL_PLAYER = 55;
 export const PAD_ENEMY_SKILL_SOURCE_TO_POISON = 56;
 export const PAD_ENEMY_SKILL_POISON_BLOCKS = 57;
@@ -82,6 +83,21 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
     ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
     : null;
+  if (type === PAD_ENEMY_SKILL_BIND_LEADER_HELPER) {
+    requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    const targetFlags = definition.getUint8(0x10) & 0x03;
+    const durationMin = definition.getInt32(0x14, true);
+    const durationMax = definition.getInt32(0x18, true);
+    return Object.freeze({
+      type,
+      kind: 'bindLeaderHelper',
+      supported: targetFlags !== 0 && durationMax >= durationMin,
+      targetFlags,
+      durationMin,
+      durationMax,
+      attackWithSkillValue,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_HEAL_PLAYER) {
     return Object.freeze({
       type,
@@ -331,6 +347,27 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
   );
   const monster = new DataView(monsterBytes.buffer, monsterBytes.byteOffset, monsterBytes.byteLength);
   const type = definition.getInt16(PAD_ENEMY_SKILL_RUNTIME_LAYOUT.definitionTypeOffset, true);
+  if (type === PAD_ENEMY_SKILL_BIND_LEADER_HELPER) {
+    requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    const targetFlags = definition.getUint8(0x10) & 0x03;
+    const durationMin = definition.getInt32(0x14, true);
+    const durationMax = definition.getInt32(0x18, true);
+    return Object.freeze({
+      type,
+      kind: 'bindLeaderHelper',
+      supported: targetFlags !== 0 && durationMax >= durationMin,
+      targetFlags,
+      durationMin,
+      durationMax,
+      targetMask: monster.getUint16(0x674, true) & 0x3f,
+      setupDurationTurns: monster.getInt32(0x678, true),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_HEAL_PLAYER) {
     requireLength(definitionBytes, 0x14, 'PAD enemy-skill definition');
     return Object.freeze({
@@ -355,6 +392,25 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
 
 export function normalizePadEnemySkillRecord(record) {
   const type = Math.trunc(Number(record?.type));
+  if (type === PAD_ENEMY_SKILL_BIND_LEADER_HELPER || record?.kind === 'bindLeaderHelper') {
+    const durationMin = Math.trunc(Number(record?.durationMin) || 0);
+    const durationMax = Math.trunc(Number(record?.durationMax) || 0);
+    const targetFlags = Math.trunc(Number(record?.targetFlags) || 0) & 0x03;
+    const targetMaskPresent = record?.targetMask !== undefined && record?.targetMask !== null;
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_BIND_LEADER_HELPER,
+      kind: 'bindLeaderHelper',
+      supported: targetFlags !== 0 && durationMax >= durationMin,
+      targetFlags,
+      durationMin,
+      durationMax,
+      ...(targetMaskPresent ? { targetMask: Number(record.targetMask) & 0x3f } : {}),
+      ...(record?.setupDurationTurns !== undefined
+        ? { setupDurationTurns: Math.trunc(Number(record.setupDurationTurns) || 0) }
+        : {}),
+      setupMaterialized: Boolean(record?.setupMaterialized || targetMaskPresent),
+    });
+  }
   if (type === PAD_ENEMY_SKILL_HEAL_PLAYER || record?.kind === 'healPlayer') {
     return Object.freeze({
       type: PAD_ENEMY_SKILL_HEAL_PLAYER,

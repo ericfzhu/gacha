@@ -33,6 +33,7 @@ import {
   tracePadPointerCells,
 } from './padCoreRules.js';
 import {
+  PAD_ENEMY_SKILL_BIND_LEADER_HELPER,
   PAD_ENEMY_SKILL_HEAL_PLAYER,
   PAD_ENEMY_SKILL_BLACK_FALL,
   PAD_ENEMY_SKILL_SOURCE_TO_POISON,
@@ -101,12 +102,12 @@ const DEMO_COMBO_LEADER = Object.freeze({
 });
 
 const PARTY = Object.freeze([
-  { id: 'ember', name: 'Ember', attribute: 'fire', secondaryAttribute: 'dark', attack: 890, recovery: 140, leaderSkill: DEMO_COMBO_LEADER },
-  { id: 'marina', name: 'Marina', attribute: 'water', secondaryAttribute: 'light', attack: 940, recovery: 155 },
-  { id: 'briar', name: 'Briar', attribute: 'wood', secondaryAttribute: 'fire', attack: 850, recovery: 145 },
-  { id: 'sol', name: 'Sol', attribute: 'light', secondaryAttribute: 'light', attack: 910, recovery: 130 },
-  { id: 'nyx', name: 'Nyx', attribute: 'dark', secondaryAttribute: 'water', attack: 900, recovery: 120 },
-  { id: 'helper', name: 'Helper', attribute: 'fire', secondaryAttribute: 'wood', tertiaryAttribute: 'light', attack: 980, recovery: 130, helper: true, leaderSkill: DEMO_COMBO_LEADER },
+  { id: 'ember', name: 'Ember', attribute: 'fire', secondaryAttribute: 'dark', attack: 890, recovery: 140, bindTurns: 0, bindResist: false, superBindResist: false, leaderSkill: DEMO_COMBO_LEADER },
+  { id: 'marina', name: 'Marina', attribute: 'water', secondaryAttribute: 'light', attack: 940, recovery: 155, bindTurns: 0, bindResist: false, superBindResist: false },
+  { id: 'briar', name: 'Briar', attribute: 'wood', secondaryAttribute: 'fire', attack: 850, recovery: 145, bindTurns: 0, bindResist: false, superBindResist: false },
+  { id: 'sol', name: 'Sol', attribute: 'light', secondaryAttribute: 'light', attack: 910, recovery: 130, bindTurns: 0, bindResist: false, superBindResist: false },
+  { id: 'nyx', name: 'Nyx', attribute: 'dark', secondaryAttribute: 'water', attack: 900, recovery: 120, bindTurns: 0, bindResist: false, superBindResist: false },
+  { id: 'helper', name: 'Helper', attribute: 'fire', secondaryAttribute: 'wood', tertiaryAttribute: 'light', attack: 980, recovery: 130, bindTurns: 0, bindResist: false, superBindResist: false, helper: true, leaderSkill: DEMO_COMBO_LEADER },
 ]);
 
 const ENEMY_TEMPLATE = Object.freeze([
@@ -696,8 +697,10 @@ export class PuzzleEngine {
   }
 
   resolvePlayerTurn() {
-    const leader = padComboLeaderMultiplier(this.comboCount, this.party[0]?.leaderSkill);
-    const helper = padComboLeaderMultiplier(this.comboCount, this.party[5]?.leaderSkill);
+    const leader = Number(this.party[0]?.bindTurns || 0) > 0
+      ? 1 : padComboLeaderMultiplier(this.comboCount, this.party[0]?.leaderSkill);
+    const helper = Number(this.party[5]?.bindTurns || 0) > 0
+      ? 1 : padComboLeaderMultiplier(this.comboCount, this.party[5]?.leaderSkill);
     const leaderPair = leader * helper;
     this.lastLeaderMultiplier = leaderPair;
     this.lastComboCount = this.comboCount;
@@ -711,7 +714,8 @@ export class PuzzleEngine {
     const heartMatches = byType.get('heart') || [];
     const partyRecovery = this.party.reduce((total, member) => total + member.recovery, 0);
     const recoveryLanes = this.player.recovery === partyRecovery
-      ? this.party.map((member) => member.recovery)
+      ? this.party.filter((member) => Number(member.bindTurns || 0) <= 0)
+        .map((member) => member.recovery)
       : [this.player.recovery];
     const extraComboBonus = this.allowDiagonalMoves ? 0.5 : 0.25;
     const healing = padNativeRecoveryPower(recoveryLanes, heartMatches, this.comboCount, extraComboBonus);
@@ -741,6 +745,7 @@ export class PuzzleEngine {
     ];
     attackRounds.forEach((getLane) => {
       this.party.forEach((member) => {
+        if (Number(member.bindTurns || 0) > 0) return;
         const lane = getLane(member);
         const matches = byType.get(lane.attribute) || [];
         if (!lane.attack || !matches.length) return;
@@ -779,6 +784,7 @@ export class PuzzleEngine {
     }
     this.lastNailDamage = nailDamage;
     this.lastDamage = totalDamage + nailDamage;
+    this.advancePartyBindTurns();
     this.message = `${this.comboCount} combo${this.comboCount === 1 ? '' : 's'} · ${this.lastDamage.toLocaleString()} total damage${this.lastNailDamage ? ` · ${this.lastNailDamage.toLocaleString()} nails` : ''}${this.lastHealing ? ` · +${this.lastHealing.toLocaleString()} HP` : ''}${this.lastPoisonDamage ? ` · -${this.lastPoisonDamage.toLocaleString()} poison` : ''}${this.lastBombDamage ? ` · -${this.lastBombDamage.toLocaleString()} bombs` : ''}${this.lastThornDamage ? ` · -${this.lastThornDamage.toLocaleString()} thorns` : ''}`;
   }
 
@@ -851,7 +857,7 @@ export class PuzzleEngine {
       if (queue.position < queue.records.length) {
         const skill = queue.records[queue.position];
         queue.position += 1;
-        return skill;
+        return this.materializeEnemySkillRecord(skill);
       }
     }
     const pool = this.enemyAiPools[enemyIndex];
@@ -862,6 +868,10 @@ export class PuzzleEngine {
       maxHp: enemy.maxHp,
       playerCurrentHp: this.player.hp,
       playerMaxHp: this.player.maxHp,
+      party: this.party.map((member) => ({
+        present: member.present !== false,
+        bindTurns: Math.max(0, Math.trunc(Number(member.bindTurns) || 0)),
+      })),
       aiBudget: pool.aiBudget,
       blackFallActive: Boolean(this.blackFallRule?.active),
       rngState: this.rng.state,
@@ -928,7 +938,82 @@ export class PuzzleEngine {
     });
     this.rng.setState(selection.rngState);
     pool.aiBudget = selection.aiBudget;
-    return selection.effect ? { ...selection.effect, skillId: selection.skillId } : null;
+    return selection.effect
+      ? this.materializeEnemySkillRecord({ ...selection.effect, skillId: selection.skillId })
+      : null;
+  }
+
+  rollEnemySkillDuration(durationMin, durationMax) {
+    const minimum = Math.trunc(Number(durationMin) || 0);
+    const maximum = Math.trunc(Number(durationMax) || 0);
+    const width = (maximum - minimum + 1) | 0;
+    const roll = this.rng.nextUint16();
+    return (minimum + (Math.imul(roll, width) >>> 16)) | 0;
+  }
+
+  materializeEnemySkillRecord(record) {
+    const skill = normalizePadEnemySkillRecord(record);
+    if (!skill.supported || skill.kind !== 'bindLeaderHelper' || skill.setupMaterialized) {
+      return record;
+    }
+    const setupDurationTurns = this.rollEnemySkillDuration(skill.durationMin, skill.durationMax);
+    let targetMask = 0;
+    if (
+      (skill.targetFlags & 1) !== 0
+      && this.party[0]?.present !== false
+      && Number(this.party[0]?.bindTurns || 0) <= 0
+    ) targetMask |= 1;
+    if (
+      (skill.targetFlags & 2) !== 0
+      && this.party[5]?.present !== false
+      && Number(this.party[5]?.bindTurns || 0) <= 0
+    ) targetMask |= 1 << 5;
+    return Object.freeze({
+      ...record,
+      targetMask,
+      setupDurationTurns,
+      setupMaterialized: true,
+    });
+  }
+
+  doBind(targetMask, durationTurns, teamBadgeResistance = 0) {
+    const mask = Math.trunc(Number(targetMask) || 0) & 0x3f;
+    const duration = Math.trunc(Number(durationTurns) || 0);
+    const badgeResistance = Math.max(0, Math.trunc(Number(teamBadgeResistance) || 0));
+    let boundMask = 0;
+    let resistedMask = 0;
+    for (const index of [0, 5, 1, 2, 3, 4]) {
+      const bit = 1 << index;
+      const member = this.party[index];
+      if ((mask & bit) === 0 || !member || member.present === false) continue;
+      const current = Math.max(0, Math.trunc(Number(member.bindTurns) || 0));
+      if (current > 0) {
+        member.bindTurns = Math.min(99, current + duration);
+        boundMask |= bit;
+        continue;
+      }
+      const resistance = (
+        (member.bindResist ? 50 : 0)
+        + (member.superBindResist ? 100 : 0)
+        + badgeResistance
+      );
+      if (resistance >= 1) {
+        const resistanceRoll = Math.imul(this.rng.nextUint16(), 100) >>> 16;
+        if (resistance >= resistanceRoll) {
+          resistedMask |= bit;
+          continue;
+        }
+      }
+      member.bindTurns = Math.min(99, Math.max(0, duration));
+      boundMask |= bit;
+    }
+    return Object.freeze({ boundMask, resistedMask, durationTurns: duration });
+  }
+
+  advancePartyBindTurns() {
+    this.party.forEach((member) => {
+      member.bindTurns = Math.max(0, Math.trunc(Number(member.bindTurns) || 0) - 1);
+    });
   }
 
   advanceBlackOrbCountdowns() {
@@ -1052,8 +1137,18 @@ export class PuzzleEngine {
   }
 
   applyEnemySkillRecord(record) {
-    const skill = normalizePadEnemySkillRecord(record);
+    const materialized = this.materializeEnemySkillRecord(record);
+    const skill = normalizePadEnemySkillRecord(materialized);
     this.lastEnemySkill = skill;
+    if (skill.supported && skill.kind === 'bindLeaderHelper') {
+      const durationTurns = this.rollEnemySkillDuration(skill.durationMin, skill.durationMax);
+      const result = this.doBind(skill.targetMask || 0, durationTurns);
+      this.lastEnemySkill = Object.freeze({ ...skill, ...result });
+      const boundCount = result.boundMask.toString(2).replaceAll('0', '').length;
+      const resistedCount = result.resistedMask.toString(2).replaceAll('0', '').length;
+      this.message = `${boundCount} party member${boundCount === 1 ? '' : 's'} bound${resistedCount ? ` · ${resistedCount} resisted` : ''}.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'healPlayer') {
       const requested = padEnemySkillPlayerHeal(this.player.maxHp, skill.healPercent);
       const before = this.player.hp;
@@ -1201,6 +1296,7 @@ export class PuzzleEngine {
       const definition = definitionsById.get(slot.skillId);
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
       if (![
+        PAD_ENEMY_SKILL_BIND_LEADER_HELPER,
         PAD_ENEMY_SKILL_HEAL_PLAYER,
         PAD_ENEMY_SKILL_BLACK_FALL,
         PAD_ENEMY_SKILL_SOURCE_TO_POISON,
@@ -1764,7 +1860,7 @@ export class PuzzleEngine {
       })),
       leaderPairMultiplier: this.lastLeaderMultiplier,
       player: { ...this.player },
-      party: this.party.map(({ id, name, attribute, secondaryAttribute, tertiaryAttribute, secondaryAttributeChanged = false, attack, recovery, damageCap, helper = false, leaderSkill = null }) => ({
+      party: this.party.map(({ id, name, attribute, secondaryAttribute, tertiaryAttribute, secondaryAttributeChanged = false, attack, recovery, damageCap, helper = false, leaderSkill = null, present = true, bindTurns = 0, bindResist = false, superBindResist = false }) => ({
         id,
         name,
         attribute,
@@ -1776,6 +1872,10 @@ export class PuzzleEngine {
         damageCap,
         helper,
         leaderSkill,
+        present,
+        bindTurns,
+        bindResist,
+        superBindResist,
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,

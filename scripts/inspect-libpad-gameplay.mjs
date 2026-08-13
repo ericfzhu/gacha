@@ -24,6 +24,10 @@ const HEAL_PLAYER_ENEMY_SKILL_TYPE = 55;
 const HEAL_PLAYER_HANDLER = 0x629900;
 const HEAL_PLAYER_SETUP_HANDLER = 0x620040;
 const HEAL_PLAYER_CONDITION_HANDLER = 0x61aa74;
+const BIND_LEADER_HELPER_ENEMY_SKILL_TYPE = 54;
+const BIND_LEADER_HELPER_HANDLER = 0x628fe0;
+const BIND_LEADER_HELPER_SETUP_HANDLER = 0x621008;
+const BIND_LEADER_HELPER_CONDITION_HANDLER = 0x61aa5c;
 const SOURCE_TO_POISON_ENEMY_SKILL_TYPE = 56;
 const SOURCE_TO_MORTAL_POISON_ENEMY_SKILL_TYPE = 58;
 const SOURCE_TO_POISON_HANDLER = 0x62917c;
@@ -145,6 +149,9 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['enemy-ai', 'resetEnemyAtkLeft', '_ZN9cGAMEMAIN18_resetEnemyAtkLeftEP8sMONSTER', 0x6408f0],
   ['enemy-ai', 'playerMaxHp', '_ZNK7sPLAYER3mhpEv', 0x66b840],
   ['enemy-ai', 'playerAddHp', '_ZN7sPLAYER5addHpEib', 0x678838],
+  ['enemy-ai', 'doBind', '_ZN9cGAMEMAIN7_doBindEPK8sMONSTERjib', 0x616de4],
+  ['enemy-ai', 'hasPassiveSkillsCard', '_ZNK9cGAMEMAIN17_hasPassiveSkillsEPK5sCARDi', 0x640a90],
+  ['enemy-ai', 'isValidCardNumber', '_ZN9cSAVEDATA17isValidCardNumberEib', 0x74393c],
   ['math', 'roundDouble', 'izMathRoundD', 0x36b2ec],
   ['math', 'signedIntMultiplyAdd', 'izMathSint32MulAdd', 0x36b3fc],
   ['combat', 'setEnemyAttackMain', '_ZN9cGAMEMAIN20__setEnemyAttackMainEP8sMONSTERbfi', 0x62c2cc],
@@ -247,6 +254,27 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : healPlayerSetupTarget === HEAL_PLAYER_SETUP_HANDLER;
   const healPlayerConditionMatches = healPlayerConditionTarget === null
     ? null : healPlayerConditionTarget === HEAL_PLAYER_CONDITION_HANDLER;
+  const bindLeaderHelperDispatchTarget = resolveEnemySkillTarget(
+    BIND_LEADER_HELPER_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const bindLeaderHelperSetupTarget = resolveEnemySkillTarget(
+    BIND_LEADER_HELPER_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const bindLeaderHelperConditionTarget = resolveEnemySkillTarget(
+    BIND_LEADER_HELPER_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const bindLeaderHelperDispatchMatches = bindLeaderHelperDispatchTarget === null
+    ? null : bindLeaderHelperDispatchTarget === BIND_LEADER_HELPER_HANDLER;
+  const bindLeaderHelperSetupMatches = bindLeaderHelperSetupTarget === null
+    ? null : bindLeaderHelperSetupTarget === BIND_LEADER_HELPER_SETUP_HANDLER;
+  const bindLeaderHelperConditionMatches = bindLeaderHelperConditionTarget === null
+    ? null : bindLeaderHelperConditionTarget === BIND_LEADER_HELPER_CONDITION_HANDLER;
   const sourceToPoisonDispatchTarget = resolveEnemySkillTarget(
     SOURCE_TO_POISON_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -857,6 +885,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       healPlayerDispatchMatches21_9: healPlayerDispatchMatches,
       healPlayerSetupMatches21_9: healPlayerSetupMatches,
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
+      bindLeaderHelperDispatchMatches21_9: bindLeaderHelperDispatchMatches,
+      bindLeaderHelperSetupMatches21_9: bindLeaderHelperSetupMatches,
+      bindLeaderHelperConditionMatches21_9: bindLeaderHelperConditionMatches,
       sourceToPoisonDispatchMatches21_9: sourceToPoisonDispatchMatches,
       sourceToPoisonSetupMatches21_9: sourceToPoisonSetupMatches,
       sourceToPoisonConditionMatches21_9: sourceToPoisonConditionMatches,
@@ -930,6 +961,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       monsterAttackWithSkillOffset: 'sMONSTER+0x7e8 (uint32 converted to float32 / 100)',
       monsterDurationOffset: 'sMONSTER+0x678 (packed low 10 bits)',
       monsterHealPercentOffset: 'sMONSTER+0x678 (type 55 signed int32 percent)',
+      monsterBindTargetMaskOffset: 'sMONSTER+0x674 (type 54 uint16 party mask)',
+      monsterBindSetupDurationOffset: 'sMONSTER+0x678 (type 54 signed int32; execution rerolls)',
       monsterChanceOffset: 'sMONSTER+0x67c (signed low 16 bits)',
       blackFallType: BLACK_FALL_ENEMY_SKILL_TYPE,
       dispatchEntry: blackFallDispatchEntry === null ? null : hex(blackFallDispatchEntry),
@@ -947,6 +980,16 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       healPlayerConditionTarget: healPlayerConditionTarget === null
         ? null : hex(healPlayerConditionTarget),
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
+      bindLeaderHelperType: BIND_LEADER_HELPER_ENEMY_SKILL_TYPE,
+      bindLeaderHelperDispatchTarget: bindLeaderHelperDispatchTarget === null
+        ? null : hex(bindLeaderHelperDispatchTarget),
+      bindLeaderHelperDispatchMatches21_9: bindLeaderHelperDispatchMatches,
+      bindLeaderHelperSetupTarget: bindLeaderHelperSetupTarget === null
+        ? null : hex(bindLeaderHelperSetupTarget),
+      bindLeaderHelperSetupMatches21_9: bindLeaderHelperSetupMatches,
+      bindLeaderHelperConditionTarget: bindLeaderHelperConditionTarget === null
+        ? null : hex(bindLeaderHelperConditionTarget),
+      bindLeaderHelperConditionMatches21_9: bindLeaderHelperConditionMatches,
       sourceToPoisonType: SOURCE_TO_POISON_ENEMY_SKILL_TYPE,
       sourceToPoisonDispatchTarget: sourceToPoisonDispatchTarget === null
         ? null : hex(sourceToPoisonDispatchTarget),
@@ -1176,6 +1219,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || blackFallDispatchMatches === false || blackFallSetupMatches === false
     || healPlayerDispatchMatches === false || healPlayerSetupMatches === false
     || healPlayerConditionMatches === false
+    || bindLeaderHelperDispatchMatches === false || bindLeaderHelperSetupMatches === false
+    || bindLeaderHelperConditionMatches === false
     || sourceToPoisonDispatchMatches === false || sourceToPoisonSetupMatches === false
     || sourceToPoisonConditionMatches === false
     || sourceToMortalPoisonDispatchMatches === false
