@@ -575,6 +575,21 @@ the erase-effect count before this step. The browser keeps the raw flag and
 renders a nail overlay, exposes `nailFallRule`, and reports the separately
 resolved `lastNailDamage` while including it in total outgoing damage.
 
+The last `_checkPassiveSkill4Block` branch handles enhanced and weakened
+skyfalls for natural types. `_countPassiveSkills` at `0x63fa28` is called with
+attribute-specific skill IDs `14, 15, 16, 17, 18, 29`; each matching awakening
+adds 20 percentage points and the positive base is capped at 100. An active
+ordinary modifier with zero weakening power adds its signed chance, while a
+weakening modifier subtracts the chance. Positive net chance creates the
+native `+0.06f` enhancement; negative net chance creates
+`float32(-weakeningPower / 100)`. Both directions cap their roll probability at
+100%. Crucially, the branch consumes exactly one `+0x66a14` LCG advance for
+every natural spawn even when the net chance is zero or its roll fails. Special
+types skip this branch and consume nothing. The browser exposes the decoded
+inputs as `enhancedFallAwakenings`, `enhancedFallModifier`, and
+`passiveEnhancementFallsEnabled`, and performs this step between Nail and lock
+assignment on the shared stream.
+
 Bomb and thorn hits accumulate in the same native pending-damage integer at
 game-work offset `0x8aacc`; neither is clamped against current HP at the moment
 of contact. `_applyHpRecAndPoisonDamage` later subtracts that aggregate from

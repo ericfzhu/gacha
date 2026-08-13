@@ -28,6 +28,7 @@ import {
   padResolveBlockSwapPassive,
   padResolveComboDropAwakenings,
   padResolveComboDropSpawns,
+  padResolveEnhancementFall,
   padResolveLockFall,
   padResolveNailFall,
   padResolveThornFall,
@@ -194,6 +195,51 @@ assert.deepEqual(padResolveNailFall(21_900, 6, {
   blockFlags: 0,
   applied: false,
   attempts: 0,
+});
+assert.deepEqual(padResolveEnhancementFall(21_900, 0, Array(6).fill(0)), {
+  state: 394_448_415,
+  enhancementPower: 0,
+  netChancePercent: 0,
+  applied: false,
+  processed: true,
+});
+assert.deepEqual(padResolveEnhancementFall(21_900, 6, Array(6).fill(5)), {
+  state: 21_900,
+  enhancementPower: 0,
+  netChancePercent: 0,
+  applied: false,
+  processed: false,
+});
+assert.deepEqual(padResolveEnhancementFall(21_900, 0, [1, 0, 0, 0, 0, 0]), {
+  state: 394_448_415,
+  enhancementPower: Math.fround(0.06),
+  netChancePercent: 20,
+  applied: true,
+  processed: true,
+});
+assert.deepEqual(padResolveEnhancementFall(
+  21_900,
+  0,
+  [1, 0, 0, 0, 0, 0],
+  { active: true, chancePercent: 30, weakeningPowerPercent: 50 },
+), {
+  state: 394_448_415,
+  enhancementPower: -0.5,
+  netChancePercent: -10,
+  applied: true,
+  processed: true,
+});
+assert.deepEqual(padResolveEnhancementFall(
+  21_900,
+  0,
+  Array(6).fill(0),
+  { active: true, chancePercent: 10, weakeningPowerPercent: 0 },
+), {
+  state: 394_448_415,
+  enhancementPower: Math.fround(0.06),
+  netChancePercent: 10,
+  applied: true,
+  processed: true,
 });
 assert.deepEqual(padResolveLockFall(21_900, 0, [
   { typeMask: 1 << 0, chancePercent: 0 },
@@ -674,7 +720,7 @@ lockFallEngine.collapseAndRefill();
 assert.equal(lockFallEngine.board[0][0].type, 'fire');
 assert.equal(lockFallEngine.board[0][0].locked, true);
 assert.equal(lockFallEngine.rng.state, 394_448_415);
-assert.equal(lockFallEngine.lockFallRng.state, 394_448_415);
+assert.equal(lockFallEngine.lockFallRng.state, 3_803_934_822);
 const thornFallEngine = new PuzzleEngine({
   seed: 21_900,
   lockFallSeed: 21_900,
@@ -696,7 +742,7 @@ assert.equal(thornFallEngine.board[0][0].locked, true);
 assert.equal(thornFallEngine.board[0][0].thornActive, true);
 assert.equal(thornFallEngine.board[0][0].thornDescriptor, 0x84);
 assert.equal(thornFallEngine.rng.state, 394_448_415);
-assert.equal(thornFallEngine.lockFallRng.state, 3_803_934_822);
+assert.equal(thornFallEngine.lockFallRng.state, 1_929_471_377);
 assert.deepEqual(thornFallEngine.snapshot().thornFallRule, {
   active: true,
   typeMask: 1,
@@ -724,10 +770,29 @@ nailFallEngine.collapseAndRefill();
 assert.equal(nailFallEngine.board[0][0].nail, true);
 assert.equal(nailFallEngine.board[0][0].blockFlags, 0xa0800);
 assert.equal(nailFallEngine.rng.state, 394_448_415);
-assert.equal(nailFallEngine.lockFallRng.state, 1_929_471_377);
+assert.equal(nailFallEngine.lockFallRng.state, 919_597_584);
 assert.deepEqual(nailFallEngine.snapshot().nailFallRule, {
   active: true,
   chancePercent: 100,
+});
+const enhancedFallEngine = new PuzzleEngine({
+  seed: 21_900,
+  lockFallSeed: 21_900,
+  enhancedFallAwakenings: [1, 0, 0, 0, 0, 0],
+  enhancedFallModifier: { chancePercent: 30, weakeningPowerPercent: 50 },
+});
+enhancedFallEngine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+enhancedFallEngine.setRngState(21_900);
+enhancedFallEngine.setLockFallRngState(21_900);
+enhancedFallEngine.board[0][0] = null;
+enhancedFallEngine.collapseAndRefill();
+assert.equal(enhancedFallEngine.board[0][0].enhancementPower, -0.5);
+assert.equal(enhancedFallEngine.lockFallRng.state, 394_448_415);
+assert.deepEqual(enhancedFallEngine.snapshot().enhancedFallAwakenings, [1, 0, 0, 0, 0, 0]);
+assert.deepEqual(enhancedFallEngine.snapshot().enhancedFallModifier, {
+  active: true,
+  chancePercent: 30,
+  weakeningPowerPercent: 50,
 });
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);

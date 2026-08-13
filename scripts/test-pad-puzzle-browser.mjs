@@ -482,6 +482,25 @@ try {
     const nailDamage = engine.lastNailDamage;
     const nailDamageTotal = engine.lastDamage;
     engine.reset();
+    engine.setEnhancedFallAwakenings([1, 0, 0, 0, 0, 0]);
+    engine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+    engine.setRngState(21_900);
+    engine.setLockFallRngState(21_900);
+    engine.board[0][0] = null;
+    engine.collapseAndRefill();
+    const enhancedFallPower = engine.board[0][0].enhancementPower;
+    const enhancedFallRuleState = engine.lockFallRng.state;
+    engine.setEnhancedFallModifier({ chancePercent: 30, weakeningPowerPercent: 50 });
+    engine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+    engine.setRngState(21_900);
+    engine.setLockFallRngState(21_900);
+    engine.board[0][0] = null;
+    engine.collapseAndRefill();
+    const weakenedFallPower = engine.board[0][0].enhancementPower;
+    const weakenedFallRuleState = engine.lockFallRng.state;
+    engine.setEnhancedFallAwakenings(Array(6).fill(0));
+    engine.setEnhancedFallModifier(null);
+    engine.reset();
     const initialBoard = engine.snapshot().board;
     const initialBoardState = engine.rng.state;
     engine.start();
@@ -510,6 +529,7 @@ try {
       lockFallType, lockFallLocked, lockFallMainState, lockFallRuleState,
       thornFallOrb, thornFallMainState, thornFallRuleState,
       nailMatchCount, nailDamage, nailDamageTotal,
+      enhancedFallPower, enhancedFallRuleState, weakenedFallPower, weakenedFallRuleState,
       initialBoard, initialBoardState,
     };
   }) : null;
@@ -584,14 +604,18 @@ try {
     poisonBlockSample.comboDropAwakeningPending !== 2 ||
     poisonBlockSample.lockFallType !== 'fire' || !poisonBlockSample.lockFallLocked ||
     poisonBlockSample.lockFallMainState !== 394_448_415 ||
-    poisonBlockSample.lockFallRuleState !== 394_448_415 ||
+    poisonBlockSample.lockFallRuleState !== 3_803_934_822 ||
     poisonBlockSample.thornFallOrb.code !== 'R' || !poisonBlockSample.thornFallOrb.locked ||
     !poisonBlockSample.thornFallOrb.thornActive || !poisonBlockSample.thornFallOrb.nail ||
     poisonBlockSample.thornFallOrb.thornDescriptor !== 0x84 ||
     poisonBlockSample.thornFallMainState !== 394_448_415 ||
-    poisonBlockSample.thornFallRuleState !== 1_929_471_377 ||
+    poisonBlockSample.thornFallRuleState !== 919_597_584 ||
     poisonBlockSample.nailMatchCount !== 3 || poisonBlockSample.nailDamage !== 2_280 ||
     poisonBlockSample.nailDamageTotal <= poisonBlockSample.nailDamage ||
+    Math.abs(poisonBlockSample.enhancedFallPower - 0.06) > 1e-6 ||
+    poisonBlockSample.enhancedFallRuleState !== 394_448_415 ||
+    poisonBlockSample.weakenedFallPower !== -0.5 ||
+    poisonBlockSample.weakenedFallRuleState !== 394_448_415 ||
     JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
       'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',
     ]) || poisonBlockSample.initialBoardState !== 79_238_434

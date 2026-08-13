@@ -21,6 +21,7 @@ import {
   padResolveBlockSwapPassive,
   padResolveComboDropAwakenings,
   padResolveComboDropSpawns,
+  padResolveEnhancementFall,
   padResolveLockFall,
   padResolveNailFall,
   padResolveThornFall,
@@ -108,6 +109,9 @@ export class PuzzleEngine {
     topLineDropTypes = null,
     thornFallRule = null,
     nailFallRule = null,
+    enhancedFallAwakenings = Array(6).fill(0),
+    enhancedFallModifier = null,
+    passiveEnhancementFallsEnabled = true,
     lockFallRules = [],
     lockFallSeed = seed,
   } = {}) {
@@ -128,6 +132,9 @@ export class PuzzleEngine {
     this.setTopLineDropTypes(topLineDropTypes);
     this.setThornFallRule(thornFallRule);
     this.setNailFallRule(nailFallRule);
+    this.setEnhancedFallAwakenings(enhancedFallAwakenings);
+    this.setEnhancedFallModifier(enhancedFallModifier);
+    this.passiveEnhancementFallsEnabled = Boolean(passiveEnhancementFallsEnabled);
     this.setLockFallRules(lockFallRules);
     this.lockFallSeed = Number(lockFallSeed) >>> 0;
     this.rng = createPadRng(seed);
@@ -574,6 +581,14 @@ export class PuzzleEngine {
         thornFall.blockFlags,
       );
       this.lockFallRng.setState(nailFall.state);
+      const enhancementFall = padResolveEnhancementFall(
+        this.lockFallRng.state,
+        entry.type,
+        this.enhancedFallAwakenings,
+        this.enhancedFallModifier,
+        this.passiveEnhancementFallsEnabled,
+      );
+      this.lockFallRng.setState(enhancementFall.state);
       const lockFall = padResolveLockFall(
         this.lockFallRng.state,
         entry.type,
@@ -583,7 +598,7 @@ export class PuzzleEngine {
       this.lockFallRng.setState(lockFall.state);
       this.board[entry.row][entry.column] = this.createOrb(ORB_TYPES[entry.type]?.id || NATURAL_ORB_TYPES[0].id, {
         blockFlags: lockFall.blockFlags,
-        enhancementPower: thornFall.clearEnhancement ? 0 : undefined,
+        enhancementPower: thornFall.clearEnhancement ? 0 : enhancementFall.enhancementPower,
         thornDescriptor: thornFall.thornDescriptor,
       });
     });
@@ -788,6 +803,28 @@ export class PuzzleEngine {
     this.nailFallRule = {
       active: rule.active === undefined ? true : Boolean(rule.active),
       chancePercent: Number(rule.chancePercent) & 0xff,
+    };
+  }
+
+  setEnhancedFallAwakenings(counts) {
+    if (!Array.isArray(counts) || counts.length !== 6 || counts.some((count) => (
+      !Number.isInteger(Number(count)) || Number(count) < 0
+    ))) throw new Error('PAD enhanced-fall awakenings must contain six nonnegative attribute counts.');
+    this.enhancedFallAwakenings = counts.map((count) => Number(count));
+  }
+
+  setEnhancedFallModifier(modifier) {
+    if (modifier === null || modifier === undefined) {
+      this.enhancedFallModifier = null;
+      return;
+    }
+    if (![modifier.chancePercent, modifier.weakeningPowerPercent].every((value) => Number.isInteger(Number(value)))) {
+      throw new Error('PAD enhanced-fall modifier requires integer chancePercent and weakeningPowerPercent values.');
+    }
+    this.enhancedFallModifier = {
+      active: modifier.active === undefined ? true : Boolean(modifier.active),
+      chancePercent: (Number(modifier.chancePercent) << 16) >> 16,
+      weakeningPowerPercent: Number(modifier.weakeningPowerPercent) & 0xffff,
     };
   }
 
@@ -1218,6 +1255,9 @@ export class PuzzleEngine {
       topLineDropTypes: this.topLineDropTypes ? [...this.topLineDropTypes] : null,
       thornFallRule: this.thornFallRule ? { ...this.thornFallRule } : null,
       nailFallRule: this.nailFallRule ? { ...this.nailFallRule } : null,
+      enhancedFallAwakenings: [...this.enhancedFallAwakenings],
+      enhancedFallModifier: this.enhancedFallModifier ? { ...this.enhancedFallModifier } : null,
+      passiveEnhancementFallsEnabled: this.passiveEnhancementFallsEnabled,
       lockFallRules: this.lockFallRules.map((rule) => ({ ...rule })),
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({

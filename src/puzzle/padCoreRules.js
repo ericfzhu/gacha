@@ -411,6 +411,64 @@ export function padResolveNailFall(state, type, rule, initialBlockFlags = 0) {
   };
 }
 
+// The final _checkPassiveSkill4Block branch combines the six attribute-specific
+// orb-enhance awakening counts (skill IDs 14..18 and 29) with the active floor
+// modifier. Each awakening contributes 20 percentage points, capped at 100.
+// A weakening record subtracts its chance; an ordinary boost adds it. Every
+// natural spawn consumes one +0x66a14 roll even when the net chance is exactly
+// zero, while special types return without advancing the stream.
+export function padResolveEnhancementFall(
+  state,
+  type,
+  awakeningCounts,
+  modifier = null,
+  passiveEnabled = true,
+) {
+  const typeIndex = Math.trunc(Number(type));
+  if (typeIndex < 0 || typeIndex > 5) {
+    return {
+      state: Number(state) >>> 0,
+      enhancementPower: 0,
+      netChancePercent: 0,
+      applied: false,
+      processed: false,
+    };
+  }
+
+  const count = Math.max(0, Math.trunc(Number(awakeningCounts?.[typeIndex]) || 0));
+  let netChancePercent = passiveEnabled
+    ? Math.fround(Math.min(Math.fround(count * 20), 100))
+    : Math.fround(0);
+  const weakeningPowerPercent = Math.trunc(Number(modifier?.weakeningPowerPercent) || 0) & 0xffff;
+  if (modifier?.active) {
+    const chancePercent = (Math.trunc(Number(modifier.chancePercent) || 0) << 16) >> 16;
+    netChancePercent = Math.fround(weakeningPowerPercent === 0
+      ? netChancePercent + chancePercent
+      : netChancePercent - chancePercent);
+  }
+
+  const roll = padLcgStep(state);
+  const scaled = Math.floor(roll.value * 10_000 / 0x10000);
+  let enhancementPower = 0;
+  let applied = false;
+  if (netChancePercent > 0) {
+    const threshold = Math.fround(Math.min(netChancePercent, 100) * 100);
+    applied = threshold > scaled;
+    if (applied) enhancementPower = PAD_ENHANCED_ORB_BONUS;
+  } else if (netChancePercent < 0) {
+    const threshold = Math.min(Math.fround(netChancePercent * -100), 10_000);
+    applied = threshold > scaled;
+    if (applied) enhancementPower = Math.fround(weakeningPowerPercent / -100);
+  }
+  return {
+    state: roll.state,
+    enhancementPower: Math.fround(enhancementPower),
+    netChancePercent,
+    applied,
+    processed: true,
+  };
+}
+
 // Nail damage is resolved after ordinary attacks. _gamePhaseEachTurn computes
 // max(1.0, enemyMaxHp * nailCount / 100.0) in binary64 and passes it through
 // izMathRoundSint64 (positive values round by truncating value + 0.5).

@@ -2,6 +2,21 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 native enhanced/weakened fall resolution
+
+- Recovered `_checkPassiveSkill4Block`'s final natural-orb branch. Passive skill
+  IDs `14..18` and `29` contribute 20% enhanced-fall chance each; an active
+  weakening record subtracts its chance and supplies the negative power, while
+  a zero-power modifier adds enhanced-fall chance.
+- Preserved float32 `+0.06`/negative power values, the 100% chance cap, and the
+  unconditional shared `+0x66a14` LCG advance for every natural spawn—even at
+  zero net chance. This corrected downstream thorn/Nail/lock stream positions.
+- Added pure, engine, and browser fixtures for zero, enhanced, weakened, boost,
+  special-type, and combined post-spawn ordering. `_countPassiveSkills` raises
+  the exact restored-image inspector to 66 gameplay anchors.
+- Next: recover the remaining `0x1000`/`0x10000` roulette or invisible-drop
+  branch and then map the decoded fall controls from raw dungeon records.
+
 ## 2026-08-14 native Nail Orb fall and post-attack damage
 
 - Identified `_checkPassiveSkill4Block`'s `0x20000` branch through the binary's
