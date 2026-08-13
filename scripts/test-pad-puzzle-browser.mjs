@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 const { chromium } = await import(process.env.GACHA_PLAYWRIGHT_MODULE || 'playwright');
 const url = process.argv[2] || 'http://127.0.0.1:4173/puzzle';
 const outputPath = process.argv[3] || '/tmp/gacha-pad-puzzle.png';
+const apkPath = process.argv[4] || null;
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 980, height: 900 } });
 const consoleMessages = [];
@@ -16,6 +17,10 @@ function internalPoint(box, x, y) {
 try {
   await page.goto(url, { waitUntil: 'networkidle' });
   await page.waitForFunction(() => typeof window.render_game_to_text === 'function');
+  if (apkPath) {
+    await page.locator('.puzzle-apk-art input').setInputFiles(apkPath);
+    await page.waitForFunction(() => document.querySelector('.puzzle-apk-art span')?.textContent?.startsWith('Original BLOCK2.PNG'), null, { timeout: 120_000 });
+  }
   const canvas = page.locator('canvas[aria-label^="Orb Battle Lab"]');
   const box = await canvas.boundingBox();
   if (!box) throw new Error('Puzzle canvas is not visible.');
@@ -54,7 +59,8 @@ try {
 
   await page.screenshot({ path: outputPath, fullPage: true });
   await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, consoleMessages }, null, 2));
-  process.stdout.write(`${JSON.stringify({ dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, consoleMessages }, null, 2)}\n`);
+  const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

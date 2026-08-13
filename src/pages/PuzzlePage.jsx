@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BOARD_COLUMNS, BOARD_ROWS, ORB_BY_ID, PuzzleEngine } from '../puzzle/puzzleEngine.js';
 
@@ -10,6 +10,8 @@ const CELL = 70;
 const SKILL_RECT = { x: 291, y: 353, width: 144, height: 64 };
 const RESET_RECT = { x: 15, y: 353, width: 48, height: 48 };
 const START_RECT = { x: 95, y: 541, width: 260, height: 58 };
+const PAD_ORB_SPRITES = Object.freeze({ fire: 2, water: 3, wood: 4, light: 5, dark: 6, heart: 7 });
+let activePadOrbAtlas = null;
 
 function roundedRect(ctx, x, y, width, height, radius) {
   const r = Math.min(radius, width / 2, height / 2);
@@ -19,6 +21,30 @@ function roundedRect(ctx, x, y, width, height, radius) {
 
 function drawOrb(ctx, orb, x, y, radius, alpha = 1, selected = false) {
   const meta = ORB_BY_ID[orb.type];
+  const atlasSprite = activePadOrbAtlas?.sprites[PAD_ORB_SPRITES[orb.type]];
+  if (atlasSprite) {
+    const diameter = radius * (orb.type === 'heart' ? 2.16 : 2.28);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.shadowColor = 'rgba(9, 18, 29, .48)';
+    ctx.shadowBlur = selected ? 15 : 7;
+    ctx.shadowOffsetY = selected ? 7 : 4;
+    ctx.drawImage(
+      activePadOrbAtlas.image,
+      atlasSprite.x, atlasSprite.y, atlasSprite.width, atlasSprite.height,
+      x - diameter / 2, y - diameter / 2, diameter, diameter,
+    );
+    if (selected) {
+      ctx.shadowColor = 'transparent';
+      ctx.strokeStyle = 'rgba(255,255,255,.94)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(x, y, diameter * 0.47, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.shadowColor = 'rgba(9, 18, 29, .36)';
@@ -349,6 +375,42 @@ export default function PuzzlePage() {
   const navigate = useNavigate();
   const canvasRef = useRef(null);
   const engineRef = useRef(null);
+  const assetWorkerRef = useRef(null);
+  const [atlasStatus, setAtlasStatus] = useState('Use your 21.9.0 APK for original orb art');
+
+  const loadOriginalOrbArt = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    assetWorkerRef.current?.terminate();
+    setAtlasStatus('Decoding block2.btex locally…');
+    const worker = new Worker(new URL('../puzzle/padAssetWorker.js', import.meta.url), { type: 'module' });
+    assetWorkerRef.current = worker;
+    worker.onmessage = ({ data }) => {
+      if (data.type === 'error') {
+        setAtlasStatus(data.message);
+        worker.terminate();
+        if (assetWorkerRef.current === worker) assetWorkerRef.current = null;
+        return;
+      }
+      const image = document.createElement('canvas');
+      image.width = data.width;
+      image.height = data.height;
+      const context = image.getContext('2d');
+      context.putImageData(new ImageData(new Uint8ClampedArray(data.pixels), data.width, data.height), 0, 0);
+      activePadOrbAtlas = { image, sprites: data.sprites };
+      setAtlasStatus(`Original ${data.sourceName} orb art active`);
+      worker.terminate();
+      if (assetWorkerRef.current === worker) assetWorkerRef.current = null;
+    };
+    worker.onerror = (error) => {
+      setAtlasStatus(error.message || 'Could not decode the selected APK.');
+      worker.terminate();
+      if (assetWorkerRef.current === worker) assetWorkerRef.current = null;
+    };
+    const apkBytes = await file.arrayBuffer();
+    worker.postMessage({ apkBytes }, [apkBytes]);
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -438,12 +500,19 @@ export default function PuzzlePage() {
       delete window.render_game_to_text;
       delete window.advanceTime;
       delete window.__puzzleGame;
+      assetWorkerRef.current?.terminate();
+      assetWorkerRef.current = null;
+      activePadOrbAtlas = null;
     };
   }, []);
 
   return (
     <main className="puzzle-page">
       <button className="puzzle-back" onClick={() => navigate('/')} aria-label="Return to title">‹ <span>Title</span></button>
+      <label className="puzzle-apk-art">
+        <input type="file" accept=".apk,application/vnd.android.package-archive" onChange={loadOriginalOrbArt} />
+        <span>{atlasStatus}</span>
+      </label>
       <div className="puzzle-canvas-shell">
         <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} aria-label="Orb Battle Lab. Drag colored orbs to form matches and battle two enemies." />
       </div>
