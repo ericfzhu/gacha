@@ -529,6 +529,7 @@ try {
     scheduledBlackFallView.setInt16(0x04, 128, true);
     scheduledBlackFallView.setInt32(0x10, 3, true);
     scheduledBlackFallView.setInt32(0x14, 75, true);
+    scheduledBlackFallView.setInt32(0x44, 50, true);
     engine.setBlackFallRule(null);
     engine.setEnemySkillQueue(0, [scheduledBlackFallDefinition]);
     engine.enemies[0].counter = 1;
@@ -673,11 +674,12 @@ try {
     poisonBlockSample.blackFallAfterExpiry.blindCountdown !== 0 ||
     poisonBlockSample.blackFallRuleAfterExpiry.active !== false ||
     poisonBlockSample.blackFallRuleAfterExpiry.turnsRemaining !== 0 ||
-    poisonBlockSample.scheduledBlackFall.player.hp !== poisonBlockSample.scheduledBlackFallHp ||
+    poisonBlockSample.scheduledBlackFall.player.hp !== poisonBlockSample.scheduledBlackFallHp - 925 ||
     poisonBlockSample.scheduledBlackFall.blackFallRule?.turnsRemaining !== 3 ||
     poisonBlockSample.scheduledBlackFall.blackFallRule?.chanceBasisPoints !== 7_500 ||
     poisonBlockSample.scheduledBlackFall.lastEnemyActions?.[0]?.kind !== 'skill' ||
     poisonBlockSample.scheduledBlackFall.lastEnemyActions?.[0]?.skill?.type !== 128 ||
+    poisonBlockSample.scheduledBlackFall.lastEnemyActions?.[0]?.damage !== 925 ||
     poisonBlockSample.scheduledBlackFall.enemies?.[0]?.queuedEnemySkills !== 0 ||
     JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
       'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',

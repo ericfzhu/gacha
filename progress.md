@@ -2,6 +2,23 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 enemy skill accompanying attacks
+
+- Traced `_setupSkillWithAttack`'s positive definition field `+0x44` through
+  `sMONSTER+0x7e8` and `_doEnemySkill` into `_setEnemyAttackMain`: it is a
+  percentage of the enemy's base attack and accompanies, rather than replaces,
+  the selected skill effect.
+- Ported the native binary32 calculation and `izMathRound` positive rounding
+  path. Scheduled type-128 black-fall skills can now damage the player and
+  activate the fall rule in the same enemy action; the action snapshot reports
+  the resolved damage.
+- Added exact anchors for `_setupSkillWithAttack` and `_setEnemyAttackMain` (79
+  total). Pure rules, the production build, the exhaustive project browser
+  matrix, and the generic gameplay-client state/render check pass.
+- Next: decode downloaded enemy-AI condition/weight records sufficiently to
+  select definitions from data, and port another high-impact board-affecting
+  `_doEnemySkill` dispatch type.
+
 ## 2026-08-14 enemy definition setup and turn boundary
 
 - Ported `_setupEnemyAttackSub`'s type-128 materialization: definition `+0x10`

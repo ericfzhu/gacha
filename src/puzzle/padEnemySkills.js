@@ -1,5 +1,7 @@
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 
+const PAD_INT32_MAX = 0x7fffffff;
+
 export const PAD_ENEMY_SKILL_RUNTIME_LAYOUT = Object.freeze({
   definitionTypeOffset: 0x04,
   monsterDurationOffset: 0x678,
@@ -81,6 +83,20 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
     definitionChancePercent,
     attackWithSkillValue,
   });
+}
+
+// _doEnemySkill converts the positive signed +0x44 field to an unsigned
+// float32 percentage, divides it by 100, and passes that multiplier to
+// _setEnemyAttackMain. The latter converts the enemy's int64 attack to
+// float32, multiplies in float32, and calls izMathRound (add 0.5, truncate for
+// positive values). Keep every single-precision boundary explicit here.
+export function padEnemySkillAttack(baseAttack, attackWithSkillPercent) {
+  const attack = Math.max(0, Math.trunc(Number(baseAttack) || 0));
+  const percent = Math.trunc(Number(attackWithSkillPercent) || 0);
+  if (percent <= 0 || attack <= 0) return 0;
+  const multiplier = Math.fround(Math.fround(percent >>> 0) / Math.fround(100));
+  const scaled = Math.fround(Math.fround(attack) * multiplier);
+  return Math.min(PAD_INT32_MAX, Math.max(0, Math.trunc(Math.fround(scaled + 0.5))));
 }
 
 // _doEnemySkill's second jump table dispatches signed type 128 to 0x62a854.

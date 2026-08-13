@@ -625,11 +625,14 @@ completed player turn, resets on an admitted action, executes the next supplied
 definition instead of a normal hit, and otherwise falls back to the enemy's
 ordinary attack. Existing status countdowns advance before action setup, so a
 newly activated fall effect retains its full authored duration on that turn.
-`_setupSkillWithAttack` separately reads signed definition field `+0x44` and
-stores it at `sMONSTER+0x7e8`. Because its downstream damage interpretation is
-not yet ported, scheduled records must include that field and currently require
-it to be nonpositive; positive attack-with-skill records are rejected rather
-than silently losing their accompanying hit.
+`_setupSkillWithAttack` (`0x61fcec`) separately reads positive signed definition
+field `+0x44` and stores it at `sMONSTER+0x7e8`. Before the skill handler runs,
+`_doEnemySkill` converts that value to an unsigned float32 percentage, divides
+it by 100, and calls `_setEnemyAttackMain` (`0x62c2cc`). That routine converts
+the enemy's int64 attack to float32, multiplies it by the supplied percentage,
+and calls `izMathRound` (`0x36a9bc`), whose positive path adds float32 `0.5`
+and truncates. The scheduled browser path reproduces each float32 boundary and
+applies this accompanying hit in addition to the selected skill effect.
 
 The last `_checkPassiveSkill4Block` branch handles enhanced and weakened
 skyfalls for natural types. `_countPassiveSkills` at `0x63fa28` is called with

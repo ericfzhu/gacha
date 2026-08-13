@@ -36,6 +36,7 @@ import {
   decodePadEnemySkillDefinition,
   decodePadEnemySkillRuntime,
   normalizePadEnemySkillRecord,
+  padEnemySkillAttack,
 } from './padEnemySkills.js';
 
 export const BOARD_COLUMNS = PAD_BOARD_COLUMNS;
@@ -781,7 +782,17 @@ export class PuzzleEngine {
         const skill = this.takeEnemySkill(index);
         if (skill) {
           this.applyEnemySkillRecord(skill);
-          this.lastEnemyActions.push({ enemy: index, kind: 'skill', skill: { ...skill } });
+          const damage = padEnemySkillAttack(enemy.attack, skill.attackWithSkillValue);
+          total += damage;
+          this.lastEnemyActions.push({
+            enemy: index,
+            kind: 'skill',
+            skill: { ...skill },
+            ...(damage > 0 ? { damage } : {}),
+          });
+          if (damage > 0) {
+            this.floatingText.push({ kind: 'enemy', value: damage, enemy: index, age: 0 });
+          }
           return;
         }
         total += enemy.attack;
@@ -959,9 +970,6 @@ export class PuzzleEngine {
     }
     if (records.some((record) => record.attackWithSkillValue === null)) {
       throw new RangeError('PAD scheduled enemy-skill definitions require the native +0x44 attack-with-skill field.');
-    }
-    if (records.some((record) => record.attackWithSkillValue > 0)) {
-      throw new Error('PAD attack-with-skill actions are not implemented at this scheduler boundary.');
     }
     this.enemySkillQueues[index] = { records, position: 0, repeat: Boolean(repeat) };
   }
