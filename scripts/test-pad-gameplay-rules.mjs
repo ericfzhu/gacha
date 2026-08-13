@@ -13,6 +13,7 @@ import {
   padNativeBaseAttackPower,
   padOrbMatchMultiplier,
   padPoisonDamage,
+  padThornDamage,
   tracePadDragCells,
   tracePadPointerCells,
 } from '../src/puzzle/padCoreRules.js';
@@ -72,6 +73,7 @@ assert.equal(padNativeBaseAttackPower(100, [{ size: 3, enhancedCount: 3 }], 1), 
 assert.equal(padPoisonDamage(10_000, [3], []), 2_000);
 assert.equal(padPoisonDamage(10_000, [4], [3]), 7_500);
 assert.equal(padBombDamage(10_001, 2), 4_002);
+assert.equal(padThornDamage(10_001, 4), 401);
 assert.equal(padAttributeMultiplier('fire', 'wood'), 2);
 assert.equal(padAttributeMultiplier('fire', 'water'), 0.5);
 assert.equal(padAttributeMultiplier('light', 'dark'), 2);
@@ -136,6 +138,22 @@ stateEngine.useSkill();
 assert.equal(stateEngine.board[0][0].type, 'wood');
 assert.equal(stateEngine.board[0][0].enhanced, true);
 assert.equal(stateEngine.board[0][0].locked, true);
+
+const thornEngine = new PuzzleEngine({ seed: 5 });
+thornEngine.setBoardFromCodes(['RBGHLD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD']);
+thornEngine.setOrbState(0, 1, { thornPercent: 4 });
+thornEngine.start();
+thornEngine.startDrag(0, 0, 50, 50, 0.5, 0.5);
+thornEngine.moveDrag(0, 1, 120, 50, 1.5, 0.5);
+assert.equal(thornEngine.lastThornDamage, 480);
+assert.equal(thornEngine.player.hp, 11_520);
+assert.equal(thornEngine.board[0][0].thornPercent, 4);
+thornEngine.moveDrag(0, 0, 50, 50, 0.5, 0.5);
+assert.equal(thornEngine.lastThornDamage, 960);
+assert.equal(thornEngine.player.hp, 11_040);
+thornEngine.board[0][2] = thornEngine.createOrb('jammer', { enhanced: true });
+thornEngine.setOrbState(0, 2, { thornPercent: 4 });
+assert.equal(thornEngine.board[0][2].enhanced, false);
 
 const bombEngine = new PuzzleEngine({ seed: 4 });
 bombEngine.setBoardFromCodes(bombBoard.map((row) => row.join('')));

@@ -23,6 +23,26 @@ function roundedRect(ctx, x, y, width, height, radius) {
 function drawOrbState(ctx, orb, x, y, radius, alpha) {
   ctx.save();
   ctx.globalAlpha = alpha;
+  if (orb.thornPercent > 0) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = 'rgba(220, 230, 239, .92)';
+    ctx.strokeStyle = 'rgba(42, 52, 65, .92)';
+    ctx.lineWidth = Math.max(1, radius * 0.055);
+    for (let index = 0; index < 10; index += 1) {
+      ctx.save();
+      ctx.rotate(index * Math.PI / 5);
+      ctx.beginPath();
+      ctx.moveTo(-radius * 0.12, -radius * 0.82);
+      ctx.lineTo(0, -radius * 1.14);
+      ctx.lineTo(radius * 0.12, -radius * 0.82);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
   if (activePadOrbAtlas && orb.enhanced) {
     const sprite = activePadOrbAtlas.sprites[22];
     ctx.drawImage(activePadOrbAtlas.image, sprite.x, sprite.y, sprite.width, sprite.height,
@@ -396,13 +416,13 @@ function render(ctx, engine) {
 
   engine.floatingText.forEach((item, index) => {
     const t = item.age / 1.15;
-    const isPlayerHp = item.kind === 'heal' || item.kind === 'poison' || item.kind === 'bomb';
+    const isPlayerHp = item.kind === 'heal' || item.kind === 'poison' || item.kind === 'bomb' || item.kind === 'thorn';
     const x = isPlayerHp ? 225 : item.enemy === 0 ? 132 : 318;
     const y = isPlayerHp ? 322 - t * 30 : 122 - t * 44 - index * 2;
     ctx.globalAlpha = Math.max(0, 1 - t);
     ctx.textAlign = 'center';
     ctx.font = '900 22px "Barlow Condensed", sans-serif';
-    ctx.fillStyle = item.kind === 'heal' ? '#83ef9d' : item.kind === 'poison' ? '#d995ef' : item.kind === 'bomb' ? '#ffb45f' : item.kind === 'enemy' ? '#ff8b7f' : ORB_BY_ID[item.attribute]?.highlight || '#fff';
+    ctx.fillStyle = item.kind === 'heal' ? '#83ef9d' : item.kind === 'poison' ? '#d995ef' : item.kind === 'bomb' ? '#ffb45f' : item.kind === 'thorn' ? '#e4edf3' : item.kind === 'enemy' ? '#ff8b7f' : ORB_BY_ID[item.attribute]?.highlight || '#fff';
     ctx.fillText(`${item.kind === 'heal' ? '+' : '-'}${item.value.toLocaleString()}`, x, y);
     ctx.globalAlpha = 1;
   });

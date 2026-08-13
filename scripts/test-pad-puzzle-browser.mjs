@@ -7,6 +7,7 @@ const apkPath = process.argv[4] || null;
 const showOrbStates = process.argv.includes('--orb-states');
 const renderAtlasSheet = process.argv.includes('--atlas-sheet');
 const testBombResolution = process.argv.includes('--bomb-resolution');
+const testThornInput = process.argv.includes('--thorn-input');
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 980, height: 900 } });
 const consoleMessages = [];
@@ -98,10 +99,35 @@ try {
     bombResolution.damage !== 2_400 || bombResolution.clearedCells !== 10
   )) throw new Error(`Bomb resolution mismatch: ${JSON.stringify(bombResolution)}`);
 
+  const thornInput = testThornInput ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    engine.reset();
+    engine.setBoardFromCodes(['RBGHLD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD']);
+    engine.setOrbState(0, 1, { thornPercent: 4 });
+    engine.start();
+    engine.startDrag(0, 0, 50, 475, 0.5, 0.5);
+    engine.moveDrag(0, 1, 120, 475, 1.5, 0.5);
+    engine.moveDrag(0, 0, 50, 475, 0.5, 0.5);
+    const result = {
+      hp: engine.player.hp,
+      damage: engine.lastThornDamage,
+      pathLength: engine.drag.pathLength,
+      thornColumn: engine.board[0].findIndex((orb) => orb.thornPercent > 0),
+    };
+    engine.reset();
+    engine.start();
+    return result;
+  }) : null;
+  if (thornInput && (
+    thornInput.hp !== 11_040 || thornInput.damage !== 960 ||
+    thornInput.pathLength !== 2 || thornInput.thornColumn !== 1
+  )) throw new Error(`Thorn input mismatch: ${JSON.stringify(thornInput)}`);
+
   const orbStateSample = showOrbStates ? await page.evaluate(() => {
     window.__puzzleGame.setBoardFromCodes(['XJPMRB', 'HRBGDL', 'BGHRDL', 'DLGRHB', 'HRBGLD']);
     window.__puzzleGame.setOrbState(0, 3, { enhanced: true, locked: false });
     window.__puzzleGame.setOrbState(0, 4, { enhanced: true, locked: true });
+    window.__puzzleGame.setOrbState(0, 5, { thornPercent: 4 });
     return window.__puzzleGame.snapshot().boardState[0];
   }) : null;
   if (renderAtlasSheet) {
@@ -141,9 +167,9 @@ try {
     await sheet.screenshot({ path: `${outputPath}.atlas.png` });
   }
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, orbStateSample, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, orbStateSample, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

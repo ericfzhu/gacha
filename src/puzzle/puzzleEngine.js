@@ -13,6 +13,7 @@ import {
   padNativeBaseAttackPower,
   padOrbMatchMultiplier,
   padPoisonDamage,
+  padThornDamage,
   tracePadPointerCells,
 } from './padCoreRules.js';
 
@@ -98,6 +99,7 @@ export class PuzzleEngine {
     this.lastHealing = 0;
     this.lastPoisonDamage = 0;
     this.lastBombDamage = 0;
+    this.lastThornDamage = 0;
     this.lastLeaderMultiplier = 1;
     this.message = 'Drag one orb through the board to rearrange the whole path.';
     this.player = { hp: 12000, maxHp: 12000, recovery: 820 };
@@ -121,7 +123,7 @@ export class PuzzleEngine {
   }
 
   createOrb(type, state = {}) {
-    return { id: ++this.orbSerial, type, enhanced: false, locked: false, ...state };
+    return { id: ++this.orbSerial, type, enhanced: false, locked: false, thornPercent: 0, ...state };
   }
 
   createStableBoard() {
@@ -142,6 +144,7 @@ export class PuzzleEngine {
   startDrag(row, column, pointerX = 0, pointerY = 0, gridColumn = column + 0.5, gridRow = row + 0.5) {
     if (this.mode !== 'playing' || this.phase !== 'input' || this.drag) return false;
     if (!this.isCell(row, column)) return false;
+    this.lastThornDamage = 0;
     this.drag = { row, column, pointerX, pointerY, gridColumn, gridRow, remaining: this.moveTime, pathLength: 0 };
     this.message = 'Keep moving — every crossed cell swaps with the held orb.';
     return true;
@@ -167,6 +170,13 @@ export class PuzzleEngine {
     this.drag.gridRow = Math.max(0, Math.min(BOARD_ROWS - Number.EPSILON * BOARD_ROWS, gridRow));
     if (!path.length) return false;
     for (const { row: nextRow, column: nextColumn } of path) {
+      const crossedOrb = this.board[nextRow][nextColumn];
+      if (crossedOrb.thornPercent > 0) {
+        const damage = padThornDamage(this.player.maxHp, crossedOrb.thornPercent);
+        this.lastThornDamage += damage;
+        this.player.hp = Math.max(0, this.player.hp - damage);
+        this.floatingText.push({ kind: 'thorn', value: damage, enemy: -1, age: 0 });
+      }
       [this.board[fromRow][fromColumn], this.board[nextRow][nextColumn]] = [this.board[nextRow][nextColumn], this.board[fromRow][fromColumn]];
       fromRow = nextRow;
       fromColumn = nextColumn;
@@ -388,7 +398,7 @@ export class PuzzleEngine {
       });
     });
     this.lastDamage = totalDamage;
-    this.message = `${this.comboCount} combo${this.comboCount === 1 ? '' : 's'} · ${totalDamage.toLocaleString()} total damage${this.lastHealing ? ` · +${this.lastHealing.toLocaleString()} HP` : ''}${this.lastPoisonDamage ? ` · -${this.lastPoisonDamage.toLocaleString()} poison` : ''}${this.lastBombDamage ? ` · -${this.lastBombDamage.toLocaleString()} bombs` : ''}`;
+    this.message = `${this.comboCount} combo${this.comboCount === 1 ? '' : 's'} · ${totalDamage.toLocaleString()} total damage${this.lastHealing ? ` · +${this.lastHealing.toLocaleString()} HP` : ''}${this.lastPoisonDamage ? ` · -${this.lastPoisonDamage.toLocaleString()} poison` : ''}${this.lastBombDamage ? ` · -${this.lastBombDamage.toLocaleString()} bombs` : ''}${this.lastThornDamage ? ` · -${this.lastThornDamage.toLocaleString()} thorns` : ''}`;
   }
 
   resolveEnemyTurn() {
@@ -420,7 +430,18 @@ export class PuzzleEngine {
   setOrbState(row, column, state) {
     if (!this.isCell(row, column)) throw new Error(`Orb state cell ${row},${column} is outside the board.`);
     const orb = this.board[row][column];
-    this.board[row][column] = { ...orb, enhanced: Boolean(state.enhanced), locked: Boolean(state.locked) };
+    const thornPercent = state.thornPercent === undefined
+      ? orb.thornPercent
+      : Math.max(0, Math.min(0x7f, Math.trunc(Number(state.thornPercent) || 0)));
+    const specialType = ['jammer', 'poison', 'mortalPoison', 'bomb'].includes(orb.type);
+    this.board[row][column] = {
+      ...orb,
+      enhanced: thornPercent > 0 && specialType
+        ? false
+        : state.enhanced === undefined ? orb.enhanced : Boolean(state.enhanced),
+      locked: state.locked === undefined ? orb.locked : Boolean(state.locked),
+      thornPercent,
+    };
   }
 
   isCell(row, column) {
@@ -434,7 +455,12 @@ export class PuzzleEngine {
       phase: this.phase,
       turn: this.turn,
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
-      boardState: this.board.map((row) => row.map((orb) => ({ code: ORB_BY_ID[orb.type].code, enhanced: orb.enhanced, locked: orb.locked }))),
+      boardState: this.board.map((row) => row.map((orb) => ({
+        code: ORB_BY_ID[orb.type].code,
+        enhanced: orb.enhanced,
+        locked: orb.locked,
+        thornPercent: orb.thornPercent,
+      }))),
       drag: this.drag ? { row: this.drag.row, column: this.drag.column, remainingSeconds: Number(this.drag.remaining.toFixed(2)), pathLength: this.drag.pathLength } : null,
       comboCount: this.comboCount,
       lastComboCount: this.lastComboCount,
@@ -442,6 +468,7 @@ export class PuzzleEngine {
       lastHealing: this.lastHealing,
       lastPoisonDamage: this.lastPoisonDamage,
       lastBombDamage: this.lastBombDamage,
+      lastThornDamage: this.lastThornDamage,
       leaderPairMultiplier: this.lastLeaderMultiplier,
       player: { ...this.player },
       targetEnemy: this.targetEnemy,

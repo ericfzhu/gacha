@@ -8,6 +8,7 @@ export const PAD_EXTRA_COMBO_BONUS = 0.25;
 export const PAD_POISON_MAX_HP_RATIO = 0.2;
 export const PAD_MORTAL_POISON_MAX_HP_RATIO = 0.5;
 export const PAD_BOMB_MAX_HP_RATIO = 0.2;
+export const PAD_DEFAULT_THORN_HP_PERCENT = 4;
 export const PAD_ENHANCED_ORB_BONUS = 0.06;
 
 // Version 21.9.0's restored image exposes the corresponding native routines as
@@ -80,6 +81,14 @@ export function padBombDamage(maxHp, bombCount = 1) {
   const hp = Math.max(0, Number(maxHp) || 0);
   const count = Math.max(0, Math.trunc(Number(bombCount) || 0));
   return Math.ceil(hp * PAD_BOMB_MAX_HP_RATIO) * count;
+}
+
+// _swapBlockMain (0x67a7a0) reads sBLOCK+0x0c & 0x7f, divides by 100,
+// multiplies maximum HP, and passes the result through izMathCeiling.
+export function padThornDamage(maxHp, percent = PAD_DEFAULT_THORN_HP_PERCENT) {
+  const hp = Math.max(0, Number(maxHp) || 0);
+  const rate = Math.max(0, Math.min(0x7f, Math.trunc(Number(percent) || 0)));
+  return Math.ceil(hp * rate / 100);
 }
 
 // Android may coalesce pointer motion. The native normal-board swap routine

@@ -143,6 +143,14 @@ in its row and column. A blast deliberately skips other bombs, allowing each
 unmatched bomb to detonate and contribute its own HP hit. Blast-only cells do
 not become combos and therefore do not contribute attack, recovery, or poison.
 
+The “Bur” name means the spiked/thorn-drop overlay. `_swapBlockMain` tests the
+orb being crossed for flag `0x80000`, reads the damage rate from
+`sBLOCK+0x0c & 0x7f`, and deals `ceil(maxHP * rate / 100)` on every crossing.
+It checks the stationary orb being crossed, not the held orb. Because the
+overlay moves backward with that stationary orb during the swap, reversing over
+it triggers the damage again. The browser input path preserves that behavior,
+including multiple crossed cells from one coalesced pointer-motion event.
+
 Classic base multipliers recovered in the calculation path are:
 
 - three connected orbs: `1.0`
