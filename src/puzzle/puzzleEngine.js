@@ -1,5 +1,16 @@
-export const BOARD_COLUMNS = 6;
-export const BOARD_ROWS = 5;
+import {
+  PAD_BOARD_COLUMNS,
+  PAD_BOARD_ROWS,
+  PAD_DEFAULT_MOVE_TIME_SECONDS,
+  findPadMatches,
+  padAttributeMultiplier,
+  padComboMultiplier,
+  padMatchPower,
+  tracePadDragCells,
+} from './padCoreRules.js';
+
+export const BOARD_COLUMNS = PAD_BOARD_COLUMNS;
+export const BOARD_ROWS = PAD_BOARD_ROWS;
 
 export const ORB_TYPES = Object.freeze([
   { id: 'fire', code: 'R', label: 'Fire', color: '#ef5a4f', highlight: '#ffb09e' },
@@ -50,15 +61,8 @@ function leaderMultiplier(combos) {
   return 1;
 }
 
-function attributeMultiplier(attacker, defender) {
-  if ((attacker === 'fire' && defender === 'wood') || (attacker === 'wood' && defender === 'water') || (attacker === 'water' && defender === 'fire')) return 2;
-  if ((attacker === 'wood' && defender === 'fire') || (attacker === 'water' && defender === 'wood') || (attacker === 'fire' && defender === 'water')) return 0.5;
-  if ((attacker === 'light' && defender === 'dark') || (attacker === 'dark' && defender === 'light')) return 2;
-  return 1;
-}
-
 export class PuzzleEngine {
-  constructor({ seed = 21900, moveTime = 5 } = {}) {
+  constructor({ seed = 21900, moveTime = PAD_DEFAULT_MOVE_TIME_SECONDS } = {}) {
     this.seed = seed;
     this.moveTime = moveTime;
     this.rng = makeRng(seed);
@@ -133,15 +137,9 @@ export class PuzzleEngine {
     this.drag.pointerY = pointerY;
     if (!this.isCell(row, column) || (row === this.drag.row && column === this.drag.column)) return false;
 
-    const rowDelta = row - this.drag.row;
-    const columnDelta = column - this.drag.column;
-    const steps = Math.max(Math.abs(rowDelta), Math.abs(columnDelta));
     let fromRow = this.drag.row;
     let fromColumn = this.drag.column;
-    for (let step = 1; step <= steps; step += 1) {
-      const nextRow = clamp(Math.round(this.drag.row + (rowDelta * step) / steps), 0, BOARD_ROWS - 1);
-      const nextColumn = clamp(Math.round(this.drag.column + (columnDelta * step) / steps), 0, BOARD_COLUMNS - 1);
-      if (nextRow === fromRow && nextColumn === fromColumn) continue;
+    for (const { row: nextRow, column: nextColumn } of tracePadDragCells(fromRow, fromColumn, row, column)) {
       [this.board[fromRow][fromColumn], this.board[nextRow][nextColumn]] = [this.board[nextRow][nextColumn], this.board[fromRow][fromColumn]];
       fromRow = nextRow;
       fromColumn = nextColumn;
@@ -217,7 +215,7 @@ export class PuzzleEngine {
       const matches = this.findMatches();
       if (matches.length) {
         this.pendingMatches = matches;
-        this.turnMatches.push(...matches.map((match) => ({ type: match.type, size: match.cells.length })));
+        this.turnMatches.push(...matches.map((match) => ({ type: match.type, size: match.size, isMassAttack: match.isMassAttack })));
         this.comboCount += matches.length;
         this.cascadeDepth += 1;
         this.phase = 'clear';
@@ -274,53 +272,7 @@ export class PuzzleEngine {
   }
 
   findMatches() {
-    const marked = Array.from({ length: BOARD_ROWS }, () => Array(BOARD_COLUMNS).fill(false));
-    for (let row = 0; row < BOARD_ROWS; row += 1) {
-      let start = 0;
-      while (start < BOARD_COLUMNS) {
-        const type = this.board[row][start]?.type;
-        let end = start + 1;
-        while (end < BOARD_COLUMNS && this.board[row][end]?.type === type) end += 1;
-        if (type && end - start >= 3) for (let column = start; column < end; column += 1) marked[row][column] = true;
-        start = end;
-      }
-    }
-    for (let column = 0; column < BOARD_COLUMNS; column += 1) {
-      let start = 0;
-      while (start < BOARD_ROWS) {
-        const type = this.board[start][column]?.type;
-        let end = start + 1;
-        while (end < BOARD_ROWS && this.board[end][column]?.type === type) end += 1;
-        if (type && end - start >= 3) for (let row = start; row < end; row += 1) marked[row][column] = true;
-        start = end;
-      }
-    }
-
-    const visited = Array.from({ length: BOARD_ROWS }, () => Array(BOARD_COLUMNS).fill(false));
-    const matches = [];
-    for (let row = 0; row < BOARD_ROWS; row += 1) {
-      for (let column = 0; column < BOARD_COLUMNS; column += 1) {
-        if (!marked[row][column] || visited[row][column]) continue;
-        const type = this.board[row][column].type;
-        const cells = [];
-        const queue = [{ row, column }];
-        visited[row][column] = true;
-        while (queue.length) {
-          const cell = queue.shift();
-          cells.push(cell);
-          [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dr, dc]) => {
-            const nextRow = cell.row + dr;
-            const nextColumn = cell.column + dc;
-            if (this.isCell(nextRow, nextColumn) && marked[nextRow][nextColumn] && !visited[nextRow][nextColumn] && this.board[nextRow][nextColumn]?.type === type) {
-              visited[nextRow][nextColumn] = true;
-              queue.push({ row: nextRow, column: nextColumn });
-            }
-          });
-        }
-        matches.push({ type, cells });
-      }
-    }
-    return matches;
+    return findPadMatches(this.board);
   }
 
   collapseAndRefill() {
@@ -334,7 +286,7 @@ export class PuzzleEngine {
   }
 
   resolvePlayerTurn() {
-    const comboMultiplier = 1 + 0.25 * Math.max(0, this.comboCount - 1);
+    const comboMultiplier = padComboMultiplier(this.comboCount);
     const leader = leaderMultiplier(this.comboCount);
     const leaderPair = leader * leader;
     this.lastLeaderMultiplier = leaderPair;
@@ -348,7 +300,7 @@ export class PuzzleEngine {
 
     const heartMatches = byType.get('heart') || [];
     if (heartMatches.length) {
-      const heartBase = heartMatches.reduce((sum, size) => sum + this.player.recovery * (1 + 0.25 * (size - 3)), 0);
+      const heartBase = padMatchPower(this.player.recovery, heartMatches);
       const healing = Math.floor(heartBase * comboMultiplier);
       const actual = Math.min(healing, this.player.maxHp - this.player.hp);
       this.player.hp += actual;
@@ -362,12 +314,12 @@ export class PuzzleEngine {
     this.party.forEach((member) => {
       const sizes = byType.get(member.attribute) || [];
       if (!sizes.length) return;
-      const matchAttack = sizes.reduce((sum, size) => sum + member.attack * (1 + 0.25 * (size - 3)), 0);
+      const matchAttack = padMatchPower(member.attack, sizes);
       const raw = matchAttack * comboMultiplier * leaderPair;
       const isMassAttack = sizes.some((size) => size >= 5);
       this.enemies.forEach((enemy, enemyIndex) => {
         if (enemy.hp <= 0 || (!isMassAttack && enemyIndex !== this.targetEnemy)) return;
-        const damage = Math.max(1, Math.floor(raw * attributeMultiplier(member.attribute, enemy.attribute)) - enemy.defense);
+        const damage = Math.max(1, Math.floor(raw * padAttributeMultiplier(member.attribute, enemy.attribute)) - enemy.defense);
         enemy.hp = Math.max(0, enemy.hp - damage);
         totalDamage += damage;
         this.floatingText.push({ kind: 'damage', value: damage, enemy: enemyIndex, attribute: member.attribute, age: 0 });
@@ -428,4 +380,3 @@ export class PuzzleEngine {
     };
   }
 }
-
