@@ -9,7 +9,7 @@ import {
   padDamageAfterDefense,
   padMatchPower,
   padNativeBaseAttackPower,
-  tracePadDragCells,
+  tracePadPointerCells,
 } from './padCoreRules.js';
 
 export const BOARD_COLUMNS = PAD_BOARD_COLUMNS;
@@ -126,23 +126,34 @@ export class PuzzleEngine {
     return board;
   }
 
-  startDrag(row, column, pointerX = 0, pointerY = 0) {
+  startDrag(row, column, pointerX = 0, pointerY = 0, gridColumn = column + 0.5, gridRow = row + 0.5) {
     if (this.mode !== 'playing' || this.phase !== 'input' || this.drag) return false;
     if (!this.isCell(row, column)) return false;
-    this.drag = { row, column, pointerX, pointerY, remaining: this.moveTime, pathLength: 0 };
+    this.drag = { row, column, pointerX, pointerY, gridColumn, gridRow, remaining: this.moveTime, pathLength: 0 };
     this.message = 'Keep moving — every crossed cell swaps with the held orb.';
     return true;
   }
 
-  moveDrag(row, column, pointerX = 0, pointerY = 0) {
+  moveDrag(row, column, pointerX = 0, pointerY = 0, gridColumn = column + 0.5, gridRow = row + 0.5) {
     if (!this.drag) return false;
     this.drag.pointerX = pointerX;
     this.drag.pointerY = pointerY;
-    if (!this.isCell(row, column) || (row === this.drag.row && column === this.drag.column)) return false;
+    if (![gridColumn, gridRow].every(Number.isFinite)) return false;
 
     let fromRow = this.drag.row;
     let fromColumn = this.drag.column;
-    for (const { row: nextRow, column: nextColumn } of tracePadDragCells(fromRow, fromColumn, row, column)) {
+    const path = tracePadPointerCells(
+      fromRow,
+      fromColumn,
+      this.drag.gridColumn,
+      this.drag.gridRow,
+      gridColumn,
+      gridRow,
+    );
+    this.drag.gridColumn = Math.max(0, Math.min(BOARD_COLUMNS - Number.EPSILON * BOARD_COLUMNS, gridColumn));
+    this.drag.gridRow = Math.max(0, Math.min(BOARD_ROWS - Number.EPSILON * BOARD_ROWS, gridRow));
+    if (!path.length) return false;
+    for (const { row: nextRow, column: nextColumn } of path) {
       [this.board[fromRow][fromColumn], this.board[nextRow][nextColumn]] = [this.board[nextRow][nextColumn], this.board[fromRow][fromColumn]];
       fromRow = nextRow;
       fromColumn = nextColumn;

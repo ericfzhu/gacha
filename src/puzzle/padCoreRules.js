@@ -86,6 +86,61 @@ export function tracePadDragCells(fromRow, fromColumn, toRow, toColumn) {
   return cells;
 }
 
+function clampGridCoordinate(value, extent) {
+  return Math.max(0, Math.min(extent - Number.EPSILON * extent, value));
+}
+
+export function tracePadPointerCells(
+  fromRow,
+  fromColumn,
+  fromGridColumn,
+  fromGridRow,
+  toGridColumn,
+  toGridRow,
+  rowCount = PAD_BOARD_ROWS,
+  columnCount = PAD_BOARD_COLUMNS,
+) {
+  if (![fromRow, fromColumn, rowCount, columnCount].every(Number.isInteger) ||
+      ![fromGridColumn, fromGridRow, toGridColumn, toGridRow].every(Number.isFinite) ||
+      rowCount <= 0 || columnCount <= 0) {
+    throw new Error('PAD pointer traversal requires finite grid coordinates and integer dimensions.');
+  }
+  const startColumn = clampGridCoordinate(fromGridColumn, columnCount);
+  const startRow = clampGridCoordinate(fromGridRow, rowCount);
+  const endColumn = clampGridCoordinate(toGridColumn, columnCount);
+  const endRow = clampGridCoordinate(toGridRow, rowCount);
+  const targetColumn = Math.floor(endColumn);
+  const targetRow = Math.floor(endRow);
+  if (fromRow === targetRow && fromColumn === targetColumn) return [];
+
+  const columnDelta = endColumn - startColumn;
+  const rowDelta = endRow - startRow;
+  const columnStep = Math.sign(columnDelta);
+  const rowStep = Math.sign(rowDelta);
+  let columnCrossing = columnStep > 0
+    ? (Math.floor(startColumn) + 1 - startColumn) / columnDelta
+    : columnStep < 0 ? (startColumn - Math.floor(startColumn)) / -columnDelta : Infinity;
+  let rowCrossing = rowStep > 0
+    ? (Math.floor(startRow) + 1 - startRow) / rowDelta
+    : rowStep < 0 ? (startRow - Math.floor(startRow)) / -rowDelta : Infinity;
+  const columnIncrement = columnStep ? 1 / Math.abs(columnDelta) : Infinity;
+  const rowIncrement = rowStep ? 1 / Math.abs(rowDelta) : Infinity;
+  let row = fromRow;
+  let column = fromColumn;
+  const cells = [];
+  while (row !== targetRow || column !== targetColumn) {
+    if (column !== targetColumn && columnCrossing <= rowCrossing) {
+      column += columnStep;
+      columnCrossing += columnIncrement;
+    } else {
+      row += rowStep;
+      rowCrossing += rowIncrement;
+    }
+    cells.push({ row, column });
+  }
+  return cells;
+}
+
 function matchShape(cells) {
   const coordinates = new Set(cells.map(({ row, column }) => `${row}:${column}`));
   const rows = new Set(cells.map(({ row }) => row));

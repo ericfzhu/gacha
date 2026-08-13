@@ -10,6 +10,7 @@ import {
   padNativeBaseAttackPower,
   padOrbMatchMultiplier,
   tracePadDragCells,
+  tracePadPointerCells,
 } from '../src/puzzle/padCoreRules.js';
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);
@@ -27,6 +28,17 @@ for (const path of [tracePadDragCells(0, 0, 4, 5), tracePadDragCells(4, 5, 0, 0)
     previous = cell;
   }
 }
+assert.deepEqual(tracePadPointerCells(0, 0, 0.9, 0.2, 1.1, 1.9), [
+  { row: 1, column: 0 },
+  { row: 1, column: 1 },
+]);
+assert.deepEqual(tracePadPointerCells(0, 0, 0.5, 0.5, 8, -2), [
+  { row: 0, column: 1 },
+  { row: 0, column: 2 },
+  { row: 0, column: 3 },
+  { row: 0, column: 4 },
+  { row: 0, column: 5 },
+]);
 
 const board = [
   ['R', 'R', 'R', 'B', 'G', 'L'],

@@ -82,8 +82,12 @@ when its destination is farther away. Therefore a coalesced browser pointer move
 must be expanded into the orthogonal grid boundaries crossed by the motion; a
 single direct diagonal exchange is incorrect in normal play.
 
-The JS engine now uses a supercover-style crossing trace with deterministic
-horizontal corner ties. Every emitted step has Manhattan distance one.
+The JS engine now uses a fractional pointer-segment crossing trace with
+deterministic horizontal corner ties. Every emitted step has Manhattan distance
+one. The segment is clamped to the 6x5 board before traversal, matching the
+native `_checkXYdir`/`_getNearestBlock` split: an off-centre diagonal crosses the
+geometrically correct neighbour first, while a pointer just outside the board
+continues swapping along its nearest edge.
 
 ## Match grouping and cascades
 

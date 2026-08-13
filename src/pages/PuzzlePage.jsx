@@ -440,7 +440,14 @@ export default function PuzzlePage() {
         return;
       }
       const cell = cellFromPoint(point);
-      if (engine.startDrag(cell.row, cell.column, point.x, point.y)) {
+      if (engine.startDrag(
+        cell.row,
+        cell.column,
+        point.x,
+        point.y,
+        (point.x - BOARD_X) / CELL,
+        (point.y - BOARD_Y) / CELL,
+      )) {
         canvas.setPointerCapture?.(event.pointerId);
         event.preventDefault();
         render(context, engine);
@@ -450,7 +457,14 @@ export default function PuzzlePage() {
       if (!engine.drag) return;
       const point = pointFromEvent(event);
       const cell = cellFromPoint(point);
-      engine.moveDrag(cell.row, cell.column, point.x, point.y);
+      engine.moveDrag(
+        cell.row,
+        cell.column,
+        point.x,
+        point.y,
+        (point.x - BOARD_X) / CELL,
+        (point.y - BOARD_Y) / CELL,
+      );
       event.preventDefault();
       render(context, engine);
     };
