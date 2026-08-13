@@ -11,6 +11,7 @@
     "wasm:test": "npm run wasm:build && node scripts/test-arm64-core.mjs",
     "pad-data:test": "node scripts/test-pad-data.mjs",
     "pad-rules:test": "node scripts/test-pad-gameplay-rules.mjs",
+    "libpad:inspect": "node scripts/inspect-libpad-gameplay.mjs",
     "android-stubs:build": "bash scripts/build-android-stubs.sh",
     "api:dev": "wrangler dev",
     "api:deploy": "wrangler deploy",

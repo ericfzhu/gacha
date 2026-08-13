@@ -20,6 +20,20 @@ surface/frame/touch exports. The restored image contains a 10,427,240-byte `.tex
 section and, unusually for a release build, thousands of named dynamic C++
 symbols. Those symbols provide reliable boundaries for the gameplay routines.
 
+The gameplay anchors can be reproduced after generating the restored image:
+
+```sh
+npm run libpad:inspect -- \
+  'jp.gungho.pad_21.9.0-21900_minAPI24(arm64-v8a).apk' \
+  --restored /tmp/libpad-restored.so
+```
+
+The inspector verifies the protected payload and known restoration hashes, then
+reports the address and byte size of every input, board, match, hazard, combat,
+targeting, and recovery routine used below. `--json` emits the same evidence in
+machine-readable form. It deliberately does not claim that the protected APK's
+mostly blank dynamic names are usable before restoration.
+
 ## Browser architecture
 
 The port is deliberately hybrid:
