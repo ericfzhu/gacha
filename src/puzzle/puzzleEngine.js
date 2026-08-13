@@ -32,6 +32,10 @@ import {
   padThornDamage,
   tracePadPointerCells,
 } from './padCoreRules.js';
+import {
+  decodePadEnemySkillRuntime,
+  normalizePadEnemySkillRecord,
+} from './padEnemySkills.js';
 
 export const BOARD_COLUMNS = PAD_BOARD_COLUMNS;
 export const BOARD_ROWS = PAD_BOARD_ROWS;
@@ -165,6 +169,7 @@ export class PuzzleEngine {
     this.lastPoisonDamage = 0;
     this.lastBombDamage = 0;
     this.lastThornDamage = 0;
+    this.lastEnemySkill = null;
     this.pendingComboDrops = 0;
     this.comboDropBonusCount = 0;
     this.turnNailCount = 0;
@@ -887,6 +892,22 @@ export class PuzzleEngine {
     };
   }
 
+  applyEnemySkillRecord(record) {
+    const skill = normalizePadEnemySkillRecord(record);
+    this.lastEnemySkill = skill;
+    if (!skill.supported || skill.kind !== 'blackFall') return false;
+    this.setBlackFallRule({
+      chanceBasisPoints: skill.chanceBasisPoints,
+      turnsRemaining: skill.durationTurns,
+    });
+    this.message = `Black skyfall active for ${skill.durationTurns} turn${skill.durationTurns === 1 ? '' : 's'}.`;
+    return true;
+  }
+
+  applyEnemySkillRuntime(skillDefinition, monsterRuntime) {
+    return this.applyEnemySkillRecord(decodePadEnemySkillRuntime(skillDefinition, monsterRuntime));
+  }
+
   setEnhancedFallAwakenings(counts) {
     if (!Array.isArray(counts) || counts.length !== 6 || counts.some((count) => (
       !Number.isInteger(Number(count)) || Number(count) < 0
@@ -1392,6 +1413,7 @@ export class PuzzleEngine {
       lastPoisonDamage: this.lastPoisonDamage,
       lastBombDamage: this.lastBombDamage,
       lastThornDamage: this.lastThornDamage,
+      lastEnemySkill: this.lastEnemySkill ? { ...this.lastEnemySkill } : null,
       leaderPairMultiplier: this.lastLeaderMultiplier,
       player: { ...this.player },
       party: this.party.map(({ id, name, attribute, secondaryAttribute, tertiaryAttribute, secondaryAttributeChanged = false, attack, recovery, damageCap, helper = false, leaderSkill = null }) => ({

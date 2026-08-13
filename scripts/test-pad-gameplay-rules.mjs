@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
+  PAD_ENEMY_SKILL_BLACK_FALL,
+  decodePadEnemySkillRuntime,
+} from '../src/puzzle/padEnemySkills.js';
+import {
   createPadLcg,
   createPadRng,
   findPadMatches,
@@ -243,6 +247,28 @@ assert.deepEqual(padResolveBlackFall(21_900, 0, {
   applied: false,
   attempts: 1,
 });
+const blackFallSkillDefinition = new Uint8Array(6);
+new DataView(blackFallSkillDefinition.buffer).setInt16(4, PAD_ENEMY_SKILL_BLACK_FALL, true);
+const blackFallMonsterRuntime = new Uint8Array(0x680);
+const blackFallMonsterView = new DataView(blackFallMonsterRuntime.buffer);
+blackFallMonsterView.setUint16(0x678, 3, true);
+blackFallMonsterView.setUint32(0x67c, 7_500, true);
+assert.deepEqual(decodePadEnemySkillRuntime(blackFallSkillDefinition, blackFallMonsterRuntime), {
+  type: 127,
+  kind: 'blackFall',
+  supported: true,
+  durationTurns: 3,
+  chanceBasisPoints: 7_500,
+  packedDuration: 3,
+  rawChance: 7_500,
+});
+new DataView(blackFallSkillDefinition.buffer).setInt16(4, 126, true);
+assert.deepEqual(decodePadEnemySkillRuntime(blackFallSkillDefinition, blackFallMonsterRuntime), {
+  type: 126,
+  kind: 'unsupported',
+  supported: false,
+});
+new DataView(blackFallSkillDefinition.buffer).setInt16(4, PAD_ENEMY_SKILL_BLACK_FALL, true);
 assert.deepEqual(padResolveEnhancementFall(21_900, 0, Array(6).fill(0)), {
   state: 394_448_415,
   enhancementPower: 0,
@@ -844,7 +870,6 @@ assert.deepEqual(enhancedFallEngine.snapshot().enhancedFallModifier, {
 const blackFallEngine = new PuzzleEngine({
   seed: 21_900,
   lockFallSeed: 21_900,
-  blackFallRule: { chanceBasisPoints: 10_000, turnsRemaining: 2 },
   thornFallRule: {
     typeMask: 1 << 0,
     chancePercent: 100,
@@ -853,6 +878,19 @@ const blackFallEngine = new PuzzleEngine({
   },
   nailFallRule: { chancePercent: 100 },
   lockFallRules: [{ typeMask: 1 << 0, chancePercent: 100 }],
+});
+blackFallMonsterView.setUint16(0x678, 2, true);
+blackFallMonsterView.setUint32(0x67c, 10_000, true);
+assert.equal(blackFallEngine.applyEnemySkillRuntime(
+  blackFallSkillDefinition,
+  blackFallMonsterRuntime,
+), true);
+assert.deepEqual(blackFallEngine.snapshot().lastEnemySkill, {
+  type: 127,
+  kind: 'blackFall',
+  supported: true,
+  durationTurns: 2,
+  chanceBasisPoints: 10_000,
 });
 blackFallEngine.setBoardFromCodes(Array(5).fill('DDDDDD'));
 blackFallEngine.setRngState(21_900);

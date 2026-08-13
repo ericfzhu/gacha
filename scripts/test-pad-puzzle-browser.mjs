@@ -501,7 +501,16 @@ try {
     const weakenedFallRuleState = engine.lockFallRng.state;
     engine.setEnhancedFallAwakenings(Array(6).fill(0));
     engine.setEnhancedFallModifier(null);
-    engine.setBlackFallRule({ chanceBasisPoints: 10_000, turnsRemaining: 2 });
+    const blackFallSkillDefinition = new Uint8Array(6);
+    new DataView(blackFallSkillDefinition.buffer).setInt16(4, 127, true);
+    const blackFallMonsterRuntime = new Uint8Array(0x680);
+    const blackFallMonsterView = new DataView(blackFallMonsterRuntime.buffer);
+    blackFallMonsterView.setUint16(0x678, 2, true);
+    blackFallMonsterView.setUint32(0x67c, 10_000, true);
+    const blackFallSkillApplied = engine.applyEnemySkillRuntime(
+      blackFallSkillDefinition,
+      blackFallMonsterRuntime,
+    );
     engine.setBoardFromCodes(Array(5).fill('DDDDDD'));
     engine.setRngState(21_900);
     engine.setLockFallRngState(21_900);
@@ -546,7 +555,7 @@ try {
       thornFallOrb, thornFallMainState, thornFallRuleState,
       nailMatchCount, nailDamage, nailDamageTotal,
       enhancedFallPower, enhancedFallRuleState, weakenedFallPower, weakenedFallRuleState,
-      blackFallOrb, blackFallRuleState, blackFallAfterFresh, blackFallTurnsAfterFresh,
+      blackFallSkillApplied, blackFallOrb, blackFallRuleState, blackFallAfterFresh, blackFallTurnsAfterFresh,
       blackFallAfterExpiry, blackFallRuleAfterExpiry,
       initialBoard, initialBoardState,
     };
@@ -634,6 +643,7 @@ try {
     poisonBlockSample.enhancedFallRuleState !== 394_448_415 ||
     poisonBlockSample.weakenedFallPower !== -0.5 ||
     poisonBlockSample.weakenedFallRuleState !== 394_448_415 ||
+    poisonBlockSample.blackFallSkillApplied !== true ||
     poisonBlockSample.blackFallOrb.blockFlags !== 0x11000 ||
     poisonBlockSample.blackFallOrb.blind !== true ||
     poisonBlockSample.blackFallOrb.blindFresh !== true ||

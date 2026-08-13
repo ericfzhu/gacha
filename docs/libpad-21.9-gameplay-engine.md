@@ -590,6 +590,17 @@ clears pre-existing combo-drop/Nail flags. The browser exposes this record as
 `blackFallRule`, renders the concealed orb and countdown, and advances both
 orb and effect lifetimes on the enemy-turn boundary.
 
+The raw activation path is now decoded as well. `_doEnemySkill` (`0x6285a4`)
+uses its second halfword jump table at `0xd3cbe0`; signed skill type `127` has
+entry `0x5fd`, which resolves from base `0x628fe0` to the black-fall handler at
+`0x62a7d4`. The selected definition's type is a signed halfword at `+0x04`.
+The handler reads its runtime duration from `sMONSTER+0x678` (the packed signed
+ten-bit lane) and its effective signed basis-point chance from the low half of
+`sMONSTER+0x67c`. `decodePadEnemySkillRuntime` accepts those two native byte
+records directly, and `PuzzleEngine.applyEnemySkillRuntime` or
+`applyEnemySkillRecord` installs the decoded effect. Unsupported skill types
+are reported without mutating the board-rule state.
+
 The last `_checkPassiveSkill4Block` branch handles enhanced and weakened
 skyfalls for natural types. `_countPassiveSkills` at `0x63fa28` is called with
 attribute-specific skill IDs `14, 15, 16, 17, 18, 29`; each matching awakening

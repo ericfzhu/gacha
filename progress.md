@@ -2,6 +2,19 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 black-fall enemy-skill runtime decode
+
+- Recovered `_doEnemySkill`'s second dispatch table: signed type `127`, table
+  entry `0x5fd`, resolves to the black-fall handler at `0x62a7d4`.
+- Added a byte-exact runtime decoder for definition type `+0x04`, monster
+  duration `+0x678`, and signed chance `+0x67c`, plus an engine application
+  boundary that rejects unsupported types without changing fall state.
+- Routed engine and browser fixtures through the decoded type-127 record and
+  made the exact inspector verify both the `0x6285a4` `_doEnemySkill` anchor and
+  jump-table target (71 symbols total).
+- Next: recover the enemy-skill scheduler/selection boundary and add the next
+  high-impact board-affecting dispatch types without inventing server data.
+
 ## 2026-08-14 native black/invisible skyfalls
 
 - Identified `_checkPassiveSkill4Block`'s `0x1000` branch as black/invisible

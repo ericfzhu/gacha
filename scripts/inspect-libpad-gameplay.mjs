@@ -9,6 +9,10 @@ import { parseElf64 } from '../src/binary-port/elf64.js';
 const APK_LIBPAD_PATH = 'lib/arm64-v8a/libpad.so';
 const PAD_21_9_LIBPAD_SHA256 = '785ffa641837c528864cfbeb9716e340c9d948ba3a37bca3193b5cd32dda89d8';
 const PAD_21_9_RESTORED_SHA256 = '91223570f42247f155e50fba03e529f2a21b936021bd1525928237a5c87cd99a';
+const ENEMY_SKILL_DISPATCH_TABLE = 0xd3cbe0;
+const ENEMY_SKILL_DISPATCH_BASE = 0x628fe0;
+const BLACK_FALL_ENEMY_SKILL_TYPE = 127;
+const BLACK_FALL_HANDLER = 0x62a7d4;
 
 const GAMEPLAY_SYMBOLS = Object.freeze([
   ['input', 'walk1step', '_ZN9cGAMEMAIN10_walk1stepEv', 0x647c28],
@@ -35,6 +39,7 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['orb-state', 'doMakeInvDropEfc', '_ZN9cGAMEMAIN17_doMakeInvDropEfcEb', 0x627e58],
   ['orb-state', 'clearBlackFall', '_ZN9cGAMEMAIN15_clearBlackFallEv', 0x6b57a0],
   ['orb-state', 'incEneTurn', '_ZN9cGAMEMAIN11_incEneTurnEb', 0x677978],
+  ['orb-state', 'doEnemySkill', '_ZN9cGAMEMAIN13_doEnemySkillEP8sMONSTER', 0x6285a4],
   ['orb-state', 'addNailCounts', '_ZN9sGAMEWORK13addNailCountsEi', 0x422e60],
   ['orb-state', 'countPassiveSkills', '_ZNK9cGAMEMAIN19_countPassiveSkillsEiR8sSKILLBYbb', 0x63fa28],
   ['orb-state', 'hasBlockPowup', '_ZN9cGAMEMAIN14_hasBlockPowupEi', 0x6b0cc8],
@@ -95,6 +100,16 @@ function hex(value) {
   return `0x${value.toString(16)}`;
 }
 
+function readUint16Virtual(elf, bytes, address) {
+  const segment = elf?.loadSegments.find((candidate) => (
+    address >= candidate.virtualAddress
+    && address + 2 <= candidate.virtualAddress + candidate.fileSize
+  ));
+  if (!segment) return null;
+  const offset = segment.fileOffset + address - segment.virtualAddress;
+  return new DataView(bytes.buffer, bytes.byteOffset + offset, 2).getUint16(0, true);
+}
+
 function usage() {
   console.error('Usage: node scripts/inspect-libpad-gameplay.mjs <APK-or-libpad.so> [--restored <restored-libpad.so>] [--json]');
   process.exitCode = 2;
@@ -124,6 +139,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
   const restoredElf = restoredBytes ? parseElf64(restoredBytes) : null;
   const restoredHash = restoredBytes ? sha256(restoredBytes) : null;
   const restoredSymbols = new Map(restoredElf?.dynamicSymbols.map((symbol) => [symbol.name, symbol]) || []);
+  const blackFallDispatchEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      ENEMY_SKILL_DISPATCH_TABLE + (BLACK_FALL_ENEMY_SKILL_TYPE - 1) * 2,
+    )
+    : null;
+  const blackFallDispatchTarget = blackFallDispatchEntry === null
+    ? null
+    : ENEMY_SKILL_DISPATCH_BASE + blackFallDispatchEntry * 4;
+  const blackFallDispatchMatches = blackFallDispatchTarget === null
+    ? null
+    : blackFallDispatchTarget === BLACK_FALL_HANDLER;
 
   const symbols = GAMEPLAY_SYMBOLS.map(([group, label, mangledName, expectedAddress]) => {
     const symbol = restoredSymbols.get(mangledName) || null;
@@ -155,6 +183,7 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       namedDynamicSymbols: restoredElf.dynamicSymbols.filter((symbol) => symbol.name).length,
       allAnchorsPresent: missing.length === 0,
       allAddressesMatch21_9: mismatches.length === 0,
+      blackFallDispatchMatches21_9: blackFallDispatchMatches,
     } : null,
     layout: {
       boardColumnsOffset: 'cGAMEMAIN+0x70',
@@ -170,6 +199,15 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       specialLockClearedFlags: 'sBLOCK.flags & ~0x28000',
       erasedBlockMarker: 'sBLOCK.flags & 0x40000',
       matchEnhancementAccumulator: 'float32(1.0 + sequential sum of marked sBLOCK+0x08 values)',
+    },
+    enemySkillRuntime: {
+      definitionTypeOffset: 'sENEMYSKILL+0x04 (signed int16)',
+      monsterDurationOffset: 'sMONSTER+0x678 (packed low 10 bits)',
+      monsterChanceOffset: 'sMONSTER+0x67c (signed low 16 bits)',
+      blackFallType: BLACK_FALL_ENEMY_SKILL_TYPE,
+      dispatchEntry: blackFallDispatchEntry === null ? null : hex(blackFallDispatchEntry),
+      dispatchTarget: blackFallDispatchTarget === null ? null : hex(blackFallDispatchTarget),
+      dispatchMatches21_9: blackFallDispatchMatches,
     },
     symbols,
   };
@@ -200,7 +238,11 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     }
     console.log('\n[board layout]');
     for (const [key, value] of Object.entries(report.layout)) console.log(`  ${key.padEnd(23)} ${value}`);
+    console.log('\n[enemy skill runtime]');
+    for (const [key, value] of Object.entries(report.enemySkillRuntime)) {
+      console.log(`  ${key.padEnd(23)} ${value}`);
+    }
   }
 
-  if (missing.length || mismatches.length) process.exitCode = 1;
+  if (missing.length || mismatches.length || blackFallDispatchMatches === false) process.exitCode = 1;
 }
