@@ -2,6 +2,17 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-13 gameplay data and rules fidelity pass
+
+- Decoded the `MCD5` shipped-asset index: 4,328 records spanning resident `DATA001.BIN`, compressed `DATA002.BIN`, WAV `DATA003.BIN`, download-only names, and reserved slots. Added a dependency-free parser, inspector, and exact-APK regression.
+- Decoded `TEX2` layout and the 512x512 `block2.btex` atlas, including its 26 sprite rectangles and base-orb records 2–7.
+- Regenerated the post-protection `libpad.so` image and anchored the native movement, adjacency, swap, match flood-fill, erase, fall, combo, damage, recovery, and game-phase routines by restored symbol and address.
+- Corrected coalesced pointer movement in the JS engine. Normal `libpad` rejects diagonal neighbours, so sparse motion is now expanded into orthogonally adjacent boundary crossings instead of a direct diagonal swap.
+- Extracted classic match/combo/attribute constants into a pure rules layer and added connected-group shape metadata for row, column, cross, L, box, and mass attacks.
+- Added an optional local-only APK worker to decode and render the original orb atlas in the playable puzzle harness without committing or uploading proprietary pixels.
+- Verification passes: rules tests, data-container tests, ARM64/Wasm integration, production build, custom-art Chromium input regression, and exact-APK-atlas Chromium input regression with zero console errors.
+- Detailed evidence and current data boundary: `docs/libpad-21.9-gameplay-engine.md`.
+
 ## 2026-08-13 playable native-frame milestone
 
 - Completed the protected PAD module chain and restored enough of the original image to call `JNI_OnLoad` (`JNI_VERSION_1_6`) and the exported Android lifecycle directly from the browser worker.
