@@ -25,6 +25,7 @@ import {
   padPoisonDamage,
   padResolveBitReplacements,
   padResolveBlockSwapPassive,
+  padResolveComboDropSpawns,
   padResolveBlockSwapNew,
   padResolveLineBlockSwaps,
   padResolveSkillBoardSwap,
@@ -98,6 +99,21 @@ assert.deepEqual(padSpawnNewBlockInBits(21_900, 0b101010, [0, 1, 2, 3, 4, 5]), {
   state: 394_448_415,
   type: 1,
   usedFaceFallback: false,
+});
+assert.deepEqual(padResolveComboDropSpawns(21_900, [6, 1], {
+  pendingCount: 1,
+}), {
+  state: 394_448_415,
+  marked: [false, true],
+  desiredCount: 1,
+});
+assert.deepEqual(padResolveComboDropSpawns(3_803_934_822, [0, 5], {
+  chanceBasisPoints: 5_000,
+  remainingCapacity: 2,
+}), {
+  state: 1_569_558_794,
+  marked: [true, true],
+  desiredCount: 2,
 });
 assert.deepEqual(padSpawnNewBlockInBits(394_448_415, (1 << 0) | (1 << 6), [0, 1, 2, 3, 4, 5]), {
   state: 1_929_471_377,
@@ -505,6 +521,18 @@ assert.deepEqual(orderedSkyfallEngine.board.map((row) => row[0].type), [
   'fire', 'heart', 'dark', 'dark', 'dark',
 ]);
 assert.equal(orderedSkyfallEngine.rng.state, 3_803_934_822);
+const comboDropSkyfallEngine = new PuzzleEngine({ seed: 21_900 });
+comboDropSkyfallEngine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+comboDropSkyfallEngine.setRngState(21_900);
+comboDropSkyfallEngine.pendingComboDrops = 2;
+comboDropSkyfallEngine.board[1][0] = null;
+comboDropSkyfallEngine.board[3][0] = null;
+comboDropSkyfallEngine.collapseAndRefill();
+assert.deepEqual(comboDropSkyfallEngine.board.slice(0, 2).map((row) => (
+  row[0].blockFlags & 0x8000
+)), [0x8000, 0x8000]);
+assert.equal(comboDropSkyfallEngine.pendingComboDrops, 0);
+assert.equal(comboDropSkyfallEngine.rng.state, 919_597_584);
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);
 assert.deepEqual(tracePadDragCells(0, 0, 2, 2, true), [{ row: 1, column: 1 }, { row: 2, column: 2 }]);

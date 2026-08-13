@@ -412,6 +412,14 @@ try {
     engine.collapseAndRefill();
     const orderedSkyfallTypes = engine.board.map((row) => row[0].type);
     const orderedSkyfallState = engine.rng.state;
+    engine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+    engine.setRngState(21_900);
+    engine.pendingComboDrops = 2;
+    engine.board[1][0] = null;
+    engine.board[3][0] = null;
+    engine.collapseAndRefill();
+    const comboDropSkyfallFlags = engine.board.slice(0, 2).map((row) => row[0].blockFlags);
+    const comboDropSkyfallState = engine.rng.state;
     engine.reset();
     const initialBoard = engine.snapshot().board;
     const initialBoardState = engine.rng.state;
@@ -434,6 +442,7 @@ try {
       skyfallType, skyfallState, weightedSkyfallType, weightedSkyfallState,
       excludedSkyfallType, excludedSkyfallState,
       orderedSkyfallTypes, orderedSkyfallState,
+      comboDropSkyfallFlags, comboDropSkyfallState,
       initialBoard, initialBoardState,
     };
   }) : null;
@@ -497,6 +506,8 @@ try {
     JSON.stringify(poisonBlockSample.orderedSkyfallTypes) !== JSON.stringify([
       'fire', 'heart', 'dark', 'dark', 'dark',
     ]) || poisonBlockSample.orderedSkyfallState !== 3_803_934_822 ||
+    JSON.stringify(poisonBlockSample.comboDropSkyfallFlags) !== JSON.stringify([0x8000, 0x8000]) ||
+    poisonBlockSample.comboDropSkyfallState !== 919_597_584 ||
     JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
       'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',
     ]) || poisonBlockSample.initialBoardState !== 79_238_434

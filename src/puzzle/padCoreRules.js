@@ -58,6 +58,9 @@ export function createPadRng(seed = 0) {
     get state() {
       return state;
     },
+    setState(value) {
+      state = Number(value) >>> 0;
+    },
     nextUint16() {
       return nextUint16();
     },
@@ -255,6 +258,55 @@ export function padSpawnNewBlock(
     type = faces[(start + offset + 1) % faces.length];
   }
   return { state: faceRoll.state, type, spawnFlags: 0, weighted: false, scripted: false };
+}
+
+// _checkFalls (0x673fbc) first generates every replacement type, then rolls
+// floor-configured combo-drop chances once per replacement until the configured
+// cap is full. Requested markers each spend one additional saved LCG advance;
+// native starts at that random replacement index and scans forward (wrapping)
+// for an unmarked natural type. The output byte's bit 6 becomes sBLOCK flag
+// 0x8000 when the replacement object is initialized.
+export function padResolveComboDropSpawns(
+  state,
+  spawnedTypes,
+  {
+    pendingCount = 0,
+    chanceBasisPoints = 0,
+    remainingCapacity = 0,
+  } = {},
+) {
+  const types = (Array.isArray(spawnedTypes) ? spawnedTypes : [])
+    .map((type) => Math.trunc(Number(type)));
+  const marked = Array(types.length).fill(false);
+  let nextState = Number(state) >>> 0;
+  let desiredCount = Math.max(0, Math.trunc(Number(pendingCount) || 0));
+  let capacity = Math.max(0, Math.trunc(Number(remainingCapacity) || 0));
+  const chance = Math.max(0, Math.trunc(Number(chanceBasisPoints) || 0));
+
+  for (let index = 0; index < types.length && capacity > 0 && chance > 0; index += 1) {
+    const roll = padLcgStep(nextState);
+    nextState = roll.state;
+    const scaled = Math.floor(roll.value * 10_000 / 0x10000);
+    if (scaled < chance) {
+      desiredCount += 1;
+      capacity -= 1;
+    }
+  }
+
+  for (let marker = 0; marker < desiredCount && types.length > 0; marker += 1) {
+    const roll = padLcgStep(nextState);
+    nextState = roll.state;
+    let candidate = Math.floor(roll.value * types.length / 0x10000);
+    for (let attempt = 0; attempt < types.length * 2; attempt += 1) {
+      if (!marked[candidate] && types[candidate] >= 0 && types[candidate] <= 5) {
+        marked[candidate] = true;
+        break;
+      }
+      candidate = (candidate + 1) % types.length;
+    }
+  }
+
+  return { state: nextState, marked, desiredCount };
 }
 
 // _buildBlockList (0x6615e8) emits ten float32 lanes, adds them sequentially,

@@ -138,6 +138,7 @@ Important routines include:
 | `0x666a78` | `_checkFlood2(int, int, int&)` |
 | `0x66c81c` | `_checkErases()` |
 | `0x673fbc` | `_checkFalls()` |
+| `0x7752fc` | `sFLOORLIST::getComboDrop()` |
 | `0x651854` | `_calcCombo()` |
 | `0x66c2dc` | `_incCombos(float, float)` |
 
@@ -198,6 +199,23 @@ new top slots in the same order. This is observable whenever a column has two
 or more holes: the first RNG result belongs to the highest empty slot, not the
 lowest. `PuzzleEngine.collapseAndRefill` preserves that column-major,
 top-to-bottom generation and placement contract.
+
+`_checkFalls` stores each replacement in a temporary byte before constructing
+the falling `sBLOCK`: its low six bits are the type and bit 6 becomes block flag
+`0x8000`. Native finishes all type generation before it processes these
+combo-drop markers. The floor record's `getComboDrop` value supplies a chance
+in basis points and a live-marker cap. It spends one saved LCG advance per
+replacement chance attempt until the cap is full. Every requested marker then
+spends another advance to choose a starting replacement index and scans forward
+with wrap for an unmarked natural type; non-natural types `6..9` are skipped.
+
+`padResolveComboDropSpawns` reproduces this sequencing, and
+`PuzzleEngine.collapseAndRefill` exposes `comboDropChanceBasisPoints`,
+`comboDropCap`, and `pendingComboDrops` for decoded dungeon/floor data. The
+marker is retained in `blockFlags` and surfaced as `comboDrop` in snapshots.
+Raw party-awakening records that produce pending markers, top-line scripted
+descriptors selected by `_isEnableTopLine` (`0x6401d0`), and the marker's later
+combo accounting are still upstream/downstream tasks rather than inferred here.
 
 The upstream `_buildBlockList(float rates[10], uint32 excludedMask)` at
 `0x6615e8` clears ten lanes, applies dungeon/passive additions, sequentially

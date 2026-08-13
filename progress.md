@@ -2,6 +2,22 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 native combo-drop skyfall markers
+
+- Recovered `_checkFalls`' replacement-byte stream: low six bits carry the
+  generated type and bit 6 becomes `sBLOCK.flags & 0x8000` on the new block.
+- Ported floor-configured combo-drop chance/cap rolls and pending marker counts.
+  All replacement types are generated first; each chance attempt and each
+  marker-selection start spends the native saved LCG advance, then selection
+  scans forward with wrap for an unmarked natural type.
+- Added pure helper, engine, and browser fixtures, including the exact two-hole
+  marker result/state. `_isEnableTopLine` and `sFLOORLIST::getComboDrop` raise
+  the exact restored-image inspector to 60 anchors.
+- Rules, production build, exhaustive browser mechanics, and the independent
+  gameplay-client render pass with no console errors.
+- Next: recover top-line scripted replacement descriptors and the downstream
+  combo accounting/awakening-record production for `0x8000` markers.
+
 ## 2026-08-14 native multi-hole refill order
 
 - Recovered the ordinary refill traversal in `_checkFalls` at `0x673fbc`:

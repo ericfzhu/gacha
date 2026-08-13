@@ -18,6 +18,7 @@ import {
   padNativeRecoveryPower,
   padPoisonDamage,
   padResolveBlockSwapPassive,
+  padResolveComboDropSpawns,
   padSecondaryAttributeAttack,
   padShuffleLockDropCandidates,
   padTertiaryAttributeAttack,
@@ -43,6 +44,7 @@ export const ORB_TYPES = Object.freeze([
 
 const NATURAL_ORB_TYPES = ORB_TYPES.slice(0, 6);
 const PAD_BLOCK_LOCKED_FLAG = 0x800;
+const PAD_BLOCK_COMBO_DROP_FLAG = 0x8000;
 const PAD_BLOCK_SPECIAL_LOCK_CLEAR_FLAGS = 0x28000;
 const PAD_BLOCK_BURST_FLAG = 0x80000;
 
@@ -94,6 +96,8 @@ export class PuzzleEngine {
     faceTypes = [0, 1, 2, 3, 4, 5],
     dropRates = Array(10).fill(0),
     skyfallExclusionMask = 0,
+    comboDropChanceBasisPoints = 0,
+    comboDropCap = 12,
   } = {}) {
     if (![columns, rows].every(Number.isInteger) || columns < 1 || columns > 15 || rows < 1 || rows > 15) {
       throw new Error('PAD board dimensions must be integers from 1 through 15.');
@@ -106,6 +110,8 @@ export class PuzzleEngine {
     this.setFaceTypes(faceTypes);
     this.setDropRates(dropRates);
     this.skyfallExclusionMask = Number(skyfallExclusionMask) >>> 0;
+    this.comboDropChanceBasisPoints = Math.max(0, Math.trunc(Number(comboDropChanceBasisPoints) || 0));
+    this.comboDropCap = Math.max(0, Math.trunc(Number(comboDropCap) || 0));
     this.rng = createPadRng(seed);
     this.orbSerial = 0;
     this.visualTime = 0;
@@ -127,6 +133,7 @@ export class PuzzleEngine {
     this.lastPoisonDamage = 0;
     this.lastBombDamage = 0;
     this.lastThornDamage = 0;
+    this.pendingComboDrops = 0;
     this.hpResolutionApplied = false;
     this.lastLeaderMultiplier = 1;
     this.message = 'Drag one orb through the board to rearrange the whole path.';
@@ -473,20 +480,51 @@ export class PuzzleEngine {
   }
 
   collapseAndRefill() {
+    const generated = [];
+    let existingComboDrops = 0;
+    for (let row = 0; row < this.rows; row += 1) {
+      for (let column = 0; column < this.columns; column += 1) {
+        if ((Number(this.board[row][column]?.blockFlags) & PAD_BLOCK_COMBO_DROP_FLAG) !== 0) {
+          existingComboDrops += 1;
+        }
+      }
+    }
     for (let column = 0; column < this.columns; column += 1) {
       const survivors = [];
       for (let row = this.rows - 1; row >= 0; row -= 1) if (this.board[row][column]) survivors.push(this.board[row][column]);
       const missingCount = this.rows - survivors.length;
-      const generated = Array.from({ length: missingCount }, () => {
+      const columnGenerated = Array.from({ length: missingCount }, (_, row) => {
         const type = this.rng.spawnNewBlock(this.dropRates, this.faceTypes, this.skyfallExclusionMask);
-        return this.createOrb(ORB_TYPES[type]?.id || NATURAL_ORB_TYPES[0].id);
+        const entry = { row, column, type };
+        generated.push(entry);
+        return entry;
       });
       for (let row = 0; row < this.rows; row += 1) {
         this.board[row][column] = row < missingCount
-          ? generated[row]
+          ? columnGenerated[row]
           : survivors[this.rows - 1 - row];
       }
     }
+    const pendingCount = Math.max(0, Math.min(
+      Number(this.pendingComboDrops) || 0,
+      8 - existingComboDrops,
+    ));
+    const comboDropResolution = padResolveComboDropSpawns(
+      this.rng.state,
+      generated.map((entry) => entry.type),
+      {
+        pendingCount,
+        chanceBasisPoints: this.comboDropChanceBasisPoints,
+        remainingCapacity: this.comboDropCap - existingComboDrops - pendingCount,
+      },
+    );
+    this.rng.setState(comboDropResolution.state);
+    this.pendingComboDrops = 0;
+    generated.forEach((entry, index) => {
+      this.board[entry.row][entry.column] = this.createOrb(ORB_TYPES[entry.type]?.id || NATURAL_ORB_TYPES[0].id, {
+        blockFlags: comboDropResolution.marked[index] ? PAD_BLOCK_COMBO_DROP_FLAG : 0,
+      });
+    });
   }
 
   resolvePlayerTurn() {
@@ -1027,10 +1065,14 @@ export class PuzzleEngine {
       faceTypes: [...this.faceTypes],
       dropRates: [...this.dropRates],
       skyfallExclusionMask: this.skyfallExclusionMask,
+      comboDropChanceBasisPoints: this.comboDropChanceBasisPoints,
+      comboDropCap: this.comboDropCap,
+      pendingComboDrops: this.pendingComboDrops,
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({
         code: ORB_BY_ID[orb.type].code,
         blockFlags: orb.blockFlags,
+        comboDrop: (orb.blockFlags & PAD_BLOCK_COMBO_DROP_FLAG) !== 0,
         enhancementPower: orb.enhancementPower,
         enhanced: orb.enhanced,
         locked: orb.locked,
