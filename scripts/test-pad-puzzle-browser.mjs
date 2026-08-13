@@ -23,6 +23,7 @@ const renderReviveState = process.argv.includes('--revive-render');
 const renderAttributeChangeState = process.argv.includes('--attribute-change-render');
 const renderSelfDestructState = process.argv.includes('--self-destruct-render');
 const renderMoveTimeState = process.argv.includes('--move-time-render');
+const renderStatusShieldState = process.argv.includes('--status-shield-render');
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 980, height: 900 } });
 const consoleMessages = [];
@@ -949,6 +950,32 @@ try {
     engine.setRngState(21_900);
     const rejectedHealPlayerSkill = engine.takeEnemySkill(0);
     const rejectedHealPlayerState = engine.snapshot();
+    const statusShieldMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(statusShieldMonsterDefinition.buffer).setUint32(0xec, 9_029, true);
+    const statusShieldDefinition = sourceToPoisonDefinition.slice();
+    const statusShieldView = new DataView(statusShieldDefinition.buffer);
+    statusShieldView.setUint32(0x00, 9_029, true);
+    statusShieldView.setInt16(0x04, 20, true);
+    statusShieldView.setInt32(0x10, 3, true);
+    engine.reset();
+    engine.setEnemyAiDefinitionPool(
+      0,
+      statusShieldMonsterDefinition,
+      [statusShieldDefinition],
+    );
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedStatusShieldAi = engine.snapshot();
+    engine.setEnemyAiDefinitionPool(
+      0,
+      statusShieldMonsterDefinition,
+      [statusShieldDefinition],
+    );
+    engine.setRngState(21_900);
+    const rejectedStatusShieldSkill = engine.takeEnemySkill(0);
+    const rejectedStatusShieldState = engine.snapshot();
     const moveTimeReductionMonsterDefinition = enemyAiMonsterDefinition.slice();
     new DataView(moveTimeReductionMonsterDefinition.buffer).setUint32(0xec, 9_028, true);
     const moveTimeReductionDefinition = sourceToPoisonDefinition.slice();
@@ -1216,6 +1243,7 @@ try {
       rejectedScaledSourceToPoisonSkill, rejectedScaledSourceToPoisonState,
       selectedSourceToMortalPoisonAi, selectedSourceToMortalPoisonCount,
       selectedHealPlayerAi, rejectedHealPlayerSkill, rejectedHealPlayerState,
+      selectedStatusShieldAi, rejectedStatusShieldSkill, rejectedStatusShieldState,
       selectedMoveTimeReductionAi, moveTimeReductionDrag,
       rejectedMoveTimeReductionSkill, rejectedMoveTimeReductionState,
       selectedSelfDestructAi,
@@ -1461,6 +1489,13 @@ try {
     poisonBlockSample.selectedHealPlayerAi.enemies?.[0]?.enemyAiBudget !== 80 ||
     poisonBlockSample.rejectedHealPlayerSkill !== null ||
     poisonBlockSample.rejectedHealPlayerState.rngState !== 21_900 ||
+    poisonBlockSample.selectedStatusShieldAi.enemies?.[0]?.statusShieldTurns !== 3 ||
+    poisonBlockSample.selectedStatusShieldAi.lastEnemyActions?.[0]?.skill?.type !== 20 ||
+    poisonBlockSample.selectedStatusShieldAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_029 ||
+    poisonBlockSample.selectedStatusShieldAi.rngState !== advanceLcg(21_900, 1) ||
+    poisonBlockSample.selectedStatusShieldAi.enemies?.[0]?.enemyAiBudget !== 80 ||
+    poisonBlockSample.rejectedStatusShieldSkill !== null ||
+    poisonBlockSample.rejectedStatusShieldState.rngState !== 21_900 ||
     poisonBlockSample.selectedMoveTimeReductionAi.moveTimeSeconds !== 3.75 ||
     poisonBlockSample.selectedMoveTimeReductionAi.moveTimeReduction?.turnsRemaining !== 2 ||
     poisonBlockSample.selectedMoveTimeReductionAi.lastEnemyActions?.[0]?.skill?.type !== 39 ||
@@ -1881,10 +1916,31 @@ try {
     || moveTimeRenderState.moveTimeReduction?.turnsRemaining !== 2
   )) throw new Error(`Move-time render-state mismatch: ${JSON.stringify(moveTimeRenderState)}`);
   if (moveTimeRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
+  const statusShieldRenderState = renderStatusShieldState ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    engine.reset();
+    engine.start();
+    const applied = engine.applyEnemySkillRecord({
+      type: 20,
+      kind: 'statusShield',
+      supported: true,
+      durationTurns: 3,
+      attackWithSkillValue: 0,
+    }, 0);
+    return {
+      applied,
+      enemy: engine.snapshot().enemies[0],
+    };
+  }) : null;
+  if (statusShieldRenderState && (
+    statusShieldRenderState.applied !== true
+    || statusShieldRenderState.enemy?.statusShieldTurns !== 3
+  )) throw new Error(`Status-shield render-state mismatch: ${JSON.stringify(statusShieldRenderState)}`);
+  if (statusShieldRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

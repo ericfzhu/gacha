@@ -2,6 +2,24 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 enemy status-ailment shield
+
+- Identified enemy skill type `20` as the enemy status-ailment immunity shield:
+  late handler `0x629534`, setup `0x61ff08`, and condition `0x61b4d8`.
+  Setup copies definition duration `+0x10` to runtime `sMONSTER+0x678` without
+  RNG; execution writes its signed low 16 bits to protected counter `+0x870`.
+- The condition rejects reapplication while the counter is positive, and
+  `_incEneTurn` decrements it before a later enemy action. Native damage setup
+  checks the same counter before admitting player-applied defense reduction,
+  while monster reset/status-clear paths zero it.
+- Ported definition/runtime decoding, new-AI selection and exact one-draw RNG,
+  reapplication rejection, per-enemy countdown, snapshots, canvas status icon,
+  browser fixtures, and exact dispatch/setup/condition plus lifecycle anchors.
+- Confirmed types `21..38` are rejected native records in this build: all use
+  no-effect dispatch `0x62be50` and false condition `0x61c01c`; type `37` has
+  generic setup `0x6217c0` while the rest use selection-clearing `0x621c94`.
+- Next: inspect the next live pre-20 enemy action.
+
 ## 2026-08-14 enemy move-time reduction
 
 - Identified enemy skill type `39` as the player move-time reduction status:

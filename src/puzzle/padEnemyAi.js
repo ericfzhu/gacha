@@ -1,5 +1,6 @@
 import { padLcgStep } from './padCoreRules.js';
 import {
+  PAD_ENEMY_SKILL_STATUS_SHIELD,
   PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
   PAD_ENEMY_SKILL_SELF_DESTRUCT,
   PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
@@ -124,6 +125,7 @@ function normalizeDefinitionMap(definitions) {
 
 function isStaticallyEligible(definition, state) {
   if (!definition.effect.supported || ![
+    PAD_ENEMY_SKILL_STATUS_SHIELD,
     PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
     PAD_ENEMY_SKILL_SELF_DESTRUCT,
     PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
@@ -163,6 +165,10 @@ function evaluateCondition(definition, state, rngState) {
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_BLACK_FALL) {
     const eligible = !state.blackFallActive;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_STATUS_SHIELD) {
+    const eligible = state.enemyStatusShieldTurns <= 0;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION) {
@@ -279,6 +285,7 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     playerMaxHp: Math.max(0, Number(state.playerMaxHp) || 0),
     attributeAbsorbTurns: Math.max(0, Math.trunc(Number(state.attributeAbsorbTurns) || 0)),
     scaledAttackGate: Math.trunc(Number(state.scaledAttackGate) || 0),
+    enemyStatusShieldTurns: Math.max(0, Math.trunc(Number(state.enemyStatusShieldTurns) || 0)),
     moveTimeReductionTurns: Math.max(0, Math.trunc(Number(state.moveTimeReductionTurns) || 0)),
     enemyAttribute: Math.trunc(Number(state.enemyAttribute)),
     enemies: Array.isArray(state.enemies) ? state.enemies : [],

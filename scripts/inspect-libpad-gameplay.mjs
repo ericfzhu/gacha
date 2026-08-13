@@ -24,6 +24,14 @@ const HEAL_PLAYER_ENEMY_SKILL_TYPE = 55;
 const HEAL_PLAYER_HANDLER = 0x629900;
 const HEAL_PLAYER_SETUP_HANDLER = 0x620040;
 const HEAL_PLAYER_CONDITION_HANDLER = 0x61aa74;
+const STATUS_SHIELD_ENEMY_SKILL_TYPE = 20;
+const STATUS_SHIELD_HANDLER = 0x629534;
+const STATUS_SHIELD_SETUP_HANDLER = 0x61ff08;
+const STATUS_SHIELD_CONDITION_HANDLER = 0x61b4d8;
+const INACTIVE_ENEMY_SKILL_TYPE37_SETUP_HANDLER = 0x6217c0;
+const INACTIVE_ENEMY_SKILL_TYPES_21_THROUGH_38 = Object.freeze(
+  Array.from({ length: 18 }, (_, index) => index + 21),
+);
 const MOVE_TIME_REDUCTION_ENEMY_SKILL_TYPE = 39;
 const MOVE_TIME_REDUCTION_HANDLER = 0x629544;
 const MOVE_TIME_REDUCTION_SETUP_HANDLER = 0x6217a8;
@@ -180,6 +188,8 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['enemy-ai', 'doEnemyAi', '_ZN9cGAMEMAIN10_doEnemyAiEP8sMONSTER', 0x622544],
   ['enemy-ai', 'setupEnemyAttack', '_ZN9cGAMEMAIN17_setupEnemyAttackEv', 0x622f64],
   ['enemy-ai', 'resetEnemyAtkLeft', '_ZN9cGAMEMAIN18_resetEnemyAtkLeftEP8sMONSTER', 0x6408f0],
+  ['enemy-ai', 'resetMonsterStatus', '_ZN8sMONSTER11resetStatusEv', 0x6b159c],
+  ['enemy-ai', 'clearMonsterStatus', '_ZN9cGAMEMAIN16_monsStatusClearEb', 0x691bcc],
   ['enemy-ai', 'playerMaxHp', '_ZNK7sPLAYER3mhpEv', 0x66b840],
   ['enemy-ai', 'playerAddHp', '_ZN7sPLAYER5addHpEib', 0x678838],
   ['enemy-ai', 'doBind', '_ZN9cGAMEMAIN7_doBindEPK8sMONSTERjib', 0x616de4],
@@ -290,6 +300,40 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : healPlayerSetupTarget === HEAL_PLAYER_SETUP_HANDLER;
   const healPlayerConditionMatches = healPlayerConditionTarget === null
     ? null : healPlayerConditionTarget === HEAL_PLAYER_CONDITION_HANDLER;
+  const statusShieldDispatchTarget = resolveEnemySkillTarget(
+    STATUS_SHIELD_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const statusShieldSetupTarget = resolveEnemySkillTarget(
+    STATUS_SHIELD_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const statusShieldConditionTarget = resolveEnemySkillTarget(
+    STATUS_SHIELD_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const statusShieldDispatchMatches = statusShieldDispatchTarget === null
+    ? null : statusShieldDispatchTarget === STATUS_SHIELD_HANDLER;
+  const statusShieldSetupMatches = statusShieldSetupTarget === null
+    ? null : statusShieldSetupTarget === STATUS_SHIELD_SETUP_HANDLER;
+  const statusShieldConditionMatches = statusShieldConditionTarget === null
+    ? null : statusShieldConditionTarget === STATUS_SHIELD_CONDITION_HANDLER;
+  const inactiveEnemySkillTargets21Through38 = INACTIVE_ENEMY_SKILL_TYPES_21_THROUGH_38
+    .map((type) => ({
+      type,
+      dispatchTarget: resolveEnemySkillTarget(
+        type, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+      ),
+      setupTarget: resolveEnemySkillTarget(type, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE),
+      conditionTarget: resolveEnemySkillTarget(
+        type, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+      ),
+    }));
+  const inactiveEnemySkills21Through38Match = restoredElf === null ? null
+    : inactiveEnemySkillTargets21Through38.every((entry) => (
+      entry.dispatchTarget === INACTIVE_ENEMY_SKILL_HANDLER
+      && entry.setupTarget === (entry.type === 37
+        ? INACTIVE_ENEMY_SKILL_TYPE37_SETUP_HANDLER
+        : INACTIVE_ENEMY_SKILL_SETUP_HANDLER)
+      && entry.conditionTarget === INACTIVE_ENEMY_SKILL_CONDITION_HANDLER
+    ));
   const moveTimeReductionDispatchTarget = resolveEnemySkillTarget(
     MOVE_TIME_REDUCTION_ENEMY_SKILL_TYPE,
     ENEMY_SKILL_DISPATCH_TABLE,
@@ -1077,6 +1121,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       healPlayerDispatchMatches21_9: healPlayerDispatchMatches,
       healPlayerSetupMatches21_9: healPlayerSetupMatches,
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
+      statusShieldDispatchMatches21_9: statusShieldDispatchMatches,
+      statusShieldSetupMatches21_9: statusShieldSetupMatches,
+      statusShieldConditionMatches21_9: statusShieldConditionMatches,
+      inactiveEnemySkillTypes21Through38Match21_9: inactiveEnemySkills21Through38Match,
       moveTimeReductionDispatchMatches21_9: moveTimeReductionDispatchMatches,
       moveTimeReductionSetupMatches21_9: moveTimeReductionSetupMatches,
       moveTimeReductionConditionMatches21_9: moveTimeReductionConditionMatches,
@@ -1175,6 +1223,7 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       monsterAttackWithSkillOffset: 'sMONSTER+0x7e8 (uint32 converted to float32 / 100)',
       monsterDurationOffset: 'sMONSTER+0x678 (packed low 10 bits)',
       monsterHealPercentOffset: 'sMONSTER+0x678 (type 55 signed int32 percent)',
+      monsterStatusShieldDurationOffset: 'sMONSTER+0x870 (type 20 protected signed int16)',
       moveTimeDurationOffset: 'sMONSTER+0x678 (type 39 packed low 10 bits)',
       moveTimeFixedReductionOffset: 'sMONSTER+0x67c (type 39 signed centiseconds)',
       moveTimePercentReductionOffset: 'sMONSTER+0x680 (type 39 nonzero selects percent mode)',
@@ -1208,6 +1257,23 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       healPlayerConditionTarget: healPlayerConditionTarget === null
         ? null : hex(healPlayerConditionTarget),
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
+      statusShieldType: STATUS_SHIELD_ENEMY_SKILL_TYPE,
+      statusShieldDispatchTarget: statusShieldDispatchTarget === null
+        ? null : hex(statusShieldDispatchTarget),
+      statusShieldDispatchMatches21_9: statusShieldDispatchMatches,
+      statusShieldSetupTarget: statusShieldSetupTarget === null
+        ? null : hex(statusShieldSetupTarget),
+      statusShieldSetupMatches21_9: statusShieldSetupMatches,
+      statusShieldConditionTarget: statusShieldConditionTarget === null
+        ? null : hex(statusShieldConditionTarget),
+      statusShieldConditionMatches21_9: statusShieldConditionMatches,
+      inactiveEnemySkillTypes21Through38: inactiveEnemySkillTargets21Through38.map((entry) => ({
+        type: entry.type,
+        dispatchTarget: entry.dispatchTarget === null ? null : hex(entry.dispatchTarget),
+        setupTarget: entry.setupTarget === null ? null : hex(entry.setupTarget),
+        conditionTarget: entry.conditionTarget === null ? null : hex(entry.conditionTarget),
+      })),
+      inactiveEnemySkillTypes21Through38Match21_9: inactiveEnemySkills21Through38Match,
       moveTimeReductionType: MOVE_TIME_REDUCTION_ENEMY_SKILL_TYPE,
       moveTimeReductionDispatchTarget: moveTimeReductionDispatchTarget === null
         ? null : hex(moveTimeReductionDispatchTarget),
@@ -1524,6 +1590,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || blackFallDispatchMatches === false || blackFallSetupMatches === false
     || healPlayerDispatchMatches === false || healPlayerSetupMatches === false
     || healPlayerConditionMatches === false
+    || statusShieldDispatchMatches === false || statusShieldSetupMatches === false
+    || statusShieldConditionMatches === false || inactiveEnemySkills21Through38Match === false
     || moveTimeReductionDispatchMatches === false || moveTimeReductionSetupMatches === false
     || moveTimeReductionConditionMatches === false
     || selfDestructDispatchMatches === false || selfDestructSetupMatches === false

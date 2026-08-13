@@ -647,6 +647,29 @@ gate. An eligible fallback retains its authored `sENEAI+5` weight without
 scaling. The browser selector exposes this as `probabilityScale` while keeping
 the already decoded condition-owned RNG state transitions intact.
 
+Enemy skill type `20` applies the enemy's status-ailment immunity shield. Its
+late dispatch entry targets `0x629534`, setup targets `0x61ff08`, and AI
+condition targets `0x61b4d8`. Setup copies signed definition integer `+0x10`
+to runtime `sMONSTER+0x678` without consuming RNG. The handler writes that
+value through the protected signed-int16 counter at `sMONSTER+0x870`.
+
+The condition reads the same protected counter and admits the action only when
+it is not positive. `_incEneTurn` (`0x677978`) decrements positive status
+counters before a later enemy action, while `sMONSTER::resetStatus`
+(`0x6b159c`) and `cGAMEMAIN::_monsStatusClear` (`0x691bcc`) clear this lane.
+The damage pipeline also checks `+0x870` before applying the player's global
+enemy-defense reduction, demonstrating the immunity shield's gameplay effect
+rather than treating it as presentation-only state. The browser records the
+per-enemy counter, rejects reapplication before the immediate probability
+test, advances it on the same enemy-phase boundary, and renders its remaining
+turns. An admitted immediate record spends one probability draw only.
+
+Types `21` through `38` are rejected records in this build. Their dispatch
+entries all use no-effect finalizer `0x62be50` and their conditions all use the
+false return at `0x61c01c`. Types `21..36` and `38` use selection-clearing setup
+`0x621c94`; type `37` points at generic setup tail `0x6217c0`, but its false
+condition prevents that setup from being reached through normal AI selection.
+
 Enemy skill type `39` applies the player move-time reduction status. Its late
 dispatch entry targets `0x629544`, setup targets `0x6217a8`, and AI condition
 targets `0x61b4f0`. Setup copies signed definition integers `+0x10`, `+0x14`,

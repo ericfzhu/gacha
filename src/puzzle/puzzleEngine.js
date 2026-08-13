@@ -33,6 +33,7 @@ import {
   tracePadPointerCells,
 } from './padCoreRules.js';
 import {
+  PAD_ENEMY_SKILL_STATUS_SHIELD,
   PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
   PAD_ENEMY_SKILL_SELF_DESTRUCT,
   PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
@@ -125,8 +126,8 @@ const PARTY = Object.freeze([
 ]);
 
 const ENEMY_TEMPLATE = Object.freeze([
-  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
-  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
+  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
+  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
 ]);
 
 function clamp(value, min, max) {
@@ -849,6 +850,7 @@ export class PuzzleEngine {
     // admits monsters whose sMONSTER+0x120 counter has reached zero. Keeping
     // this order prevents a newly executed enemy skill from losing a turn
     // immediately on the same action boundary.
+    this.advanceEnemyStatusShieldTurns();
     this.advanceEnemyAttributeAbsorbTurns();
     this.advanceMoveTimeReductionTurns();
     this.advanceBlackOrbCountdowns();
@@ -913,6 +915,7 @@ export class PuzzleEngine {
       maxHp: enemy.maxHp,
       attributeAbsorbTurns: enemy.attributeAbsorbTurns,
       scaledAttackGate: enemy.scaledAttackGate,
+      enemyStatusShieldTurns: enemy.statusShieldTurns,
       moveTimeReductionTurns: this.moveTimeReduction?.turnsRemaining || 0,
       enemyAttribute: PAD_ATTRIBUTE_INDEX[enemy.attribute] ?? -1,
       playerCurrentHp: this.player.hp,
@@ -1121,6 +1124,15 @@ export class PuzzleEngine {
     });
   }
 
+  advanceEnemyStatusShieldTurns() {
+    this.enemies.forEach((enemy) => {
+      enemy.statusShieldTurns = Math.max(
+        0,
+        Math.trunc(Number(enemy.statusShieldTurns) || 0) - 1,
+      );
+    });
+  }
+
   advanceMoveTimeReductionTurns() {
     if (!this.moveTimeReduction) return;
     this.moveTimeReduction.turnsRemaining = Math.max(
@@ -1257,6 +1269,13 @@ export class PuzzleEngine {
     const materialized = this.materializeEnemySkillRecord(record, enemyIndex);
     const skill = normalizePadEnemySkillRecord(materialized);
     this.lastEnemySkill = skill;
+    if (skill.supported && skill.kind === 'statusShield') {
+      const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
+      if (!enemy) return false;
+      enemy.statusShieldTurns = Math.max(0, (skill.durationTurns << 16) >> 16);
+      this.message = `${enemy.name} blocks status ailments for ${enemy.statusShieldTurns} turn${enemy.statusShieldTurns === 1 ? '' : 's'}.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'moveTimeReduction') {
       const turnsRemaining = Math.max(0, skill.durationTurns & 0x3ff);
       this.moveTime = padEnemySkillMoveTimeSeconds(
@@ -1475,6 +1494,7 @@ export class PuzzleEngine {
       const definition = definitionsById.get(slot.skillId);
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
       if (![
+        PAD_ENEMY_SKILL_STATUS_SHIELD,
         PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
         PAD_ENEMY_SKILL_SELF_DESTRUCT,
         PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
@@ -2069,7 +2089,7 @@ export class PuzzleEngine {
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,
-      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, scaledAttackGate = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0 }, index) => ({
+      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, scaledAttackGate = 0, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0 }, index) => ({
         id,
         name,
         attribute,
@@ -2078,6 +2098,7 @@ export class PuzzleEngine {
         counter,
         maxCounter,
         scaledAttackGate,
+        statusShieldTurns,
         attributeAbsorbTurns,
         attributeAbsorbMask,
         queuedEnemySkills: Math.max(

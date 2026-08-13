@@ -1,3 +1,4 @@
+export const PAD_ENEMY_SKILL_STATUS_SHIELD = 20;
 export const PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION = 39;
 export const PAD_ENEMY_SKILL_SELF_DESTRUCT = 40;
 export const PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE = 46;
@@ -90,6 +91,15 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
     ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
     : null;
+  if (type === PAD_ENEMY_SKILL_STATUS_SHIELD) {
+    return Object.freeze({
+      type,
+      kind: 'statusShield',
+      supported: true,
+      durationTurns: definition.getInt32(0x10, true),
+      attackWithSkillValue,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION) {
     return Object.freeze({
       type,
@@ -486,6 +496,19 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
   );
   const monster = new DataView(monsterBytes.buffer, monsterBytes.byteOffset, monsterBytes.byteLength);
   const type = definition.getInt16(PAD_ENEMY_SKILL_RUNTIME_LAYOUT.definitionTypeOffset, true);
+  if (type === PAD_ENEMY_SKILL_STATUS_SHIELD) {
+    return Object.freeze({
+      type,
+      kind: 'statusShield',
+      supported: true,
+      durationTurns: monster.getInt32(0x678, true),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION) {
     return Object.freeze({
       type,
@@ -634,6 +657,18 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
 
 export function normalizePadEnemySkillRecord(record) {
   const type = Math.trunc(Number(record?.type));
+  if (type === PAD_ENEMY_SKILL_STATUS_SHIELD || record?.kind === 'statusShield') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_STATUS_SHIELD,
+      kind: 'statusShield',
+      supported: true,
+      durationTurns: Math.trunc(Number(record?.durationTurns) || 0),
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
   if (type === PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION || record?.kind === 'moveTimeReduction') {
     return Object.freeze({
       type: PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,

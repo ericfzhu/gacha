@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
+  PAD_ENEMY_SKILL_STATUS_SHIELD,
   PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
   PAD_ENEMY_SKILL_SELF_DESTRUCT,
   PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
@@ -748,6 +749,37 @@ assert.deepEqual(
     attackWithSkillValue: 0,
   },
 );
+const enemyAiStatusShieldDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiStatusShieldView = new DataView(enemyAiStatusShieldDefinition.buffer);
+enemyAiStatusShieldView.setUint32(0x00, 9_029, true);
+enemyAiStatusShieldView.setInt16(0x04, PAD_ENEMY_SKILL_STATUS_SHIELD, true);
+enemyAiStatusShieldView.setInt32(0x10, 3, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiStatusShieldDefinition), {
+  type: 20,
+  kind: 'statusShield',
+  supported: true,
+  durationTurns: 3,
+  attackWithSkillValue: 0,
+});
+const statusShieldMonsterRuntime = new Uint8Array(0x680);
+new DataView(statusShieldMonsterRuntime.buffer).setInt32(0x678, 5, true);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiStatusShieldDefinition, statusShieldMonsterRuntime),
+  {
+    type: 20,
+    kind: 'statusShield',
+    supported: true,
+    durationTurns: 5,
+    setupMaterialized: true,
+    attackWithSkillValue: 0,
+  },
+);
+const statusShieldRuntimeEngine = new PuzzleEngine({ seed: 21_900 });
+assert.equal(statusShieldRuntimeEngine.applyEnemySkillRuntime(
+  enemyAiStatusShieldDefinition,
+  statusShieldMonsterRuntime,
+), true);
+assert.equal(statusShieldRuntimeEngine.enemies[0].statusShieldTurns, 5);
 assert.equal(padEnemySkillMoveTimeSeconds(5, 125, 0), 3.75);
 assert.equal(padEnemySkillMoveTimeSeconds(5, 125, 40), 3);
 assert.equal(padEnemySkillMoveTimeSeconds(5, -100, 0), 6);
@@ -2386,6 +2418,41 @@ assert.equal(rejectedMoveTimeReductionEngine.applyEnemySkillDefinition(
 rejectedMoveTimeReductionEngine.setRngState(21_900);
 assert.equal(rejectedMoveTimeReductionEngine.takeEnemySkill(0), null);
 assert.equal(rejectedMoveTimeReductionEngine.rng.state, 21_900);
+const statusShieldMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(statusShieldMonsterDefinition.buffer).setUint32(0xec, 9_029, true);
+const selectedStatusShieldEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: statusShieldMonsterDefinition,
+    skillDefinitions: [enemyAiStatusShieldDefinition],
+  }],
+});
+selectedStatusShieldEngine.setRngState(21_900);
+selectedStatusShieldEngine.enemies[0].counter = 1;
+selectedStatusShieldEngine.enemies[1].counter = 99;
+selectedStatusShieldEngine.resolveEnemyTurn();
+const selectedStatusShieldState = selectedStatusShieldEngine.snapshot();
+assert.equal(selectedStatusShieldState.enemies[0].statusShieldTurns, 3);
+assert.equal(selectedStatusShieldState.lastEnemyActions[0].skill.type, 20);
+assert.equal(selectedStatusShieldState.lastEnemyActions[0].skill.skillId, 9_029);
+assert.equal(selectedStatusShieldState.enemies[0].enemyAiBudget, 80);
+assert.equal(selectedStatusShieldEngine.rng.state, padLcgStep(21_900).state);
+selectedStatusShieldEngine.enemies[0].counter = 99;
+selectedStatusShieldEngine.resolveEnemyTurn();
+assert.equal(selectedStatusShieldEngine.enemies[0].statusShieldTurns, 2);
+const rejectedStatusShieldEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: statusShieldMonsterDefinition,
+    skillDefinitions: [enemyAiStatusShieldDefinition],
+  }],
+});
+assert.equal(rejectedStatusShieldEngine.applyEnemySkillDefinition(
+  enemyAiStatusShieldDefinition,
+), true);
+rejectedStatusShieldEngine.setRngState(21_900);
+assert.equal(rejectedStatusShieldEngine.takeEnemySkill(0), null);
+assert.equal(rejectedStatusShieldEngine.rng.state, 21_900);
 const selfDestructMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(selfDestructMonsterDefinition.buffer).setUint32(0xec, 9_027, true);
 const selectedSelfDestructEngine = new PuzzleEngine({

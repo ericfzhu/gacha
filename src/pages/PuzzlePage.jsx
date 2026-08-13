@@ -277,14 +277,21 @@ function drawEnemy(ctx, enemy, index, target, time) {
   ctx.fillStyle = '#d7dce7';
   ctx.font = '600 10px "Noto Sans", sans-serif';
   ctx.fillText(`${Math.max(0, enemy.hp).toLocaleString()} / ${enemy.maxHp.toLocaleString()}`, x, 264);
+  const enemyStatus = [];
+  if (Number(enemy.statusShieldTurns || 0) > 0) {
+    enemyStatus.push(`IMMUNE ${enemy.statusShieldTurns}T`);
+  }
   if (Number(enemy.attributeAbsorbTurns || 0) > 0) {
     const attributes = ORB_TYPES.slice(0, 6)
       .filter((_, attributeIndex) => (enemy.attributeAbsorbMask & (1 << attributeIndex)) !== 0)
       .map((orb) => orb.code)
       .join('/');
+    enemyStatus.push(`ABS ${attributes} ${enemy.attributeAbsorbTurns}T`);
+  }
+  if (enemyStatus.length > 0) {
     ctx.fillStyle = '#bfe9ff';
     ctx.font = '800 9px "Barlow Condensed", sans-serif';
-    ctx.fillText(`ABS ${attributes} · ${enemy.attributeAbsorbTurns}`, x, 278);
+    ctx.fillText(enemyStatus.join(' · '), x, 278);
   }
   if (alive) {
     ctx.fillStyle = enemy.counter === 1 ? '#ff6f62' : '#f4cf69';
