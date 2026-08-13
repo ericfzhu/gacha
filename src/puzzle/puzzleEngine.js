@@ -100,6 +100,7 @@ export class PuzzleEngine {
     this.lastPoisonDamage = 0;
     this.lastBombDamage = 0;
     this.lastThornDamage = 0;
+    this.hpResolutionApplied = false;
     this.lastLeaderMultiplier = 1;
     this.message = 'Drag one orb through the board to rearrange the whole path.';
     this.player = { hp: 12000, maxHp: 12000, recovery: 820 };
@@ -145,6 +146,7 @@ export class PuzzleEngine {
     if (this.mode !== 'playing' || this.phase !== 'input' || this.drag) return false;
     if (!this.isCell(row, column)) return false;
     this.lastThornDamage = 0;
+    this.hpResolutionApplied = false;
     this.drag = { row, column, pointerX, pointerY, gridColumn, gridRow, remaining: this.moveTime, pathLength: 0 };
     this.message = 'Keep moving — every crossed cell swaps with the held orb.';
     return true;
@@ -174,8 +176,6 @@ export class PuzzleEngine {
       if (crossedOrb.thornPercent > 0) {
         const damage = padThornDamage(this.player.maxHp, crossedOrb.thornPercent);
         this.lastThornDamage += damage;
-        this.player.hp = Math.max(0, this.player.hp - damage);
-        this.floatingText.push({ kind: 'thorn', value: damage, enemy: -1, age: 0 });
       }
       [this.board[fromRow][fromColumn], this.board[nextRow][nextColumn]] = [this.board[nextRow][nextColumn], this.board[fromRow][fromColumn]];
       fromRow = nextRow;
@@ -259,9 +259,7 @@ export class PuzzleEngine {
       if (bombResolution.bombs.length) {
         const damage = padBombDamage(this.player.maxHp, bombResolution.bombs.length);
         this.lastBombDamage += damage;
-        this.player.hp = Math.max(0, this.player.hp - damage);
         this.pendingBombCells = bombResolution.cells;
-        this.floatingText.push({ kind: 'bomb', value: damage, enemy: -1, age: 0 });
       }
       if (matches.length || bombResolution.cells.length) {
         this.pendingMatches = matches;
@@ -283,6 +281,7 @@ export class PuzzleEngine {
         this.phase = 'attack';
         this.phaseTimer = 0.72;
       } else {
+        this.applyPlayerHpResolution();
         if (this.player.hp <= 0) {
           this.mode = 'defeat';
           this.phase = 'complete';
@@ -373,12 +372,7 @@ export class PuzzleEngine {
       (byType.get('poison') || []).map((match) => match.size),
       (byType.get('mortalPoison') || []).map((match) => match.size),
     );
-    const previousHp = this.player.hp;
-    this.player.hp = clamp(previousHp + healing - poisonDamage, 0, this.player.maxHp);
-    this.lastHealing = healing;
-    this.lastPoisonDamage = poisonDamage;
-    if (healing > 0) this.floatingText.push({ kind: 'heal', value: healing, enemy: -1, age: 0 });
-    if (poisonDamage > 0) this.floatingText.push({ kind: 'poison', value: poisonDamage, enemy: -1, age: 0 });
+    this.applyPlayerHpResolution(healing, poisonDamage);
 
     let totalDamage = 0;
     const target = this.enemies[this.targetEnemy]?.hp > 0 ? this.targetEnemy : this.enemies.findIndex((enemy) => enemy.hp > 0);
@@ -399,6 +393,19 @@ export class PuzzleEngine {
     });
     this.lastDamage = totalDamage;
     this.message = `${this.comboCount} combo${this.comboCount === 1 ? '' : 's'} · ${totalDamage.toLocaleString()} total damage${this.lastHealing ? ` · +${this.lastHealing.toLocaleString()} HP` : ''}${this.lastPoisonDamage ? ` · -${this.lastPoisonDamage.toLocaleString()} poison` : ''}${this.lastBombDamage ? ` · -${this.lastBombDamage.toLocaleString()} bombs` : ''}${this.lastThornDamage ? ` · -${this.lastThornDamage.toLocaleString()} thorns` : ''}`;
+  }
+
+  applyPlayerHpResolution(healing = 0, poisonDamage = 0) {
+    if (this.hpResolutionApplied) return;
+    this.hpResolutionApplied = true;
+    this.lastHealing = Math.max(0, Math.trunc(Number(healing) || 0));
+    this.lastPoisonDamage = Math.max(0, Math.trunc(Number(poisonDamage) || 0));
+    const pendingDamage = this.lastPoisonDamage + this.lastBombDamage + this.lastThornDamage;
+    this.player.hp = clamp(this.player.hp + this.lastHealing - pendingDamage, 0, this.player.maxHp);
+    if (this.lastHealing > 0) this.floatingText.push({ kind: 'heal', value: this.lastHealing, enemy: -1, age: 0 });
+    if (this.lastPoisonDamage > 0) this.floatingText.push({ kind: 'poison', value: this.lastPoisonDamage, enemy: -1, age: 0 });
+    if (this.lastBombDamage > 0) this.floatingText.push({ kind: 'bomb', value: this.lastBombDamage, enemy: -1, age: 0 });
+    if (this.lastThornDamage > 0) this.floatingText.push({ kind: 'thorn', value: this.lastThornDamage, enemy: -1, age: 0 });
   }
 
   resolveEnemyTurn() {

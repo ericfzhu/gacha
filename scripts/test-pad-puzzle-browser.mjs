@@ -90,13 +90,15 @@ try {
       damage: engine.lastBombDamage,
       clearedCells: engine.pendingBombCells.length,
     };
+    engine.applyPlayerHpResolution();
+    resolution.resolvedHp = engine.player.hp;
     engine.reset();
     engine.start();
     return resolution;
   }) : null;
   if (bombResolution && (
-    bombResolution.phase !== 'clear' || bombResolution.hp !== 9_600 ||
-    bombResolution.damage !== 2_400 || bombResolution.clearedCells !== 10
+    bombResolution.phase !== 'clear' || bombResolution.hp !== 12_000 ||
+    bombResolution.resolvedHp !== 9_600 || bombResolution.damage !== 2_400 || bombResolution.clearedCells !== 10
   )) throw new Error(`Bomb resolution mismatch: ${JSON.stringify(bombResolution)}`);
 
   const thornInput = testThornInput ? await page.evaluate(() => {
@@ -114,12 +116,14 @@ try {
       pathLength: engine.drag.pathLength,
       thornColumn: engine.board[0].findIndex((orb) => orb.thornPercent > 0),
     };
+    engine.applyPlayerHpResolution();
+    result.resolvedHp = engine.player.hp;
     engine.reset();
     engine.start();
     return result;
   }) : null;
   if (thornInput && (
-    thornInput.hp !== 11_040 || thornInput.damage !== 960 ||
+    thornInput.hp !== 12_000 || thornInput.resolvedHp !== 11_040 || thornInput.damage !== 960 ||
     thornInput.pathLength !== 2 || thornInput.thornColumn !== 1
   )) throw new Error(`Thorn input mismatch: ${JSON.stringify(thornInput)}`);
 

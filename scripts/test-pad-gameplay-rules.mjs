@@ -146,10 +146,12 @@ thornEngine.start();
 thornEngine.startDrag(0, 0, 50, 50, 0.5, 0.5);
 thornEngine.moveDrag(0, 1, 120, 50, 1.5, 0.5);
 assert.equal(thornEngine.lastThornDamage, 480);
-assert.equal(thornEngine.player.hp, 11_520);
+assert.equal(thornEngine.player.hp, 12_000);
 assert.equal(thornEngine.board[0][0].thornPercent, 4);
 thornEngine.moveDrag(0, 0, 50, 50, 0.5, 0.5);
 assert.equal(thornEngine.lastThornDamage, 960);
+assert.equal(thornEngine.player.hp, 12_000);
+thornEngine.applyPlayerHpResolution();
 assert.equal(thornEngine.player.hp, 11_040);
 thornEngine.board[0][2] = thornEngine.createOrb('jammer', { enhanced: true });
 thornEngine.setOrbState(0, 2, { thornPercent: 4 });
@@ -163,6 +165,24 @@ bombEngine.phaseTimer = 0;
 bombEngine.advancePhase();
 assert.equal(bombEngine.phase, 'clear');
 assert.equal(bombEngine.lastBombDamage, 2_400);
-assert.equal(bombEngine.player.hp, 9_600);
+assert.equal(bombEngine.player.hp, 12_000);
 assert.equal(bombEngine.pendingBombCells.length, 10);
+bombEngine.applyPlayerHpResolution();
+assert.equal(bombEngine.player.hp, 9_600);
+
+const netHpEngine = new PuzzleEngine({ seed: 6 });
+netHpEngine.setBoardFromCodes(['HHHRBG', 'BGLDHR', 'GLXHRB', 'LDHRBG', 'DHRBGL']);
+netHpEngine.player.hp = 1_000;
+netHpEngine.player.recovery = 3_000;
+netHpEngine.comboCount = 1;
+netHpEngine.turnMatches = netHpEngine.findMatches().map((match) => ({
+  type: match.type,
+  size: match.size,
+  enhancedCount: 0,
+  isMassAttack: match.isMassAttack,
+}));
+netHpEngine.lastBombDamage = 2_400;
+netHpEngine.resolvePlayerTurn();
+assert.equal(netHpEngine.lastHealing, 3_000);
+assert.equal(netHpEngine.player.hp, 1_600);
 console.log('PAD orthogonal drag, connected match, and classic multiplier checks passed.');

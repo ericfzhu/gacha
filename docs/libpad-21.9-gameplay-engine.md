@@ -151,6 +151,14 @@ overlay moves backward with that stationary orb during the swap, reversing over
 it triggers the damage again. The browser input path preserves that behavior,
 including multiple crossed cells from one coalesced pointer-motion event.
 
+Bomb and thorn hits accumulate in the same native pending-damage integer at
+game-work offset `0x8aacc`; neither is clamped against current HP at the moment
+of contact. `_applyHpRecAndPoisonDamage` later subtracts that aggregate from
+recovery and applies one signed HP delta. The browser therefore nets heart
+recovery against poison, bombs, and thorn crossings before its single `0..maxHP`
+clamp. This matters at low HP, where an early hazard clamp would over-credit a
+subsequent heart match.
+
 Classic base multipliers recovered in the calculation path are:
 
 - three connected orbs: `1.0`
