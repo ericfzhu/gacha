@@ -14,6 +14,7 @@ const testTapTurn = process.argv.includes('--tap-turn');
 const testMatchShapes = process.argv.includes('--match-shapes');
 const testAttackRounds = process.argv.includes('--attack-rounds');
 const testPointerIdentity = process.argv.includes('--pointer-identity');
+const testMoveDeadline = process.argv.includes('--move-deadline');
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 980, height: 900 } });
 const consoleMessages = [];
@@ -322,10 +323,24 @@ try {
     pointerIdentity.foreignKeptDrag !== true || pointerIdentity.activePathLength !== 1 ||
     pointerIdentity.releasedDrag !== null || pointerIdentity.releasedTurn !== 1
   )) throw new Error(`Pointer identity mismatch: ${JSON.stringify(pointerIdentity)}`);
+  const moveDeadline = testMoveDeadline ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    engine.reset();
+    engine.start();
+    engine.startDrag(0, 0, 35, 447, 0.5, 0.5);
+    engine.update(6);
+    const result = { drag: engine.drag, turn: engine.turn, phase: engine.phase };
+    engine.reset();
+    engine.start();
+    return result;
+  }) : null;
+  if (moveDeadline && (
+    moveDeadline.drag !== null || moveDeadline.turn !== 1 || moveDeadline.phase !== 'detect'
+  )) throw new Error(`Move deadline mismatch: ${JSON.stringify(moveDeadline)}`);
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

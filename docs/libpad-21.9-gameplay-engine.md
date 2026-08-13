@@ -94,6 +94,11 @@ adjacent swaps when its destination is farther away. Therefore a coalesced brows
 must be expanded into the orthogonal grid boundaries crossed by the motion; a
 single direct diagonal exchange is incorrect in normal play.
 
+The five-second move limit uses elapsed gameplay time. Browser animation deltas
+remain bounded so a delayed frame cannot jump visual effects, but the drag
+deadline is not bounded with them; a frame arriving after the move window ends
+immediately takes the native release path instead of granting extra time.
+
 `_gamePhaseMove` reads the current touch-state field at `sPAD+0xb2`. Value `1`
 keeps the move active; release/cancel takes the turn-ending path beginning at
 `0x6826c4`. The swap count at game-work offset `0x6edc` controls movement-side

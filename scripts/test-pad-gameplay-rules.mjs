@@ -219,6 +219,14 @@ assert.equal(tapEngine.turn, 1);
 assert.equal(tapEngine.phase, 'detect');
 assert.deepEqual(tapEngine.snapshot().board, tapBoard);
 
+const deadlineEngine = new PuzzleEngine({ seed: 14, moveTime: 5 });
+deadlineEngine.start();
+deadlineEngine.startDrag(0, 0, 35, 447, 0.5, 0.5);
+deadlineEngine.update(6);
+assert.equal(deadlineEngine.drag, null);
+assert.equal(deadlineEngine.turn, 1);
+assert.equal(deadlineEngine.phase, 'detect');
+
 const largeBoardEngine = new PuzzleEngine({ seed: 7, columns: 7, rows: 6 });
 largeBoardEngine.setBoardFromCodes([
   'RBGHLDR',

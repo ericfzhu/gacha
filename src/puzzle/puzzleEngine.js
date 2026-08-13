@@ -289,13 +289,17 @@ export class PuzzleEngine {
   }
 
   update(deltaSeconds) {
-    const dt = clamp(Number(deltaSeconds) || 0, 0, 0.1);
+    const elapsed = Math.max(0, Number(deltaSeconds) || 0);
+    const dt = clamp(elapsed, 0, 0.1);
     this.visualTime += dt;
     this.floatingText = this.floatingText.map((item) => ({ ...item, age: item.age + dt })).filter((item) => item.age < 1.15);
 
     if (this.mode !== 'playing') return;
     if (this.drag) {
-      this.drag.remaining = Math.max(0, this.drag.remaining - dt);
+      // Keep effect animation bounded after a delayed frame, but do not grant
+      // extra movement time: native _gamePhaseMove compares elapsed move time,
+      // not a maximum of 100 ms per rendered frame.
+      this.drag.remaining = Math.max(0, this.drag.remaining - elapsed);
       if (this.drag.remaining === 0) this.endDrag();
       return;
     }
