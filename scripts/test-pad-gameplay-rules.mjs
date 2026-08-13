@@ -21,6 +21,7 @@ import {
   padOrbMatchMultiplier,
   padPoisonDamage,
   padSecondaryAttributeAttack,
+  padSelectPoisonBlockCandidates,
   padShuffleBlockCandidates,
   padShuffleBlockMinusCandidates,
   padShuffleBurDropCandidates,
@@ -73,6 +74,22 @@ assert.deepEqual(padShuffleBurDropCandidates(21_900, []), {
   candidates: [],
 });
 assert.deepEqual(padShuffleLockDropCandidates(21_900, [0, 2, 3]), [2, 3, 0]);
+assert.deepEqual(padSelectPoisonBlockCandidates(21_900, [
+  [0, 5, 7, 1, 0, 4],
+  [2, 8, 4, 5, 6, 2],
+  [5, 8, 2, 4, 2, 3],
+  [4, 3, 2, 5, 5, 6],
+  [5, 6, 2, 2, 3, 4],
+], 5, true), {
+  state: 4_221_117_678,
+  candidates: [
+    { row: 4, column: 1 },
+    { row: 1, column: 2 },
+    { row: 1, column: 4 },
+    { row: 1, column: 5 },
+    { row: 4, column: 2 },
+  ],
+});
 assert.deepEqual(padGetRandomBlock(21_900), { state: 3_803_934_822, type: 1 });
 assert.deepEqual(padGetRandomBlock(21_900, 1), { state: 3_803_934_822, type: 2 });
 assert.deepEqual(padGetRandomBlock(21_900, -1, true, true), { state: 3_803_934_822, type: 1 });
@@ -544,6 +561,22 @@ specialLockEngine.setBoardFromCodes(['JPMXHD', 'GLDHRG', 'HBGDGL', 'DLGHHB', 'HB
 for (let column = 0; column < 4; column += 1) {
   specialLockEngine.setOrbState(0, column, { blockFlags: 0x28000, enhancementPower: 0.5 });
 }
+
+const poisonBlockEngine = new PuzzleEngine({ seed: 21_900 });
+poisonBlockEngine.setBoardFromCodes(['RHPBRD', 'GMDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
+poisonBlockEngine.rng = createPadRng(21_900);
+poisonBlockEngine.setOrbState(4, 1, { locked: true });
+assert.equal(poisonBlockEngine.doPoisonBlockN(7, 5, true), 4);
+assert.equal(poisonBlockEngine.rng.state, 4_221_117_678);
+assert.equal(poisonBlockEngine.board[4][1].type, 'jammer');
+for (const [row, column] of [[1, 2], [1, 4], [1, 5], [4, 2]]) {
+  assert.equal(poisonBlockEngine.board[row][column].type, 'poison');
+}
+const poisonZeroState = poisonBlockEngine.rng.state;
+assert.equal(poisonBlockEngine.doPoisonBlockN('mortalPoison', 0), 0);
+assert.equal(poisonBlockEngine.rng.state, poisonZeroState);
+assert.equal(poisonBlockEngine.doPoisonBlockN('bomb', 2), 0);
+assert.equal(poisonBlockEngine.rng.state, poisonZeroState);
 assert.equal(specialLockEngine.doLockDropBits(0x3c0, 4, 0xbeef), true);
 for (let column = 0; column < 4; column += 1) {
   const orb = specialLockEngine.board[0][column];

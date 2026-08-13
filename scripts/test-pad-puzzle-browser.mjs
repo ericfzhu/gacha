@@ -263,6 +263,41 @@ try {
       (orb.blockFlags & 0x28000) !== 0 || orb.enhancementPower !== 0
     ))
   )) throw new Error(`Lock-drop mismatch: ${JSON.stringify(lockDropSample)}`);
+  const poisonBlockSample = showOrbStates ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    const board = ['RHPBRD', 'GMDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD'];
+    engine.reset();
+    engine.setBoardFromCodes(board);
+    engine.board.forEach((row, rowIndex) => row.forEach((orb, columnIndex) => {
+      if (!['poison', 'mortalPoison', 'heart'].includes(orb.type)) {
+        engine.setOrbState(rowIndex, columnIndex, { locked: true });
+      }
+    }));
+    const lockedStartState = engine.rng.state;
+    const lockedChanged = engine.doPoisonBlockN('poison', 3, true);
+    const lockedEndState = engine.rng.state;
+    engine.setBoardFromCodes(board);
+    const startState = engine.rng.state;
+    const beforeMortal = engine.board.flat().filter((orb) => orb.type === 'mortalPoison').length;
+    const changed = engine.doPoisonBlockN(8, 5, true);
+    const endState = engine.rng.state;
+    const afterMortal = engine.board.flat().filter((orb) => orb.type === 'mortalPoison').length;
+    engine.reset();
+    engine.start();
+    return { lockedStartState, lockedChanged, lockedEndState, startState, changed, endState, beforeMortal, afterMortal };
+  }) : null;
+  const advanceLcg = (state, count) => {
+    let next = state;
+    for (let index = 0; index < count; index += 1) next = stepLcg(next);
+    return next;
+  };
+  if (poisonBlockSample && (
+    poisonBlockSample.lockedChanged !== 0 ||
+    poisonBlockSample.lockedEndState !== advanceLcg(poisonBlockSample.lockedStartState, 6) ||
+    poisonBlockSample.changed !== 5 ||
+    poisonBlockSample.endState !== advanceLcg(poisonBlockSample.startState, 10) ||
+    poisonBlockSample.afterMortal - poisonBlockSample.beforeMortal !== 5
+  )) throw new Error(`Poison-block mismatch: ${JSON.stringify(poisonBlockSample)}`);
   if (renderAtlasSheet) {
     const sheet = page.locator('#pad-atlas-sheet');
     await page.evaluate(() => {
@@ -474,9 +509,9 @@ try {
     moveDeadline.drag !== null || moveDeadline.turn !== 1 || moveDeadline.phase !== 'detect'
   )) throw new Error(`Move deadline mismatch: ${JSON.stringify(moveDeadline)}`);
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

@@ -746,6 +746,25 @@ export class PuzzleEngine {
     return true;
   }
 
+  doPoisonBlockN(type, count, excludeHeart = false) {
+    const destinationType = typeof type === 'number' ? ORB_TYPES[type]?.id : type;
+    if (!['poison', 'mortalPoison'].includes(destinationType)) return 0;
+    const boardTypes = this.board.map((row) => row.map((orb) => (
+      ORB_TYPES.findIndex((candidate) => candidate.id === orb.type)
+    )));
+    const candidates = this.rng.selectPoisonBlockCandidates(boardTypes, count, excludeHeart);
+    let changed = 0;
+    candidates.forEach(({ row, column }) => {
+      const orb = this.board[row][column];
+      if (orb.locked) return;
+      orb.type = destinationType;
+      orb.enhancementPower = 0;
+      orb.enhanced = false;
+      changed += 1;
+    });
+    return changed;
+  }
+
   isCell(row, column) {
     return row >= 0 && row < this.rows && column >= 0 && column < this.columns;
   }

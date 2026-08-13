@@ -234,6 +234,20 @@ retain `sBLOCK+8`; special types 6 through 9 clear that float and flags
 `0x28000` while retaining the new lock. `PuzzleEngine.doLockDropBits` mirrors
 that behavior and retains the relevant raw `sBLOCK.flags` bits as `blockFlags`.
 
+`_doPoisonBlockN(int destinationType, int count, bool excludeHeart)` at
+`0x626bf0` is the random individual poison writer. It clears a temporary visited
+byte on every board cell, then spends two saved LCG advances for every positive
+request: one chooses the starting column and the other the starting row. From
+that coordinate it scans forward row-major with wraparound for an unvisited
+cell whose type is not poison `7` or mortal poison `8`, also skipping heart `5`
+when requested. The chosen cell is marked visited even when the downstream
+block-change helper rejects it for being locked. Thus locked cells consume an
+attempt without changing, and exhausted boards continue consuming two RNG
+steps per remaining request. Successful special-type conversion clears
+`sBLOCK+8` but leaves independent block flags, such as the burst overlay, on
+the cell. `padSelectPoisonBlockCandidates` and
+`PuzzleEngine.doPoisonBlockN` reproduce the selection and mutation paths.
+
 The enemy inverse is `_doBlockMinus(bool, uint32 mask, float, int)` at
 `0x61caa0`. Only cells whose type bit is in the mask and whose current power is
 non-negative are eligible; applying the effect stores the negated binary32

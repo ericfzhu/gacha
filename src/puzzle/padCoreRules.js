@@ -79,6 +79,11 @@ export function createPadRng(seed = 0) {
       state = shuffled.state;
       return shuffled.candidates;
     },
+    selectPoisonBlockCandidates(boardTypes, count, excludeHeart = false) {
+      const selected = padSelectPoisonBlockCandidates(state, boardTypes, count, excludeHeart);
+      state = selected.state;
+      return selected.candidates;
+    },
     getRandomBlock(excludedType = -1, includeJammer = false, includeHeart = true) {
       const result = padGetRandomBlock(state, excludedType, includeJammer, includeHeart);
       state = result.state;
@@ -151,6 +156,44 @@ export function padShuffleLockDropCandidates(seed, candidates) {
     [shuffled[index], shuffled[target]] = [shuffled[target], shuffled[index]];
   }
   return shuffled;
+}
+
+// _doPoisonBlockN (0x626bf0) spends two saved LCG advances for every requested
+// cell. Those values choose a starting column and row; the routine then walks
+// forward in row-major order with wraparound until it finds a cell not already
+// selected by this call, not type 7/8, and optionally not heart type 5.
+export function padSelectPoisonBlockCandidates(state, boardTypes, count, excludeHeart = false) {
+  const rows = Array.isArray(boardTypes) ? boardTypes.length : 0;
+  const columns = rows > 0 && Array.isArray(boardTypes[0]) ? boardTypes[0].length : 0;
+  if (rows === 0 || columns === 0 || boardTypes.some((row) => !Array.isArray(row) || row.length !== columns)) {
+    return { state: Number(state) >>> 0, candidates: [] };
+  }
+  let savedState = Number(state) >>> 0;
+  const selected = new Set();
+  const candidates = [];
+  const attempts = Math.max(0, Math.trunc(Number(count) || 0));
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const columnRoll = padLcgStep(savedState);
+    const rowRoll = padLcgStep(columnRoll.state);
+    savedState = rowRoll.state;
+    let column = Math.floor(columnRoll.value * columns / 0x10000);
+    let row = Math.floor(rowRoll.value * rows / 0x10000);
+    for (let scanned = 0; scanned < rows * columns; scanned += 1) {
+      const key = row * columns + column;
+      const type = Number(boardTypes[row][column]);
+      if (!selected.has(key) && type !== 7 && type !== 8 && (!excludeHeart || type !== 5)) {
+        selected.add(key);
+        candidates.push({ row, column });
+        break;
+      }
+      column += 1;
+      if (column >= columns) {
+        column = 0;
+        row = (row + 1) % rows;
+      }
+    }
+  }
+  return { state: savedState, candidates };
 }
 
 // The same native routine builds its candidates from numeric block types
