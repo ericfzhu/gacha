@@ -562,6 +562,19 @@ descriptor, and its independently packed descriptor high bit. Thorn and lock
 skyfall therefore consume the same LCG in that order. The browser exposes the
 decoded record as `thornFallRule` and preserves this shared-stream ordering.
 
+The following `_checkPassiveSkill4Block` branch produces Nail Orbs. While its
+packed control is active, each newly spawned natural type `0..5` spends one
+advance from the same `+0x66a14` stream and receives flag `0x20000` when
+`floor(high16 * 100 / 65536) < percent`; special types neither qualify nor
+consume a roll. This branch runs after thorn assignment and before lock-fall.
+Matched Nail Orbs are counted across every cascade. After ordinary party
+attacks, `_gamePhaseEachTurn` at `0x67d2e0` visits each surviving enemy and
+deals `izMathRoundSint64(max(1, enemyMaxHp * nailCount / 100))`, so positive
+half values round upward. `sGAMEWORK::addNailCounts` at `0x422e60` accumulates
+the erase-effect count before this step. The browser keeps the raw flag and
+renders a nail overlay, exposes `nailFallRule`, and reports the separately
+resolved `lastNailDamage` while including it in total outgoing damage.
+
 Bomb and thorn hits accumulate in the same native pending-damage integer at
 game-work offset `0x8aacc`; neither is clamped against current HP at the moment
 of contact. `_applyHpRecAndPoisonDamage` later subtracts that aggregate from

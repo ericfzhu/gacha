@@ -16,11 +16,13 @@ import {
   padDamageAfterDefense,
   padNativeBaseAttackPower,
   padNativeRecoveryPower,
+  padNailDamage,
   padPoisonDamage,
   padResolveBlockSwapPassive,
   padResolveComboDropAwakenings,
   padResolveComboDropSpawns,
   padResolveLockFall,
+  padResolveNailFall,
   padResolveThornFall,
   padSecondaryAttributeAttack,
   padShuffleLockDropCandidates,
@@ -48,6 +50,7 @@ export const ORB_TYPES = Object.freeze([
 const NATURAL_ORB_TYPES = ORB_TYPES.slice(0, 6);
 const PAD_BLOCK_LOCKED_FLAG = 0x800;
 const PAD_BLOCK_COMBO_DROP_FLAG = 0x8000;
+const PAD_BLOCK_NAIL_FLAG = 0x20000;
 const PAD_BLOCK_SPECIAL_LOCK_CLEAR_FLAGS = 0x28000;
 const PAD_BLOCK_BURST_FLAG = 0x80000;
 
@@ -104,6 +107,7 @@ export class PuzzleEngine {
     comboDropAwakenings = Array(5).fill(0),
     topLineDropTypes = null,
     thornFallRule = null,
+    nailFallRule = null,
     lockFallRules = [],
     lockFallSeed = seed,
   } = {}) {
@@ -123,6 +127,7 @@ export class PuzzleEngine {
     this.setComboDropAwakenings(comboDropAwakenings);
     this.setTopLineDropTypes(topLineDropTypes);
     this.setThornFallRule(thornFallRule);
+    this.setNailFallRule(nailFallRule);
     this.setLockFallRules(lockFallRules);
     this.lockFallSeed = Number(lockFallSeed) >>> 0;
     this.rng = createPadRng(seed);
@@ -143,12 +148,14 @@ export class PuzzleEngine {
     this.cascadeDepth = 0;
     this.lastComboCount = 0;
     this.lastDamage = 0;
+    this.lastNailDamage = 0;
     this.lastHealing = 0;
     this.lastPoisonDamage = 0;
     this.lastBombDamage = 0;
     this.lastThornDamage = 0;
     this.pendingComboDrops = 0;
     this.comboDropBonusCount = 0;
+    this.turnNailCount = 0;
     this.hpResolutionApplied = false;
     this.lastLeaderMultiplier = 1;
     this.message = 'Drag one orb through the board to rearrange the whole path.';
@@ -195,9 +202,13 @@ export class PuzzleEngine {
     const thornActive = state.thornActive === undefined
       ? thornDescriptor !== 0 || (requestedBlockFlags & PAD_BLOCK_BURST_FLAG) !== 0
       : Boolean(state.thornActive);
+    const nail = state.nail === undefined
+      ? (requestedBlockFlags & PAD_BLOCK_NAIL_FLAG) !== 0
+      : Boolean(state.nail);
     const blockFlags = (requestedBlockFlags
-      & ~(PAD_BLOCK_LOCKED_FLAG | PAD_BLOCK_BURST_FLAG))
+      & ~(PAD_BLOCK_LOCKED_FLAG | PAD_BLOCK_NAIL_FLAG | PAD_BLOCK_BURST_FLAG))
       | (locked ? PAD_BLOCK_LOCKED_FLAG : 0)
+      | (nail ? PAD_BLOCK_NAIL_FLAG : 0)
       | (thornActive ? PAD_BLOCK_BURST_FLAG : 0);
     return {
       id: ++this.orbSerial,
@@ -207,6 +218,7 @@ export class PuzzleEngine {
       enhancementPower,
       enhanced: enhancementPower > 0,
       locked,
+      nail,
       thornActive,
       thornDescriptor,
       thornPercent,
@@ -283,11 +295,13 @@ export class PuzzleEngine {
     this.pendingMatches = [];
     this.pendingBombCells = [];
     this.lastDamage = 0;
+    this.lastNailDamage = 0;
     this.lastHealing = 0;
     this.lastPoisonDamage = 0;
     this.lastBombDamage = 0;
     this.pendingComboDrops = 0;
     this.comboDropBonusCount = 0;
+    this.turnNailCount = 0;
     this.phase = 'detect';
     this.phaseTimer = 0.12;
     this.message = 'Checking matches…';
@@ -419,6 +433,9 @@ export class PuzzleEngine {
           };
         }));
         const comboDropAwakening = padResolveComboDropAwakenings(matches, this.comboDropAwakenings);
+        this.turnNailCount += matches.reduce((total, match) => total + match.cells.reduce((count, { row, column }) => (
+          count + (((Number(this.board[row][column]?.blockFlags) >>> 0) & PAD_BLOCK_NAIL_FLAG) !== 0 ? 1 : 0)
+        ), 0), 0);
         this.pendingComboDrops = (this.pendingComboDrops + comboDropAwakening.pendingCount) & 0xff;
         this.comboDropBonusCount += comboDropAwakening.bonusCombos;
         this.comboCount += matches.length + comboDropAwakening.bonusCombos;
@@ -550,11 +567,18 @@ export class PuzzleEngine {
         comboDropResolution.marked[index] ? PAD_BLOCK_COMBO_DROP_FLAG : 0,
       );
       this.lockFallRng.setState(thornFall.state);
+      const nailFall = padResolveNailFall(
+        this.lockFallRng.state,
+        entry.type,
+        this.nailFallRule,
+        thornFall.blockFlags,
+      );
+      this.lockFallRng.setState(nailFall.state);
       const lockFall = padResolveLockFall(
         this.lockFallRng.state,
         entry.type,
         this.lockFallRules,
-        thornFall.blockFlags,
+        nailFall.blockFlags,
       );
       this.lockFallRng.setState(lockFall.state);
       this.board[entry.row][entry.column] = this.createOrb(ORB_TYPES[entry.type]?.id || NATURAL_ORB_TYPES[0].id, {
@@ -632,13 +656,24 @@ export class PuzzleEngine {
         });
       });
     });
+    let nailDamage = 0;
+    if (this.turnNailCount > 0) {
+      this.enemies.forEach((enemy, enemyIndex) => {
+        if (enemy.hp <= 0) return;
+        const damage = padNailDamage(enemy.maxHp, this.turnNailCount);
+        enemy.hp = Math.max(0, enemy.hp - damage);
+        nailDamage += damage;
+        this.floatingText.push({ kind: 'nail', value: damage, enemy: enemyIndex, age: 0 });
+      });
+    }
     if (this.manualTarget && this.enemies[this.targetEnemy]?.hp <= 0) {
       this.manualTarget = false;
       const nextAlive = this.enemies.findIndex((enemy) => enemy.hp > 0);
       if (nextAlive >= 0) this.targetEnemy = nextAlive;
     }
-    this.lastDamage = totalDamage;
-    this.message = `${this.comboCount} combo${this.comboCount === 1 ? '' : 's'} · ${totalDamage.toLocaleString()} total damage${this.lastHealing ? ` · +${this.lastHealing.toLocaleString()} HP` : ''}${this.lastPoisonDamage ? ` · -${this.lastPoisonDamage.toLocaleString()} poison` : ''}${this.lastBombDamage ? ` · -${this.lastBombDamage.toLocaleString()} bombs` : ''}${this.lastThornDamage ? ` · -${this.lastThornDamage.toLocaleString()} thorns` : ''}`;
+    this.lastNailDamage = nailDamage;
+    this.lastDamage = totalDamage + nailDamage;
+    this.message = `${this.comboCount} combo${this.comboCount === 1 ? '' : 's'} · ${this.lastDamage.toLocaleString()} total damage${this.lastNailDamage ? ` · ${this.lastNailDamage.toLocaleString()} nails` : ''}${this.lastHealing ? ` · +${this.lastHealing.toLocaleString()} HP` : ''}${this.lastPoisonDamage ? ` · -${this.lastPoisonDamage.toLocaleString()} poison` : ''}${this.lastBombDamage ? ` · -${this.lastBombDamage.toLocaleString()} bombs` : ''}${this.lastThornDamage ? ` · -${this.lastThornDamage.toLocaleString()} thorns` : ''}`;
   }
 
   applyPlayerHpResolution(healing = 0, poisonDamage = 0) {
@@ -742,6 +777,20 @@ export class PuzzleEngine {
     };
   }
 
+  setNailFallRule(rule) {
+    if (rule === null || rule === undefined) {
+      this.nailFallRule = null;
+      return;
+    }
+    if (!Number.isInteger(Number(rule.chancePercent))) {
+      throw new Error('PAD nail-fall rule requires an integer chancePercent value.');
+    }
+    this.nailFallRule = {
+      active: rule.active === undefined ? true : Boolean(rule.active),
+      chancePercent: Number(rule.chancePercent) & 0xff,
+    };
+  }
+
   setLockFallRules(rules) {
     if (!Array.isArray(rules) || rules.length > 10 || rules.some((rule) => (
       !Number.isInteger(Number(rule?.typeMask)) || !Number.isInteger(Number(rule?.chancePercent))
@@ -768,6 +817,11 @@ export class PuzzleEngine {
     const sourceBlockFlags = state.blockFlags === undefined
       ? Number(orb.blockFlags) >>> 0
       : Number(state.blockFlags) >>> 0;
+    const nail = state.nail === undefined
+      ? state.blockFlags === undefined
+        ? Boolean(orb.nail)
+        : (sourceBlockFlags & PAD_BLOCK_NAIL_FLAG) !== 0
+      : Boolean(state.nail);
     const thornActive = state.thornActive === undefined
       ? thornStateChanged
         ? thornDescriptor !== 0
@@ -782,8 +836,9 @@ export class PuzzleEngine {
         : (sourceBlockFlags & PAD_BLOCK_LOCKED_FLAG) !== 0
       : Boolean(state.locked);
     const blockFlags = (sourceBlockFlags
-      & ~(PAD_BLOCK_LOCKED_FLAG | PAD_BLOCK_BURST_FLAG))
+      & ~(PAD_BLOCK_LOCKED_FLAG | PAD_BLOCK_NAIL_FLAG | PAD_BLOCK_BURST_FLAG))
       | (locked ? PAD_BLOCK_LOCKED_FLAG : 0)
+      | (nail ? PAD_BLOCK_NAIL_FLAG : 0)
       | (thornActive ? PAD_BLOCK_BURST_FLAG : 0);
     const currentEnhancementPower = normalizeEnhancementPower(
       orb.enhancementPower === undefined ? (orb.enhanced ? PAD_ENHANCED_ORB_BONUS : 0) : orb.enhancementPower,
@@ -806,6 +861,7 @@ export class PuzzleEngine {
       enhanced: enhancementPower > 0,
       blockFlags,
       locked,
+      nail,
       thornActive,
       thornDescriptor,
       thornPercent,
@@ -1158,14 +1214,17 @@ export class PuzzleEngine {
       comboDropAwakenings: [...this.comboDropAwakenings],
       pendingComboDrops: this.pendingComboDrops,
       comboDropBonusCount: this.comboDropBonusCount,
+      turnNailCount: this.turnNailCount,
       topLineDropTypes: this.topLineDropTypes ? [...this.topLineDropTypes] : null,
       thornFallRule: this.thornFallRule ? { ...this.thornFallRule } : null,
+      nailFallRule: this.nailFallRule ? { ...this.nailFallRule } : null,
       lockFallRules: this.lockFallRules.map((rule) => ({ ...rule })),
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({
         code: ORB_BY_ID[orb.type].code,
         blockFlags: orb.blockFlags,
         comboDrop: (orb.blockFlags & PAD_BLOCK_COMBO_DROP_FLAG) !== 0,
+        nail: (orb.blockFlags & PAD_BLOCK_NAIL_FLAG) !== 0,
         enhancementPower: orb.enhancementPower,
         enhanced: orb.enhanced,
         locked: orb.locked,
@@ -1178,6 +1237,7 @@ export class PuzzleEngine {
       turnMatches: this.turnMatches.map((match) => ({ ...match })),
       lastComboCount: this.lastComboCount,
       lastDamage: this.lastDamage,
+      lastNailDamage: this.lastNailDamage,
       lastHealing: this.lastHealing,
       lastPoisonDamage: this.lastPoisonDamage,
       lastBombDamage: this.lastBombDamage,

@@ -2,6 +2,21 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 native Nail Orb fall and post-attack damage
+
+- Identified `_checkPassiveSkill4Block`'s `0x20000` branch through the binary's
+  `ED_NAIL_ERASE`, `ED_MAKENAILDROP`, and `sGAMEWORK::addNailCounts` symbols.
+  Natural spawns consume one shared post-spawn roll and become Nail Orbs when
+  `floor(high16 * 100 / 65536) < percent`; special types consume nothing.
+- Ported `nailFallRule` after thorn assignment and before lock-fall, persistent
+  Nail Orb state/rendering, and cascade-wide erased-nail counting.
+- Recovered `_gamePhaseEachTurn`'s post-attack damage: each surviving enemy
+  takes rounded `max(1, maxHP * nails / 100)` damage. Pure, engine, and browser
+  fixtures cover the percentage edge, shared three-effect LCG order, visual
+  state, and per-enemy damage. The inspector now checks 65 exact anchors.
+- Next: recover the remaining roulette/invisible-drop and enhanced/weakened
+  fall branches in `_checkPassiveSkill4Block`.
+
 ## 2026-08-14 native thorn-fall post-spawn rule
 
 - Recovered `_checkPassiveSkill4Block`'s thorn/burst branch: an active record

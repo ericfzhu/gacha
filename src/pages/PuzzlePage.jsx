@@ -55,6 +55,27 @@ function drawOrbState(ctx, orb, x, y, radius, alpha) {
     }
     ctx.restore();
   }
+  if (orb.nail) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(-0.55);
+    ctx.fillStyle = 'rgba(232, 237, 241, .96)';
+    ctx.strokeStyle = 'rgba(46, 54, 65, .9)';
+    ctx.lineWidth = Math.max(1, radius * 0.055);
+    ctx.beginPath();
+    ctx.roundRect(-radius * 0.1, -radius * 0.56, radius * 0.2, radius * 0.82, radius * 0.05);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-radius * 0.28, -radius * 0.55);
+    ctx.lineTo(radius * 0.28, -radius * 0.55);
+    ctx.lineTo(radius * 0.18, -radius * 0.72);
+    ctx.lineTo(-radius * 0.18, -radius * 0.72);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
   if (activePadOrbAtlas && orb.enhanced) {
     const sprite = activePadOrbAtlas.sprites[22];
     ctx.drawImage(activePadOrbAtlas.image, sprite.x, sprite.y, sprite.width, sprite.height,
@@ -437,7 +458,7 @@ function render(ctx, engine) {
     ctx.globalAlpha = Math.max(0, 1 - t);
     ctx.textAlign = 'center';
     ctx.font = '900 22px "Barlow Condensed", sans-serif';
-    ctx.fillStyle = item.kind === 'heal' ? '#83ef9d' : item.kind === 'poison' ? '#d995ef' : item.kind === 'bomb' ? '#ffb45f' : item.kind === 'thorn' ? '#e4edf3' : item.kind === 'enemy' ? '#ff8b7f' : ORB_BY_ID[item.attribute]?.highlight || '#fff';
+    ctx.fillStyle = item.kind === 'heal' ? '#83ef9d' : item.kind === 'poison' ? '#d995ef' : item.kind === 'bomb' ? '#ffb45f' : item.kind === 'thorn' || item.kind === 'nail' ? '#e4edf3' : item.kind === 'enemy' ? '#ff8b7f' : ORB_BY_ID[item.attribute]?.highlight || '#fff';
     ctx.fillText(`${item.kind === 'heal' ? '+' : '-'}${item.value.toLocaleString()}`, x, y);
     ctx.globalAlpha = 1;
   });

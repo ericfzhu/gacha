@@ -21,6 +21,7 @@ import {
   padMatchPower,
   padNativeBaseAttackPower,
   padNativeRecoveryPower,
+  padNailDamage,
   padOrbMatchMultiplier,
   padPoisonDamage,
   padResolveBitReplacements,
@@ -28,6 +29,7 @@ import {
   padResolveComboDropAwakenings,
   padResolveComboDropSpawns,
   padResolveLockFall,
+  padResolveNailFall,
   padResolveThornFall,
   padResolveBlockSwapNew,
   padResolveLineBlockSwaps,
@@ -165,6 +167,33 @@ assert.deepEqual(padResolveThornFall(21_900, 6, {
   clearEnhancement: true,
   applied: true,
   attempts: 1,
+});
+assert.deepEqual(padResolveNailFall(21_900, 0, {
+  active: true,
+  chancePercent: 10,
+}, 0x8000), {
+  state: 394_448_415,
+  blockFlags: 0x28000,
+  applied: true,
+  attempts: 1,
+});
+assert.deepEqual(padResolveNailFall(21_900, 0, {
+  active: true,
+  chancePercent: 9,
+}), {
+  state: 394_448_415,
+  blockFlags: 0,
+  applied: false,
+  attempts: 1,
+});
+assert.deepEqual(padResolveNailFall(21_900, 6, {
+  active: true,
+  chancePercent: 100,
+}), {
+  state: 21_900,
+  blockFlags: 0,
+  applied: false,
+  attempts: 0,
 });
 assert.deepEqual(padResolveLockFall(21_900, 0, [
   { typeMask: 1 << 0, chancePercent: 0 },
@@ -675,6 +704,31 @@ assert.deepEqual(thornFallEngine.snapshot().thornFallRule, {
   descriptor: 4,
   descriptorHighBit: true,
 });
+const nailFallEngine = new PuzzleEngine({
+  seed: 21_900,
+  lockFallSeed: 21_900,
+  thornFallRule: {
+    typeMask: 1 << 0,
+    chancePercent: 100,
+    descriptor: 4,
+    descriptorHighBit: true,
+  },
+  nailFallRule: { chancePercent: 100 },
+  lockFallRules: [{ typeMask: 1 << 0, chancePercent: 100 }],
+});
+nailFallEngine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+nailFallEngine.setRngState(21_900);
+nailFallEngine.setLockFallRngState(21_900);
+nailFallEngine.board[0][0] = null;
+nailFallEngine.collapseAndRefill();
+assert.equal(nailFallEngine.board[0][0].nail, true);
+assert.equal(nailFallEngine.board[0][0].blockFlags, 0xa0800);
+assert.equal(nailFallEngine.rng.state, 394_448_415);
+assert.equal(nailFallEngine.lockFallRng.state, 1_929_471_377);
+assert.deepEqual(nailFallEngine.snapshot().nailFallRule, {
+  active: true,
+  chancePercent: 100,
+});
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);
 assert.deepEqual(tracePadDragCells(0, 0, 2, 2, true), [{ row: 1, column: 1 }, { row: 2, column: 2 }]);
@@ -810,10 +864,29 @@ assert.equal(padPoisonDamage(2_147_483_647, [3, 3, 3, 3, 3, 3], []), 2_147_483_6
 assert.equal(padBombDamage(10_001, 2), 4_002);
 assert.equal(padBombDamage(2_147_483_647, 10), 2_147_483_647);
 assert.equal(padThornDamage(10_001, 4), 401);
+assert.equal(padNailDamage(92_000, 2), 1_840);
+assert.equal(padNailDamage(50, 1), 1);
+assert.equal(padNailDamage(150, 1), 2);
+assert.equal(padNailDamage(92_000, 0), 0);
 assert.equal(padAttributeMultiplier('fire', 'wood'), 2);
 assert.equal(padAttributeMultiplier('fire', 'water'), 0.5);
 assert.equal(padAttributeMultiplier('light', 'dark'), 2);
 assert.equal(padAttributeMultiplier('light', 'fire'), 1);
+
+const nailDamageEngine = new PuzzleEngine({ seed: 21_900 });
+nailDamageEngine.turnMatches = [{
+  type: 'heart',
+  size: 3,
+  enhancedCount: 0,
+  enhancementMultiplier: 1,
+}];
+nailDamageEngine.turnNailCount = 2;
+nailDamageEngine.comboCount = 1;
+nailDamageEngine.resolvePlayerTurn();
+assert.equal(nailDamageEngine.lastNailDamage, 3_360);
+assert.equal(nailDamageEngine.lastDamage, 3_360);
+assert.deepEqual(nailDamageEngine.enemies.map((enemy) => enemy.hp), [90_160, 74_480]);
+assert.equal(nailDamageEngine.floatingText.filter((item) => item.kind === 'nail').length, 2);
 
 const bombBoard = [
   ['R', 'B', 'G', 'L', 'D', 'H'],

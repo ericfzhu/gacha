@@ -8,6 +8,7 @@ export const PAD_EXTRA_COMBO_BONUS = 0.25;
 export const PAD_POISON_MAX_HP_RATIO = 0.2;
 export const PAD_MORTAL_POISON_MAX_HP_RATIO = 0.5;
 export const PAD_BOMB_MAX_HP_RATIO = 0.2;
+export const PAD_NAIL_ENEMY_MAX_HP_RATIO = 0.01;
 export const PAD_DEFAULT_THORN_HP_PERCENT = 4;
 export const PAD_ENHANCED_ORB_BONUS = 0.06;
 export const PAD_CHANGED_SECONDARY_ATTRIBUTE_RATIO = 0.15;
@@ -382,6 +383,42 @@ export function padResolveThornFall(state, type, rule, initialBlockFlags = 0) {
     applied,
     attempts: 1,
   };
+}
+
+// The next _checkPassiveSkill4Block branch is the Nail Orb fall record. It is
+// limited to the six natural types, spends one +0x66a14 LCG advance per eligible
+// spawn, and marks the block when floor(high16 * 100 / 65536) < percent.
+export function padResolveNailFall(state, type, rule, initialBlockFlags = 0) {
+  const blockFlags = Number(initialBlockFlags) >>> 0;
+  const typeIndex = Math.trunc(Number(type));
+  if (!rule?.active || typeIndex < 0 || typeIndex > 5) {
+    return {
+      state: Number(state) >>> 0,
+      blockFlags,
+      applied: false,
+      attempts: 0,
+    };
+  }
+  const roll = padLcgStep(state);
+  const chancePercent = Math.trunc(Number(rule.chancePercent) || 0) & 0xff;
+  const scaled = Math.floor(roll.value * 100 / 0x10000);
+  const applied = scaled < chancePercent;
+  return {
+    state: roll.state,
+    blockFlags: (blockFlags | (applied ? 0x20000 : 0)) >>> 0,
+    applied,
+    attempts: 1,
+  };
+}
+
+// Nail damage is resolved after ordinary attacks. _gamePhaseEachTurn computes
+// max(1.0, enemyMaxHp * nailCount / 100.0) in binary64 and passes it through
+// izMathRoundSint64 (positive values round by truncating value + 0.5).
+export function padNailDamage(enemyMaxHp, nailCount) {
+  const maxHp = Math.max(0, Math.trunc(Number(enemyMaxHp) || 0));
+  const count = Math.max(0, Math.trunc(Number(nailCount) || 0));
+  if (count === 0) return 0;
+  return Math.trunc(Math.max(1, maxHp * count * PAD_NAIL_ENEMY_MAX_HP_RATIO) + 0.5);
 }
 
 // _checkLockFall (0x626200) walks ten active rules. A matching type mask spends

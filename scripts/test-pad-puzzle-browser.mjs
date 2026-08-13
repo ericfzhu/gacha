@@ -15,6 +15,7 @@ const testMatchShapes = process.argv.includes('--match-shapes');
 const testAttackRounds = process.argv.includes('--attack-rounds');
 const testPointerIdentity = process.argv.includes('--pointer-identity');
 const testMoveDeadline = process.argv.includes('--move-deadline');
+const renderNailState = process.argv.includes('--nail-render');
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 980, height: 900 } });
 const consoleMessages = [];
@@ -458,6 +459,7 @@ try {
       descriptor: 4,
       descriptorHighBit: true,
     });
+    engine.setNailFallRule({ chancePercent: 100 });
     engine.setBoardFromCodes(Array(5).fill('DDDDDD'));
     engine.setRngState(21_900);
     engine.setLockFallRngState(21_900);
@@ -467,7 +469,18 @@ try {
     const thornFallMainState = engine.rng.state;
     const thornFallRuleState = engine.lockFallRng.state;
     engine.setThornFallRule(null);
+    engine.setNailFallRule(null);
     engine.setLockFallRules([]);
+    engine.setBoardFromCodes([
+      'RRRHBG', 'BGLHDB', 'GLHDBG', 'LHDBGL', 'HDBGLH',
+    ]);
+    for (let column = 0; column < 3; column += 1) engine.setOrbState(0, column, { nail: true });
+    engine.phase = 'detect';
+    engine.advancePhase();
+    const nailMatchCount = engine.turnNailCount;
+    engine.resolvePlayerTurn();
+    const nailDamage = engine.lastNailDamage;
+    const nailDamageTotal = engine.lastDamage;
     engine.reset();
     const initialBoard = engine.snapshot().board;
     const initialBoardState = engine.rng.state;
@@ -496,6 +509,7 @@ try {
       comboDropAwakeningBonus, comboDropAwakeningPending,
       lockFallType, lockFallLocked, lockFallMainState, lockFallRuleState,
       thornFallOrb, thornFallMainState, thornFallRuleState,
+      nailMatchCount, nailDamage, nailDamageTotal,
       initialBoard, initialBoardState,
     };
   }) : null;
@@ -572,10 +586,12 @@ try {
     poisonBlockSample.lockFallMainState !== 394_448_415 ||
     poisonBlockSample.lockFallRuleState !== 394_448_415 ||
     poisonBlockSample.thornFallOrb.code !== 'R' || !poisonBlockSample.thornFallOrb.locked ||
-    !poisonBlockSample.thornFallOrb.thornActive ||
+    !poisonBlockSample.thornFallOrb.thornActive || !poisonBlockSample.thornFallOrb.nail ||
     poisonBlockSample.thornFallOrb.thornDescriptor !== 0x84 ||
     poisonBlockSample.thornFallMainState !== 394_448_415 ||
-    poisonBlockSample.thornFallRuleState !== 3_803_934_822 ||
+    poisonBlockSample.thornFallRuleState !== 1_929_471_377 ||
+    poisonBlockSample.nailMatchCount !== 3 || poisonBlockSample.nailDamage !== 2_280 ||
+    poisonBlockSample.nailDamageTotal <= poisonBlockSample.nailDamage ||
     JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
       'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',
     ]) || poisonBlockSample.initialBoardState !== 79_238_434
@@ -790,10 +806,22 @@ try {
   if (moveDeadline && (
     moveDeadline.drag !== null || moveDeadline.turn !== 1 || moveDeadline.phase !== 'detect'
   )) throw new Error(`Move deadline mismatch: ${JSON.stringify(moveDeadline)}`);
+  const nailRenderState = renderNailState ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    engine.reset();
+    engine.setBoardFromCodes(['RRRHBG', 'BGLHDB', 'GLHDBG', 'LHDBGL', 'HDBGLH']);
+    for (let column = 0; column < 3; column += 1) engine.setOrbState(0, column, { nail: true });
+    engine.start();
+    return engine.snapshot().boardState[0];
+  }) : null;
+  if (nailRenderState && nailRenderState.slice(0, 3).some((orb) => !orb.nail || (orb.blockFlags & 0x20000) === 0)) {
+    throw new Error(`Nail render-state mismatch: ${JSON.stringify(nailRenderState)}`);
+  }
+  if (nailRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }
