@@ -122,6 +122,15 @@ maximum HP for a three-orb group and mortal poison 50%, with the same 25%
 per-extra-orb group scaling. Recovery and poison are netted before the HP clamp,
 matching `_applyHpRecAndPoisonDamage` rather than healing to the cap first.
 
+Orb state remains separate from type. In native `sBLOCK`, type is the signed
+byte at `+0`, the flag word is at `+4`, and the enhancement value is the float at
+`+8`. `_doLockDropBits` tests and sets flag `0x800`; locking a special type also
+clears its enhancement value. The browser orb record therefore carries
+`enhanced` and `locked` alongside `type`. Locked orbs still move and match but
+are skipped by conversion skills, while enhanced orbs retain their type and add
+the classic 6% per enhanced orb in that match. Original atlas overlays 22 and 25
+render the enhanced and locked states.
+
 Classic base multipliers recovered in the calculation path are:
 
 - three connected orbs: `1.0`

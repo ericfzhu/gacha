@@ -6,6 +6,7 @@ import {
   padAttributeMultiplier,
   padComboMultiplier,
   padDamageAfterDefense,
+  padEnhancedOrbMultiplier,
   padMatchPower,
   padNativeBaseAttackPower,
   padOrbMatchMultiplier,
@@ -64,6 +65,8 @@ assert.equal(padNativeBaseAttackPower(101, [3, 4], 2), 285);
 assert.equal(padApplyAttackMultipliers(285, [1.5, 1.5]), 642);
 assert.equal(padDamageAfterDefense(101, 0.5, 40), 11);
 assert.equal(padDamageAfterDefense(10, 0.5, 999), 1);
+assert.equal(padEnhancedOrbMultiplier(3), 1.18);
+assert.equal(padNativeBaseAttackPower(100, [{ size: 3, enhancedCount: 3 }], 1), 118);
 assert.equal(padPoisonDamage(10_000, [3], []), 2_000);
 assert.equal(padPoisonDamage(10_000, [4], [3]), 7_500);
 assert.equal(padAttributeMultiplier('fire', 'wood'), 2);
@@ -88,4 +91,13 @@ poisonEngine.resolvePlayerTurn();
 assert.equal(poisonEngine.lastHealing, 1_025);
 assert.equal(poisonEngine.lastPoisonDamage, 2_400);
 assert.equal(poisonEngine.player.hp, 10_625);
+
+const stateEngine = new PuzzleEngine({ seed: 3 });
+stateEngine.setBoardFromCodes(['GGGHRD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD']);
+stateEngine.setOrbState(0, 0, { enhanced: true, locked: true });
+stateEngine.start();
+stateEngine.useSkill();
+assert.equal(stateEngine.board[0][0].type, 'wood');
+assert.equal(stateEngine.board[0][0].enhanced, true);
+assert.equal(stateEngine.board[0][0].locked, true);
 console.log('PAD orthogonal drag, connected match, and classic multiplier checks passed.');

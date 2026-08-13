@@ -4,6 +4,7 @@ const { chromium } = await import(process.env.GACHA_PLAYWRIGHT_MODULE || 'playwr
 const url = process.argv[2] || 'http://127.0.0.1:4173/puzzle';
 const outputPath = process.argv[3] || '/tmp/gacha-pad-puzzle.png';
 const apkPath = process.argv[4] || null;
+const showOrbStates = process.argv.includes('--orb-states');
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 980, height: 900 } });
 const consoleMessages = [];
@@ -57,10 +58,16 @@ try {
     throw new Error(`Browser console errors: ${consoleMessages.join('\n')}`);
   }
 
+  const orbStateSample = showOrbStates ? await page.evaluate(() => {
+    window.__puzzleGame.setBoardFromCodes(['JPMRBG', 'HRBGDL', 'BGHRDL', 'DLGRHB', 'HRBGLD']);
+    window.__puzzleGame.setOrbState(0, 3, { enhanced: true, locked: false });
+    window.__puzzleGame.setOrbState(0, 4, { enhanced: true, locked: true });
+    return window.__puzzleGame.snapshot().boardState[0];
+  }) : null;
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, orbStateSample, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, orbStateSample, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

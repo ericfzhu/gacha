@@ -7,8 +7,9 @@ import {
   padAttributeMultiplier,
   padComboMultiplier,
   padDamageAfterDefense,
-  padMatchPower,
+  padEnhancedOrbMultiplier,
   padNativeBaseAttackPower,
+  padOrbMatchMultiplier,
   padPoisonDamage,
   tracePadPointerCells,
 } from './padCoreRules.js';
@@ -114,8 +115,8 @@ export class PuzzleEngine {
     this.message = 'Your move — touch and drag any orb.';
   }
 
-  createOrb(type) {
-    return { id: ++this.orbSerial, type };
+  createOrb(type, state = {}) {
+    return { id: ++this.orbSerial, type, enhanced: false, locked: false, ...state };
   }
 
   createStableBoard() {
@@ -197,7 +198,7 @@ export class PuzzleEngine {
     const candidates = [];
     for (let row = 0; row < BOARD_ROWS; row += 1) {
       for (let column = 0; column < BOARD_COLUMNS; column += 1) {
-        if (this.board[row][column].type !== 'water') candidates.push([row, column]);
+      if (this.board[row][column].type !== 'water' && !this.board[row][column].locked) candidates.push([row, column]);
       }
     }
     candidates.sort((a, b) => {
@@ -205,7 +206,9 @@ export class PuzzleEngine {
       const bPriority = this.board[b[0]][b[1]].type === 'wood' ? 0 : this.board[b[0]][b[1]].type === 'heart' ? 1 : 2;
       return aPriority - bPriority || a[0] - b[0] || a[1] - b[1];
     });
-    candidates.slice(0, 4).forEach(([row, column]) => { this.board[row][column] = this.createOrb('water'); });
+    candidates.slice(0, 4).forEach(([row, column]) => {
+      this.board[row][column] = { ...this.board[row][column], type: 'water' };
+    });
     this.skill.cooldown = this.skill.maxCooldown;
     this.message = 'Tide Shift changed four orbs to Water. Skills do not consume the turn.';
     return true;
@@ -237,7 +240,12 @@ export class PuzzleEngine {
       const matches = this.findMatches();
       if (matches.length) {
         this.pendingMatches = matches;
-        this.turnMatches.push(...matches.map((match) => ({ type: match.type, size: match.size, isMassAttack: match.isMassAttack })));
+        this.turnMatches.push(...matches.map((match) => ({
+          type: match.type,
+          size: match.size,
+          enhancedCount: match.cells.reduce((count, { row, column }) => count + (this.board[row][column]?.enhanced ? 1 : 0), 0),
+          isMassAttack: match.isMassAttack,
+        })));
         this.comboCount += matches.length;
         this.cascadeDepth += 1;
         this.phase = 'clear';
@@ -317,17 +325,18 @@ export class PuzzleEngine {
     const byType = new Map();
     this.turnMatches.forEach((match) => {
       if (!byType.has(match.type)) byType.set(match.type, []);
-      byType.get(match.type).push(match.size);
+      byType.get(match.type).push(match);
     });
 
     const heartMatches = byType.get('heart') || [];
     const healing = heartMatches.length
-      ? Math.floor(padMatchPower(this.player.recovery, heartMatches) * comboMultiplier)
+      ? Math.floor(heartMatches.reduce((total, match) => total +
+        this.player.recovery * padOrbMatchMultiplier(match.size) * padEnhancedOrbMultiplier(match.enhancedCount), 0) * comboMultiplier)
       : 0;
     const poisonDamage = padPoisonDamage(
       this.player.maxHp,
-      byType.get('poison') || [],
-      byType.get('mortalPoison') || [],
+      (byType.get('poison') || []).map((match) => match.size),
+      (byType.get('mortalPoison') || []).map((match) => match.size),
     );
     const previousHp = this.player.hp;
     this.player.hp = clamp(previousHp + healing - poisonDamage, 0, this.player.maxHp);
@@ -340,11 +349,11 @@ export class PuzzleEngine {
     const target = this.enemies[this.targetEnemy]?.hp > 0 ? this.targetEnemy : this.enemies.findIndex((enemy) => enemy.hp > 0);
     this.targetEnemy = Math.max(0, target);
     this.party.forEach((member) => {
-      const sizes = byType.get(member.attribute) || [];
-      if (!sizes.length) return;
-      const matchAttack = padNativeBaseAttackPower(member.attack, sizes, this.comboCount);
+      const matches = byType.get(member.attribute) || [];
+      if (!matches.length) return;
+      const matchAttack = padNativeBaseAttackPower(member.attack, matches, this.comboCount);
       const raw = padApplyAttackMultipliers(matchAttack, [leader, leader]);
-      const isMassAttack = sizes.some((size) => size >= 5);
+      const isMassAttack = matches.some((match) => match.size >= 5);
       this.enemies.forEach((enemy, enemyIndex) => {
         if (enemy.hp <= 0 || (!isMassAttack && enemyIndex !== this.targetEnemy)) return;
         const damage = padDamageAfterDefense(raw, padAttributeMultiplier(member.attribute, enemy.attribute), enemy.defense);
@@ -383,6 +392,12 @@ export class PuzzleEngine {
     }));
   }
 
+  setOrbState(row, column, state) {
+    if (!this.isCell(row, column)) throw new Error(`Orb state cell ${row},${column} is outside the board.`);
+    const orb = this.board[row][column];
+    this.board[row][column] = { ...orb, enhanced: Boolean(state.enhanced), locked: Boolean(state.locked) };
+  }
+
   isCell(row, column) {
     return row >= 0 && row < BOARD_ROWS && column >= 0 && column < BOARD_COLUMNS;
   }
@@ -394,6 +409,7 @@ export class PuzzleEngine {
       phase: this.phase,
       turn: this.turn,
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
+      boardState: this.board.map((row) => row.map((orb) => ({ code: ORB_BY_ID[orb.type].code, enhanced: orb.enhanced, locked: orb.locked }))),
       drag: this.drag ? { row: this.drag.row, column: this.drag.column, remainingSeconds: Number(this.drag.remaining.toFixed(2)), pathLength: this.drag.pathLength } : null,
       comboCount: this.comboCount,
       lastComboCount: this.lastComboCount,

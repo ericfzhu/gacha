@@ -7,6 +7,7 @@ export const PAD_EXTRA_ORB_BONUS = 0.25;
 export const PAD_EXTRA_COMBO_BONUS = 0.25;
 export const PAD_POISON_MAX_HP_RATIO = 0.2;
 export const PAD_MORTAL_POISON_MAX_HP_RATIO = 0.5;
+export const PAD_ENHANCED_ORB_BONUS = 0.06;
 
 // Version 21.9.0's restored image exposes the corresponding native routines as
 // cGAMEMAIN::_isNeighborBlock (0x673e24), _swapBlock (0x67ab14),
@@ -36,14 +37,23 @@ export function padMatchPower(attack, matchSizes) {
   return matchSizes.reduce((total, size) => total + attack * padOrbMatchMultiplier(size), 0);
 }
 
+export function padEnhancedOrbMultiplier(enhancedCount) {
+  return 1 + PAD_ENHANCED_ORB_BONUS * Math.max(0, Number(enhancedCount) || 0);
+}
+
 // libpad keeps attack lanes as integers. _applyComboMul routes each matched
 // lane through sCARD::dmgUpBase, which uses izMathCeiling, while later attack
 // multipliers route through sCARD::dmgUp and round positive values with +0.5.
 // _calcAttackPow then applies elemental advantage with izMathCeilingSint64.
 export function padNativeBaseAttackPower(attack, matchSizes, combos) {
   const comboMultiplier = padComboMultiplier(combos);
-  return matchSizes.reduce((total, size) =>
-    total + Math.ceil(attack * padOrbMatchMultiplier(size) * comboMultiplier), 0);
+  return matchSizes.reduce((total, match) => {
+    const size = typeof match === 'number' ? match : match.size;
+    const enhancedCount = typeof match === 'number' ? 0 : match.enhancedCount || 0;
+    return total + Math.ceil(
+      attack * padOrbMatchMultiplier(size) * padEnhancedOrbMultiplier(enhancedCount) * comboMultiplier,
+    );
+  }, 0);
 }
 
 export function padApplyAttackMultipliers(attack, multipliers) {

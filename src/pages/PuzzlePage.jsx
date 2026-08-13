@@ -19,6 +19,32 @@ function roundedRect(ctx, x, y, width, height, radius) {
   ctx.roundRect(x, y, width, height, r);
 }
 
+function drawOrbState(ctx, orb, x, y, radius, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  if (activePadOrbAtlas && orb.enhanced) {
+    const sprite = activePadOrbAtlas.sprites[22];
+    ctx.drawImage(activePadOrbAtlas.image, sprite.x, sprite.y, sprite.width, sprite.height,
+      x + radius * 0.12, y - radius * 0.76, radius * 0.86, radius * 0.71);
+  } else if (orb.enhanced) {
+    ctx.fillStyle = '#fff3a3';
+    ctx.font = `900 ${Math.round(radius * 0.75)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('+', x + radius * 0.43, y - radius * 0.25);
+  }
+  if (activePadOrbAtlas && orb.locked) {
+    const sprite = activePadOrbAtlas.sprites[25];
+    ctx.drawImage(activePadOrbAtlas.image, sprite.x, sprite.y, sprite.width, sprite.height,
+      x - radius * 0.45, y - radius * 0.42, radius * 0.9, radius * 0.78);
+  } else if (orb.locked) {
+    ctx.fillStyle = 'rgba(253, 221, 96, .96)';
+    ctx.font = `${Math.round(radius * 0.68)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('▣', x, y + radius * 0.24);
+  }
+  ctx.restore();
+}
+
 function drawOrb(ctx, orb, x, y, radius, alpha = 1, selected = false) {
   const meta = ORB_BY_ID[orb.type];
   const atlasSprite = activePadOrbAtlas?.sprites[PAD_ORB_SPRITES[orb.type]];
@@ -43,6 +69,7 @@ function drawOrb(ctx, orb, x, y, radius, alpha = 1, selected = false) {
       ctx.stroke();
     }
     ctx.restore();
+    drawOrbState(ctx, orb, x, y, radius, alpha);
     return;
   }
   ctx.save();
@@ -83,6 +110,7 @@ function drawOrb(ctx, orb, x, y, radius, alpha = 1, selected = false) {
     ctx.fill();
   }
   ctx.restore();
+  drawOrbState(ctx, orb, x, y, radius, alpha);
 }
 
 function drawBar(ctx, x, y, width, height, ratio, colors) {
