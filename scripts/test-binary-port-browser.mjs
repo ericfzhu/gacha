@@ -1,4 +1,6 @@
 import fs from 'node:fs/promises';
+import { basename } from 'node:path';
+import { canonicalPadRuntimePath } from '../src/binary-port/padRuntimeFiles.js';
 
 const { chromium } = await import(process.env.GACHA_PLAYWRIGHT_MODULE || 'playwright');
 
@@ -21,6 +23,10 @@ if (!apkPath) {
 }
 
 const browser = await chromium.launch({ headless: true });
+const runtimeFileSpecs = await Promise.all(runtimeFilePaths.map(async (path) => ({
+  path: canonicalPadRuntimePath(basename(path)),
+  size: (await fs.stat(path)).size,
+})));
 const page = await browser.newPage({ viewport: { width: 1100, height: 760 } });
 const consoleMessages = [];
 page.on('console', (message) => consoleMessages.push(`${message.type()}: ${message.text()}`));
@@ -70,6 +76,17 @@ try {
   }
   if (runtimeFilePaths.length && mountedRuntimeFiles.size !== runtimeFilePaths.length) {
     throw new Error(`Mounted ${mountedRuntimeFiles.size} runtime files; expected ${runtimeFilePaths.length}: ${JSON.stringify([...mountedRuntimeFiles])}`);
+  }
+  for (const runtimeFile of runtimeFileSpecs.filter(({ path }) => /\/data0(?:30|48)\.bin$/.test(path))) {
+    const fullRead = state.platform?.files?.some((event) =>
+      event.name === 'read' && event.path === runtimeFile.path &&
+      event.count === runtimeFile.size && event.result === runtimeFile.size);
+    if (!fullRead) {
+      throw new Error(`Native loader did not read the full mounted payload ${runtimeFile.path} (${runtimeFile.size} bytes).`);
+    }
+  }
+  if (runtimeFileSpecs.length && state.platform?.compatibilityCalls?.fgetpos) {
+    throw new Error('Native runtime-data loader resolved fgetpos through the generic compatibility bridge.');
   }
   if (consoleMessages.some((message) => /error|pageerror/i.test(message))) {
     throw new Error(`Native binary-port browser errors: ${consoleMessages.join('; ')}`);
