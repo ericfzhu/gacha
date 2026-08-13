@@ -10,6 +10,8 @@ export const PAD_MORTAL_POISON_MAX_HP_RATIO = 0.5;
 export const PAD_BOMB_MAX_HP_RATIO = 0.2;
 export const PAD_DEFAULT_THORN_HP_PERCENT = 4;
 export const PAD_ENHANCED_ORB_BONUS = 0.06;
+export const PAD_CHANGED_SECONDARY_ATTRIBUTE_RATIO = 0.15;
+export const PAD_TERTIARY_ATTRIBUTE_RATIO = 0.05;
 
 // Version 21.9.0's restored image exposes the corresponding native routines as
 // cGAMEMAIN::_isNeighborBlock (0x673e24), _swapBlock (0x67ab14),
@@ -61,13 +63,24 @@ export function padNativeBaseAttackPower(attack, matchSizes, combos) {
   return Math.ceil(baseAttack * comboMultiplier);
 }
 
-// _buildAttackCharge keeps secondary attributes in a separate integer attack
-// lane. The same-attribute path divides by 10; a different secondary attribute
-// divides by 3. Both paths call the native ceiling helper before match scaling.
-export function padSecondaryAttributeAttack(attack, mainAttribute, secondaryAttribute) {
+// _buildAttackCharge keeps secondary and tertiary attributes in separate
+// integer attack lanes. A natural secondary divides by 10 when it repeats the
+// main attribute and by 3 when it differs. An attribute-change awakening takes
+// the dedicated 15% branch instead. All paths call the native ceiling helper
+// before match scaling.
+export function padSecondaryAttributeAttack(attack, mainAttribute, secondaryAttribute, attributeChanged = false) {
   if (!secondaryAttribute) return 0;
   const value = Math.max(0, Number(attack) || 0);
+  if (attributeChanged) return Math.ceil(value * PAD_CHANGED_SECONDARY_ATTRIBUTE_RATIO);
   return Math.ceil(value / (mainAttribute === secondaryAttribute ? 10 : 3));
+}
+
+// The lane-index 2 path in _buildAttackCharge multiplies by the exact float
+// 0.05 and rounds upward. Unlike a secondary attribute, its element does not
+// alter the base ratio.
+export function padTertiaryAttributeAttack(attack, tertiaryAttribute) {
+  if (!tertiaryAttribute) return 0;
+  return Math.ceil(Math.max(0, Number(attack) || 0) * PAD_TERTIARY_ATTRIBUTE_RATIO);
 }
 
 export function padApplyAttackMultipliers(attack, multipliers) {

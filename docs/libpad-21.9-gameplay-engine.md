@@ -235,13 +235,16 @@ being independently multiplied and rounded. Later attack multipliers call
 `izMathCeilingSint64` before defense. Recovery uses positive `fcvtzs`
 truncation in `_recPowSet`, matching a floor operation.
 
-The attack records contain independent main and secondary attribute lanes.
-`_buildAttackCharge` divides secondary attack by 10 when it repeats the main
-attribute, or by 3 when it differs, and rounds the result upward before match
-scaling. The classic browser engine now models both hits independently,
-including each lane's attribute advantage, defense, mass-attack decision, and
-damage display. Its party also uses the native six-card shape (five player
-cards plus the helper), and team recovery is the sum of those six card records.
+The attack records contain independent main, tertiary, and secondary attribute
+lanes, resolved in that order. `_buildAttackCharge` divides a natural secondary
+attack by 10 when it repeats the main attribute, or by 3 when it differs. A
+secondary-attribute-change awakening takes a distinct 15% path. The tertiary
+lane takes a distinct 5% path regardless of its element. Each path rounds the
+lane upward before match scaling. The classic browser engine models all three
+hits independently, including each lane's attribute advantage, defense,
+mass-attack decision, and damage display. Its party also uses the native
+six-card shape (five player cards plus the helper), and team recovery is the
+sum of those six card records.
 
 ## Shipped asset containers
 

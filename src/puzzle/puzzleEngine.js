@@ -14,6 +14,7 @@ import {
   padOrbMatchMultiplier,
   padPoisonDamage,
   padSecondaryAttributeAttack,
+  padTertiaryAttributeAttack,
   padThornDamage,
   tracePadPointerCells,
 } from './padCoreRules.js';
@@ -45,7 +46,7 @@ const PARTY = Object.freeze([
   { id: 'briar', name: 'Briar', attribute: 'wood', secondaryAttribute: 'fire', attack: 850, recovery: 145 },
   { id: 'sol', name: 'Sol', attribute: 'light', secondaryAttribute: 'light', attack: 910, recovery: 130 },
   { id: 'nyx', name: 'Nyx', attribute: 'dark', secondaryAttribute: 'water', attack: 900, recovery: 120 },
-  { id: 'helper', name: 'Helper', attribute: 'fire', secondaryAttribute: 'wood', attack: 980, recovery: 130, helper: true },
+  { id: 'helper', name: 'Helper', attribute: 'fire', secondaryAttribute: 'wood', tertiaryAttribute: 'light', attack: 980, recovery: 130, helper: true },
 ]);
 
 const ENEMY_TEMPLATE = Object.freeze([
@@ -421,8 +422,17 @@ export class PuzzleEngine {
       const attackLanes = [
         { attribute: member.attribute, attack: member.attack },
         {
+          attribute: member.tertiaryAttribute,
+          attack: padTertiaryAttributeAttack(member.attack, member.tertiaryAttribute),
+        },
+        {
           attribute: member.secondaryAttribute,
-          attack: padSecondaryAttributeAttack(member.attack, member.attribute, member.secondaryAttribute),
+          attack: padSecondaryAttributeAttack(
+            member.attack,
+            member.attribute,
+            member.secondaryAttribute,
+            member.secondaryAttributeChanged,
+          ),
         },
       ];
       attackLanes.forEach((lane) => {
@@ -532,11 +542,13 @@ export class PuzzleEngine {
       lastThornDamage: this.lastThornDamage,
       leaderPairMultiplier: this.lastLeaderMultiplier,
       player: { ...this.player },
-      party: this.party.map(({ id, name, attribute, secondaryAttribute, attack, recovery, helper = false }) => ({
+      party: this.party.map(({ id, name, attribute, secondaryAttribute, tertiaryAttribute, secondaryAttributeChanged = false, attack, recovery, helper = false }) => ({
         id,
         name,
         attribute,
         secondaryAttribute,
+        tertiaryAttribute,
+        secondaryAttributeChanged,
         attack,
         recovery,
         helper,

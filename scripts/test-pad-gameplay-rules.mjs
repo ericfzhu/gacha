@@ -14,6 +14,7 @@ import {
   padOrbMatchMultiplier,
   padPoisonDamage,
   padSecondaryAttributeAttack,
+  padTertiaryAttributeAttack,
   padThornDamage,
   tracePadDragCells,
   tracePadPointerCells,
@@ -120,7 +121,11 @@ assert.equal(padNativeBaseAttackPower(100, [{ size: 3, enhancedCount: 3 }], 1), 
 assert.equal(padNativeBaseAttackPower(101, [{ size: 3, enhancedCount: 3 }], 1), 120);
 assert.equal(padSecondaryAttributeAttack(900, 'fire', 'fire'), 90);
 assert.equal(padSecondaryAttributeAttack(900, 'fire', 'water'), 300);
+assert.equal(padSecondaryAttributeAttack(900, 'fire', 'fire', true), 135);
 assert.equal(padSecondaryAttributeAttack(900, 'fire', null), 0);
+assert.equal(padTertiaryAttributeAttack(900, 'fire'), 45);
+assert.equal(padTertiaryAttributeAttack(901, 'water'), 46);
+assert.equal(padTertiaryAttributeAttack(900, null), 0);
 assert.equal(padPoisonDamage(10_000, [3], []), 2_000);
 assert.equal(padPoisonDamage(10_000, [4], [3]), 7_500);
 assert.equal(padPoisonDamage(10_001, [3, 3], []), 4_002);
@@ -230,6 +235,7 @@ secondaryAttackEngine.party = [{
   name: 'Dual',
   attribute: 'fire',
   secondaryAttribute: 'water',
+  tertiaryAttribute: 'wood',
   attack: 90,
   recovery: 0,
 }];
@@ -239,12 +245,13 @@ secondaryAttackEngine.comboCount = 2;
 secondaryAttackEngine.turnMatches = [
   { type: 'fire', size: 3, enhancedCount: 0 },
   { type: 'water', size: 3, enhancedCount: 0 },
+  { type: 'wood', size: 3, enhancedCount: 0 },
 ];
 secondaryAttackEngine.resolvePlayerTurn();
-assert.equal(secondaryAttackEngine.lastDamage, 151);
+assert.equal(secondaryAttackEngine.lastDamage, 158);
 assert.deepEqual(
   secondaryAttackEngine.floatingText.filter(({ kind }) => kind === 'damage').map(({ attribute, value }) => ({ attribute, value })),
-  [{ attribute: 'fire', value: 113 }, { attribute: 'water', value: 38 }],
+  [{ attribute: 'fire', value: 113 }, { attribute: 'wood', value: 7 }, { attribute: 'water', value: 38 }],
 );
 
 const stateEngine = new PuzzleEngine({ seed: 3 });
