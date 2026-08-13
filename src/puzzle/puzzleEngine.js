@@ -98,6 +98,7 @@ export class PuzzleEngine {
     skyfallExclusionMask = 0,
     comboDropChanceBasisPoints = 0,
     comboDropCap = 12,
+    topLineDropTypes = null,
   } = {}) {
     if (![columns, rows].every(Number.isInteger) || columns < 1 || columns > 15 || rows < 1 || rows > 15) {
       throw new Error('PAD board dimensions must be integers from 1 through 15.');
@@ -112,6 +113,7 @@ export class PuzzleEngine {
     this.skyfallExclusionMask = Number(skyfallExclusionMask) >>> 0;
     this.comboDropChanceBasisPoints = Math.max(0, Math.trunc(Number(comboDropChanceBasisPoints) || 0));
     this.comboDropCap = Math.max(0, Math.trunc(Number(comboDropCap) || 0));
+    this.setTopLineDropTypes(topLineDropTypes);
     this.rng = createPadRng(seed);
     this.orbSerial = 0;
     this.visualTime = 0;
@@ -494,7 +496,9 @@ export class PuzzleEngine {
       for (let row = this.rows - 1; row >= 0; row -= 1) if (this.board[row][column]) survivors.push(this.board[row][column]);
       const missingCount = this.rows - survivors.length;
       const columnGenerated = Array.from({ length: missingCount }, (_, row) => {
-        const type = this.rng.spawnNewBlock(this.dropRates, this.faceTypes, this.skyfallExclusionMask);
+        const type = this.topLineDropTypes
+          ? this.topLineDropTypes[column]
+          : this.rng.spawnNewBlock(this.dropRates, this.faceTypes, this.skyfallExclusionMask);
         const entry = { row, column, type };
         generated.push(entry);
         return entry;
@@ -663,6 +667,17 @@ export class PuzzleEngine {
       throw new Error('PAD drop rates must contain at most ten finite numeric lanes.');
     }
     this.dropRates = Array.from({ length: 10 }, (_, index) => Math.fround(Number(rates[index]) || 0));
+  }
+
+  setTopLineDropTypes(types) {
+    if (types === null || types === undefined) {
+      this.topLineDropTypes = null;
+      return;
+    }
+    if (!Array.isArray(types) || types.length !== this.columns || types.some((type) => (
+      !Number.isInteger(Number(type)) || Number(type) < 0 || Number(type) >= ORB_TYPES.length
+    ))) throw new Error(`PAD top-line drop types must contain exactly ${this.columns} native orb type indices.`);
+    this.topLineDropTypes = types.map((type) => Number(type));
   }
 
   setOrbState(row, column, state) {
@@ -1068,6 +1083,7 @@ export class PuzzleEngine {
       comboDropChanceBasisPoints: this.comboDropChanceBasisPoints,
       comboDropCap: this.comboDropCap,
       pendingComboDrops: this.pendingComboDrops,
+      topLineDropTypes: this.topLineDropTypes ? [...this.topLineDropTypes] : null,
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({
         code: ORB_BY_ID[orb.type].code,

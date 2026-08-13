@@ -533,6 +533,20 @@ assert.deepEqual(comboDropSkyfallEngine.board.slice(0, 2).map((row) => (
 )), [0x8000, 0x8000]);
 assert.equal(comboDropSkyfallEngine.pendingComboDrops, 0);
 assert.equal(comboDropSkyfallEngine.rng.state, 919_597_584);
+const topLineSkyfallEngine = new PuzzleEngine({
+  seed: 21_900,
+  topLineDropTypes: [2, 3, 4, 5, 0, 1],
+});
+topLineSkyfallEngine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+topLineSkyfallEngine.setRngState(21_900);
+topLineSkyfallEngine.board[1][0] = null;
+topLineSkyfallEngine.board[3][0] = null;
+topLineSkyfallEngine.collapseAndRefill();
+assert.deepEqual(topLineSkyfallEngine.board.map((row) => row[0].type), [
+  'wood', 'wood', 'dark', 'dark', 'dark',
+]);
+assert.equal(topLineSkyfallEngine.rng.state, 21_900);
+assert.deepEqual(topLineSkyfallEngine.snapshot().topLineDropTypes, [2, 3, 4, 5, 0, 1]);
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);
 assert.deepEqual(tracePadDragCells(0, 0, 2, 2, true), [{ row: 1, column: 1 }, { row: 2, column: 2 }]);

@@ -420,6 +420,15 @@ try {
     engine.collapseAndRefill();
     const comboDropSkyfallFlags = engine.board.slice(0, 2).map((row) => row[0].blockFlags);
     const comboDropSkyfallState = engine.rng.state;
+    engine.setTopLineDropTypes([2, 3, 4, 5, 0, 1]);
+    engine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+    engine.setRngState(21_900);
+    engine.board[1][0] = null;
+    engine.board[3][0] = null;
+    engine.collapseAndRefill();
+    const topLineSkyfallTypes = engine.board.map((row) => row[0].type);
+    const topLineSkyfallState = engine.rng.state;
+    engine.setTopLineDropTypes(null);
     engine.reset();
     const initialBoard = engine.snapshot().board;
     const initialBoardState = engine.rng.state;
@@ -443,6 +452,7 @@ try {
       excludedSkyfallType, excludedSkyfallState,
       orderedSkyfallTypes, orderedSkyfallState,
       comboDropSkyfallFlags, comboDropSkyfallState,
+      topLineSkyfallTypes, topLineSkyfallState,
       initialBoard, initialBoardState,
     };
   }) : null;
@@ -508,6 +518,9 @@ try {
     ]) || poisonBlockSample.orderedSkyfallState !== 3_803_934_822 ||
     JSON.stringify(poisonBlockSample.comboDropSkyfallFlags) !== JSON.stringify([0x8000, 0x8000]) ||
     poisonBlockSample.comboDropSkyfallState !== 919_597_584 ||
+    JSON.stringify(poisonBlockSample.topLineSkyfallTypes) !== JSON.stringify([
+      'wood', 'wood', 'dark', 'dark', 'dark',
+    ]) || poisonBlockSample.topLineSkyfallState !== 21_900 ||
     JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
       'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',
     ]) || poisonBlockSample.initialBoardState !== 79_238_434

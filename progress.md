@@ -2,6 +2,19 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 native scripted top-line skyfalls
+
+- Ported `_isEnableTopLine`'s `_checkFalls` branch: active floor descriptors
+  supply one low-nibble orb type per column, every replacement in that column
+  uses the scripted type, and `_spawnNewBlock` is not called.
+- Added constructor/setter/snapshot support through `topLineDropTypes`, plus
+  deterministic engine and browser fixtures proving multi-hole placement and
+  the RNG-free `21900` state.
+- Rules, production build, exhaustive browser mechanics, and the independent
+  gameplay-client render check pass with no console errors.
+- Next: recover the downstream combo accounting and awakening-record production
+  for `0x8000` combo-drop markers, then continue raw floor-record mapping.
+
 ## 2026-08-14 native combo-drop skyfall markers
 
 - Recovered `_checkFalls`' replacement-byte stream: low six bits carry the
@@ -15,8 +28,8 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
   the exact restored-image inspector to 60 anchors.
 - Rules, production build, exhaustive browser mechanics, and the independent
   gameplay-client render pass with no console errors.
-- Next: recover top-line scripted replacement descriptors and the downstream
-  combo accounting/awakening-record production for `0x8000` markers.
+- Next: recover downstream combo accounting/awakening-record production for
+  `0x8000` markers.
 
 ## 2026-08-14 native multi-hole refill order
 

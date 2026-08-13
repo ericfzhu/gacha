@@ -213,9 +213,16 @@ with wrap for an unmarked natural type; non-natural types `6..9` are skipped.
 `PuzzleEngine.collapseAndRefill` exposes `comboDropChanceBasisPoints`,
 `comboDropCap`, and `pendingComboDrops` for decoded dungeon/floor data. The
 marker is retained in `blockFlags` and surfaced as `comboDrop` in snapshots.
-Raw party-awakening records that produce pending markers, top-line scripted
-descriptors selected by `_isEnableTopLine` (`0x6401d0`), and the marker's later
+Raw party-awakening records that produce pending markers and the marker's later
 combo accounting are still upstream/downstream tasks rather than inferred here.
+
+The other replacement source is the scripted top-line path selected by
+`_isEnableTopLine` (`0x6401d0`). With that mode active, `_checkFalls` reads the
+low nibble of a floor descriptor indexed by column and reuses that type for
+every erased cell in the column. It does not call `_spawnNewBlock`, so these
+scripted types consume no saved RNG advances; combo-drop chance/marker passes
+still occur afterward. `topLineDropTypes` exposes the decoded per-column values
+and preserves the RNG-free branch in `PuzzleEngine.collapseAndRefill`.
 
 The upstream `_buildBlockList(float rates[10], uint32 excludedMask)` at
 `0x6615e8` clears ten lanes, applies dungeon/passive additions, sequentially
