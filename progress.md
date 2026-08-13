@@ -2,6 +2,24 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 whole-color poison fidelity
+
+- Recovered `_doPoisonBlocks` at `0x626e78` and the ordered dungeon face-color
+  list built by `_setupDungeons` at `0x65ac0c` (`sGAMEWORK+0x911d8/+0x911da`).
+- Added explicit dungeon face types, saved-RNG restoration, the exact two-step
+  combined-seed group shuffle, live-count/heart filtering, whole-color poison
+  and mortal-poison conversion, and locked-cell immunity.
+- Expanded the restored-binary inspector to 42 exact gameplay anchors.
+- Removed an unused remote IBM Plex stylesheet so the offline generic game
+  client no longer reports a resource error; the UI uses its existing
+  Noto/Barlow stacks and is visually unchanged.
+- Verification passed: pure gameplay rules, production build, exact inspector,
+  generic Playwright tap-turn/text-state loop, exhaustive project browser suite,
+  console checks, and both canvas/full-page screenshot inspection.
+- Next high-value board gaps: `_doPoisonBlockN2`, the bit-mask block-swap family,
+  and data-driven skyfall/opening-board constraints. Keep the private
+  `data048.bin`/`data030.bin` account-server boundary explicit.
+
 ## 2026-08-14 gameplay fidelity checkpoint
 
 - Added a reproducible `libpad:inspect` command that validates the exact

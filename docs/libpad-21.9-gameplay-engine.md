@@ -256,6 +256,22 @@ steps per remaining request. Successful special-type conversion clears
 the cell. `padSelectPoisonBlockCandidates` and
 `PuzzleEngine.doPoisonBlockN` reproduce the selection and mutation paths.
 
+The whole-color sibling `_doPoisonBlocks(int destinationType, int count, bool
+excludeHeart)` at `0x626e78` starts from the dungeon's ordered face-color list,
+stored with its signed count at `sGAMEWORK+0x911d8` and entries beginning at
+`+0x911da`. `_setupDungeons` at `0x65ac0c` builds that list; the ordinary case
+is `0,1,2,3,4,5`, while dungeon flags can omit individual colors. The routine
+keeps listed types that occur on the live board and optionally removes Heart.
+An empty filtered list returns without RNG use. Any non-empty list consumes two
+saved LCG advances, even when the requested group count is zero, combines their
+halves into the same temporary seed as `_getRandomBlock`, and performs its
+forward `[0,i]` shuffle. Each selected source type is then converted wholesale;
+locked cells reject the change but do not prevent their color from being
+selected. Native callers keep the requested count within the candidate count.
+The browser exposes dungeon face order through `setFaceTypes`, and
+`padSelectPoisonBlockTypes` plus `PuzzleEngine.doPoisonBlocks` reproduce this
+bulk path without pretending every dungeon has the default six-color list.
+
 The enemy inverse is `_doBlockMinus(bool, uint32 mask, float, int)` at
 `0x61caa0`. Only cells whose type bit is in the mask and whose current power is
 non-negative are eligible; applying the effect stores the negated binary32
@@ -323,7 +339,8 @@ remains. Seeded fallback boards and replacement drops use the binary's exported
 `state = state * 0x343fd + 0x269ec3`, with the unsigned high 16 bits returned
 for each draw. The browser RNG exposes its current unsigned 32-bit state in the
 game snapshot and can resume both ordinary high-16 draws and the recovered
-two-global-step `_getRandomBlock` shuffle from that state. This makes browser
+two-global-step `_getRandomBlock` shuffle from that state through
+`PuzzleEngine.setRngState`. This makes browser
 seeds reproducible against the native random primitive rather than merely
 deterministic within JavaScript; it does not make the absent weighted drop
 tables or opening-board constraints implicit.

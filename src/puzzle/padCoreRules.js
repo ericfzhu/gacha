@@ -84,6 +84,11 @@ export function createPadRng(seed = 0) {
       state = selected.state;
       return selected.candidates;
     },
+    selectPoisonBlockTypes(faceTypes, boardTypes, count, excludeHeart = false) {
+      const selected = padSelectPoisonBlockTypes(state, faceTypes, boardTypes, count, excludeHeart);
+      state = selected.state;
+      return selected.types;
+    },
     getRandomBlock(excludedType = -1, includeJammer = false, includeHeart = true) {
       const result = padGetRandomBlock(state, excludedType, includeJammer, includeHeart);
       state = result.state;
@@ -194,6 +199,26 @@ export function padSelectPoisonBlockCandidates(state, boardTypes, count, exclude
     }
   }
   return { state: savedState, candidates };
+}
+
+// _doPoisonBlocks (0x626e78) filters the dungeon's ordered face-color list by
+// live board counts, optionally removes Heart, and uses the ordinary two-saved-
+// step shuffle. A non-empty eligible list consumes both steps even if the
+// requested number of whole color groups is zero.
+export function padSelectPoisonBlockTypes(state, faceTypes, boardTypes, count, excludeHeart = false) {
+  const flattened = Array.isArray(boardTypes) ? boardTypes.flat() : [];
+  const eligible = (Array.isArray(faceTypes) ? faceTypes : []).filter((value) => {
+    const type = Math.trunc(Number(value));
+    if (excludeHeart && type === 5) return false;
+    return flattened.some((cell) => {
+      const cellType = Math.trunc(Number(cell));
+      return type === 7 || type === 8 ? cellType === 7 || cellType === 8 : cellType === type;
+    });
+  }).map((value) => Math.trunc(Number(value)));
+  if (eligible.length === 0) return { state: Number(state) >>> 0, types: [] };
+  const shuffled = padShuffleBlockCandidates(state, eligible);
+  const requested = Math.max(0, Math.trunc(Number(count) || 0));
+  return { state: shuffled.state, types: shuffled.candidates.slice(0, requested) };
 }
 
 // The same native routine builds its candidates from numeric block types

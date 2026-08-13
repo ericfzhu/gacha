@@ -286,9 +286,21 @@ try {
     const changed = engine.doPoisonBlockN(8, 5, true);
     const endState = engine.rng.state;
     const afterMortal = engine.board.flat().filter((orb) => orb.type === 'mortalPoison').length;
+    engine.setBoardFromCodes(['RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
+    engine.setFaceTypes([0, 1, 2, 3, 4, 5]);
+    engine.setRngState(21_900);
+    engine.setOrbState(0, 1, { locked: true });
+    const bulkStartState = engine.rng.state;
+    const bulkChanged = engine.doPoisonBlocks(7, 2);
+    const bulkEndState = engine.rng.state;
+    const bulkPoison = engine.board.flat().filter((orb) => orb.type === 'poison').length;
+    const bulkLockedType = engine.board[0][1].type;
     engine.reset();
     engine.start();
-    return { lockedStartState, lockedChanged, lockedEndState, startState, changed, endState, beforeMortal, afterMortal };
+    return {
+      lockedStartState, lockedChanged, lockedEndState, startState, changed, endState,
+      beforeMortal, afterMortal, bulkStartState, bulkChanged, bulkEndState, bulkPoison, bulkLockedType,
+    };
   }) : null;
   const advanceLcg = (state, count) => {
     let next = state;
@@ -300,7 +312,10 @@ try {
     poisonBlockSample.lockedEndState !== advanceLcg(poisonBlockSample.lockedStartState, 6) ||
     poisonBlockSample.changed !== 5 ||
     poisonBlockSample.endState !== advanceLcg(poisonBlockSample.startState, 10) ||
-    poisonBlockSample.afterMortal - poisonBlockSample.beforeMortal !== 5
+    poisonBlockSample.afterMortal - poisonBlockSample.beforeMortal !== 5 ||
+    poisonBlockSample.bulkChanged !== 5 ||
+    poisonBlockSample.bulkEndState !== advanceLcg(poisonBlockSample.bulkStartState, 2) ||
+    poisonBlockSample.bulkPoison !== 5 || poisonBlockSample.bulkLockedType !== 'water'
   )) throw new Error(`Poison-block mismatch: ${JSON.stringify(poisonBlockSample)}`);
   if (renderAtlasSheet) {
     const sheet = page.locator('#pad-atlas-sheet');

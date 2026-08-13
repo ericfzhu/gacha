@@ -22,6 +22,7 @@ import {
   padPoisonDamage,
   padSecondaryAttributeAttack,
   padSelectPoisonBlockCandidates,
+  padSelectPoisonBlockTypes,
   padShuffleBlockCandidates,
   padShuffleBlockMinusCandidates,
   padShuffleBurDropCandidates,
@@ -89,6 +90,21 @@ assert.deepEqual(padSelectPoisonBlockCandidates(21_900, [
     { row: 1, column: 5 },
     { row: 4, column: 2 },
   ],
+});
+assert.deepEqual(padSelectPoisonBlockTypes(21_900, [0, 1, 2, 3, 4, 5], [
+  [0, 1, 0, 1, 5, 4],
+  [2, 3, 4, 5, 6, 2],
+], 2), {
+  state: 3_803_934_822,
+  types: [1, 3],
+});
+assert.deepEqual(padSelectPoisonBlockTypes(21_900, [0, 1, 2, 3, 4, 5], [[0]], 0), {
+  state: 3_803_934_822,
+  types: [],
+});
+assert.deepEqual(padSelectPoisonBlockTypes(21_900, [5], [[5]], 1, true), {
+  state: 21_900,
+  types: [],
 });
 assert.deepEqual(padGetRandomBlock(21_900), { state: 3_803_934_822, type: 1 });
 assert.deepEqual(padGetRandomBlock(21_900, 1), { state: 3_803_934_822, type: 2 });
@@ -569,7 +585,7 @@ for (let column = 0; column < 4; column += 1) {
 
 const poisonBlockEngine = new PuzzleEngine({ seed: 21_900 });
 poisonBlockEngine.setBoardFromCodes(['RHPBRD', 'GMDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
-poisonBlockEngine.rng = createPadRng(21_900);
+poisonBlockEngine.setRngState(21_900);
 poisonBlockEngine.setOrbState(4, 1, { locked: true });
 assert.equal(poisonBlockEngine.doPoisonBlockN(7, 5, true), 4);
 assert.equal(poisonBlockEngine.rng.state, 4_221_117_678);
@@ -582,6 +598,22 @@ assert.equal(poisonBlockEngine.doPoisonBlockN('mortalPoison', 0), 0);
 assert.equal(poisonBlockEngine.rng.state, poisonZeroState);
 assert.equal(poisonBlockEngine.doPoisonBlockN('bomb', 2), 0);
 assert.equal(poisonBlockEngine.rng.state, poisonZeroState);
+
+const poisonBlocksEngine = new PuzzleEngine({ seed: 21_900 });
+poisonBlocksEngine.setBoardFromCodes(['RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
+poisonBlocksEngine.setRngState(21_900);
+poisonBlocksEngine.setOrbState(0, 1, { locked: true });
+assert.equal(poisonBlocksEngine.doPoisonBlocks(7, 2), 5);
+assert.equal(poisonBlocksEngine.rng.state, 3_803_934_822);
+assert.equal(poisonBlocksEngine.board[0][1].type, 'water');
+assert.equal(poisonBlocksEngine.board.flat().filter((orb) => orb.type === 'poison').length, 5);
+const poisonBlocksZeroState = poisonBlocksEngine.rng.state;
+assert.equal(poisonBlocksEngine.doPoisonBlocks('mortalPoison', 0), 0);
+assert.equal(poisonBlocksEngine.rng.state, padShuffleBlockCandidates(poisonBlocksZeroState, [0]).state);
+poisonBlocksEngine.setFaceTypes([5]);
+const poisonBlocksNoCandidateState = poisonBlocksEngine.rng.state;
+assert.equal(poisonBlocksEngine.doPoisonBlocks(8, 1, true), 0);
+assert.equal(poisonBlocksEngine.rng.state, poisonBlocksNoCandidateState);
 assert.equal(specialLockEngine.doLockDropBits(0x3c0, 4, 0xbeef), true);
 for (let column = 0; column < 4; column += 1) {
   const orb = specialLockEngine.board[0][column];

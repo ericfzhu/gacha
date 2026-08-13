@@ -88,6 +88,7 @@ export class PuzzleEngine {
     columns = PAD_BOARD_COLUMNS,
     rows = PAD_BOARD_ROWS,
     allowDiagonalMoves = false,
+    faceTypes = [0, 1, 2, 3, 4, 5],
   } = {}) {
     if (![columns, rows].every(Number.isInteger) || columns < 1 || columns > 15 || rows < 1 || rows > 15) {
       throw new Error('PAD board dimensions must be integers from 1 through 15.');
@@ -97,6 +98,7 @@ export class PuzzleEngine {
     this.columns = columns;
     this.rows = rows;
     this.allowDiagonalMoves = Boolean(allowDiagonalMoves);
+    this.setFaceTypes(faceTypes);
     this.rng = createPadRng(seed);
     this.orbSerial = 0;
     this.visualTime = 0;
@@ -599,6 +601,17 @@ export class PuzzleEngine {
     }));
   }
 
+  setRngState(state) {
+    this.rng = createPadRng(Number(state) >>> 0);
+  }
+
+  setFaceTypes(types) {
+    if (!Array.isArray(types) || types.length > 16 || types.some((type) => (
+      !Number.isInteger(Number(type)) || Number(type) < 0 || Number(type) >= ORB_TYPES.length
+    ))) throw new Error('PAD face types must contain at most 16 native orb type indices.');
+    this.faceTypes = types.map((type) => Number(type));
+  }
+
   setOrbState(row, column, state) {
     if (!this.isCell(row, column)) throw new Error(`Orb state cell ${row},${column} is outside the board.`);
     const orb = this.board[row][column];
@@ -776,6 +789,30 @@ export class PuzzleEngine {
     return changed;
   }
 
+  doPoisonBlocks(type, count, excludeHeart = false) {
+    const destinationType = typeof type === 'number' ? ORB_TYPES[type]?.id : type;
+    if (!['poison', 'mortalPoison'].includes(destinationType)) return 0;
+    const boardTypes = this.board.map((row) => row.map((orb) => (
+      ORB_TYPES.findIndex((candidate) => candidate.id === orb.type)
+    )));
+    const selectedTypes = new Set(this.rng.selectPoisonBlockTypes(
+      this.faceTypes,
+      boardTypes,
+      count,
+      excludeHeart,
+    ));
+    let changed = 0;
+    this.board.forEach((row) => row.forEach((orb) => {
+      const sourceType = ORB_TYPES.findIndex((candidate) => candidate.id === orb.type);
+      if (!selectedTypes.has(sourceType) || orb.locked) return;
+      orb.type = destinationType;
+      orb.enhancementPower = 0;
+      orb.enhanced = false;
+      changed += 1;
+    }));
+    return changed;
+  }
+
   isCell(row, column) {
     return row >= 0 && row < this.rows && column >= 0 && column < this.columns;
   }
@@ -789,6 +826,7 @@ export class PuzzleEngine {
       phase: this.phase,
       turn: this.turn,
       rngState: this.rng.state,
+      faceTypes: [...this.faceTypes],
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({
         code: ORB_BY_ID[orb.type].code,
