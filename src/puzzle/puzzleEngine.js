@@ -35,6 +35,7 @@ import {
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
   PAD_ENEMY_SKILL_BLOCK_MINUS,
+  PAD_ENEMY_SKILL_BUR_DROP,
   decodePadEnemySkillDefinition,
   decodePadEnemySkillRuntime,
   normalizePadEnemySkillRecord,
@@ -856,6 +857,16 @@ export class PuzzleEngine {
           ) >= 1;
           return { eligible, rngState: this.rng.state };
         }
+        if (definition.effect.kind === 'burDrop') {
+          const eligible = this.doMakeBurDrop(
+            false,
+            definition.effect.typeMask,
+            definition.effect.count,
+            definition.effect.descriptor,
+            definition.effect.clearDescriptorHighBit,
+          ) >= 1;
+          return { eligible, rngState: this.rng.state };
+        }
         return { eligible: false, rngState: this.rng.state };
       },
     });
@@ -997,6 +1008,17 @@ export class PuzzleEngine {
       this.message = `${changed} orb${changed === 1 ? '' : 's'} weakened.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'burDrop') {
+      const changed = this.doMakeBurDrop(
+        true,
+        skill.typeMask,
+        skill.count,
+        skill.descriptor,
+        skill.clearDescriptorHighBit,
+      );
+      this.message = `${changed} orb${changed === 1 ? '' : 's'} became thorns.`;
+      return true;
+    }
     if (!skill.supported || skill.kind !== 'blackFall') return false;
     this.setBlackFallRule({
       chanceBasisPoints: skill.chanceBasisPoints,
@@ -1050,6 +1072,7 @@ export class PuzzleEngine {
       if (![
         PAD_ENEMY_SKILL_BLACK_FALL,
         PAD_ENEMY_SKILL_BLOCK_MINUS,
+        PAD_ENEMY_SKILL_BUR_DROP,
       ].includes(definition.effect.type) || !definition.effect.supported) {
         throw new Error(`PAD enemy AI skill ${slot.skillId} uses an unsupported condition/effect type.`);
       }

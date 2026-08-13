@@ -1,5 +1,6 @@
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
+export const PAD_ENEMY_SKILL_BUR_DROP = 153;
 
 const PAD_INT32_MAX = 0x7fffffff;
 
@@ -80,6 +81,19 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       powerPercent,
       power: Math.fround(Math.fround(powerPercent) / Math.fround(100)),
       limit,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_BUR_DROP) {
+    requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'burDrop',
+      supported: true,
+      typeMask: definition.getUint32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.parameter0Offset, true),
+      count: definition.getUint32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.parameter1Offset, true),
+      descriptor: definition.getUint16(0x18, true),
+      clearDescriptorHighBit: true,
       attackWithSkillValue,
     });
   }
@@ -166,6 +180,19 @@ export function normalizePadEnemySkillRecord(record) {
         ? Math.fround(Math.fround(powerPercent) / Math.fround(100))
         : Math.fround(Number(record.power) || 0),
       limit: Math.trunc(Number(record?.limit) || 0),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_BUR_DROP || record?.kind === 'burDrop') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_BUR_DROP,
+      kind: 'burDrop',
+      supported: true,
+      typeMask: Number(record?.typeMask) >>> 0,
+      count: Number(record?.count) >>> 0,
+      descriptor: Math.trunc(Number(record?.descriptor) || 0) & 0xffff,
+      clearDescriptorHighBit: record?.clearDescriptorHighBit === undefined
+        ? true
+        : Boolean(record.clearDescriptorHighBit),
     });
   }
   if (type !== PAD_ENEMY_SKILL_BLACK_FALL && record?.kind !== 'blackFall') {

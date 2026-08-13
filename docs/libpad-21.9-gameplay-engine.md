@@ -656,6 +656,18 @@ execution spends the later shuffle step again. This produces all three native
 advances for a capped, immediately selected type-151 action: condition dry run,
 selection roll, then actual application.
 
+Enemy skill type `153` follows the same selection shape for thorn/burst markers.
+Its execution entry `0x62b0d0` calls `_doMakeBurDrop(true, mask, count,
+descriptor, true)` with definition fields `+0x10/+0x14/+0x18`; the final true
+argument clears the stored descriptor's high bit. The condition entry at
+`0x61ba04` calls the same primitive with `apply=false` and requires a nonzero
+candidate count. Matching cells must not already carry block flag `0x80000`.
+For a nonzero requested count, both the dry run and actual application spend
+one saved-LCG advance to seed candidate shuffling, so an immediately selected
+action again consumes three advances including its probability roll. The
+browser decodes, selects, applies, renders, and snapshots the resulting thorn
+descriptor through the raw AI pool.
+
 The action boundary is recovered independently. `_setupEnemyAttack`
 (`0x622f64`) reads the counter object at `sMONSTER+0x120` and only admits a live
 enemy when its value is at or below zero; it then clears the prepared index at

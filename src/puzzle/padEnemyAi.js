@@ -2,6 +2,7 @@ import { padLcgStep } from './padCoreRules.js';
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
   PAD_ENEMY_SKILL_BLOCK_MINUS,
+  PAD_ENEMY_SKILL_BUR_DROP,
   decodePadEnemySkillDefinition,
 } from './padEnemySkills.js';
 
@@ -99,6 +100,7 @@ function isStaticallyEligible(definition, state) {
   if (!definition.effect.supported || ![
     PAD_ENEMY_SKILL_BLACK_FALL,
     PAD_ENEMY_SKILL_BLOCK_MINUS,
+    PAD_ENEMY_SKILL_BUR_DROP,
   ].includes(definition.effect.type)) return false;
   if (definition.budgetCost > state.aiBudget) return false;
   const hpPercent = state.maxHp > 0 ? state.currentHp / state.maxHp * 100 : 0;

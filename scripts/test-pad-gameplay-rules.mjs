@@ -3,6 +3,7 @@ import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
   PAD_ENEMY_SKILL_BLOCK_MINUS,
+  PAD_ENEMY_SKILL_BUR_DROP,
   decodePadEnemySkillDefinition,
   decodePadEnemySkillRuntime,
   padEnemySkillAttack,
@@ -410,6 +411,23 @@ assert.deepEqual(decodePadEnemySkillDefinition(enemyAiBlockMinusDefinition), {
   powerPercent: 50,
   power: 0.5,
   limit: 2,
+  attackWithSkillValue: 0,
+});
+const enemyAiBurDropDefinition = enemyAiBlockMinusDefinition.slice();
+const enemyAiBurDropView = new DataView(enemyAiBurDropDefinition.buffer);
+enemyAiBurDropView.setUint32(0x00, 9_003, true);
+enemyAiBurDropView.setInt16(0x04, PAD_ENEMY_SKILL_BUR_DROP, true);
+enemyAiBurDropView.setUint32(0x10, 0b11, true);
+enemyAiBurDropView.setUint32(0x14, 2, true);
+enemyAiBurDropView.setUint16(0x18, 4, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiBurDropDefinition), {
+  type: 153,
+  kind: 'burDrop',
+  supported: true,
+  typeMask: 0b11,
+  count: 2,
+  descriptor: 4,
+  clearDescriptorHighBit: true,
   attackWithSkillValue: 0,
 });
 assert.deepEqual(padResolveEnhancementFall(21_900, 0, Array(6).fill(0)), {
@@ -1157,6 +1175,33 @@ assert.equal(
   padLcgStep(padLcgStep(padLcgStep(21_900).state).state).state,
 );
 assert.equal(blockMinusAiState.enemies[0].enemyAiBudget, 80);
+
+const burDropAiMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(burDropAiMonsterDefinition.buffer).setUint32(0xec, 9_003, true);
+const selectedBurDropAiEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: burDropAiMonsterDefinition,
+    skillDefinitions: [enemyAiBurDropDefinition],
+  }],
+});
+selectedBurDropAiEngine.setBoardFromCodes([
+  'RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD',
+]);
+selectedBurDropAiEngine.setRngState(21_900);
+selectedBurDropAiEngine.enemies[0].counter = 1;
+selectedBurDropAiEngine.enemies[1].counter = 99;
+selectedBurDropAiEngine.resolveEnemyTurn();
+const burDropAiState = selectedBurDropAiEngine.snapshot();
+assert.equal(burDropAiState.lastEnemyActions[0].skill.type, 153);
+assert.equal(burDropAiState.lastEnemyActions[0].skill.skillId, 9_003);
+assert.equal(burDropAiState.boardState.flat().filter((orb) => orb.thornActive).length, 2);
+assert.equal(burDropAiState.boardState.flat().filter((orb) => orb.thornDescriptor === 4).length, 2);
+assert.equal(
+  selectedBurDropAiEngine.rng.state,
+  padLcgStep(padLcgStep(padLcgStep(21_900).state).state).state,
+);
+assert.equal(burDropAiState.enemies[0].enemyAiBudget, 80);
 assert.equal(blackFallEngine.board[0][0].nail, false);
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);

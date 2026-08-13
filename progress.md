@@ -2,6 +2,22 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 enemy thorn-marker skill dispatch
+
+- Mapped enemy skill type `153` to condition `0x61ba04`, generic setup
+  `0x6217c0`, and execution `0x62b0d0`. The definition fields are type mask
+  `+0x10`, requested count `+0x14`, descriptor `+0x18`, and optional attack
+  percentage `+0x44`.
+- Connected raw and scheduled definitions to the existing `_doMakeBurDrop`
+  port. Both AI dry-run eligibility and application preserve the native
+  one-step candidate-shuffle seed, and type 153 clears the descriptor high bit.
+- Pure and browser fixtures select skill ID 9003, mark exactly two eligible
+  orbs with descriptor 4, consume three ordinary LCG advances, and update AI
+  budget 100 -> 80. The exact inspector now asserts its dispatch, setup, and
+  condition table targets in addition to all 83 named symbols.
+- Next: decode a distinct board transformation or fall-status skill rather
+  than continuing only through adjacent wrappers around already ported helpers.
+
 ## 2026-08-14 enemy weakened-orb skill dispatch
 
 - Mapped enemy skill type `151` through all three native tables: condition

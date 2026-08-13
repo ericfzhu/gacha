@@ -580,6 +580,23 @@ try {
     const selectedBlockMinusAi = engine.snapshot();
     const selectedBlockMinusCount = selectedBlockMinusAi.boardState.flat()
       .filter((orb) => orb.enhancementPower === -0.5).length;
+    const burDropAiMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(burDropAiMonsterDefinition.buffer).setUint32(0xec, 9_003, true);
+    const burDropAiDefinition = blockMinusAiDefinition.slice();
+    const burDropAiView = new DataView(burDropAiDefinition.buffer);
+    burDropAiView.setUint32(0x00, 9_003, true);
+    burDropAiView.setInt16(0x04, 153, true);
+    burDropAiView.setUint32(0x14, 2, true);
+    burDropAiView.setUint16(0x18, 4, true);
+    engine.setEnemyAiDefinitionPool(0, burDropAiMonsterDefinition, [burDropAiDefinition]);
+    engine.setBoardFromCodes(['RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedBurDropAi = engine.snapshot();
+    const selectedBurDropCount = selectedBurDropAi.boardState.flat()
+      .filter((orb) => orb.thornActive && orb.thornDescriptor === 4).length;
     engine.setEnemyAiDefinitionPool(0, null);
     engine.setBlackFallRule(null);
     engine.reset();
@@ -616,6 +633,7 @@ try {
       blackFallAfterExpiry, blackFallRuleAfterExpiry,
       scheduledBlackFallHp, scheduledBlackFall, selectedEnemyAiHp, selectedEnemyAi,
       selectedBlockMinusAi, selectedBlockMinusCount,
+      selectedBurDropAi, selectedBurDropCount,
       initialBoard, initialBoardState,
     };
   }) : null;
@@ -737,6 +755,11 @@ try {
     poisonBlockSample.selectedBlockMinusAi.rngState !== advanceLcg(21_900, 3) ||
     poisonBlockSample.selectedBlockMinusAi.enemies?.[0]?.enemyAiBudget !== 80 ||
     poisonBlockSample.selectedBlockMinusCount !== 2 ||
+    poisonBlockSample.selectedBurDropAi.lastEnemyActions?.[0]?.skill?.type !== 153 ||
+    poisonBlockSample.selectedBurDropAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_003 ||
+    poisonBlockSample.selectedBurDropAi.rngState !== advanceLcg(21_900, 3) ||
+    poisonBlockSample.selectedBurDropAi.enemies?.[0]?.enemyAiBudget !== 80 ||
+    poisonBlockSample.selectedBurDropCount !== 2 ||
     JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
       'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',
     ]) || poisonBlockSample.initialBoardState !== 79_238_434

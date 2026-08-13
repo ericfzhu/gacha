@@ -22,6 +22,10 @@ const BLOCK_MINUS_ENEMY_SKILL_TYPE = 151;
 const BLOCK_MINUS_HANDLER = 0x62afd0;
 const BLOCK_MINUS_SETUP_HANDLER = 0x6217c0;
 const BLOCK_MINUS_CONDITION_HANDLER = 0x61bab4;
+const BUR_DROP_ENEMY_SKILL_TYPE = 153;
+const BUR_DROP_HANDLER = 0x62b0d0;
+const BUR_DROP_SETUP_HANDLER = 0x6217c0;
+const BUR_DROP_CONDITION_HANDLER = 0x61ba04;
 
 const GAMEPLAY_SYMBOLS = Object.freeze([
   ['input', 'walk1step', '_ZN9cGAMEMAIN10_walk1stepEv', 0x647c28],
@@ -225,6 +229,45 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
   const blockMinusConditionMatches = blockMinusConditionTarget === null
     ? null
     : blockMinusConditionTarget === BLOCK_MINUS_CONDITION_HANDLER;
+  const burDropDispatchEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      ENEMY_SKILL_DISPATCH_TABLE + (BUR_DROP_ENEMY_SKILL_TYPE - 1) * 2,
+    )
+    : null;
+  const burDropSetupEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      ENEMY_SKILL_SETUP_TABLE + (BUR_DROP_ENEMY_SKILL_TYPE - 1) * 2,
+    )
+    : null;
+  const burDropConditionEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      ENEMY_SKILL_CONDITION_TABLE + (BUR_DROP_ENEMY_SKILL_TYPE - 1) * 2,
+    )
+    : null;
+  const burDropDispatchTarget = burDropDispatchEntry === null
+    ? null
+    : ENEMY_SKILL_DISPATCH_BASE + burDropDispatchEntry * 4;
+  const burDropSetupTarget = burDropSetupEntry === null
+    ? null
+    : ENEMY_SKILL_SETUP_BASE + burDropSetupEntry * 4;
+  const burDropConditionTarget = burDropConditionEntry === null
+    ? null
+    : ENEMY_SKILL_CONDITION_BASE + burDropConditionEntry * 4;
+  const burDropDispatchMatches = burDropDispatchTarget === null
+    ? null
+    : burDropDispatchTarget === BUR_DROP_HANDLER;
+  const burDropSetupMatches = burDropSetupTarget === null
+    ? null
+    : burDropSetupTarget === BUR_DROP_SETUP_HANDLER;
+  const burDropConditionMatches = burDropConditionTarget === null
+    ? null
+    : burDropConditionTarget === BUR_DROP_CONDITION_HANDLER;
 
   const symbols = GAMEPLAY_SYMBOLS.map(([group, label, mangledName, expectedAddress]) => {
     const symbol = restoredSymbols.get(mangledName) || null;
@@ -261,6 +304,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       blockMinusDispatchMatches21_9: blockMinusDispatchMatches,
       blockMinusSetupMatches21_9: blockMinusSetupMatches,
       blockMinusConditionMatches21_9: blockMinusConditionMatches,
+      burDropDispatchMatches21_9: burDropDispatchMatches,
+      burDropSetupMatches21_9: burDropSetupMatches,
+      burDropConditionMatches21_9: burDropConditionMatches,
     } : null,
     layout: {
       boardColumnsOffset: 'cGAMEMAIN+0x70',
@@ -297,6 +343,13 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       blockMinusSetupMatches21_9: blockMinusSetupMatches,
       blockMinusConditionTarget: blockMinusConditionTarget === null ? null : hex(blockMinusConditionTarget),
       blockMinusConditionMatches21_9: blockMinusConditionMatches,
+      burDropType: BUR_DROP_ENEMY_SKILL_TYPE,
+      burDropDispatchTarget: burDropDispatchTarget === null ? null : hex(burDropDispatchTarget),
+      burDropDispatchMatches21_9: burDropDispatchMatches,
+      burDropSetupTarget: burDropSetupTarget === null ? null : hex(burDropSetupTarget),
+      burDropSetupMatches21_9: burDropSetupMatches,
+      burDropConditionTarget: burDropConditionTarget === null ? null : hex(burDropConditionTarget),
+      burDropConditionMatches21_9: burDropConditionMatches,
     },
     enemyTurn: {
       attackCounterOffset: 'sMONSTER+0x120',
@@ -363,5 +416,7 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || blackFallDispatchMatches === false || blackFallSetupMatches === false
     || blockMinusDispatchMatches === false || blockMinusSetupMatches === false
     || blockMinusConditionMatches === false
+    || burDropDispatchMatches === false || burDropSetupMatches === false
+    || burDropConditionMatches === false
   ) process.exitCode = 1;
 }
