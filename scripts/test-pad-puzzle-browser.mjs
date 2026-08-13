@@ -257,13 +257,24 @@ try {
       resolvedManually: resolved.manualTarget,
     };
     engine.reset();
+    engine.allowDiagonalMoves = true;
+    engine.party = [{ id: 'diagonal', name: 'Diagonal', attribute: 'fire', attack: 100, recovery: 0 }];
+    engine.enemies[0] = { ...engine.enemies[0], hp: 1_000, attribute: 'light', defense: 0 };
+    engine.enemies[1].hp = 0;
+    engine.comboCount = 3;
+    engine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+    engine.resolvePlayerTurn();
+    result.diagonalComboDamage = engine.lastDamage;
+    engine.allowDiagonalMoves = false;
+    engine.reset();
     engine.start();
     return result;
   }) : null;
   if (attackRounds && (
     attackRounds.selectedTarget !== 0 || attackRounds.selectedManually !== true ||
     JSON.stringify(attackRounds.damageTargets) !== JSON.stringify([0, 1]) ||
-    attackRounds.resolvedTarget !== 1 || attackRounds.resolvedManually !== false
+    attackRounds.resolvedTarget !== 1 || attackRounds.resolvedManually !== false ||
+    attackRounds.diagonalComboDamage !== 200
   )) throw new Error(`Attack round retarget mismatch: ${JSON.stringify(attackRounds)}`);
   await page.screenshot({ path: outputPath, fullPage: true });
   await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, largeBoard, tapTurn, matchShape, attackRounds, consoleMessages }, null, 2));

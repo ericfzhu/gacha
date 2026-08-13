@@ -440,7 +440,8 @@ export class PuzzleEngine {
     const recoveryLanes = this.player.recovery === partyRecovery
       ? this.party.map((member) => member.recovery)
       : [this.player.recovery];
-    const healing = padNativeRecoveryPower(recoveryLanes, heartMatches, this.comboCount);
+    const extraComboBonus = this.allowDiagonalMoves ? 0.5 : 0.25;
+    const healing = padNativeRecoveryPower(recoveryLanes, heartMatches, this.comboCount, extraComboBonus);
     const poisonDamage = padPoisonDamage(
       this.player.maxHp,
       (byType.get('poison') || []).map((match) => match.size),
@@ -470,7 +471,7 @@ export class PuzzleEngine {
         const lane = getLane(member);
         const matches = byType.get(lane.attribute) || [];
         if (!lane.attack || !matches.length) return;
-        const matchAttack = padNativeBaseAttackPower(lane.attack, matches, this.comboCount);
+        const matchAttack = padNativeBaseAttackPower(lane.attack, matches, this.comboCount, extraComboBonus);
         const raw = padApplyAttackMultipliers(matchAttack, [leader, helper]);
         const isMassAttack = matches.some((match) => match.size >= 5);
         const target = isMassAttack ? -1 : this.chooseAttackTarget(lane.attribute, raw);

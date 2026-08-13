@@ -81,7 +81,9 @@ equal and the other must differ by less than two. A special board-mode byte at
 equal. `_swapBlock` then advances both coordinates per step; a two-cell diagonal
 therefore performs two diagonal swaps rather than four orthogonal ones. The JS
 engine exposes this recovered mode through `allowDiagonalMoves`, including
-corner-crossing input and per-crossed-orb thorn damage. `_swapBlock` repeats
+corner-crossing input and per-crossed-orb thorn damage. The mode also changes
+`_applyComboMul`'s bonus from `+0.25` to `+0.50` per combo after the first; the
+browser carries that value through both attack and recovery. `_swapBlock` repeats
 adjacent swaps when its destination is farther away. Therefore a coalesced browser pointer move
 must be expanded into the orthogonal grid boundaries crossed by the motion; a
 single direct diagonal exchange is incorrect in normal play.

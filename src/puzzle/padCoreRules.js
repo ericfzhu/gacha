@@ -23,8 +23,8 @@ export function padOrbMatchMultiplier(size) {
   return 1 + PAD_EXTRA_ORB_BONUS * Math.max(0, size - PAD_MINIMUM_MATCH);
 }
 
-export function padComboMultiplier(combos) {
-  return 1 + PAD_EXTRA_COMBO_BONUS * Math.max(0, combos - 1);
+export function padComboMultiplier(combos, extraComboBonus = PAD_EXTRA_COMBO_BONUS) {
+  return 1 + Math.max(0, Number(extraComboBonus) || 0) * Math.max(0, combos - 1);
 }
 
 // Leader effects are data, not a global part of the combo formula. The full
@@ -87,8 +87,8 @@ function padFloat32Multiply(left, right) {
 // combo multiplication once. Later attack multipliers route through
 // sCARD::dmgUp and round positive values with +0.5. _calcAttackPow then applies
 // elemental advantage with izMathCeilingSint64.
-export function padNativeBaseAttackPower(attack, matchSizes, combos) {
-  const comboMultiplier = Math.fround(padComboMultiplier(combos));
+export function padNativeBaseAttackPower(attack, matchSizes, combos, extraComboBonus = PAD_EXTRA_COMBO_BONUS) {
+  const comboMultiplier = Math.fround(padComboMultiplier(combos, extraComboBonus));
   const baseAttack = matchSizes.reduce((total, match) => {
     const size = typeof match === 'number' ? match : match.size;
     const enhancedCount = typeof match === 'number' ? 0 : match.enhancedCount || 0;
@@ -129,7 +129,12 @@ export function padApplyAttackMultipliers(attack, multipliers) {
 // to an integer with fcvtzs. Accept either the team total or the six native
 // card values; the latter preserves per-card float additions for callers that
 // model recovery modifiers.
-export function padNativeRecoveryPower(recoveries, heartMatches, combos) {
+export function padNativeRecoveryPower(
+  recoveries,
+  heartMatches,
+  combos,
+  extraComboBonus = PAD_EXTRA_COMBO_BONUS,
+) {
   const cardRecoveries = Array.isArray(recoveries) ? recoveries : [recoveries];
   const matchPower = heartMatches.reduce((total, match) => {
     const size = typeof match === 'number' ? match : match.size;
@@ -137,7 +142,7 @@ export function padNativeRecoveryPower(recoveries, heartMatches, combos) {
     const contribution = padFloat32Multiply(padOrbMatchMultiplier(size), padEnhancedOrbMultiplier(enhancedCount));
     return Math.fround(total + contribution);
   }, Math.fround(0));
-  const comboMultiplier = Math.fround(padComboMultiplier(combos));
+  const comboMultiplier = Math.fround(padComboMultiplier(combos, extraComboBonus));
   const total = cardRecoveries.reduce((sum, recovery) => {
     const matchScaled = padFloat32Multiply(Math.max(0, Number(recovery) || 0), matchPower);
     const comboScaled = padFloat32Multiply(matchScaled, comboMultiplier);
