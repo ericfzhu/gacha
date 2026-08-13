@@ -3,7 +3,7 @@ import {
   PAD_BOARD_ROWS,
   PAD_DEFAULT_MOVE_TIME_SECONDS,
   PAD_INT32_MAX,
-  createPadLcg,
+  createPadRng,
   findPadBombDetonations,
   findPadMatches,
   padApplyAttackMultipliers,
@@ -87,14 +87,14 @@ export class PuzzleEngine {
     this.columns = columns;
     this.rows = rows;
     this.allowDiagonalMoves = Boolean(allowDiagonalMoves);
-    this.rng = createPadLcg(seed);
+    this.rng = createPadRng(seed);
     this.orbSerial = 0;
     this.visualTime = 0;
     this.reset();
   }
 
   reset() {
-    this.rng = createPadLcg(this.seed);
+    this.rng = createPadRng(this.seed);
     this.orbSerial = 0;
     this.mode = 'ready';
     this.phase = 'input';
@@ -148,7 +148,7 @@ export class PuzzleEngine {
         if (column >= 2 && board[row][column - 1]?.type === board[row][column - 2]?.type) blocked.add(board[row][column - 1].type);
         if (row >= 2 && board[row - 1][column]?.type === board[row - 2][column]?.type) blocked.add(board[row - 1][column].type);
         const choices = NATURAL_ORB_TYPES.map((orb) => orb.id).filter((type) => !blocked.has(type));
-        const type = choices[Math.floor(this.rng() * choices.length)];
+        const type = choices[Math.floor(this.rng.nextFloat() * choices.length)];
         board[row][column] = this.createOrb(type);
       }
     }
@@ -423,7 +423,7 @@ export class PuzzleEngine {
       const survivors = [];
       for (let row = this.rows - 1; row >= 0; row -= 1) if (this.board[row][column]) survivors.push(this.board[row][column]);
       for (let row = this.rows - 1, index = 0; row >= 0; row -= 1, index += 1) {
-        this.board[row][column] = survivors[index] || this.createOrb(NATURAL_ORB_TYPES[Math.floor(this.rng() * NATURAL_ORB_TYPES.length)].id);
+        this.board[row][column] = survivors[index] || this.createOrb(NATURAL_ORB_TYPES[Math.floor(this.rng.nextFloat() * NATURAL_ORB_TYPES.length)].id);
       }
     }
   }
@@ -578,6 +578,7 @@ export class PuzzleEngine {
       mode: this.mode,
       phase: this.phase,
       turn: this.turn,
+      rngState: this.rng.state,
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({
         code: ORB_BY_ID[orb.type].code,

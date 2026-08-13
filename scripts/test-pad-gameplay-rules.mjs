@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
   createPadLcg,
+  createPadRng,
   findPadMatches,
   findPadBombDetonations,
   padApplyAttackMultipliers,
@@ -32,6 +33,16 @@ assert.deepEqual(
   Array.from({ length: 5 }, () => nativeRng()),
   [6_018, 58_043, 29_441, 14_031, 28_211].map((value) => value / 65_536),
 );
+const statefulNativeRng = createPadRng(21_900);
+assert.equal(statefulNativeRng.state, 21_900);
+assert.equal(statefulNativeRng.nextUint16(), 6_018);
+assert.equal(statefulNativeRng.state, 394_448_415);
+assert.equal(statefulNativeRng.nextFloat(), 58_043 / 65_536);
+assert.equal(statefulNativeRng.state, 3_803_934_822);
+assert.deepEqual(statefulNativeRng.shuffleBlockCandidates([0, 1, 2]), [2, 1, 0]);
+assert.equal(statefulNativeRng.state, 919_597_584);
+assert.equal(statefulNativeRng.getRandomBlock(), 3);
+assert.equal(statefulNativeRng.state, 1_569_558_794);
 assert.deepEqual(padShuffleBlockCandidates(21_900, [0, 1, 2, 3, 4, 5]), {
   state: 3_803_934_822,
   candidates: [1, 3, 2, 4, 5, 0],
@@ -51,6 +62,7 @@ assert.deepEqual(new PuzzleEngine({ seed: 21_900 }).snapshot().board, [
   'BHLDBH',
   'LRLDHR',
 ]);
+assert.equal(new PuzzleEngine({ seed: 21_900 }).snapshot().rngState, 79_238_434);
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);
 assert.deepEqual(tracePadDragCells(0, 0, 2, 2, true), [{ row: 1, column: 1 }, { row: 2, column: 2 }]);

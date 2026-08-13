@@ -47,13 +47,39 @@ export function padLcgStep(state) {
   return { state: nextState, value: nextState >>> 16 };
 }
 
-export function createPadLcg(seed = 0) {
+export function createPadRng(seed = 0) {
   let state = Number(seed) >>> 0;
-  return () => {
+  const nextUint16 = () => {
     const next = padLcgStep(state);
     state = next.state;
-    return next.value / 0x10000;
+    return next.value;
   };
+  return {
+    get state() {
+      return state;
+    },
+    nextUint16() {
+      return nextUint16();
+    },
+    nextFloat() {
+      return nextUint16() / 0x10000;
+    },
+    shuffleBlockCandidates(candidates) {
+      const shuffled = padShuffleBlockCandidates(state, candidates);
+      state = shuffled.state;
+      return shuffled.candidates;
+    },
+    getRandomBlock(excludedType = -1, includeJammer = false, includeHeart = true) {
+      const result = padGetRandomBlock(state, excludedType, includeJammer, includeHeart);
+      state = result.state;
+      return result.type;
+    },
+  };
+}
+
+export function createPadLcg(seed = 0) {
+  const rng = createPadRng(seed);
+  return () => rng.nextFloat();
 }
 
 // cGAMEMAIN::_getRandomBlock (0x617874) advances the saved game-work LCG

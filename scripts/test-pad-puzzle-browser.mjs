@@ -53,6 +53,9 @@ try {
   const start = internalPoint(box, 225, 570);
   await page.mouse.click(start.x, start.y);
   const before = JSON.parse(await page.evaluate(() => window.render_game_to_text()));
+  if (!Number.isInteger(before.rngState) || before.rngState < 0 || before.rngState > 0xffff_ffff) {
+    throw new Error(`Puzzle snapshot exposed invalid native RNG state: ${before.rngState}.`);
+  }
 
   const from = internalPoint(box, 50, 475);
   const diagonal = internalPoint(box, 120, 545);
@@ -74,6 +77,7 @@ try {
   expectedRows[0] = first.join('');
   expectedRows[1] = second.join('');
   if (during.drag?.pathLength !== 2) throw new Error(`Diagonal coalesced move used ${during.drag?.pathLength} swaps instead of 2.`);
+  if (during.rngState !== before.rngState) throw new Error('Pointer movement consumed native RNG state before a board refill.');
   if (during.board[0] !== expectedRows[0] || during.board[1] !== expectedRows[1]) {
     throw new Error(`Orthogonal drag board mismatch: ${during.board.slice(0, 2)} vs ${expectedRows.slice(0, 2)}.`);
   }

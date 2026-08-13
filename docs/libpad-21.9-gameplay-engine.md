@@ -239,8 +239,12 @@ Skyfall collapse is column-based and matching is repeated until no marked group
 remains. Seeded fallback boards and replacement drops use the binary's exported
 `izRndLcGet` sequence: a wrapping 32-bit
 `state = state * 0x343fd + 0x269ec3`, with the unsigned high 16 bits returned
-for each draw. This makes browser seeds reproducible against the native random
-primitive rather than merely deterministic within JavaScript.
+for each draw. The browser RNG exposes its current unsigned 32-bit state in the
+game snapshot and can resume both ordinary high-16 draws and the recovered
+two-global-step `_getRandomBlock` shuffle from that state. This makes browser
+seeds reproducible against the native random primitive rather than merely
+deterministic within JavaScript; it does not make the absent weighted drop
+tables or opening-board constraints implicit.
 
 ## Damage and recovery pipeline
 
