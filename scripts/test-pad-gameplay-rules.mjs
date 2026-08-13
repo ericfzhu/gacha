@@ -495,6 +495,16 @@ excludedSkyfallEngine.board[0][0] = null;
 excludedSkyfallEngine.collapseAndRefill();
 assert.equal(excludedSkyfallEngine.board[0][0].type, 'water');
 assert.equal(excludedSkyfallEngine.rng.state, 394_448_415);
+const orderedSkyfallEngine = new PuzzleEngine({ seed: 21_900 });
+orderedSkyfallEngine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+orderedSkyfallEngine.setRngState(21_900);
+orderedSkyfallEngine.board[1][0] = null;
+orderedSkyfallEngine.board[3][0] = null;
+orderedSkyfallEngine.collapseAndRefill();
+assert.deepEqual(orderedSkyfallEngine.board.map((row) => row[0].type), [
+  'fire', 'heart', 'dark', 'dark', 'dark',
+]);
+assert.equal(orderedSkyfallEngine.rng.state, 3_803_934_822);
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);
 assert.deepEqual(tracePadDragCells(0, 0, 2, 2, true), [{ row: 1, column: 1 }, { row: 2, column: 2 }]);

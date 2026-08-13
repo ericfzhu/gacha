@@ -405,6 +405,13 @@ try {
     const excludedSkyfallType = engine.board[0][0].type;
     const excludedSkyfallState = engine.rng.state;
     engine.skyfallExclusionMask = 0;
+    engine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+    engine.setRngState(21_900);
+    engine.board[1][0] = null;
+    engine.board[3][0] = null;
+    engine.collapseAndRefill();
+    const orderedSkyfallTypes = engine.board.map((row) => row[0].type);
+    const orderedSkyfallState = engine.rng.state;
     engine.reset();
     const initialBoard = engine.snapshot().board;
     const initialBoardState = engine.rng.state;
@@ -426,6 +433,7 @@ try {
       passiveBlockFlagByte, passiveLineFlags, passiveLineState, passiveLineTypes, passiveLineFlagByte,
       skyfallType, skyfallState, weightedSkyfallType, weightedSkyfallState,
       excludedSkyfallType, excludedSkyfallState,
+      orderedSkyfallTypes, orderedSkyfallState,
       initialBoard, initialBoardState,
     };
   }) : null;
@@ -486,6 +494,9 @@ try {
     poisonBlockSample.weightedSkyfallState !== 3_803_934_822 ||
     poisonBlockSample.excludedSkyfallType !== 'water' ||
     poisonBlockSample.excludedSkyfallState !== 394_448_415 ||
+    JSON.stringify(poisonBlockSample.orderedSkyfallTypes) !== JSON.stringify([
+      'fire', 'heart', 'dark', 'dark', 'dark',
+    ]) || poisonBlockSample.orderedSkyfallState !== 3_803_934_822 ||
     JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
       'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',
     ]) || poisonBlockSample.initialBoardState !== 79_238_434

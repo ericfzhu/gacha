@@ -190,6 +190,15 @@ cell still consumes exactly one saved LCG step. `padCreateInitialBoard` and
 `PuzzleEngine.createStableBoard` now reproduce the row-major traversal,
 horizontal/vertical mask union, forward face rotation, and dynamic dimensions.
 
+Ordinary cascade refill follows a separate ordering recovered from
+`_checkFalls()` at `0x673fbc`. Native walks columns from left to right and
+preallocates replacement types for erased cells from the top row downward.
+Surviving cells then compact to the bottom and the generated stream fills the
+new top slots in the same order. This is observable whenever a column has two
+or more holes: the first RNG result belongs to the highest empty slot, not the
+lowest. `PuzzleEngine.collapseAndRefill` preserves that column-major,
+top-to-bottom generation and placement contract.
+
 The upstream `_buildBlockList(float rates[10], uint32 excludedMask)` at
 `0x6615e8` clears ten lanes, applies dungeon/passive additions, sequentially
 adds the resulting binary32 values, multiplies the binary32 total by

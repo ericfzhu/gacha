@@ -2,6 +2,21 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 native multi-hole refill order
+
+- Recovered the ordinary refill traversal in `_checkFalls` at `0x673fbc`:
+  columns are visited left to right, empty cells within a column are generated
+  top to bottom, and that generated stream occupies the new top slots after
+  surviving blocks compact downward.
+- Updated cascade refill so multiple holes in one column no longer reverse the
+  native RNG-result order. Added deterministic engine and browser fixtures for
+  the observable two-hole case.
+- Pure rules, production build, the full browser gameplay suite, and the
+  independent gameplay-client render check all pass with no console errors.
+- Next: recover the special fall-status/combo-drop overrides around
+  `_checkFalls`, then continue mapping raw dungeon/passive drop records while
+  preserving the private account/server data boundary.
+
 ## 2026-08-14 drop-rate lane summary
 
 - Recovered `_buildBlockList` at `0x6615e8` through its final ten binary32

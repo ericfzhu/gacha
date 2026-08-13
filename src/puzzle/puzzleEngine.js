@@ -476,13 +476,15 @@ export class PuzzleEngine {
     for (let column = 0; column < this.columns; column += 1) {
       const survivors = [];
       for (let row = this.rows - 1; row >= 0; row -= 1) if (this.board[row][column]) survivors.push(this.board[row][column]);
-      for (let row = this.rows - 1, index = 0; row >= 0; row -= 1, index += 1) {
-        if (survivors[index]) {
-          this.board[row][column] = survivors[index];
-          continue;
-        }
+      const missingCount = this.rows - survivors.length;
+      const generated = Array.from({ length: missingCount }, () => {
         const type = this.rng.spawnNewBlock(this.dropRates, this.faceTypes, this.skyfallExclusionMask);
-        this.board[row][column] = this.createOrb(ORB_TYPES[type]?.id || NATURAL_ORB_TYPES[0].id);
+        return this.createOrb(ORB_TYPES[type]?.id || NATURAL_ORB_TYPES[0].id);
+      });
+      for (let row = 0; row < this.rows; row += 1) {
+        this.board[row][column] = row < missingCount
+          ? generated[row]
+          : survivors[this.rows - 1 - row];
       }
     }
   }
