@@ -1,4 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Noto+Sans:wght@400;500;600;700&display=swap');
+@font-face {
+  font-family: 'Barlow Condensed';
+  src: local('Arial Narrow'), local('Avenir Next Condensed'), local('DejaVu Sans Condensed');
+  font-style: normal;
+  font-weight: 500 700;
+  font-display: swap;
+}
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
