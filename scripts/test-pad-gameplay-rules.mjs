@@ -160,6 +160,7 @@ assert.equal(padPoisonDamage(10_000, [3], []), 2_000);
 assert.equal(padPoisonDamage(10_000, [4], [3]), 7_500);
 assert.equal(padPoisonDamage(10_001, [3, 3], []), 4_002);
 assert.equal(padPoisonDamage(10_001, [], [3]), 5_001);
+assert.equal(padPoisonDamage(12, [4], []), 3);
 assert.equal(padBombDamage(10_001, 2), 4_002);
 assert.equal(padThornDamage(10_001, 4), 401);
 assert.equal(padAttributeMultiplier('fire', 'wood'), 2);

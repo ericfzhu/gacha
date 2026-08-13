@@ -152,7 +152,11 @@ maximum HP for a three-orb group and mortal poison 50%, with the same 25%
 per-extra-orb group scaling. `_calcCharge` (`0x64f220`) passes each poison
 group's HP cost through `izMathCeiling` before adding it to game-work offset
 `0x8aacc`; two groups therefore round independently rather than as one combined
-percentage. Recovery and poison are netted before the HP clamp, matching
+percentage. Its operation order is observable too: the extra-orb multiplier is
+formed in binary32, widened to binary64, then evaluated as
+`maxHP * orbMultiplier * percent / 100` before the ceiling. Reassociating that
+expression can over-round an exact integer (four poison orbs at 12 maximum HP
+deal 3, not 4). Recovery and poison are netted before the HP clamp, matching
 `_applyHpRecAndPoisonDamage` rather than healing to the cap first.
 
 Orb state remains separate from type. In native `sBLOCK`, type is the signed
