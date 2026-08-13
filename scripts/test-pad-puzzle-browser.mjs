@@ -842,6 +842,44 @@ try {
     engine.setRngState(21_900);
     const rejectedPoisonBlocksSkill = engine.takeEnemySkill(0);
     const rejectedPoisonBlocksState = engine.snapshot();
+    const countedPoisonMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(countedPoisonMonsterDefinition.buffer).setUint32(0xec, 9_015, true);
+    const countedPoisonDefinition = poisonBlocksAiDefinition.slice();
+    const countedPoisonView = new DataView(countedPoisonDefinition.buffer);
+    countedPoisonView.setUint32(0x00, 9_015, true);
+    countedPoisonView.setInt16(0x04, 60, true);
+    countedPoisonView.setInt32(0x10, 4, true);
+    countedPoisonView.setInt32(0x14, 1, true);
+    engine.setEnemyAiDefinitionPool(0, countedPoisonMonsterDefinition, [countedPoisonDefinition]);
+    engine.setBoardFromCodes(['RBRBHD', 'GLDHBG', 'HBGDGL', 'DLGHHB', 'HBGGLD']);
+    const countedPoisonHeartCount = engine.board.flat().filter((orb) => orb.type === 'heart').length;
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedCountedPoisonAi = engine.snapshot();
+    const selectedCountedPoisonCount = engine.board.flat().filter((orb) => orb.type === 'poison').length;
+    const selectedCountedPoisonHeartCount = engine.board.flat().filter((orb) => orb.type === 'heart').length;
+    const countedMortalMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(countedMortalMonsterDefinition.buffer).setUint32(0xec, 9_016, true);
+    const countedMortalDefinition = countedPoisonDefinition.slice();
+    const countedMortalView = new DataView(countedMortalDefinition.buffer);
+    countedMortalView.setUint32(0x00, 9_016, true);
+    countedMortalView.setInt16(0x04, 61, true);
+    engine.setEnemyAiDefinitionPool(0, countedMortalMonsterDefinition, [countedMortalDefinition]);
+    engine.setBoardFromCodes(['RBRBHD', 'GLDHBG', 'HBGDGL', 'DLGHHB', 'HBGGLD']);
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedCountedMortalAi = engine.snapshot();
+    const selectedCountedMortalCount = engine.board.flat()
+      .filter((orb) => orb.type === 'mortalPoison').length;
+    engine.setEnemyAiDefinitionPool(0, countedPoisonMonsterDefinition, [countedPoisonDefinition]);
+    engine.setBoardFromCodes(['RRRHHH', 'PMPMPM', 'MHMHMH', 'PMPMPM', 'MHMHMH']);
+    engine.setRngState(21_900);
+    const rejectedCountedPoisonSkill = engine.takeEnemySkill(0);
+    const rejectedCountedPoisonState = engine.snapshot();
     engine.setEnemyAiDefinitionPool(0, null);
     engine.setBlackFallRule(null);
     engine.reset();
@@ -892,6 +930,9 @@ try {
       poisonBlocksHeartCount, selectedPoisonBlocksAi, selectedPoisonBlocksCount,
       selectedPoisonBlocksHeartCount, selectedMortalPoisonBlocksAi,
       selectedMortalPoisonBlocksCount, rejectedPoisonBlocksSkill, rejectedPoisonBlocksState,
+      countedPoisonHeartCount, selectedCountedPoisonAi, selectedCountedPoisonCount,
+      selectedCountedPoisonHeartCount, selectedCountedMortalAi, selectedCountedMortalCount,
+      rejectedCountedPoisonSkill, rejectedCountedPoisonState,
       initialBoard, initialBoardState,
     };
   }) : null;
@@ -1092,6 +1133,19 @@ try {
     poisonBlockSample.selectedMortalPoisonBlocksCount !== 7 ||
     poisonBlockSample.rejectedPoisonBlocksSkill !== null ||
     poisonBlockSample.rejectedPoisonBlocksState.rngState !== 21_900 ||
+    poisonBlockSample.selectedCountedPoisonAi.lastEnemyActions?.[0]?.skill?.type !== 60 ||
+    poisonBlockSample.selectedCountedPoisonAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_015 ||
+    poisonBlockSample.selectedCountedPoisonAi.rngState !== advanceLcg(21_900, 9) ||
+    poisonBlockSample.selectedCountedPoisonAi.enemies?.[0]?.enemyAiBudget !== 80 ||
+    poisonBlockSample.selectedCountedPoisonCount !== 4 ||
+    poisonBlockSample.selectedCountedPoisonHeartCount !== poisonBlockSample.countedPoisonHeartCount ||
+    poisonBlockSample.selectedCountedMortalAi.lastEnemyActions?.[0]?.skill?.type !== 61 ||
+    poisonBlockSample.selectedCountedMortalAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_016 ||
+    poisonBlockSample.selectedCountedMortalAi.rngState !== advanceLcg(21_900, 9) ||
+    poisonBlockSample.selectedCountedMortalAi.enemies?.[0]?.enemyAiBudget !== 80 ||
+    poisonBlockSample.selectedCountedMortalCount !== 4 ||
+    poisonBlockSample.rejectedCountedPoisonSkill !== null ||
+    poisonBlockSample.rejectedCountedPoisonState.rngState !== 21_900 ||
     JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
       'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',
     ]) || poisonBlockSample.initialBoardState !== 79_238_434

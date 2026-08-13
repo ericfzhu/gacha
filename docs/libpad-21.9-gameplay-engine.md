@@ -638,6 +638,26 @@ this raw record path into enemy turns and reports the chosen skill ID, budget,
 and RNG state. Other condition callbacks, flow-control records, and the legacy
 selector are rejected explicitly until decoded rather than approximated.
 
+Enemy skill types `60` and `61` are count-gated individual poison writers.
+Both use late handler `0x6291e0`, setup `0x61fee4`, and AI condition `0x61a710`.
+Definition `+0x10` is a positive requested cell count and nonzero `+0x14`
+excludes Heart. Type 60 selects poison type 7; type 61 selects mortal poison
+type 8. Nonpositive counts are rejected at the browser's raw-data boundary
+because the native condition divides by this value.
+
+The condition counts every live cell that is neither poison nor mortal poison,
+optionally excluding Heart, and admits the skill only when that count is at
+least the requested amount. It ignores locks and consumes no RNG. Execution
+then uses `_doPoisonBlockN`, spending two saved-LCG coordinate advances per
+requested cell. This differs deliberately from type 64: type 64 needs only one
+eligible candidate even when its requested count exceeds the available cells,
+while types 60/61 require the full requested count before AI selection.
+
+Browser fixtures request four cells, preserve every Heart, write exactly four
+poison or mortal-poison cells, spend one AI probability roll plus eight writer
+rolls, and update budget 100 to 80. A board with only three eligible cells is
+rejected without consuming RNG.
+
 Enemy skill types `57` and `59` are the whole-color poison writers. Both use
 the late dispatch handler `0x6291b8`, setup `0x61fee4`, and AI condition
 `0x61a6a0`. Definition `+0x10` is the requested number of represented dungeon

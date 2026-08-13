@@ -2,6 +2,24 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 count-gated individual poison writers
+
+- Mapped types `60` and `61` to shared late handler `0x6291e0`, setup
+  `0x61fee4`, and condition `0x61a710`; type 60 writes poison and type 61 writes
+  mortal poison.
+- Decoded positive `+0x10` as requested cells and nonzero `+0x14` as Heart
+  exclusion. The condition consumes no RNG and requires at least the requested
+  number of non-poison-family cells after optional Heart exclusion.
+- Preserved the important distinction from type 64, whose condition requires
+  only one eligible cell. Types 60/61 reject a four-cell request when only
+  three eligible cells remain.
+- Pure and browser fixtures select skill IDs 9015/9016, preserve Heart, write
+  four cells, consume nine total LCG advances including AI, and update budget
+  100 -> 80. The insufficient-candidate fixture is rejected at zero RNG cost.
+- Exact restored-table inspection, rule tests, production build, exhaustive
+  browser regression, generic gameplay client, and both visual captures pass.
+- Next: commit this pair, then continue the neighboring dispatch audit.
+
 ## 2026-08-14 whole-color enemy poison writers
 
 - Identified types `57` and `59` as a paired family sharing late handler

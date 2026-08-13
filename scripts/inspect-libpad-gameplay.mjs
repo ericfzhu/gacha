@@ -25,6 +25,11 @@ const MORTAL_POISON_BLOCKS_ENEMY_SKILL_TYPE = 59;
 const POISON_BLOCKS_HANDLER = 0x6291b8;
 const POISON_BLOCKS_SETUP_HANDLER = 0x61fee4;
 const POISON_BLOCKS_CONDITION_HANDLER = 0x61a6a0;
+const POISON_BLOCK_N_COUNTED_ENEMY_SKILL_TYPE = 60;
+const MORTAL_POISON_BLOCK_N_COUNTED_ENEMY_SKILL_TYPE = 61;
+const POISON_BLOCK_N_COUNTED_HANDLER = 0x6291e0;
+const POISON_BLOCK_N_COUNTED_SETUP_HANDLER = 0x61fee4;
+const POISON_BLOCK_N_COUNTED_CONDITION_HANDLER = 0x61a710;
 const POISON_BLOCK_N_ENEMY_SKILL_TYPE = 64;
 const POISON_BLOCK_N_HANDLER = 0x628ccc;
 const POISON_BLOCK_N_SETUP_HANDLER = 0x6203f8;
@@ -254,6 +259,47 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : mortalPoisonBlocksSetupTarget === POISON_BLOCKS_SETUP_HANDLER;
   const mortalPoisonBlocksConditionMatches = mortalPoisonBlocksConditionTarget === null
     ? null : mortalPoisonBlocksConditionTarget === POISON_BLOCKS_CONDITION_HANDLER;
+  const resolveCountedPoisonTarget = (type, table, base) => resolveEnemySkillTarget(
+    type,
+    table,
+    base,
+  );
+  const poisonBlockNCountedDispatchTarget = resolveCountedPoisonTarget(
+    POISON_BLOCK_N_COUNTED_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const poisonBlockNCountedSetupTarget = resolveCountedPoisonTarget(
+    POISON_BLOCK_N_COUNTED_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const poisonBlockNCountedConditionTarget = resolveCountedPoisonTarget(
+    POISON_BLOCK_N_COUNTED_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const mortalPoisonBlockNCountedDispatchTarget = resolveCountedPoisonTarget(
+    MORTAL_POISON_BLOCK_N_COUNTED_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const mortalPoisonBlockNCountedSetupTarget = resolveCountedPoisonTarget(
+    MORTAL_POISON_BLOCK_N_COUNTED_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const mortalPoisonBlockNCountedConditionTarget = resolveCountedPoisonTarget(
+    MORTAL_POISON_BLOCK_N_COUNTED_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const poisonBlockNCountedDispatchMatches = poisonBlockNCountedDispatchTarget === null
+    ? null : poisonBlockNCountedDispatchTarget === POISON_BLOCK_N_COUNTED_HANDLER;
+  const poisonBlockNCountedSetupMatches = poisonBlockNCountedSetupTarget === null
+    ? null : poisonBlockNCountedSetupTarget === POISON_BLOCK_N_COUNTED_SETUP_HANDLER;
+  const poisonBlockNCountedConditionMatches = poisonBlockNCountedConditionTarget === null
+    ? null : poisonBlockNCountedConditionTarget === POISON_BLOCK_N_COUNTED_CONDITION_HANDLER;
+  const mortalPoisonBlockNCountedDispatchMatches = mortalPoisonBlockNCountedDispatchTarget === null
+    ? null : mortalPoisonBlockNCountedDispatchTarget === POISON_BLOCK_N_COUNTED_HANDLER;
+  const mortalPoisonBlockNCountedSetupMatches = mortalPoisonBlockNCountedSetupTarget === null
+    ? null : mortalPoisonBlockNCountedSetupTarget === POISON_BLOCK_N_COUNTED_SETUP_HANDLER;
+  const mortalPoisonBlockNCountedConditionMatches = mortalPoisonBlockNCountedConditionTarget === null
+    ? null : mortalPoisonBlockNCountedConditionTarget === POISON_BLOCK_N_COUNTED_CONDITION_HANDLER;
   const blackFallDispatchEntry = restoredElf
     ? readUint16Virtual(
       restoredElf,
@@ -748,6 +794,12 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       mortalPoisonBlocksDispatchMatches21_9: mortalPoisonBlocksDispatchMatches,
       mortalPoisonBlocksSetupMatches21_9: mortalPoisonBlocksSetupMatches,
       mortalPoisonBlocksConditionMatches21_9: mortalPoisonBlocksConditionMatches,
+      poisonBlockNCountedDispatchMatches21_9: poisonBlockNCountedDispatchMatches,
+      poisonBlockNCountedSetupMatches21_9: poisonBlockNCountedSetupMatches,
+      poisonBlockNCountedConditionMatches21_9: poisonBlockNCountedConditionMatches,
+      mortalPoisonBlockNCountedDispatchMatches21_9: mortalPoisonBlockNCountedDispatchMatches,
+      mortalPoisonBlockNCountedSetupMatches21_9: mortalPoisonBlockNCountedSetupMatches,
+      mortalPoisonBlockNCountedConditionMatches21_9: mortalPoisonBlockNCountedConditionMatches,
       poisonBlockNDispatchMatches21_9: poisonBlockNDispatchMatches,
       poisonBlockNSetupMatches21_9: poisonBlockNSetupMatches,
       poisonBlockNConditionMatches21_9: poisonBlockNConditionMatches,
@@ -829,6 +881,26 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       mortalPoisonBlocksConditionTarget: mortalPoisonBlocksConditionTarget === null
         ? null : hex(mortalPoisonBlocksConditionTarget),
       mortalPoisonBlocksConditionMatches21_9: mortalPoisonBlocksConditionMatches,
+      poisonBlockNCountedType: POISON_BLOCK_N_COUNTED_ENEMY_SKILL_TYPE,
+      poisonBlockNCountedDispatchTarget: poisonBlockNCountedDispatchTarget === null
+        ? null : hex(poisonBlockNCountedDispatchTarget),
+      poisonBlockNCountedDispatchMatches21_9: poisonBlockNCountedDispatchMatches,
+      poisonBlockNCountedSetupTarget: poisonBlockNCountedSetupTarget === null
+        ? null : hex(poisonBlockNCountedSetupTarget),
+      poisonBlockNCountedSetupMatches21_9: poisonBlockNCountedSetupMatches,
+      poisonBlockNCountedConditionTarget: poisonBlockNCountedConditionTarget === null
+        ? null : hex(poisonBlockNCountedConditionTarget),
+      poisonBlockNCountedConditionMatches21_9: poisonBlockNCountedConditionMatches,
+      mortalPoisonBlockNCountedType: MORTAL_POISON_BLOCK_N_COUNTED_ENEMY_SKILL_TYPE,
+      mortalPoisonBlockNCountedDispatchTarget: mortalPoisonBlockNCountedDispatchTarget === null
+        ? null : hex(mortalPoisonBlockNCountedDispatchTarget),
+      mortalPoisonBlockNCountedDispatchMatches21_9: mortalPoisonBlockNCountedDispatchMatches,
+      mortalPoisonBlockNCountedSetupTarget: mortalPoisonBlockNCountedSetupTarget === null
+        ? null : hex(mortalPoisonBlockNCountedSetupTarget),
+      mortalPoisonBlockNCountedSetupMatches21_9: mortalPoisonBlockNCountedSetupMatches,
+      mortalPoisonBlockNCountedConditionTarget: mortalPoisonBlockNCountedConditionTarget === null
+        ? null : hex(mortalPoisonBlockNCountedConditionTarget),
+      mortalPoisonBlockNCountedConditionMatches21_9: mortalPoisonBlockNCountedConditionMatches,
       poisonBlockNType: POISON_BLOCK_N_ENEMY_SKILL_TYPE,
       poisonBlockNDispatchTarget: poisonBlockNDispatchTarget === null
         ? null : hex(poisonBlockNDispatchTarget),
@@ -1001,6 +1073,11 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || poisonBlocksConditionMatches === false
     || mortalPoisonBlocksDispatchMatches === false || mortalPoisonBlocksSetupMatches === false
     || mortalPoisonBlocksConditionMatches === false
+    || poisonBlockNCountedDispatchMatches === false || poisonBlockNCountedSetupMatches === false
+    || poisonBlockNCountedConditionMatches === false
+    || mortalPoisonBlockNCountedDispatchMatches === false
+    || mortalPoisonBlockNCountedSetupMatches === false
+    || mortalPoisonBlockNCountedConditionMatches === false
     || poisonBlockNDispatchMatches === false || poisonBlockNSetupMatches === false
     || poisonBlockNConditionMatches === false
     || horizontalLinesDispatchMatches === false || horizontalLinesSetupMatches === false

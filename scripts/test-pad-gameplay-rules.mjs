@@ -4,6 +4,8 @@ import {
   PAD_ENEMY_SKILL_BLACK_FALL,
   PAD_ENEMY_SKILL_POISON_BLOCKS,
   PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS,
+  PAD_ENEMY_SKILL_POISON_BLOCK_N_COUNTED,
+  PAD_ENEMY_SKILL_MORTAL_POISON_BLOCK_N_COUNTED,
   PAD_ENEMY_SKILL_POISON_BLOCK_N,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES_4,
@@ -631,6 +633,40 @@ assert.deepEqual(decodePadEnemySkillDefinition(enemyAiMortalPoisonBlocksDefiniti
   kind: 'poisonBlocks',
   supported: true,
   count: 2,
+  excludeHeart: true,
+  destinationType: 8,
+  attackWithSkillValue: 0,
+});
+const enemyAiPoisonBlockNCountedDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiPoisonBlockNCountedView = new DataView(enemyAiPoisonBlockNCountedDefinition.buffer);
+enemyAiPoisonBlockNCountedView.setUint32(0x00, 9_015, true);
+enemyAiPoisonBlockNCountedView.setInt16(0x04, PAD_ENEMY_SKILL_POISON_BLOCK_N_COUNTED, true);
+enemyAiPoisonBlockNCountedView.setInt32(0x10, 4, true);
+enemyAiPoisonBlockNCountedView.setInt32(0x14, 1, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiPoisonBlockNCountedDefinition), {
+  type: 60,
+  kind: 'poisonBlockNCounted',
+  supported: true,
+  count: 4,
+  excludeHeart: true,
+  destinationType: 7,
+  attackWithSkillValue: 0,
+});
+const enemyAiMortalPoisonBlockNCountedDefinition = enemyAiPoisonBlockNCountedDefinition.slice();
+const enemyAiMortalPoisonBlockNCountedView = new DataView(
+  enemyAiMortalPoisonBlockNCountedDefinition.buffer,
+);
+enemyAiMortalPoisonBlockNCountedView.setUint32(0x00, 9_016, true);
+enemyAiMortalPoisonBlockNCountedView.setInt16(
+  0x04,
+  PAD_ENEMY_SKILL_MORTAL_POISON_BLOCK_N_COUNTED,
+  true,
+);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiMortalPoisonBlockNCountedDefinition), {
+  type: 61,
+  kind: 'poisonBlockNCounted',
+  supported: true,
+  count: 4,
   excludeHeart: true,
   destinationType: 8,
   attackWithSkillValue: 0,
@@ -1730,6 +1766,73 @@ rejectedPoisonBlocksAiEngine.setBoardFromCodes(Array(5).fill('HHHHHH'));
 rejectedPoisonBlocksAiEngine.setRngState(21_900);
 assert.equal(rejectedPoisonBlocksAiEngine.takeEnemySkill(0), null);
 assert.equal(rejectedPoisonBlocksAiEngine.rng.state, 21_900);
+const poisonBlockNCountedMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(poisonBlockNCountedMonsterDefinition.buffer).setUint32(0xec, 9_015, true);
+const selectedPoisonBlockNCountedEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: poisonBlockNCountedMonsterDefinition,
+    skillDefinitions: [enemyAiPoisonBlockNCountedDefinition],
+  }],
+});
+selectedPoisonBlockNCountedEngine.setBoardFromCodes([
+  'RBRBHD', 'GLDHBG', 'HBGDGL', 'DLGHHB', 'HBGGLD',
+]);
+const countedHeartCount = selectedPoisonBlockNCountedEngine.board.flat()
+  .filter((orb) => orb.type === 'heart').length;
+selectedPoisonBlockNCountedEngine.setRngState(21_900);
+selectedPoisonBlockNCountedEngine.enemies[0].counter = 1;
+selectedPoisonBlockNCountedEngine.enemies[1].counter = 99;
+selectedPoisonBlockNCountedEngine.resolveEnemyTurn();
+const poisonBlockNCountedState = selectedPoisonBlockNCountedEngine.snapshot();
+assert.equal(poisonBlockNCountedState.lastEnemyActions[0].skill.type, 60);
+assert.equal(poisonBlockNCountedState.lastEnemyActions[0].skill.skillId, 9_015);
+assert.equal(selectedPoisonBlockNCountedEngine.board.flat()
+  .filter((orb) => orb.type === 'poison').length, 4);
+assert.equal(selectedPoisonBlockNCountedEngine.board.flat()
+  .filter((orb) => orb.type === 'heart').length, countedHeartCount);
+let poisonBlockNCountedExpectedState = 21_900;
+for (let index = 0; index < 9; index += 1) {
+  poisonBlockNCountedExpectedState = padLcgStep(poisonBlockNCountedExpectedState).state;
+}
+assert.equal(selectedPoisonBlockNCountedEngine.rng.state, poisonBlockNCountedExpectedState);
+assert.equal(poisonBlockNCountedState.enemies[0].enemyAiBudget, 80);
+const mortalPoisonBlockNCountedMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(mortalPoisonBlockNCountedMonsterDefinition.buffer).setUint32(0xec, 9_016, true);
+const selectedMortalPoisonBlockNCountedEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: mortalPoisonBlockNCountedMonsterDefinition,
+    skillDefinitions: [enemyAiMortalPoisonBlockNCountedDefinition],
+  }],
+});
+selectedMortalPoisonBlockNCountedEngine.setBoardFromCodes([
+  'RBRBHD', 'GLDHBG', 'HBGDGL', 'DLGHHB', 'HBGGLD',
+]);
+selectedMortalPoisonBlockNCountedEngine.setRngState(21_900);
+selectedMortalPoisonBlockNCountedEngine.enemies[0].counter = 1;
+selectedMortalPoisonBlockNCountedEngine.enemies[1].counter = 99;
+selectedMortalPoisonBlockNCountedEngine.resolveEnemyTurn();
+const mortalPoisonBlockNCountedState = selectedMortalPoisonBlockNCountedEngine.snapshot();
+assert.equal(mortalPoisonBlockNCountedState.lastEnemyActions[0].skill.type, 61);
+assert.equal(mortalPoisonBlockNCountedState.lastEnemyActions[0].skill.skillId, 9_016);
+assert.equal(selectedMortalPoisonBlockNCountedEngine.board.flat()
+  .filter((orb) => orb.type === 'mortalPoison').length, 4);
+assert.equal(selectedMortalPoisonBlockNCountedEngine.rng.state, poisonBlockNCountedExpectedState);
+assert.equal(mortalPoisonBlockNCountedState.enemies[0].enemyAiBudget, 80);
+const rejectedPoisonBlockNCountedEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: poisonBlockNCountedMonsterDefinition,
+    skillDefinitions: [enemyAiPoisonBlockNCountedDefinition],
+  }],
+});
+rejectedPoisonBlockNCountedEngine.setBoardFromCodes([
+  'RRRHHH', 'PMPMPM', 'MHMHMH', 'PMPMPM', 'MHMHMH',
+]);
+rejectedPoisonBlockNCountedEngine.setRngState(21_900);
+assert.equal(rejectedPoisonBlockNCountedEngine.takeEnemySkill(0), null);
+assert.equal(rejectedPoisonBlockNCountedEngine.rng.state, 21_900);
 assert.equal(blackFallEngine.board[0][0].nail, false);
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);

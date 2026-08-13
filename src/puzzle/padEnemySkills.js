@@ -1,5 +1,7 @@
 export const PAD_ENEMY_SKILL_POISON_BLOCKS = 57;
 export const PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS = 59;
+export const PAD_ENEMY_SKILL_POISON_BLOCK_N_COUNTED = 60;
+export const PAD_ENEMY_SKILL_MORTAL_POISON_BLOCK_N_COUNTED = 61;
 export const PAD_ENEMY_SKILL_POISON_BLOCK_N = 64;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES_4 = 76;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES = 77;
@@ -87,6 +89,21 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       count: definition.getInt32(0x10, true),
       excludeHeart: definition.getInt32(0x14, true) !== 0,
       destinationType: type === PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS ? 8 : 7,
+      attackWithSkillValue,
+    });
+  }
+  if (
+    type === PAD_ENEMY_SKILL_POISON_BLOCK_N_COUNTED
+    || type === PAD_ENEMY_SKILL_MORTAL_POISON_BLOCK_N_COUNTED
+  ) {
+    const count = definition.getInt32(0x10, true);
+    return Object.freeze({
+      type,
+      kind: 'poisonBlockNCounted',
+      supported: count > 0,
+      count,
+      excludeHeart: definition.getInt32(0x14, true) !== 0,
+      destinationType: type === PAD_ENEMY_SKILL_MORTAL_POISON_BLOCK_N_COUNTED ? 8 : 7,
       attackWithSkillValue,
     });
   }
@@ -289,6 +306,25 @@ export function normalizePadEnemySkillRecord(record) {
       count: Math.trunc(Number(record?.count) || 0),
       excludeHeart: Boolean(record?.excludeHeart),
       destinationType: poisonBlocksType === PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS ? 8 : 7,
+    });
+  }
+  if (
+    type === PAD_ENEMY_SKILL_POISON_BLOCK_N_COUNTED
+    || type === PAD_ENEMY_SKILL_MORTAL_POISON_BLOCK_N_COUNTED
+    || record?.kind === 'poisonBlockNCounted'
+  ) {
+    const countedType = type === PAD_ENEMY_SKILL_MORTAL_POISON_BLOCK_N_COUNTED
+      || Number(record?.destinationType) === 8
+      ? PAD_ENEMY_SKILL_MORTAL_POISON_BLOCK_N_COUNTED
+      : PAD_ENEMY_SKILL_POISON_BLOCK_N_COUNTED;
+    const count = Math.trunc(Number(record?.count) || 0);
+    return Object.freeze({
+      type: countedType,
+      kind: 'poisonBlockNCounted',
+      supported: count > 0,
+      count,
+      excludeHeart: Boolean(record?.excludeHeart),
+      destinationType: countedType === PAD_ENEMY_SKILL_MORTAL_POISON_BLOCK_N_COUNTED ? 8 : 7,
     });
   }
   if (type === PAD_ENEMY_SKILL_POISON_BLOCK_N || record?.kind === 'poisonBlockN') {
