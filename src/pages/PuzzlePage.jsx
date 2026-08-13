@@ -374,7 +374,8 @@ function render(ctx, engine) {
   ctx.textAlign = 'left';
   ctx.fillStyle = '#ecf3e5';
   ctx.font = '700 11px "Noto Sans", sans-serif';
-  ctx.fillText(`HP ${engine.player.hp.toLocaleString()} / ${engine.player.maxHp.toLocaleString()}`, 19, 376);
+  // Keep the live HP readout clear of the 48px reset hit target below the bar.
+  ctx.fillText(`HP ${engine.player.hp.toLocaleString()} / ${engine.player.maxHp.toLocaleString()}`, 72, 376);
   drawButton(ctx, RESET_RECT, '↻', '', true, false);
   const skillReady = engine.skill.cooldown === 0 && engine.mode === 'playing' && engine.phase === 'input' && !engine.drag;
   drawButton(ctx, SKILL_RECT, engine.skill.name.toUpperCase(), skillReady ? 'READY · no turn cost' : `${engine.skill.cooldown} turn cooldown`, skillReady, skillReady);
