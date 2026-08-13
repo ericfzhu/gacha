@@ -429,6 +429,17 @@ try {
     const topLineSkyfallTypes = engine.board.map((row) => row[0].type);
     const topLineSkyfallState = engine.rng.state;
     engine.setTopLineDropTypes(null);
+    engine.setComboDropAwakenings([2, 0, 0, 0, 0]);
+    engine.setBoardFromCodes([
+      'RRRRRR', 'RRRRBG', 'BGLHDB', 'GLHDBG', 'LHDBGL',
+    ]);
+    engine.phase = 'detect';
+    engine.advancePhase();
+    const comboDropAwakeningMatchSize = engine.pendingMatches[0]?.size;
+    const comboDropAwakeningCombos = engine.comboCount;
+    const comboDropAwakeningBonus = engine.comboDropBonusCount;
+    const comboDropAwakeningPending = engine.pendingComboDrops;
+    engine.setComboDropAwakenings([0, 0, 0, 0, 0]);
     engine.reset();
     const initialBoard = engine.snapshot().board;
     const initialBoardState = engine.rng.state;
@@ -453,6 +464,8 @@ try {
       orderedSkyfallTypes, orderedSkyfallState,
       comboDropSkyfallFlags, comboDropSkyfallState,
       topLineSkyfallTypes, topLineSkyfallState,
+      comboDropAwakeningMatchSize, comboDropAwakeningCombos,
+      comboDropAwakeningBonus, comboDropAwakeningPending,
       initialBoard, initialBoardState,
     };
   }) : null;
@@ -521,6 +534,10 @@ try {
     JSON.stringify(poisonBlockSample.topLineSkyfallTypes) !== JSON.stringify([
       'wood', 'wood', 'dark', 'dark', 'dark',
     ]) || poisonBlockSample.topLineSkyfallState !== 21_900 ||
+    poisonBlockSample.comboDropAwakeningMatchSize !== 10 ||
+    poisonBlockSample.comboDropAwakeningCombos !== 3 ||
+    poisonBlockSample.comboDropAwakeningBonus !== 2 ||
+    poisonBlockSample.comboDropAwakeningPending !== 2 ||
     JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
       'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',
     ]) || poisonBlockSample.initialBoardState !== 79_238_434

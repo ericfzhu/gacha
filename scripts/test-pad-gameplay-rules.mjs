@@ -25,6 +25,7 @@ import {
   padPoisonDamage,
   padResolveBitReplacements,
   padResolveBlockSwapPassive,
+  padResolveComboDropAwakenings,
   padResolveComboDropSpawns,
   padResolveBlockSwapNew,
   padResolveLineBlockSwaps,
@@ -114,6 +115,14 @@ assert.deepEqual(padResolveComboDropSpawns(3_803_934_822, [0, 5], {
   state: 1_569_558_794,
   marked: [true, true],
   desiredCount: 2,
+});
+assert.deepEqual(padResolveComboDropAwakenings([
+  { type: 'fire', size: 10 },
+  { type: 'water', size: 12 },
+  { type: 'heart', size: 30 },
+], [3, 3, 9, 9, 9]), {
+  pendingCount: 6,
+  bonusCombos: 4,
 });
 assert.deepEqual(padSpawnNewBlockInBits(394_448_415, (1 << 0) | (1 << 6), [0, 1, 2, 3, 4, 5]), {
   state: 1_929_471_377,
@@ -547,6 +556,25 @@ assert.deepEqual(topLineSkyfallEngine.board.map((row) => row[0].type), [
 ]);
 assert.equal(topLineSkyfallEngine.rng.state, 21_900);
 assert.deepEqual(topLineSkyfallEngine.snapshot().topLineDropTypes, [2, 3, 4, 5, 0, 1]);
+const comboDropAwakeningEngine = new PuzzleEngine({
+  seed: 21_900,
+  comboDropAwakenings: [2, 0, 0, 0, 0],
+});
+comboDropAwakeningEngine.setBoardFromCodes([
+  'RRRRRR',
+  'RRRRBG',
+  'BGLHDB',
+  'GLHDBG',
+  'LHDBGL',
+]);
+comboDropAwakeningEngine.start();
+comboDropAwakeningEngine.phase = 'detect';
+comboDropAwakeningEngine.advancePhase();
+assert.equal(comboDropAwakeningEngine.pendingMatches.length, 1);
+assert.equal(comboDropAwakeningEngine.pendingMatches[0].size, 10);
+assert.equal(comboDropAwakeningEngine.comboCount, 3);
+assert.equal(comboDropAwakeningEngine.comboDropBonusCount, 2);
+assert.equal(comboDropAwakeningEngine.pendingComboDrops, 2);
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);
 assert.deepEqual(tracePadDragCells(0, 0, 2, 2, true), [{ row: 1, column: 1 }, { row: 2, column: 2 }]);

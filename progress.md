@@ -2,6 +2,22 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 native combo-drop awakening accounting
+
+- Recovered `_checkErases`' passive-skill `62` path: it builds five elemental
+  awakening counts, applies them only to connected elemental matches of at
+  least ten blocks, queues the full count for the following fall, and adds
+  dummy combos capped at four per erase pass.
+- Ported the uint8 pending-count behavior and dummy-combo contribution to combat
+  combo multipliers through `comboDropAwakenings`; Heart and special matches do
+  not enter this branch.
+- Added pure, engine, and browser fixtures for a ten-Fire match, and anchored
+  `_addComboDropFlags` at `0x673d90`. The exact inspector now checks 61 anchors.
+- Rules, production build, exhaustive browser mechanics, and the independent
+  gameplay-client render pass with no console errors.
+- Next: map saved party/passive records into the five elemental counts and
+  continue the remaining fall-state/post-spawn flag pipeline.
+
 ## 2026-08-14 native scripted top-line skyfalls
 
 - Ported `_isEnableTopLine`'s `_checkFalls` branch: active floor descriptors
@@ -12,8 +28,7 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
   the RNG-free `21900` state.
 - Rules, production build, exhaustive browser mechanics, and the independent
   gameplay-client render check pass with no console errors.
-- Next: recover the downstream combo accounting and awakening-record production
-  for `0x8000` combo-drop markers, then continue raw floor-record mapping.
+- Next: map raw party/floor records into the recovered combo-drop inputs.
 
 ## 2026-08-14 native combo-drop skyfall markers
 

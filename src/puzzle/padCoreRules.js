@@ -309,6 +309,30 @@ export function padResolveComboDropSpawns(
   return { state: nextState, marked, desiredCount };
 }
 
+// _checkErases (0x66c81c) builds five elemental counts from passive skill 62.
+// Every connected elemental match of at least ten blocks queues that type's
+// full count for _checkFalls and adds the same number of dummy combos, with a
+// four-combo cap shared by the current erase pass. The pending byte wraps like
+// native uint8 storage; Heart and special types do not use this branch.
+export function padResolveComboDropAwakenings(matches, awakeningCounts) {
+  const typeIndices = new Map([
+    ['fire', 0], ['water', 1], ['wood', 2], ['light', 3], ['dark', 4],
+  ]);
+  const counts = Array.from({ length: 5 }, (_, index) => (
+    Math.max(0, Math.trunc(Number(awakeningCounts?.[index]) || 0))
+  ));
+  let pendingCount = 0;
+  let bonusCombos = 0;
+  for (const match of Array.isArray(matches) ? matches : []) {
+    const typeIndex = typeIndices.get(match?.type);
+    if (typeIndex === undefined || Math.trunc(Number(match?.size) || 0) < 10) continue;
+    const count = counts[typeIndex];
+    pendingCount = (pendingCount + count) & 0xff;
+    bonusCombos += Math.min(count, 4 - bonusCombos);
+  }
+  return { pendingCount, bonusCombos };
+}
+
 // _buildBlockList (0x6615e8) emits ten float32 lanes, adds them sequentially,
 // multiplies the final binary32 total by 100000.0f, and returns
 // izMathCeiling(result). The raw dungeon/passive records are upstream inputs;

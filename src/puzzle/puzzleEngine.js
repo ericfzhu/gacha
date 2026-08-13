@@ -18,6 +18,7 @@ import {
   padNativeRecoveryPower,
   padPoisonDamage,
   padResolveBlockSwapPassive,
+  padResolveComboDropAwakenings,
   padResolveComboDropSpawns,
   padSecondaryAttributeAttack,
   padShuffleLockDropCandidates,
@@ -98,6 +99,7 @@ export class PuzzleEngine {
     skyfallExclusionMask = 0,
     comboDropChanceBasisPoints = 0,
     comboDropCap = 12,
+    comboDropAwakenings = Array(5).fill(0),
     topLineDropTypes = null,
   } = {}) {
     if (![columns, rows].every(Number.isInteger) || columns < 1 || columns > 15 || rows < 1 || rows > 15) {
@@ -113,6 +115,7 @@ export class PuzzleEngine {
     this.skyfallExclusionMask = Number(skyfallExclusionMask) >>> 0;
     this.comboDropChanceBasisPoints = Math.max(0, Math.trunc(Number(comboDropChanceBasisPoints) || 0));
     this.comboDropCap = Math.max(0, Math.trunc(Number(comboDropCap) || 0));
+    this.setComboDropAwakenings(comboDropAwakenings);
     this.setTopLineDropTypes(topLineDropTypes);
     this.rng = createPadRng(seed);
     this.orbSerial = 0;
@@ -136,6 +139,7 @@ export class PuzzleEngine {
     this.lastBombDamage = 0;
     this.lastThornDamage = 0;
     this.pendingComboDrops = 0;
+    this.comboDropBonusCount = 0;
     this.hpResolutionApplied = false;
     this.lastLeaderMultiplier = 1;
     this.message = 'Drag one orb through the board to rearrange the whole path.';
@@ -273,6 +277,8 @@ export class PuzzleEngine {
     this.lastHealing = 0;
     this.lastPoisonDamage = 0;
     this.lastBombDamage = 0;
+    this.pendingComboDrops = 0;
+    this.comboDropBonusCount = 0;
     this.phase = 'detect';
     this.phaseTimer = 0.12;
     this.message = 'Checking matches…';
@@ -403,7 +409,10 @@ export class PuzzleEngine {
             cascadeDepth: this.cascadeDepth + 1,
           };
         }));
-        this.comboCount += matches.length;
+        const comboDropAwakening = padResolveComboDropAwakenings(matches, this.comboDropAwakenings);
+        this.pendingComboDrops = (this.pendingComboDrops + comboDropAwakening.pendingCount) & 0xff;
+        this.comboDropBonusCount += comboDropAwakening.bonusCombos;
+        this.comboCount += matches.length + comboDropAwakening.bonusCombos;
         if (matches.length) this.cascadeDepth += 1;
         // libpad marks ordinary matches and unmatched-bomb blast cells in one
         // _checkBomb pass, then waits for effect 0x38 before erasing them. The
@@ -667,6 +676,13 @@ export class PuzzleEngine {
       throw new Error('PAD drop rates must contain at most ten finite numeric lanes.');
     }
     this.dropRates = Array.from({ length: 10 }, (_, index) => Math.fround(Number(rates[index]) || 0));
+  }
+
+  setComboDropAwakenings(counts) {
+    if (!Array.isArray(counts) || counts.length !== 5 || counts.some((count) => (
+      !Number.isInteger(Number(count)) || Number(count) < 0
+    ))) throw new Error('PAD combo-drop awakenings must contain five nonnegative elemental counts.');
+    this.comboDropAwakenings = counts.map((count) => Number(count));
   }
 
   setTopLineDropTypes(types) {
@@ -1082,7 +1098,9 @@ export class PuzzleEngine {
       skyfallExclusionMask: this.skyfallExclusionMask,
       comboDropChanceBasisPoints: this.comboDropChanceBasisPoints,
       comboDropCap: this.comboDropCap,
+      comboDropAwakenings: [...this.comboDropAwakenings],
       pendingComboDrops: this.pendingComboDrops,
+      comboDropBonusCount: this.comboDropBonusCount,
       topLineDropTypes: this.topLineDropTypes ? [...this.topLineDropTypes] : null,
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({

@@ -54,6 +54,7 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['match', 'checkErases', '_ZN9cGAMEMAIN12_checkErasesEv', 0x66c81c],
   ['match', 'checkFalls', '_ZN9cGAMEMAIN11_checkFallsEv', 0x673fbc],
   ['match', 'getComboDrop', '_ZNK9sSAVEDATA10sFLOORLIST12getComboDropEPa', 0x7752fc],
+  ['match', 'addComboDropFlags', '_ZN9cGAMEMAIN18_addComboDropFlagsEi', 0x673d90],
   ['match', 'calcCombo', '_ZN9cGAMEMAIN10_calcComboEv', 0x651854],
   ['hazard', 'calcCharge', '_ZN9cGAMEMAIN11_calcChargeEv', 0x64f220],
   ['hazard', 'checkBomb', '_ZN9cGAMEMAIN10_checkBombEv', 0x66a9f8],

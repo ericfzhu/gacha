@@ -139,6 +139,7 @@ Important routines include:
 | `0x66c81c` | `_checkErases()` |
 | `0x673fbc` | `_checkFalls()` |
 | `0x7752fc` | `sFLOORLIST::getComboDrop()` |
+| `0x673d90` | `_addComboDropFlags(int)` |
 | `0x651854` | `_calcCombo()` |
 | `0x66c2dc` | `_incCombos(float, float)` |
 
@@ -213,8 +214,17 @@ with wrap for an unmarked natural type; non-natural types `6..9` are skipped.
 `PuzzleEngine.collapseAndRefill` exposes `comboDropChanceBasisPoints`,
 `comboDropCap`, and `pendingComboDrops` for decoded dungeon/floor data. The
 marker is retained in `blockFlags` and surfaced as `comboDrop` in snapshots.
-Raw party-awakening records that produce pending markers and the marker's later
-combo accounting are still upstream/downstream tasks rather than inferred here.
+
+The upstream producer is also recovered. `_checkErases` queries passive skill
+ID `62` across the party and accumulates five counts by Fire, Water, Wood,
+Light, and Dark attribute. For every connected elemental match of at least ten
+blocks, native adds that attribute's full count to the uint8 pending-marker
+byte. It also adds the count as dummy combos, capped at four within that erase
+pass. Heart and special types do not qualify. `padResolveComboDropAwakenings`
+and `comboDropAwakenings` preserve the pending-byte wrap and combo cap; the
+dummy combos contribute to the turn's combo multiplier but do not create an
+attribute attack match. Mapping concrete saved party records into those five
+already-decoded counts remains content-data plumbing.
 
 The other replacement source is the scripted top-line path selected by
 `_isEnableTopLine` (`0x6401d0`). With that mode active, `_checkFalls` reads the
