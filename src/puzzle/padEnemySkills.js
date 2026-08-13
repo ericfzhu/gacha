@@ -1,3 +1,4 @@
+export const PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION = 39;
 export const PAD_ENEMY_SKILL_SELF_DESTRUCT = 40;
 export const PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE = 46;
 export const PAD_ENEMY_SKILL_SCALED_ATTACK = 47;
@@ -89,6 +90,17 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
     ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
     : null;
+  if (type === PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION) {
+    return Object.freeze({
+      type,
+      kind: 'moveTimeReduction',
+      supported: true,
+      durationTurns: definition.getInt32(0x10, true),
+      fixedReductionCentiseconds: definition.getInt32(0x14, true),
+      percentReduction: definition.getInt32(0x18, true),
+      attackWithSkillValue,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_SELF_DESTRUCT) {
     return Object.freeze({
       type,
@@ -423,6 +435,32 @@ export function padEnemySkillAttributeCandidates(candidateAttributes, currentAtt
     .filter((attribute) => attribute >= 0 && attribute < 5 && attribute !== current);
 }
 
+function signedInt16(value) {
+  return (Math.trunc(Number(value) || 0) << 16) >> 16;
+}
+
+function roundHalfAwayFromZero(value) {
+  return value < 0 ? Math.ceil(value - 0.5) : Math.floor(value + 0.5);
+}
+
+// Type 39 stores its move-time operand through a protected signed int16. A
+// nonzero third parameter selects percentage reduction; otherwise the second
+// parameter is a fixed reduction in centiseconds.
+export function padEnemySkillMoveTimeSeconds(
+  baseMoveTimeSeconds,
+  fixedReductionCentiseconds,
+  percentReduction,
+) {
+  const baseCentiseconds = Math.max(0, roundHalfAwayFromZero(
+    Number(baseMoveTimeSeconds) * 100,
+  ));
+  const percent = signedInt16(percentReduction);
+  const reduction = percent !== 0
+    ? roundHalfAwayFromZero(baseCentiseconds * percent / 100)
+    : signedInt16(fixedReductionCentiseconds);
+  return Math.max(0, baseCentiseconds - reduction) / 100;
+}
+
 // _doEnemySkill's second jump table dispatches signed type 128 to 0x62a854.
 // That handler reads the selected definition type at +0x04, the active
 // monster's packed duration at +0x678, and its chance parameter at +0x67c.
@@ -448,6 +486,21 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
   );
   const monster = new DataView(monsterBytes.buffer, monsterBytes.byteOffset, monsterBytes.byteLength);
   const type = definition.getInt16(PAD_ENEMY_SKILL_RUNTIME_LAYOUT.definitionTypeOffset, true);
+  if (type === PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION) {
+    return Object.freeze({
+      type,
+      kind: 'moveTimeReduction',
+      supported: true,
+      durationTurns: monster.getInt32(0x678, true),
+      fixedReductionCentiseconds: monster.getInt32(0x67c, true),
+      percentReduction: monster.getInt32(0x680, true),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_SELF_DESTRUCT) {
     return Object.freeze({
       type,
@@ -581,6 +634,20 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
 
 export function normalizePadEnemySkillRecord(record) {
   const type = Math.trunc(Number(record?.type));
+  if (type === PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION || record?.kind === 'moveTimeReduction') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
+      kind: 'moveTimeReduction',
+      supported: true,
+      durationTurns: Math.trunc(Number(record?.durationTurns) || 0),
+      fixedReductionCentiseconds: Math.trunc(Number(record?.fixedReductionCentiseconds) || 0),
+      percentReduction: Math.trunc(Number(record?.percentReduction) || 0),
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
   if (type === PAD_ENEMY_SKILL_SELF_DESTRUCT || record?.kind === 'selfDestruct') {
     return Object.freeze({
       type: PAD_ENEMY_SKILL_SELF_DESTRUCT,

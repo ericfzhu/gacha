@@ -33,6 +33,7 @@ import {
   tracePadPointerCells,
 } from './padCoreRules.js';
 import {
+  PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
   PAD_ENEMY_SKILL_SELF_DESTRUCT,
   PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
   PAD_ENEMY_SKILL_SCALED_ATTACK,
@@ -65,6 +66,7 @@ import {
   padEnemySkillAttributeCandidates,
   padEnemySkillAttack,
   padEnemySkillCurrentHpGravity,
+  padEnemySkillMoveTimeSeconds,
   padEnemySkillPlayerHeal,
   padEnemySkillReviveHp,
 } from './padEnemySkills.js';
@@ -169,7 +171,8 @@ export class PuzzleEngine {
       throw new Error('PAD board dimensions must be integers from 1 through 15.');
     }
     this.seed = seed;
-    this.moveTime = moveTime;
+    this.baseMoveTime = Math.max(0, Number(moveTime) || 0);
+    this.moveTime = this.baseMoveTime;
     this.columns = columns;
     this.rows = rows;
     this.allowDiagonalMoves = Boolean(allowDiagonalMoves);
@@ -228,6 +231,8 @@ export class PuzzleEngine {
     this.lastThornDamage = 0;
     this.lastEnemySkill = null;
     this.lastEnemyActions = [];
+    this.moveTime = this.baseMoveTime;
+    this.moveTimeReduction = null;
     this.enemySkillQueues.forEach((queue) => { queue.position = 0; });
     this.enemyAiPools.forEach((pool) => {
       if (pool) pool.aiBudget = pool.monster.budgetCap;
@@ -845,6 +850,7 @@ export class PuzzleEngine {
     // this order prevents a newly executed enemy skill from losing a turn
     // immediately on the same action boundary.
     this.advanceEnemyAttributeAbsorbTurns();
+    this.advanceMoveTimeReductionTurns();
     this.advanceBlackOrbCountdowns();
     if (this.blackFallRule?.active && this.blackFallRule.turnsRemaining !== null) {
       this.blackFallRule.turnsRemaining = Math.max(0, this.blackFallRule.turnsRemaining - 1);
@@ -907,6 +913,7 @@ export class PuzzleEngine {
       maxHp: enemy.maxHp,
       attributeAbsorbTurns: enemy.attributeAbsorbTurns,
       scaledAttackGate: enemy.scaledAttackGate,
+      moveTimeReductionTurns: this.moveTimeReduction?.turnsRemaining || 0,
       enemyAttribute: PAD_ATTRIBUTE_INDEX[enemy.attribute] ?? -1,
       playerCurrentHp: this.player.hp,
       playerMaxHp: this.player.maxHp,
@@ -1114,6 +1121,18 @@ export class PuzzleEngine {
     });
   }
 
+  advanceMoveTimeReductionTurns() {
+    if (!this.moveTimeReduction) return;
+    this.moveTimeReduction.turnsRemaining = Math.max(
+      0,
+      Math.trunc(Number(this.moveTimeReduction.turnsRemaining) || 0) - 1,
+    );
+    if (this.moveTimeReduction.turnsRemaining === 0) {
+      this.moveTimeReduction = null;
+      this.moveTime = this.baseMoveTime;
+    }
+  }
+
   advanceBlackOrbCountdowns() {
     this.board.forEach((row) => row.forEach((orb) => {
       if (!orb.blind) return;
@@ -1238,6 +1257,23 @@ export class PuzzleEngine {
     const materialized = this.materializeEnemySkillRecord(record, enemyIndex);
     const skill = normalizePadEnemySkillRecord(materialized);
     this.lastEnemySkill = skill;
+    if (skill.supported && skill.kind === 'moveTimeReduction') {
+      const turnsRemaining = Math.max(0, skill.durationTurns & 0x3ff);
+      this.moveTime = padEnemySkillMoveTimeSeconds(
+        this.baseMoveTime,
+        skill.fixedReductionCentiseconds,
+        skill.percentReduction,
+      );
+      this.moveTimeReduction = turnsRemaining > 0 ? {
+        turnsRemaining,
+        fixedReductionCentiseconds: (skill.fixedReductionCentiseconds << 16) >> 16,
+        percentReduction: (skill.percentReduction << 16) >> 16,
+        percentMode: ((skill.percentReduction << 16) >> 16) !== 0,
+      } : null;
+      if (!this.moveTimeReduction) this.moveTime = this.baseMoveTime;
+      this.message = `Move time reduced to ${this.moveTime.toFixed(2)} seconds.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'selfDestruct') {
       const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
       if (!enemy || enemy.hp <= 0) return false;
@@ -1439,6 +1475,7 @@ export class PuzzleEngine {
       const definition = definitionsById.get(slot.skillId);
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
       if (![
+        PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
         PAD_ENEMY_SKILL_SELF_DESTRUCT,
         PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
         PAD_ENEMY_SKILL_SCALED_ATTACK,
@@ -1969,6 +2006,9 @@ export class PuzzleEngine {
       comboDropBonusCount: this.comboDropBonusCount,
       turnNailCount: this.turnNailCount,
       topLineDropTypes: this.topLineDropTypes ? [...this.topLineDropTypes] : null,
+      baseMoveTimeSeconds: this.baseMoveTime,
+      moveTimeSeconds: this.moveTime,
+      moveTimeReduction: this.moveTimeReduction ? { ...this.moveTimeReduction } : null,
       blackFallRule: this.blackFallRule ? { ...this.blackFallRule } : null,
       thornFallRule: this.thornFallRule ? { ...this.thornFallRule } : null,
       nailFallRule: this.nailFallRule ? { ...this.nailFallRule } : null,

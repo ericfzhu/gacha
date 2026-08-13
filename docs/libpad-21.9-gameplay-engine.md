@@ -647,6 +647,32 @@ gate. An eligible fallback retains its authored `sENEAI+5` weight without
 scaling. The browser selector exposes this as `probabilityScale` while keeping
 the already decoded condition-owned RNG state transitions intact.
 
+Enemy skill type `39` applies the player move-time reduction status. Its late
+dispatch entry targets `0x629544`, setup targets `0x6217a8`, and AI condition
+targets `0x61b4f0`. Setup copies signed definition integers `+0x10`, `+0x14`,
+and `+0x18` to runtime `sMONSTER+0x678`, `+0x67c`, and `+0x680` respectively,
+without consuming RNG. They are duration, fixed centisecond reduction, and
+percentage reduction.
+
+The handler packs the duration's low ten bits into game-work status word
+`+0x871ec`, preserving its high status bits and setting the active `0x400`
+flag. When runtime `+0x680` is nonzero, native stores that signed value and
+selects percentage mode; otherwise it stores the signed fixed-centisecond
+value. Both paths use the protected signed-int16 field at `+0x871f0`, with the
+mode byte at `+0x87200`. `cGAMEMAIN::_resetTouchBar` (`0x675514`) then rebuilds
+the current move window from the player's base time: fixed mode subtracts
+centiseconds, while percentage mode subtracts the authored percentage. The
+browser carries that effective time into both the visible timer and the actual
+pointer deadline.
+
+The condition admits the skill while the status is inactive. An active status
+can only pass when native override byte `+0x87210` is nonzero, but ordinary
+execution clears that byte; normal reapplication is therefore rejected before
+the immediate probability test and consumes no RNG. Status duration advances
+at the start of a later enemy phase, so a newly applied two-turn reduction
+survives the next two player move windows. An admitted immediate record spends
+only its ordinary probability draw because setup itself is deterministic.
+
 Enemy skill type `40` makes the acting monster defeat itself. Its late dispatch
 entry targets `0x629660`, its setup entry targets the generic tail at
 `0x6217c0`, and its condition is the unconditional `1.0` return at `0x61a630`.

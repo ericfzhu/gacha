@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
+  PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
   PAD_ENEMY_SKILL_SELF_DESTRUCT,
   PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
   PAD_ENEMY_SKILL_SCALED_ATTACK,
@@ -32,6 +33,7 @@ import {
   padEnemySkillAttack,
   padEnemySkillAttributeCandidates,
   padEnemySkillCurrentHpGravity,
+  padEnemySkillMoveTimeSeconds,
   padEnemySkillPlayerHeal,
   padEnemySkillPlayerHpCondition,
   padEnemySkillReviveHp,
@@ -746,6 +748,58 @@ assert.deepEqual(
     attackWithSkillValue: 0,
   },
 );
+assert.equal(padEnemySkillMoveTimeSeconds(5, 125, 0), 3.75);
+assert.equal(padEnemySkillMoveTimeSeconds(5, 125, 40), 3);
+assert.equal(padEnemySkillMoveTimeSeconds(5, -100, 0), 6);
+const enemyAiMoveTimeReductionDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiMoveTimeReductionView = new DataView(enemyAiMoveTimeReductionDefinition.buffer);
+enemyAiMoveTimeReductionView.setUint32(0x00, 9_028, true);
+enemyAiMoveTimeReductionView.setInt16(0x04, PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION, true);
+enemyAiMoveTimeReductionView.setInt32(0x10, 2, true);
+enemyAiMoveTimeReductionView.setInt32(0x14, 125, true);
+enemyAiMoveTimeReductionView.setInt32(0x18, 0, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiMoveTimeReductionDefinition), {
+  type: 39,
+  kind: 'moveTimeReduction',
+  supported: true,
+  durationTurns: 2,
+  fixedReductionCentiseconds: 125,
+  percentReduction: 0,
+  attackWithSkillValue: 0,
+});
+const moveTimeReductionMonsterRuntime = new Uint8Array(0x684);
+const moveTimeReductionMonsterRuntimeView = new DataView(
+  moveTimeReductionMonsterRuntime.buffer,
+);
+moveTimeReductionMonsterRuntimeView.setInt32(0x678, 3, true);
+moveTimeReductionMonsterRuntimeView.setInt32(0x67c, 100, true);
+moveTimeReductionMonsterRuntimeView.setInt32(0x680, 40, true);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(
+    enemyAiMoveTimeReductionDefinition,
+    moveTimeReductionMonsterRuntime,
+  ),
+  {
+    type: 39,
+    kind: 'moveTimeReduction',
+    supported: true,
+    durationTurns: 3,
+    fixedReductionCentiseconds: 100,
+    percentReduction: 40,
+    setupMaterialized: true,
+    attackWithSkillValue: 0,
+  },
+);
+const moveTimeReductionRuntimeEngine = new PuzzleEngine({ seed: 21_900 });
+moveTimeReductionRuntimeEngine.setRngState(21_900);
+assert.equal(moveTimeReductionRuntimeEngine.applyEnemySkillRuntime(
+  enemyAiMoveTimeReductionDefinition,
+  moveTimeReductionMonsterRuntime,
+), true);
+assert.equal(moveTimeReductionRuntimeEngine.moveTime, 3);
+assert.equal(moveTimeReductionRuntimeEngine.moveTimeReduction.turnsRemaining, 3);
+assert.equal(moveTimeReductionRuntimeEngine.moveTimeReduction.percentMode, true);
+assert.equal(moveTimeReductionRuntimeEngine.rng.state, 21_900);
 const enemyAiSelfDestructDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiSelfDestructView = new DataView(enemyAiSelfDestructDefinition.buffer);
 enemyAiSelfDestructView.setUint32(0x00, 9_027, true);
@@ -2289,6 +2343,49 @@ rejectedHealPlayerEngine.player.hp = 3_060;
 rejectedHealPlayerEngine.setRngState(21_900);
 assert.equal(rejectedHealPlayerEngine.takeEnemySkill(0), null);
 assert.equal(rejectedHealPlayerEngine.rng.state, 21_900);
+const moveTimeReductionMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(moveTimeReductionMonsterDefinition.buffer).setUint32(0xec, 9_028, true);
+const selectedMoveTimeReductionEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: moveTimeReductionMonsterDefinition,
+    skillDefinitions: [enemyAiMoveTimeReductionDefinition],
+  }],
+});
+selectedMoveTimeReductionEngine.setRngState(21_900);
+selectedMoveTimeReductionEngine.enemies[0].counter = 1;
+selectedMoveTimeReductionEngine.enemies[1].counter = 99;
+selectedMoveTimeReductionEngine.resolveEnemyTurn();
+const selectedMoveTimeReductionState = selectedMoveTimeReductionEngine.snapshot();
+assert.equal(selectedMoveTimeReductionState.moveTimeSeconds, 3.75);
+assert.equal(selectedMoveTimeReductionState.moveTimeReduction.turnsRemaining, 2);
+assert.equal(selectedMoveTimeReductionState.lastEnemyActions[0].skill.type, 39);
+assert.equal(selectedMoveTimeReductionState.lastEnemyActions[0].skill.skillId, 9_028);
+assert.equal(selectedMoveTimeReductionState.enemies[0].enemyAiBudget, 80);
+assert.equal(selectedMoveTimeReductionEngine.rng.state, padLcgStep(21_900).state);
+selectedMoveTimeReductionEngine.start();
+assert.equal(selectedMoveTimeReductionEngine.startDrag(0, 0, 50, 50), true);
+assert.equal(selectedMoveTimeReductionEngine.drag.remaining, 3.75);
+selectedMoveTimeReductionEngine.drag = null;
+selectedMoveTimeReductionEngine.enemies[0].counter = 99;
+selectedMoveTimeReductionEngine.resolveEnemyTurn();
+assert.equal(selectedMoveTimeReductionEngine.moveTimeReduction.turnsRemaining, 1);
+selectedMoveTimeReductionEngine.resolveEnemyTurn();
+assert.equal(selectedMoveTimeReductionEngine.moveTimeReduction, null);
+assert.equal(selectedMoveTimeReductionEngine.moveTime, 5);
+const rejectedMoveTimeReductionEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: moveTimeReductionMonsterDefinition,
+    skillDefinitions: [enemyAiMoveTimeReductionDefinition],
+  }],
+});
+assert.equal(rejectedMoveTimeReductionEngine.applyEnemySkillDefinition(
+  enemyAiMoveTimeReductionDefinition,
+), true);
+rejectedMoveTimeReductionEngine.setRngState(21_900);
+assert.equal(rejectedMoveTimeReductionEngine.takeEnemySkill(0), null);
+assert.equal(rejectedMoveTimeReductionEngine.rng.state, 21_900);
 const selfDestructMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(selfDestructMonsterDefinition.buffer).setUint32(0xec, 9_027, true);
 const selectedSelfDestructEngine = new PuzzleEngine({

@@ -428,6 +428,15 @@ function render(ctx, engine) {
   ctx.fillStyle = '#8996ab';
   ctx.font = '600 9px "Noto Sans", sans-serif';
   ctx.fillText(engine.phase.toUpperCase(), 434, 43);
+  if (engine.moveTimeReduction) {
+    ctx.fillStyle = '#f6b9ff';
+    ctx.font = '700 9px "Barlow Condensed", sans-serif';
+    ctx.fillText(
+      `MOVE ${engine.moveTime.toFixed(2)}s · ${engine.moveTimeReduction.turnsRemaining}T`,
+      434,
+      57,
+    );
+  }
 
   const visibleTarget = engine.manualTarget ? engine.targetEnemy : -1;
   engine.enemies.forEach((enemy, index) => drawEnemy(ctx, enemy, index, visibleTarget, engine.visualTime));

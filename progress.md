@@ -2,6 +2,22 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 enemy move-time reduction
+
+- Identified enemy skill type `39` as the player move-time reduction status:
+  late handler `0x629544`, setup `0x6217a8`, and condition `0x61b4f0`.
+  Definition `+0x10/+0x14/+0x18` materializes duration, fixed centiseconds,
+  and percentage reduction at runtime `sMONSTER+0x678/+0x67c/+0x680`.
+- A nonzero percentage field selects percentage mode; otherwise the signed
+  fixed field is subtracted from the base touch time. The handler stores the
+  signed value in protected game-work state and packs the duration into the
+  native low-ten-bit status counter.
+- Ported definition/runtime decoding, exact immediate-AI RNG behavior,
+  reapplication rejection, active drag deadlines, turn countdown, snapshots,
+  status rendering, browser fixtures, and exact table/symbol checks including
+  `cGAMEMAIN::_resetTouchBar` at `0x675514`.
+- Next: inspect the next real pre-39 enemy action.
+
 ## 2026-08-14 enemy self-defeat
 
 - Identified enemy skill type `40` as an unconditional self-defeat action:

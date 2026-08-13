@@ -24,6 +24,10 @@ const HEAL_PLAYER_ENEMY_SKILL_TYPE = 55;
 const HEAL_PLAYER_HANDLER = 0x629900;
 const HEAL_PLAYER_SETUP_HANDLER = 0x620040;
 const HEAL_PLAYER_CONDITION_HANDLER = 0x61aa74;
+const MOVE_TIME_REDUCTION_ENEMY_SKILL_TYPE = 39;
+const MOVE_TIME_REDUCTION_HANDLER = 0x629544;
+const MOVE_TIME_REDUCTION_SETUP_HANDLER = 0x6217a8;
+const MOVE_TIME_REDUCTION_CONDITION_HANDLER = 0x61b4f0;
 const SELF_DESTRUCT_ENEMY_SKILL_TYPE = 40;
 const SELF_DESTRUCT_HANDLER = 0x629660;
 const SELF_DESTRUCT_SETUP_HANDLER = 0x6217c0;
@@ -123,6 +127,7 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['input', 'swapBlockMain', '_ZN9cGAMEMAIN14_swapBlockMainEP6sBLOCKS1_', 0x67a7a0],
   ['input', 'swapBlock', '_ZN9cGAMEMAIN10_swapBlockEbP6sBLOCKS1_', 0x67ab14],
   ['input', 'gamePhaseMove', '_ZN9cGAMEMAIN14_gamePhaseMoveEv', 0x680854],
+  ['input', 'resetTouchBar', '_ZN9cGAMEMAIN14_resetTouchBarEv', 0x675514],
   ['board', 'getBoardSize', '_ZNK9cGAMEMAIN13_getBoardSizeEP9IS_V2D_SB', 0x651f24],
   ['board', 'getRandomBlock', '_ZN9cGAMEMAIN15_getRandomBlockEibb', 0x617874],
   ['board', 'getRandomBlockOnFace', '_ZN9cGAMEMAIN21_getRandomBlockOnFaceEPibbb', 0x6179fc],
@@ -285,6 +290,27 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : healPlayerSetupTarget === HEAL_PLAYER_SETUP_HANDLER;
   const healPlayerConditionMatches = healPlayerConditionTarget === null
     ? null : healPlayerConditionTarget === HEAL_PLAYER_CONDITION_HANDLER;
+  const moveTimeReductionDispatchTarget = resolveEnemySkillTarget(
+    MOVE_TIME_REDUCTION_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const moveTimeReductionSetupTarget = resolveEnemySkillTarget(
+    MOVE_TIME_REDUCTION_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const moveTimeReductionConditionTarget = resolveEnemySkillTarget(
+    MOVE_TIME_REDUCTION_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const moveTimeReductionDispatchMatches = moveTimeReductionDispatchTarget === null
+    ? null : moveTimeReductionDispatchTarget === MOVE_TIME_REDUCTION_HANDLER;
+  const moveTimeReductionSetupMatches = moveTimeReductionSetupTarget === null
+    ? null : moveTimeReductionSetupTarget === MOVE_TIME_REDUCTION_SETUP_HANDLER;
+  const moveTimeReductionConditionMatches = moveTimeReductionConditionTarget === null
+    ? null : moveTimeReductionConditionTarget === MOVE_TIME_REDUCTION_CONDITION_HANDLER;
   const selfDestructDispatchTarget = resolveEnemySkillTarget(
     SELF_DESTRUCT_ENEMY_SKILL_TYPE,
     ENEMY_SKILL_DISPATCH_TABLE,
@@ -1051,6 +1077,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       healPlayerDispatchMatches21_9: healPlayerDispatchMatches,
       healPlayerSetupMatches21_9: healPlayerSetupMatches,
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
+      moveTimeReductionDispatchMatches21_9: moveTimeReductionDispatchMatches,
+      moveTimeReductionSetupMatches21_9: moveTimeReductionSetupMatches,
+      moveTimeReductionConditionMatches21_9: moveTimeReductionConditionMatches,
       selfDestructDispatchMatches21_9: selfDestructDispatchMatches,
       selfDestructSetupMatches21_9: selfDestructSetupMatches,
       selfDestructConditionMatches21_9: selfDestructConditionMatches,
@@ -1146,6 +1175,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       monsterAttackWithSkillOffset: 'sMONSTER+0x7e8 (uint32 converted to float32 / 100)',
       monsterDurationOffset: 'sMONSTER+0x678 (packed low 10 bits)',
       monsterHealPercentOffset: 'sMONSTER+0x678 (type 55 signed int32 percent)',
+      moveTimeDurationOffset: 'sMONSTER+0x678 (type 39 packed low 10 bits)',
+      moveTimeFixedReductionOffset: 'sMONSTER+0x67c (type 39 signed centiseconds)',
+      moveTimePercentReductionOffset: 'sMONSTER+0x680 (type 39 nonzero selects percent mode)',
       monsterCurrentHpOffset: 'sMONSTER+0x3c/+0x4c (protected int64; type 40 writes zero)',
       monsterDisplayedHpOffset: 'sMONSTER+0xd4/+0xe4 (protected int64 mirror; type 40 writes zero)',
       monsterAttributeTargetOffset: 'sMONSTER+0x678 (type 46 signed attribute index)',
@@ -1176,6 +1208,16 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       healPlayerConditionTarget: healPlayerConditionTarget === null
         ? null : hex(healPlayerConditionTarget),
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
+      moveTimeReductionType: MOVE_TIME_REDUCTION_ENEMY_SKILL_TYPE,
+      moveTimeReductionDispatchTarget: moveTimeReductionDispatchTarget === null
+        ? null : hex(moveTimeReductionDispatchTarget),
+      moveTimeReductionDispatchMatches21_9: moveTimeReductionDispatchMatches,
+      moveTimeReductionSetupTarget: moveTimeReductionSetupTarget === null
+        ? null : hex(moveTimeReductionSetupTarget),
+      moveTimeReductionSetupMatches21_9: moveTimeReductionSetupMatches,
+      moveTimeReductionConditionTarget: moveTimeReductionConditionTarget === null
+        ? null : hex(moveTimeReductionConditionTarget),
+      moveTimeReductionConditionMatches21_9: moveTimeReductionConditionMatches,
       selfDestructType: SELF_DESTRUCT_ENEMY_SKILL_TYPE,
       selfDestructDispatchTarget: selfDestructDispatchTarget === null
         ? null : hex(selfDestructDispatchTarget),
@@ -1482,6 +1524,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || blackFallDispatchMatches === false || blackFallSetupMatches === false
     || healPlayerDispatchMatches === false || healPlayerSetupMatches === false
     || healPlayerConditionMatches === false
+    || moveTimeReductionDispatchMatches === false || moveTimeReductionSetupMatches === false
+    || moveTimeReductionConditionMatches === false
     || selfDestructDispatchMatches === false || selfDestructSetupMatches === false
     || selfDestructConditionMatches === false || inactiveEnemySkillsMatch === false
     || changeAttributeDispatchMatches === false || changeAttributeSetupMatches === false
