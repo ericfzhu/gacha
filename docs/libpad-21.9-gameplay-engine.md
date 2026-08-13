@@ -192,13 +192,25 @@ byte at `+0`, the flag word is at `+4`, and the enhancement value is the float a
 `+8`. `setBlockPowup(type, float, bool)` compares and writes that value without
 coercing it to a boolean. `_doLockDropBits` tests and sets flag `0x800`; locking
 a special type also clears its enhancement value. The browser orb record
-therefore preserves a float32 `enhancementPower` and derives its visual
+therefore preserves a signed float32 `enhancementPower` and derives its visual
 `enhanced` flag from whether that value is positive. Locked orbs still move and
-match but are skipped by conversion skills. The classic pure-rules calculation
-currently treats each positive value as one enhanced orb and adds 6% per orb;
-the restored code proves numeric storage but not yet that the magnitude weights
-classic match damage, so the port does not invent that behavior. Original atlas
-overlays 22 and 25 render the enhanced and locked states.
+match but are skipped by conversion skills.
+
+The value is gameplay data, not merely an effect strength. `_checkXYdir`
+(`0x666c18`) marks every erased block with flag `0x40000`. Its final board pass
+tests that marker at `0x667a94`, loads the raw `sBLOCK+8` value at `0x667aa8` or
+`0x667acc`, and adds it into the match multiplier with a binary32 `fadd`/`str`
+pair at `0x667a6c`–`0x667a74`. The accumulator begins at `1.0f`; positive and
+negative values are both included. Earlier in the same routine, the value is
+compared with zero to maintain separate positive and negative counters, but it
+is not collapsed to either counter for damage. The familiar enhanced-orb state
+uses `+0.06`, so ordinary orbs retain the classic 6% behavior while modern or
+enemy-authored magnitudes remain exact. Each addition is narrowed separately;
+three ordinary boosts therefore produce binary32 `1.179999828338623`, not a
+single-rounded `float32(1 + 3 * 0.06)`. The browser match record now carries the
+resulting `enhancementMultiplier`; `enhancedCount` remains an effect and
+diagnostic count only. Original atlas overlays 22 and 25 render the enhanced and
+locked states.
 
 Bombs and burst drops are distinct native mechanisms. `_doMakeBurDrop` writes a
 one-byte descriptor at `sBLOCK+0x0c` on an otherwise normally typed orb;

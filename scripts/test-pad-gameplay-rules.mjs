@@ -11,6 +11,7 @@ import {
   padComboMultiplier,
   padComboLeaderMultiplier,
   padDamageAfterDefense,
+  padEnhancementPowerMultiplier,
   padEnhancedOrbMultiplier,
   padGetRandomBlock,
   padGetRandomBlockOnFace,
@@ -162,6 +163,7 @@ assert.deepEqual(shapeEngine.snapshot().turnMatches[0], {
   type: 'fire',
   size: 8,
   enhancedCount: 0,
+  enhancementMultiplier: 1,
   isMassAttack: true,
   isHorizontal: false,
   isVertical: false,
@@ -193,13 +195,16 @@ assert.equal(padDamageAfterDefense(10, 0.5, 999), 1);
 assert.equal(padDamageAfterDefense(3_000_000_000, 2, 100), 2_147_483_547);
 assert.equal(padDamageAfterDefense(3_000_000_000, 2, 100, 10_000_000_000), 5_999_999_900);
 assert.equal(padDamageAfterDefense(10, 0.5, 999, 2_147_483_647, 0), 0);
-assert.equal(padEnhancedOrbMultiplier(3), 1.18);
+assert.equal(padEnhancedOrbMultiplier(3), 1.179999828338623);
+assert.equal(padEnhancementPowerMultiplier([2.5, 0.25, -0.5]), 3.25);
 assert.equal(padNativeBaseAttackPower(100, [{ size: 3, enhancedCount: 3 }], 1), 118);
+assert.equal(padNativeBaseAttackPower(100, [{ size: 3, enhancementMultiplier: 3.25 }], 1), 325);
+assert.equal(padNativeBaseAttackPower(93_789, [{ size: 3, enhancedCount: 3 }], 1), 110_671);
 assert.equal(padNativeBaseAttackPower(101, [{ size: 3, enhancedCount: 3 }], 1), 120);
 assert.equal(padNativeBaseAttackPower(75, [{ size: 3, enhancedCount: 2 }], 1), 84);
 assert.equal(padNativeBaseAttackPower(100, [{ size: 3, enhancedCount: 0 }], 3, 0.5), 200);
-assert.equal(padNativeRecoveryPower([2], [{ size: 9, enhancedCount: 6 }], 7), 17);
-assert.equal(padNativeRecoveryPower([1, 2], [{ size: 13, enhancedCount: 10 }], 12), 63);
+assert.equal(padNativeRecoveryPower([2], [{ size: 9, enhancedCount: 6 }], 7), 16);
+assert.equal(padNativeRecoveryPower([1, 2], [{ size: 13, enhancedCount: 10 }], 12), 62);
 assert.equal(padNativeRecoveryPower(3, [{ size: 13, enhancedCount: 10 }], 12), 62);
 assert.equal(padNativeRecoveryPower([100], [{ size: 3, enhancedCount: 0 }], 3, 0.5), 200);
 assert.equal(padSecondaryAttributeAttack(900, 'fire', 'fire'), 90);
@@ -432,6 +437,21 @@ assert.equal(stateEngine.board[0][0].locked, true);
 stateEngine.setOrbState(0, 4, { enhancementPower: 1.75 });
 assert.equal(stateEngine.board[0][4].enhanced, true);
 assert.equal(stateEngine.snapshot().boardState[0][4].enhancementPower, 1.75);
+
+const enhancementPowerEngine = new PuzzleEngine({ seed: 4 });
+enhancementPowerEngine.setBoardFromCodes(['RRRHRD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD']);
+enhancementPowerEngine.setOrbState(0, 0, { enhancementPower: 2.5 });
+enhancementPowerEngine.setOrbState(0, 1, { enhancementPower: 0.25 });
+enhancementPowerEngine.setOrbState(0, 2, { enhancementPower: -0.5 });
+enhancementPowerEngine.start();
+enhancementPowerEngine.phase = 'detect';
+enhancementPowerEngine.advancePhase();
+const poweredFireMatch = enhancementPowerEngine.turnMatches.find((match) => match.type === 'fire');
+assert.equal(enhancementPowerEngine.board[0][2].enhanced, false);
+assert.equal(enhancementPowerEngine.board[0][2].enhancementPower, -0.5);
+assert.equal(poweredFireMatch.enhancedCount, 2);
+assert.equal(poweredFireMatch.enhancementMultiplier, 3.25);
+assert.equal(padNativeBaseAttackPower(100, [poweredFireMatch], 1), 325);
 
 const thornEngine = new PuzzleEngine({ seed: 5 });
 thornEngine.setBoardFromCodes(['RBGHLD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD']);

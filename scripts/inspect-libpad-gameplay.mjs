@@ -69,7 +69,8 @@ function usage() {
 const args = process.argv.slice(2);
 const json = args.includes('--json');
 const restoredFlag = args.indexOf('--restored');
-const inputPath = args.find((arg, index) => !arg.startsWith('--') && index !== restoredFlag + 1);
+const inputPath = args.find((arg, index) =>
+  !arg.startsWith('--') && (restoredFlag < 0 || index !== restoredFlag + 1));
 const restoredPath = restoredFlag >= 0 ? args[restoredFlag + 1] : null;
 if (!inputPath || restoredFlag >= 0 && !restoredPath) {
   usage();
@@ -126,6 +127,11 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       boardRowsOffset: 'cGAMEMAIN+0x71',
       diagonalModeOffset: 'cGAMEMAIN+0x75',
       boardBackingIndex: 'column + (row << 4)',
+      blockTypeOffset: 'sBLOCK+0x00 (signed byte)',
+      blockFlagsOffset: 'sBLOCK+0x04 (uint32)',
+      blockEnhancementOffset: 'sBLOCK+0x08 (signed float32)',
+      erasedBlockMarker: 'sBLOCK.flags & 0x40000',
+      matchEnhancementAccumulator: 'float32(1.0 + sequential sum of marked sBLOCK+0x08 values)',
     },
     symbols,
   };

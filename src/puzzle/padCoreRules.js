@@ -169,7 +169,28 @@ export function padMatchPower(attack, matchSizes) {
 }
 
 export function padEnhancedOrbMultiplier(enhancedCount) {
-  return 1 + PAD_ENHANCED_ORB_BONUS * Math.max(0, Number(enhancedCount) || 0);
+  const count = Math.max(0, Math.trunc(Number(enhancedCount) || 0));
+  return padEnhancementPowerMultiplier(Array(count).fill(PAD_ENHANCED_ORB_BONUS));
+}
+
+// _checkXYdir (0x666c18) starts this lane at 1.0f, then adds each matched
+// sBLOCK+0x08 value with an AArch64 fadd/str pair at 0x667a6c-0x667a74.
+// Preserve the sequential binary32 additions: modern data can provide values
+// other than the classic +0.06, including negative block-minus values.
+export function padEnhancementPowerMultiplier(enhancementPowers) {
+  const powers = Array.isArray(enhancementPowers) ? enhancementPowers : [enhancementPowers];
+  return powers.reduce((multiplier, power) => {
+    const numeric = Number(power);
+    return Math.fround(multiplier + Math.fround(Number.isFinite(numeric) ? numeric : 0));
+  }, Math.fround(1));
+}
+
+function padMatchEnhancementMultiplier(match) {
+  if (typeof match === 'number') return Math.fround(1);
+  if (Number.isFinite(Number(match.enhancementMultiplier))) {
+    return Math.fround(Number(match.enhancementMultiplier));
+  }
+  return Math.fround(padEnhancedOrbMultiplier(match.enhancedCount || 0));
 }
 
 function padFloat32Multiply(left, right) {
@@ -188,9 +209,8 @@ export function padNativeBaseAttackPower(attack, matchSizes, combos, extraComboB
   const comboMultiplier = Math.fround(padComboMultiplier(combos, extraComboBonus));
   const baseAttack = matchSizes.reduce((total, match) => {
     const size = typeof match === 'number' ? match : match.size;
-    const enhancedCount = typeof match === 'number' ? 0 : match.enhancedCount || 0;
     const orbScaled = padFloat32Multiply(attack, padOrbMatchMultiplier(size));
-    const enhancedScaled = padFloat32Multiply(orbScaled, padEnhancedOrbMultiplier(enhancedCount));
+    const enhancedScaled = padFloat32Multiply(orbScaled, padMatchEnhancementMultiplier(match));
     return total + Math.ceil(enhancedScaled);
   }, 0);
   return Math.ceil(padFloat32Multiply(baseAttack, comboMultiplier));
@@ -235,8 +255,7 @@ export function padNativeRecoveryPower(
   const cardRecoveries = Array.isArray(recoveries) ? recoveries : [recoveries];
   const matchPower = heartMatches.reduce((total, match) => {
     const size = typeof match === 'number' ? match : match.size;
-    const enhancedCount = typeof match === 'number' ? 0 : match.enhancedCount || 0;
-    const contribution = padFloat32Multiply(padOrbMatchMultiplier(size), padEnhancedOrbMultiplier(enhancedCount));
+    const contribution = padFloat32Multiply(padOrbMatchMultiplier(size), padMatchEnhancementMultiplier(match));
     return Math.fround(total + contribution);
   }, Math.fround(0));
   const comboMultiplier = Math.fround(padComboMultiplier(combos, extraComboBonus));

@@ -2,6 +2,7 @@ import {
   PAD_BOARD_COLUMNS,
   PAD_BOARD_ROWS,
   PAD_DEFAULT_MOVE_TIME_SECONDS,
+  PAD_ENHANCED_ORB_BONUS,
   PAD_INT32_MAX,
   createPadRng,
   findPadBombDetonations,
@@ -69,7 +70,7 @@ function clamp(value, min, max) {
 
 function normalizeEnhancementPower(value) {
   const numeric = Number(value);
-  return Math.fround(Math.max(0, Number.isFinite(numeric) ? numeric : 0));
+  return Math.fround(Number.isFinite(numeric) ? numeric : 0);
 }
 
 function copyEnemies() {
@@ -143,7 +144,7 @@ export class PuzzleEngine {
 
   createOrb(type, state = {}) {
     const enhancementPower = normalizeEnhancementPower(
-      state.enhancementPower === undefined ? (state.enhanced ? 1 : 0) : state.enhancementPower,
+      state.enhancementPower === undefined ? (state.enhanced ? PAD_ENHANCED_ORB_BONUS : 0) : state.enhancementPower,
     );
     return {
       id: ++this.orbSerial,
@@ -342,20 +343,29 @@ export class PuzzleEngine {
       }
       if (matches.length || bombResolution.cells.length) {
         this.pendingMatches = matches;
-        this.turnMatches.push(...matches.map((match) => ({
-          type: match.type,
-          size: match.size,
-          enhancedCount: match.cells.reduce((count, { row, column }) => count + (this.board[row][column]?.enhanced ? 1 : 0), 0),
-          isMassAttack: match.isMassAttack,
-          isHorizontal: match.isHorizontal,
-          isVertical: match.isVertical,
-          isRow: match.isRow,
-          isColumn: match.isColumn,
-          isBox: match.isBox,
-          isCross: match.isCross,
-          isL: match.isL,
-          cascadeDepth: this.cascadeDepth + 1,
-        })));
+        this.turnMatches.push(...matches.map((match) => {
+          const enhancement = match.cells.reduce((state, { row, column }) => {
+            const power = normalizeEnhancementPower(this.board[row][column]?.enhancementPower);
+            return {
+              enhancedCount: state.enhancedCount + (power > 0 ? 1 : 0),
+              enhancementMultiplier: Math.fround(state.enhancementMultiplier + power),
+            };
+          }, { enhancedCount: 0, enhancementMultiplier: Math.fround(1) });
+          return {
+            type: match.type,
+            size: match.size,
+            ...enhancement,
+            isMassAttack: match.isMassAttack,
+            isHorizontal: match.isHorizontal,
+            isVertical: match.isVertical,
+            isRow: match.isRow,
+            isColumn: match.isColumn,
+            isBox: match.isBox,
+            isCross: match.isCross,
+            isL: match.isL,
+            cascadeDepth: this.cascadeDepth + 1,
+          };
+        }));
         this.comboCount += matches.length;
         if (matches.length) this.cascadeDepth += 1;
         // libpad marks ordinary matches and unmatched-bomb blast cells in one
@@ -573,13 +583,17 @@ export class PuzzleEngine {
     const specialType = ['jammer', 'poison', 'mortalPoison', 'bomb'].includes(orb.type);
     const locked = state.locked === undefined ? orb.locked : Boolean(state.locked);
     const currentEnhancementPower = normalizeEnhancementPower(
-      orb.enhancementPower === undefined ? (orb.enhanced ? 1 : 0) : orb.enhancementPower,
+      orb.enhancementPower === undefined ? (orb.enhanced ? PAD_ENHANCED_ORB_BONUS : 0) : orb.enhancementPower,
     );
     const requestedEnhancementPower = state.enhancementPower !== undefined
       ? normalizeEnhancementPower(state.enhancementPower)
       : state.enhanced === undefined
         ? currentEnhancementPower
-        : state.enhanced ? (currentEnhancementPower || 1) : 0;
+        : state.enhanced
+          ? (currentEnhancementPower > 0
+              ? currentEnhancementPower
+              : normalizeEnhancementPower(PAD_ENHANCED_ORB_BONUS))
+          : 0;
     const enhancementPower = specialType && (thornPercent > 0 || locked)
       ? 0
       : requestedEnhancementPower;
