@@ -35,7 +35,9 @@ import {
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES,
+  PAD_ENEMY_SKILL_HORIZONTAL_LINES_4,
   PAD_ENEMY_SKILL_VERTICAL_LINES,
+  PAD_ENEMY_SKILL_VERTICAL_LINES_4,
   PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
   PAD_ENEMY_SKILL_BLOCK_MINUS,
   PAD_ENEMY_SKILL_BUR_DROP,
@@ -1025,8 +1027,8 @@ export class PuzzleEngine {
     if (skill.supported && (skill.kind === 'horizontalLines' || skill.kind === 'verticalLines')) {
       let effectFlags = 0;
       for (const swap of skill.lineSwaps) {
-        // _doEnemySkill types 77/79 share one `int &flags` across all three
-        // line-writer calls. A zero authored mask leaves it untouched.
+        // _doEnemySkill types 76-79 share one `int &flags` across their three
+        // or four line-writer calls. A zero authored mask leaves it untouched.
         if (swap.lineMask !== 0) {
           effectFlags = skill.kind === 'horizontalLines'
             ? this.doBlockSwapH(swap.lineMask, swap.destinationTypeMask, effectFlags)
@@ -1094,7 +1096,9 @@ export class PuzzleEngine {
       if (![
         PAD_ENEMY_SKILL_BLACK_FALL,
         PAD_ENEMY_SKILL_HORIZONTAL_LINES,
+        PAD_ENEMY_SKILL_HORIZONTAL_LINES_4,
         PAD_ENEMY_SKILL_VERTICAL_LINES,
+        PAD_ENEMY_SKILL_VERTICAL_LINES_4,
         PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
         PAD_ENEMY_SKILL_BLOCK_MINUS,
         PAD_ENEMY_SKILL_BUR_DROP,

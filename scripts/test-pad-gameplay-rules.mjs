@@ -3,7 +3,9 @@ import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES,
+  PAD_ENEMY_SKILL_HORIZONTAL_LINES_4,
   PAD_ENEMY_SKILL_VERTICAL_LINES,
+  PAD_ENEMY_SKILL_VERTICAL_LINES_4,
   PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
   PAD_ENEMY_SKILL_BLOCK_MINUS,
   PAD_ENEMY_SKILL_BUR_DROP,
@@ -472,6 +474,54 @@ assert.deepEqual(decodePadEnemySkillDefinition(enemyAiVerticalLinesDefinition), 
     { lineMask: 0b000001, destinationTypeMask: 1 << 0 },
     { lineMask: 0b000100, destinationTypeMask: 1 << 1 },
     { lineMask: 0b100000, destinationTypeMask: 1 << 2 },
+  ],
+  attackWithSkillValue: 0,
+});
+const enemyAiHorizontalLines4Definition = enemyAiHorizontalLinesDefinition.slice();
+const enemyAiHorizontalLines4View = new DataView(enemyAiHorizontalLines4Definition.buffer);
+enemyAiHorizontalLines4View.setUint32(0x00, 9_007, true);
+enemyAiHorizontalLines4View.setInt16(0x04, PAD_ENEMY_SKILL_HORIZONTAL_LINES_4, true);
+enemyAiHorizontalLines4View.setUint32(0x10, 0b10000, true);
+enemyAiHorizontalLines4View.setUint32(0x14, 1 << 0, true);
+enemyAiHorizontalLines4View.setUint32(0x18, 0b01000, true);
+enemyAiHorizontalLines4View.setUint32(0x1c, 1 << 1, true);
+enemyAiHorizontalLines4View.setUint32(0x20, 0b00010, true);
+enemyAiHorizontalLines4View.setUint32(0x24, 1 << 2, true);
+enemyAiHorizontalLines4View.setUint32(0x28, 0b00001, true);
+enemyAiHorizontalLines4View.setUint32(0x2c, 1 << 3, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiHorizontalLines4Definition), {
+  type: 78,
+  kind: 'horizontalLines',
+  supported: true,
+  lineSwaps: [
+    { lineMask: 0b10000, destinationTypeMask: 1 << 0 },
+    { lineMask: 0b01000, destinationTypeMask: 1 << 1 },
+    { lineMask: 0b00010, destinationTypeMask: 1 << 2 },
+    { lineMask: 0b00001, destinationTypeMask: 1 << 3 },
+  ],
+  attackWithSkillValue: 0,
+});
+const enemyAiVerticalLines4Definition = enemyAiHorizontalLines4Definition.slice();
+const enemyAiVerticalLines4View = new DataView(enemyAiVerticalLines4Definition.buffer);
+enemyAiVerticalLines4View.setUint32(0x00, 9_008, true);
+enemyAiVerticalLines4View.setInt16(0x04, PAD_ENEMY_SKILL_VERTICAL_LINES_4, true);
+enemyAiVerticalLines4View.setUint32(0x10, 0b000001, true);
+enemyAiVerticalLines4View.setUint32(0x14, 1 << 0, true);
+enemyAiVerticalLines4View.setUint32(0x18, 0b000010, true);
+enemyAiVerticalLines4View.setUint32(0x1c, 1 << 1, true);
+enemyAiVerticalLines4View.setUint32(0x20, 0b000100, true);
+enemyAiVerticalLines4View.setUint32(0x24, 1 << 2, true);
+enemyAiVerticalLines4View.setUint32(0x28, 0b100000, true);
+enemyAiVerticalLines4View.setUint32(0x2c, 1 << 3, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiVerticalLines4Definition), {
+  type: 76,
+  kind: 'verticalLines',
+  supported: true,
+  lineSwaps: [
+    { lineMask: 0b000001, destinationTypeMask: 1 << 0 },
+    { lineMask: 0b000010, destinationTypeMask: 1 << 1 },
+    { lineMask: 0b000100, destinationTypeMask: 1 << 2 },
+    { lineMask: 0b100000, destinationTypeMask: 1 << 3 },
   ],
   attackWithSkillValue: 0,
 });
@@ -1320,6 +1370,62 @@ for (let index = 0; index < 16; index += 1) {
 }
 assert.equal(selectedVerticalLinesAiEngine.rng.state, verticalLinesExpectedState);
 assert.equal(verticalLinesAiState.enemies[0].enemyAiBudget, 80);
+const horizontalLines4AiMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(horizontalLines4AiMonsterDefinition.buffer).setUint32(0xec, 9_007, true);
+const selectedHorizontalLines4AiEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: horizontalLines4AiMonsterDefinition,
+    skillDefinitions: [enemyAiHorizontalLines4Definition],
+  }],
+});
+selectedHorizontalLines4AiEngine.setBoardFromCodes([
+  'DDDDDD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD',
+]);
+selectedHorizontalLines4AiEngine.setRngState(21_900);
+selectedHorizontalLines4AiEngine.enemies[0].counter = 1;
+selectedHorizontalLines4AiEngine.enemies[1].counter = 99;
+selectedHorizontalLines4AiEngine.resolveEnemyTurn();
+const horizontalLines4AiState = selectedHorizontalLines4AiEngine.snapshot();
+assert.equal(horizontalLines4AiState.lastEnemyActions[0].skill.type, 78);
+assert.equal(horizontalLines4AiState.lastEnemyActions[0].skill.skillId, 9_007);
+assert.deepEqual(horizontalLines4AiState.board, [
+  'RRRRRR', 'BBBBBB', 'HMGDGL', 'GGGGGG', 'LLLLLL',
+]);
+let horizontalLines4ExpectedState = 21_900;
+for (let index = 0; index < 25; index += 1) {
+  horizontalLines4ExpectedState = padLcgStep(horizontalLines4ExpectedState).state;
+}
+assert.equal(selectedHorizontalLines4AiEngine.rng.state, horizontalLines4ExpectedState);
+assert.equal(horizontalLines4AiState.enemies[0].enemyAiBudget, 80);
+const verticalLines4AiMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(verticalLines4AiMonsterDefinition.buffer).setUint32(0xec, 9_008, true);
+const selectedVerticalLines4AiEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: verticalLines4AiMonsterDefinition,
+    skillDefinitions: [enemyAiVerticalLines4Definition],
+  }],
+});
+selectedVerticalLines4AiEngine.setBoardFromCodes([
+  'DDDDDD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD',
+]);
+selectedVerticalLines4AiEngine.setRngState(21_900);
+selectedVerticalLines4AiEngine.enemies[0].counter = 1;
+selectedVerticalLines4AiEngine.enemies[1].counter = 99;
+selectedVerticalLines4AiEngine.resolveEnemyTurn();
+const verticalLines4AiState = selectedVerticalLines4AiEngine.snapshot();
+assert.equal(verticalLines4AiState.lastEnemyActions[0].skill.type, 76);
+assert.equal(verticalLines4AiState.lastEnemyActions[0].skill.skillId, 9_008);
+assert.deepEqual(verticalLines4AiState.board, [
+  'RBGDDL', 'RBGHJL', 'RBGDGL', 'RBGHHL', 'RBGGLL',
+]);
+let verticalLines4ExpectedState = 21_900;
+for (let index = 0; index < 21; index += 1) {
+  verticalLines4ExpectedState = padLcgStep(verticalLines4ExpectedState).state;
+}
+assert.equal(selectedVerticalLines4AiEngine.rng.state, verticalLines4ExpectedState);
+assert.equal(verticalLines4AiState.enemies[0].enemyAiBudget, 80);
 const poisonTypeListAiMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(poisonTypeListAiMonsterDefinition.buffer).setUint32(0xec, 9_006, true);
 const selectedPoisonTypeListAiEngine = new PuzzleEngine({

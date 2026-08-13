@@ -672,6 +672,17 @@ one ordinary saved-LCG step before lock rejection. Thus three ordinary
 five-cell columns selected immediately from new AI consume 16 advances: one
 probability roll followed by fifteen rewrite rolls.
 
+Types `76` and `78` are the four-stage line variants. They share setup handler
+`0x61ff14` and unconditional AI condition `0x61a630` with types 77/79, but use
+all four definition pairs through `+0x28/+0x2c`. Their early dispatch entries
+are no-ops; the later table at `0xd3cbe0` resolves type 76 to `0x629c60`, which
+calls `_doBlockSwapV` four times, and type 78 to `0x629ce0`, which calls
+`_doBlockSwapH` four times. The same native effect accumulator and saved-LCG
+state cross all four calls. The browser therefore preserves the variant's
+original type ID and pair count instead of collapsing it into the three-stage
+records. Four disjoint six-cell rows spend 24 rewrite rolls plus one AI roll;
+four disjoint five-cell columns spend 20 plus one.
+
 Enemy skill type `81` converts poison-family cells through an explicit
 destination list. Its early dispatch entry resolves to `0x628de0`, setup to
 `0x620100`, and AI condition to the unconditional `0x61a630` handler. Setup

@@ -24,10 +24,18 @@ const HORIZONTAL_LINES_ENEMY_SKILL_TYPE = 79;
 const HORIZONTAL_LINES_HANDLER = 0x6287f8;
 const HORIZONTAL_LINES_SETUP_HANDLER = 0x61ff14;
 const HORIZONTAL_LINES_CONDITION_HANDLER = 0x61a630;
+const HORIZONTAL_LINES_4_ENEMY_SKILL_TYPE = 78;
+const HORIZONTAL_LINES_4_HANDLER = 0x629ce0;
+const HORIZONTAL_LINES_4_SETUP_HANDLER = 0x61ff14;
+const HORIZONTAL_LINES_4_CONDITION_HANDLER = 0x61a630;
 const VERTICAL_LINES_ENEMY_SKILL_TYPE = 77;
 const VERTICAL_LINES_HANDLER = 0x628d3c;
 const VERTICAL_LINES_SETUP_HANDLER = 0x61ff14;
 const VERTICAL_LINES_CONDITION_HANDLER = 0x61a630;
+const VERTICAL_LINES_4_ENEMY_SKILL_TYPE = 76;
+const VERTICAL_LINES_4_HANDLER = 0x629c60;
+const VERTICAL_LINES_4_SETUP_HANDLER = 0x61ff14;
+const VERTICAL_LINES_4_CONDITION_HANDLER = 0x61a630;
 const POISON_TYPE_LIST_ENEMY_SKILL_TYPE = 81;
 const POISON_TYPE_LIST_HANDLER = 0x628de0;
 const POISON_TYPE_LIST_SETUP_HANDLER = 0x620100;
@@ -243,6 +251,45 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
   const horizontalLinesConditionMatches = horizontalLinesConditionTarget === null
     ? null
     : horizontalLinesConditionTarget === HORIZONTAL_LINES_CONDITION_HANDLER;
+  const horizontalLines4DispatchEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      ENEMY_SKILL_DISPATCH_TABLE + (HORIZONTAL_LINES_4_ENEMY_SKILL_TYPE - 1) * 2,
+    )
+    : null;
+  const horizontalLines4SetupEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      ENEMY_SKILL_SETUP_TABLE + (HORIZONTAL_LINES_4_ENEMY_SKILL_TYPE - 1) * 2,
+    )
+    : null;
+  const horizontalLines4ConditionEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      ENEMY_SKILL_CONDITION_TABLE + (HORIZONTAL_LINES_4_ENEMY_SKILL_TYPE - 1) * 2,
+    )
+    : null;
+  const horizontalLines4DispatchTarget = horizontalLines4DispatchEntry === null
+    ? null
+    : ENEMY_SKILL_DISPATCH_BASE + horizontalLines4DispatchEntry * 4;
+  const horizontalLines4SetupTarget = horizontalLines4SetupEntry === null
+    ? null
+    : ENEMY_SKILL_SETUP_BASE + horizontalLines4SetupEntry * 4;
+  const horizontalLines4ConditionTarget = horizontalLines4ConditionEntry === null
+    ? null
+    : ENEMY_SKILL_CONDITION_BASE + horizontalLines4ConditionEntry * 4;
+  const horizontalLines4DispatchMatches = horizontalLines4DispatchTarget === null
+    ? null
+    : horizontalLines4DispatchTarget === HORIZONTAL_LINES_4_HANDLER;
+  const horizontalLines4SetupMatches = horizontalLines4SetupTarget === null
+    ? null
+    : horizontalLines4SetupTarget === HORIZONTAL_LINES_4_SETUP_HANDLER;
+  const horizontalLines4ConditionMatches = horizontalLines4ConditionTarget === null
+    ? null
+    : horizontalLines4ConditionTarget === HORIZONTAL_LINES_4_CONDITION_HANDLER;
   const verticalLinesDispatchEntry = restoredElf
     ? readUint16Virtual(
       restoredElf,
@@ -282,6 +329,45 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
   const verticalLinesConditionMatches = verticalLinesConditionTarget === null
     ? null
     : verticalLinesConditionTarget === VERTICAL_LINES_CONDITION_HANDLER;
+  const verticalLines4DispatchEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      ENEMY_SKILL_DISPATCH_TABLE + (VERTICAL_LINES_4_ENEMY_SKILL_TYPE - 1) * 2,
+    )
+    : null;
+  const verticalLines4SetupEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      ENEMY_SKILL_SETUP_TABLE + (VERTICAL_LINES_4_ENEMY_SKILL_TYPE - 1) * 2,
+    )
+    : null;
+  const verticalLines4ConditionEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      ENEMY_SKILL_CONDITION_TABLE + (VERTICAL_LINES_4_ENEMY_SKILL_TYPE - 1) * 2,
+    )
+    : null;
+  const verticalLines4DispatchTarget = verticalLines4DispatchEntry === null
+    ? null
+    : ENEMY_SKILL_DISPATCH_BASE + verticalLines4DispatchEntry * 4;
+  const verticalLines4SetupTarget = verticalLines4SetupEntry === null
+    ? null
+    : ENEMY_SKILL_SETUP_BASE + verticalLines4SetupEntry * 4;
+  const verticalLines4ConditionTarget = verticalLines4ConditionEntry === null
+    ? null
+    : ENEMY_SKILL_CONDITION_BASE + verticalLines4ConditionEntry * 4;
+  const verticalLines4DispatchMatches = verticalLines4DispatchTarget === null
+    ? null
+    : verticalLines4DispatchTarget === VERTICAL_LINES_4_HANDLER;
+  const verticalLines4SetupMatches = verticalLines4SetupTarget === null
+    ? null
+    : verticalLines4SetupTarget === VERTICAL_LINES_4_SETUP_HANDLER;
+  const verticalLines4ConditionMatches = verticalLines4ConditionTarget === null
+    ? null
+    : verticalLines4ConditionTarget === VERTICAL_LINES_4_CONDITION_HANDLER;
   const poisonTypeListDispatchEntry = restoredElf
     ? readUint16Virtual(
       restoredElf,
@@ -435,9 +521,15 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       horizontalLinesDispatchMatches21_9: horizontalLinesDispatchMatches,
       horizontalLinesSetupMatches21_9: horizontalLinesSetupMatches,
       horizontalLinesConditionMatches21_9: horizontalLinesConditionMatches,
+      horizontalLines4DispatchMatches21_9: horizontalLines4DispatchMatches,
+      horizontalLines4SetupMatches21_9: horizontalLines4SetupMatches,
+      horizontalLines4ConditionMatches21_9: horizontalLines4ConditionMatches,
       verticalLinesDispatchMatches21_9: verticalLinesDispatchMatches,
       verticalLinesSetupMatches21_9: verticalLinesSetupMatches,
       verticalLinesConditionMatches21_9: verticalLinesConditionMatches,
+      verticalLines4DispatchMatches21_9: verticalLines4DispatchMatches,
+      verticalLines4SetupMatches21_9: verticalLines4SetupMatches,
+      verticalLines4ConditionMatches21_9: verticalLines4ConditionMatches,
       poisonTypeListDispatchMatches21_9: poisonTypeListDispatchMatches,
       poisonTypeListSetupMatches21_9: poisonTypeListSetupMatches,
       poisonTypeListConditionMatches21_9: poisonTypeListConditionMatches,
@@ -486,6 +578,16 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       horizontalLinesConditionTarget: horizontalLinesConditionTarget === null
         ? null : hex(horizontalLinesConditionTarget),
       horizontalLinesConditionMatches21_9: horizontalLinesConditionMatches,
+      horizontalLines4Type: HORIZONTAL_LINES_4_ENEMY_SKILL_TYPE,
+      horizontalLines4DispatchTarget: horizontalLines4DispatchTarget === null
+        ? null : hex(horizontalLines4DispatchTarget),
+      horizontalLines4DispatchMatches21_9: horizontalLines4DispatchMatches,
+      horizontalLines4SetupTarget: horizontalLines4SetupTarget === null
+        ? null : hex(horizontalLines4SetupTarget),
+      horizontalLines4SetupMatches21_9: horizontalLines4SetupMatches,
+      horizontalLines4ConditionTarget: horizontalLines4ConditionTarget === null
+        ? null : hex(horizontalLines4ConditionTarget),
+      horizontalLines4ConditionMatches21_9: horizontalLines4ConditionMatches,
       verticalLinesType: VERTICAL_LINES_ENEMY_SKILL_TYPE,
       verticalLinesDispatchTarget: verticalLinesDispatchTarget === null
         ? null : hex(verticalLinesDispatchTarget),
@@ -496,6 +598,16 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       verticalLinesConditionTarget: verticalLinesConditionTarget === null
         ? null : hex(verticalLinesConditionTarget),
       verticalLinesConditionMatches21_9: verticalLinesConditionMatches,
+      verticalLines4Type: VERTICAL_LINES_4_ENEMY_SKILL_TYPE,
+      verticalLines4DispatchTarget: verticalLines4DispatchTarget === null
+        ? null : hex(verticalLines4DispatchTarget),
+      verticalLines4DispatchMatches21_9: verticalLines4DispatchMatches,
+      verticalLines4SetupTarget: verticalLines4SetupTarget === null
+        ? null : hex(verticalLines4SetupTarget),
+      verticalLines4SetupMatches21_9: verticalLines4SetupMatches,
+      verticalLines4ConditionTarget: verticalLines4ConditionTarget === null
+        ? null : hex(verticalLines4ConditionTarget),
+      verticalLines4ConditionMatches21_9: verticalLines4ConditionMatches,
       poisonTypeListType: POISON_TYPE_LIST_ENEMY_SKILL_TYPE,
       poisonTypeListDispatchTarget: poisonTypeListDispatchTarget === null
         ? null : hex(poisonTypeListDispatchTarget),
@@ -586,8 +698,12 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || blackFallDispatchMatches === false || blackFallSetupMatches === false
     || horizontalLinesDispatchMatches === false || horizontalLinesSetupMatches === false
     || horizontalLinesConditionMatches === false
+    || horizontalLines4DispatchMatches === false || horizontalLines4SetupMatches === false
+    || horizontalLines4ConditionMatches === false
     || verticalLinesDispatchMatches === false || verticalLinesSetupMatches === false
     || verticalLinesConditionMatches === false
+    || verticalLines4DispatchMatches === false || verticalLines4SetupMatches === false
+    || verticalLines4ConditionMatches === false
     || poisonTypeListDispatchMatches === false || poisonTypeListSetupMatches === false
     || poisonTypeListConditionMatches === false
     || blockMinusDispatchMatches === false || blockMinusSetupMatches === false

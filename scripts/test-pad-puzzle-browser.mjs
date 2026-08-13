@@ -639,6 +639,52 @@ try {
     engine.enemies[1].counter = 99;
     engine.resolveEnemyTurn();
     const selectedVerticalLinesAi = engine.snapshot();
+    const horizontalLines4AiMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(horizontalLines4AiMonsterDefinition.buffer).setUint32(0xec, 9_007, true);
+    const horizontalLines4AiDefinition = horizontalLinesAiDefinition.slice();
+    const horizontalLines4AiView = new DataView(horizontalLines4AiDefinition.buffer);
+    horizontalLines4AiView.setUint32(0x00, 9_007, true);
+    horizontalLines4AiView.setInt16(0x04, 78, true);
+    horizontalLines4AiView.setUint32(0x10, 0b10000, true);
+    horizontalLines4AiView.setUint32(0x14, 1 << 0, true);
+    horizontalLines4AiView.setUint32(0x18, 0b01000, true);
+    horizontalLines4AiView.setUint32(0x1c, 1 << 1, true);
+    horizontalLines4AiView.setUint32(0x20, 0b00010, true);
+    horizontalLines4AiView.setUint32(0x24, 1 << 2, true);
+    horizontalLines4AiView.setUint32(0x28, 0b00001, true);
+    horizontalLines4AiView.setUint32(0x2c, 1 << 3, true);
+    engine.setEnemyAiDefinitionPool(
+      0,
+      horizontalLines4AiMonsterDefinition,
+      [horizontalLines4AiDefinition],
+    );
+    engine.setBoardFromCodes(['DDDDDD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedHorizontalLines4Ai = engine.snapshot();
+    const verticalLines4AiMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(verticalLines4AiMonsterDefinition.buffer).setUint32(0xec, 9_008, true);
+    const verticalLines4AiDefinition = horizontalLines4AiDefinition.slice();
+    const verticalLines4AiView = new DataView(verticalLines4AiDefinition.buffer);
+    verticalLines4AiView.setUint32(0x00, 9_008, true);
+    verticalLines4AiView.setInt16(0x04, 76, true);
+    verticalLines4AiView.setUint32(0x10, 0b000001, true);
+    verticalLines4AiView.setUint32(0x14, 1 << 0, true);
+    verticalLines4AiView.setUint32(0x18, 0b000010, true);
+    verticalLines4AiView.setUint32(0x1c, 1 << 1, true);
+    verticalLines4AiView.setUint32(0x20, 0b000100, true);
+    verticalLines4AiView.setUint32(0x24, 1 << 2, true);
+    verticalLines4AiView.setUint32(0x28, 0b100000, true);
+    verticalLines4AiView.setUint32(0x2c, 1 << 3, true);
+    engine.setEnemyAiDefinitionPool(0, verticalLines4AiMonsterDefinition, [verticalLines4AiDefinition]);
+    engine.setBoardFromCodes(['DDDDDD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedVerticalLines4Ai = engine.snapshot();
     const poisonTypeListAiMonsterDefinition = enemyAiMonsterDefinition.slice();
     new DataView(poisonTypeListAiMonsterDefinition.buffer).setUint32(0xec, 9_006, true);
     const poisonTypeListAiDefinition = horizontalLinesAiDefinition.slice();
@@ -703,6 +749,7 @@ try {
       selectedBurDropAi, selectedBurDropCount,
       selectedHorizontalLinesAi,
       selectedVerticalLinesAi,
+      selectedHorizontalLines4Ai, selectedVerticalLines4Ai,
       selectedPoisonTypeListAi, selectedPoisonTypeListCounts,
       initialBoard, initialBoardState,
     };
@@ -843,6 +890,20 @@ try {
     poisonBlockSample.selectedVerticalLinesAi.enemies?.[0]?.enemyAiBudget !== 80 ||
     JSON.stringify(poisonBlockSample.selectedVerticalLinesAi.board) !== JSON.stringify([
       'RDBDDG', 'RLBHJG', 'RMBDGG', 'RLBHHG', 'RJBGLG',
+    ]) ||
+    poisonBlockSample.selectedHorizontalLines4Ai.lastEnemyActions?.[0]?.skill?.type !== 78 ||
+    poisonBlockSample.selectedHorizontalLines4Ai.lastEnemyActions?.[0]?.skill?.skillId !== 9_007 ||
+    poisonBlockSample.selectedHorizontalLines4Ai.rngState !== advanceLcg(21_900, 25) ||
+    poisonBlockSample.selectedHorizontalLines4Ai.enemies?.[0]?.enemyAiBudget !== 80 ||
+    JSON.stringify(poisonBlockSample.selectedHorizontalLines4Ai.board) !== JSON.stringify([
+      'RRRRRR', 'BBBBBB', 'HMGDGL', 'GGGGGG', 'LLLLLL',
+    ]) ||
+    poisonBlockSample.selectedVerticalLines4Ai.lastEnemyActions?.[0]?.skill?.type !== 76 ||
+    poisonBlockSample.selectedVerticalLines4Ai.lastEnemyActions?.[0]?.skill?.skillId !== 9_008 ||
+    poisonBlockSample.selectedVerticalLines4Ai.rngState !== advanceLcg(21_900, 21) ||
+    poisonBlockSample.selectedVerticalLines4Ai.enemies?.[0]?.enemyAiBudget !== 80 ||
+    JSON.stringify(poisonBlockSample.selectedVerticalLines4Ai.board) !== JSON.stringify([
+      'RBGDDL', 'RBGHJL', 'RBGDGL', 'RBGHHL', 'RBGGLL',
     ]) ||
     poisonBlockSample.selectedPoisonTypeListAi.lastEnemyActions?.[0]?.skill?.type !== 81 ||
     poisonBlockSample.selectedPoisonTypeListAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_006 ||

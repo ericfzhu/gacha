@@ -2,7 +2,9 @@ import { padLcgStep } from './padCoreRules.js';
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES,
+  PAD_ENEMY_SKILL_HORIZONTAL_LINES_4,
   PAD_ENEMY_SKILL_VERTICAL_LINES,
+  PAD_ENEMY_SKILL_VERTICAL_LINES_4,
   PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
   PAD_ENEMY_SKILL_BLOCK_MINUS,
   PAD_ENEMY_SKILL_BUR_DROP,
@@ -103,7 +105,9 @@ function isStaticallyEligible(definition, state) {
   if (!definition.effect.supported || ![
     PAD_ENEMY_SKILL_BLACK_FALL,
     PAD_ENEMY_SKILL_HORIZONTAL_LINES,
+    PAD_ENEMY_SKILL_HORIZONTAL_LINES_4,
     PAD_ENEMY_SKILL_VERTICAL_LINES,
+    PAD_ENEMY_SKILL_VERTICAL_LINES_4,
     PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
     PAD_ENEMY_SKILL_BLOCK_MINUS,
     PAD_ENEMY_SKILL_BUR_DROP,
@@ -122,7 +126,9 @@ function evaluateCondition(definition, state, rngState) {
   // unconditional 1.0 handler at 0x61a630, with no board dry run.
   if (
     definition.effect.type === PAD_ENEMY_SKILL_HORIZONTAL_LINES
+    || definition.effect.type === PAD_ENEMY_SKILL_HORIZONTAL_LINES_4
     || definition.effect.type === PAD_ENEMY_SKILL_VERTICAL_LINES
+    || definition.effect.type === PAD_ENEMY_SKILL_VERTICAL_LINES_4
     || definition.effect.type === PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP
   ) {
     return { eligible: true, rngState };

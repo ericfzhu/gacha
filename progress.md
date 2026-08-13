@@ -2,6 +2,26 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 four-stage enemy line rewrites
+
+- Mapped types `76` and `78` as the four-stage counterparts to the existing
+  type-77 vertical and type-79 horizontal rewrites. Both use unconditional AI
+  condition `0x61a630` and packed-pair setup `0x61ff14`.
+- Unlike the three-stage variants' early dispatch entries, type 76 executes at
+  later-table target `0x629c60` with four `_doBlockSwapV` calls and type 78 at
+  `0x629ce0` with four `_doBlockSwapH` calls. Their early entries are no-ops.
+- Extended raw decoding and normalization to preserve all four type IDs and to
+  read exactly three or four authored pairs as appropriate. Engine execution
+  continues the shared effect accumulator and ordinary LCG stream across every
+  nonzero pair.
+- Pure and browser fixtures select skill IDs 9007/9008, prove exact rewritten
+  rows/columns, consume 25/21 LCG advances respectively, and update each AI
+  budget 100 -> 80. The restored-image inspector checks all six new table
+  relationships. Rule tests, production build, exhaustive browser suite,
+  generic gameplay client, and both visual captures pass.
+- Next: commit the pair as one coherent native family, then continue the
+  remaining dispatch audit.
+
 ## 2026-08-14 enemy poison type-list conversion
 
 - Mapped enemy skill type `81` to unconditional condition `0x61a630`, setup
