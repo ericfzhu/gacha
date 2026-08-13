@@ -33,6 +33,25 @@ try {
   }
 
   const state = JSON.parse(await page.evaluate(() => window.render_game_to_text()));
+  const requestedFiles = new Set(state.platform?.files?.map(({ path }) => path));
+  if (state.phase !== 'native game running' || !state.probe?.passed || state.elf?.lifecycleExports !== 6 ||
+      state.elf?.deepInstructions < 100_000_000 || state.frame < 100 || state.drawCalls < 10_000 ||
+      state.touchCount < 4 || !requestedFiles.has('/data/user/0/jp.gungho.pad/files/data048.bin') ||
+      !requestedFiles.has('/data/user/0/jp.gungho.pad/cache/data030.bin')) {
+    throw new Error(`Native binary-port smoke test did not reach the verified content boundary: ${JSON.stringify({
+      phase: state.phase,
+      probePassed: state.probe?.passed,
+      lifecycleExports: state.elf?.lifecycleExports,
+      deepInstructions: state.elf?.deepInstructions,
+      frame: state.frame,
+      drawCalls: state.drawCalls,
+      touchCount: state.touchCount,
+      requestedFiles: [...requestedFiles].filter((path) => /data0(?:30|48)\.bin$/.test(path)),
+    })}`);
+  }
+  if (consoleMessages.some((message) => /error|pageerror/i.test(message))) {
+    throw new Error(`Native binary-port browser errors: ${consoleMessages.join('; ')}`);
+  }
   await page.screenshot({ path: outputPath, fullPage: true });
   if (state.phase === 'native game running') {
     await page.locator('canvas[aria-label="Puzzle and Dragons native browser port"]').screenshot({ path: `${outputPath}.game.png` });

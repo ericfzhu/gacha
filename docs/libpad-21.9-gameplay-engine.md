@@ -338,6 +338,12 @@ canonicalizes selected names to Android's case-sensitive private paths:
 `.bin` files under `files/`. This also makes uppercase host filenames usable
 without changing the path requested by `libpad.so`.
 
+The full browser smoke test treats this as a verified execution boundary, not
+just a rendered screenshot: it requires the exact-library probe, all six
+lifecycle exports, more than 100 million interpreted guest instructions, more
+than 100 frames and 10,000 translated draws, four delivered touch callbacks,
+and both missing-data requests with no console errors.
+
 This is a content boundary, not a CPU-port failure: protection, JNI, lifecycle,
 rendering, frames, and touch callbacks are all running. The remaining work for a
 fully populated offline client is downloaded data/schema recovery and coverage
