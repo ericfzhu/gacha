@@ -40,6 +40,10 @@ const POISON_TYPE_LIST_ENEMY_SKILL_TYPE = 81;
 const POISON_TYPE_LIST_HANDLER = 0x628de0;
 const POISON_TYPE_LIST_SETUP_HANDLER = 0x620100;
 const POISON_TYPE_LIST_CONDITION_HANDLER = 0x61a630;
+const POISON_TYPE_LIST_DIRECT_ENEMY_SKILL_TYPE = 80;
+const POISON_TYPE_LIST_DIRECT_HANDLER = 0x629d60;
+const POISON_TYPE_LIST_DIRECT_SETUP_HANDLER = 0x620100;
+const POISON_TYPE_LIST_DIRECT_CONDITION_HANDLER = 0x61a630;
 const BLOCK_MINUS_ENEMY_SKILL_TYPE = 151;
 const BLOCK_MINUS_HANDLER = 0x62afd0;
 const BLOCK_MINUS_SETUP_HANDLER = 0x6217c0;
@@ -407,6 +411,45 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
   const poisonTypeListConditionMatches = poisonTypeListConditionTarget === null
     ? null
     : poisonTypeListConditionTarget === POISON_TYPE_LIST_CONDITION_HANDLER;
+  const poisonTypeListDirectDispatchEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      ENEMY_SKILL_DISPATCH_TABLE + (POISON_TYPE_LIST_DIRECT_ENEMY_SKILL_TYPE - 1) * 2,
+    )
+    : null;
+  const poisonTypeListDirectSetupEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      ENEMY_SKILL_SETUP_TABLE + (POISON_TYPE_LIST_DIRECT_ENEMY_SKILL_TYPE - 1) * 2,
+    )
+    : null;
+  const poisonTypeListDirectConditionEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      ENEMY_SKILL_CONDITION_TABLE + (POISON_TYPE_LIST_DIRECT_ENEMY_SKILL_TYPE - 1) * 2,
+    )
+    : null;
+  const poisonTypeListDirectDispatchTarget = poisonTypeListDirectDispatchEntry === null
+    ? null
+    : ENEMY_SKILL_DISPATCH_BASE + poisonTypeListDirectDispatchEntry * 4;
+  const poisonTypeListDirectSetupTarget = poisonTypeListDirectSetupEntry === null
+    ? null
+    : ENEMY_SKILL_SETUP_BASE + poisonTypeListDirectSetupEntry * 4;
+  const poisonTypeListDirectConditionTarget = poisonTypeListDirectConditionEntry === null
+    ? null
+    : ENEMY_SKILL_CONDITION_BASE + poisonTypeListDirectConditionEntry * 4;
+  const poisonTypeListDirectDispatchMatches = poisonTypeListDirectDispatchTarget === null
+    ? null
+    : poisonTypeListDirectDispatchTarget === POISON_TYPE_LIST_DIRECT_HANDLER;
+  const poisonTypeListDirectSetupMatches = poisonTypeListDirectSetupTarget === null
+    ? null
+    : poisonTypeListDirectSetupTarget === POISON_TYPE_LIST_DIRECT_SETUP_HANDLER;
+  const poisonTypeListDirectConditionMatches = poisonTypeListDirectConditionTarget === null
+    ? null
+    : poisonTypeListDirectConditionTarget === POISON_TYPE_LIST_DIRECT_CONDITION_HANDLER;
   const blockMinusDispatchEntry = restoredElf
     ? readUint16Virtual(
       restoredElf,
@@ -533,6 +576,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       poisonTypeListDispatchMatches21_9: poisonTypeListDispatchMatches,
       poisonTypeListSetupMatches21_9: poisonTypeListSetupMatches,
       poisonTypeListConditionMatches21_9: poisonTypeListConditionMatches,
+      poisonTypeListDirectDispatchMatches21_9: poisonTypeListDirectDispatchMatches,
+      poisonTypeListDirectSetupMatches21_9: poisonTypeListDirectSetupMatches,
+      poisonTypeListDirectConditionMatches21_9: poisonTypeListDirectConditionMatches,
       blockMinusDispatchMatches21_9: blockMinusDispatchMatches,
       blockMinusSetupMatches21_9: blockMinusSetupMatches,
       blockMinusConditionMatches21_9: blockMinusConditionMatches,
@@ -618,6 +664,16 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       poisonTypeListConditionTarget: poisonTypeListConditionTarget === null
         ? null : hex(poisonTypeListConditionTarget),
       poisonTypeListConditionMatches21_9: poisonTypeListConditionMatches,
+      poisonTypeListDirectType: POISON_TYPE_LIST_DIRECT_ENEMY_SKILL_TYPE,
+      poisonTypeListDirectDispatchTarget: poisonTypeListDirectDispatchTarget === null
+        ? null : hex(poisonTypeListDirectDispatchTarget),
+      poisonTypeListDirectDispatchMatches21_9: poisonTypeListDirectDispatchMatches,
+      poisonTypeListDirectSetupTarget: poisonTypeListDirectSetupTarget === null
+        ? null : hex(poisonTypeListDirectSetupTarget),
+      poisonTypeListDirectSetupMatches21_9: poisonTypeListDirectSetupMatches,
+      poisonTypeListDirectConditionTarget: poisonTypeListDirectConditionTarget === null
+        ? null : hex(poisonTypeListDirectConditionTarget),
+      poisonTypeListDirectConditionMatches21_9: poisonTypeListDirectConditionMatches,
       blockMinusType: BLOCK_MINUS_ENEMY_SKILL_TYPE,
       blockMinusDispatchTarget: blockMinusDispatchTarget === null ? null : hex(blockMinusDispatchTarget),
       blockMinusDispatchMatches21_9: blockMinusDispatchMatches,
@@ -706,6 +762,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || verticalLines4ConditionMatches === false
     || poisonTypeListDispatchMatches === false || poisonTypeListSetupMatches === false
     || poisonTypeListConditionMatches === false
+    || poisonTypeListDirectDispatchMatches === false || poisonTypeListDirectSetupMatches === false
+    || poisonTypeListDirectConditionMatches === false
     || blockMinusDispatchMatches === false || blockMinusSetupMatches === false
     || blockMinusConditionMatches === false
     || burDropDispatchMatches === false || burDropSetupMatches === false

@@ -7,6 +7,7 @@ import {
   PAD_ENEMY_SKILL_VERTICAL_LINES,
   PAD_ENEMY_SKILL_VERTICAL_LINES_4,
   PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
+  PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT,
   PAD_ENEMY_SKILL_BLOCK_MINUS,
   PAD_ENEMY_SKILL_BUR_DROP,
   decodePadEnemySkillDefinition,
@@ -539,6 +540,21 @@ assert.deepEqual(decodePadEnemySkillDefinition(enemyAiPoisonTypeListDefinition),
   kind: 'poisonTypeListSwap',
   supported: true,
   presentationValue: 12,
+  destinationTypes: [0, 1, 2, -1],
+  attackWithSkillValue: 0,
+});
+const enemyAiPoisonTypeListDirectDefinition = enemyAiPoisonTypeListDefinition.slice();
+const enemyAiPoisonTypeListDirectView = new DataView(enemyAiPoisonTypeListDirectDefinition.buffer);
+enemyAiPoisonTypeListDirectView.setUint32(0x00, 9_009, true);
+enemyAiPoisonTypeListDirectView.setInt16(0x04, PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT, true);
+enemyAiPoisonTypeListDirectView.setInt32(0x10, 0, true);
+enemyAiPoisonTypeListDirectView.setInt32(0x14, 1, true);
+enemyAiPoisonTypeListDirectView.setInt32(0x18, 2, true);
+enemyAiPoisonTypeListDirectView.setInt32(0x1c, -1, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiPoisonTypeListDirectDefinition), {
+  type: 80,
+  kind: 'poisonTypeListSwap',
+  supported: true,
   destinationTypes: [0, 1, 2, -1],
   attackWithSkillValue: 0,
 });
@@ -1457,6 +1473,30 @@ for (let index = 0; index < 31; index += 1) {
 }
 assert.equal(selectedPoisonTypeListAiEngine.rng.state, poisonTypeListExpectedState);
 assert.equal(poisonTypeListAiState.enemies[0].enemyAiBudget, 80);
+const poisonTypeListDirectAiMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(poisonTypeListDirectAiMonsterDefinition.buffer).setUint32(0xec, 9_009, true);
+const selectedPoisonTypeListDirectAiEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: poisonTypeListDirectAiMonsterDefinition,
+    skillDefinitions: [enemyAiPoisonTypeListDirectDefinition],
+  }],
+});
+selectedPoisonTypeListDirectAiEngine.setBoardFromCodes([
+  'PMPMPM', 'MPMPMP', 'PMPMPM', 'MPMPMP', 'PMPMPM',
+]);
+selectedPoisonTypeListDirectAiEngine.setRngState(21_900);
+selectedPoisonTypeListDirectAiEngine.enemies[0].counter = 1;
+selectedPoisonTypeListDirectAiEngine.enemies[1].counter = 99;
+selectedPoisonTypeListDirectAiEngine.resolveEnemyTurn();
+const poisonTypeListDirectAiState = selectedPoisonTypeListDirectAiEngine.snapshot();
+assert.equal(poisonTypeListDirectAiState.lastEnemyActions[0].skill.type, 80);
+assert.equal(poisonTypeListDirectAiState.lastEnemyActions[0].skill.skillId, 9_009);
+assert.deepEqual(['fire', 'water', 'wood'].map((type) => (
+  selectedPoisonTypeListDirectAiEngine.board.flat().filter((orb) => orb.type === type).length
+)), [12, 9, 9]);
+assert.equal(selectedPoisonTypeListDirectAiEngine.rng.state, poisonTypeListExpectedState);
+assert.equal(poisonTypeListDirectAiState.enemies[0].enemyAiBudget, 80);
 assert.equal(blackFallEngine.board[0][0].nail, false);
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);

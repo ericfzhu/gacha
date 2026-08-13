@@ -2,6 +2,23 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 direct poison type-list conversion
+
+- Mapped type `80` to unconditional condition `0x61a630`, shared setup
+  `0x620100`, and later dispatch handler `0x629d60`.
+- Distinguished its raw layout from type 81: type 80's four `_doBlockSwap2`
+  destinations occupy `+0x10/+0x14/+0x18/+0x1c`; type 81 uses `+0x10` for
+  presentation and shifts destinations forward one word.
+- Preserved type 80 through normalization and new-AI admission while sharing
+  the already exact poison/mortal-only conversion primitive.
+- Pure coverage selects skill ID 9009 and proves the same deterministic
+  12/9/9 fire-water-wood distribution and 31 total LCG advances as the paired
+  type-81 fixture. Exact table and browser coverage are in place. Rule tests,
+  production build, exhaustive browser suite, generic gameplay client, and
+  both visual captures pass.
+- Next: commit this shifted record variant independently, then resume the
+  remaining board-skill dispatch audit.
+
 ## 2026-08-14 four-stage enemy line rewrites
 
 - Mapped types `76` and `78` as the four-stage counterparts to the existing

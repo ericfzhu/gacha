@@ -3,6 +3,7 @@ export const PAD_ENEMY_SKILL_VERTICAL_LINES_4 = 76;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES = 77;
 export const PAD_ENEMY_SKILL_HORIZONTAL_LINES_4 = 78;
 export const PAD_ENEMY_SKILL_HORIZONTAL_LINES = 79;
+export const PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT = 80;
 export const PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP = 81;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -100,16 +101,22 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       attackWithSkillValue,
     });
   }
-  if (type === PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP) {
-    requireLength(definitionBytes, 0x24, 'PAD enemy-skill definition');
+  if (
+    type === PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT
+    || type === PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP
+  ) {
+    const destinationOffset = type === PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT ? 0x10 : 0x14;
+    requireLength(definitionBytes, destinationOffset + 0x10, 'PAD enemy-skill definition');
     return Object.freeze({
       type,
       kind: 'poisonTypeListSwap',
       supported: true,
-      presentationValue: definition.getInt32(0x10, true),
+      ...(type === PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP
+        ? { presentationValue: definition.getInt32(0x10, true) }
+        : {}),
       destinationTypes: Object.freeze(Array.from(
         { length: 4 },
-        (_, index) => definition.getInt32(0x14 + index * 4, true),
+        (_, index) => definition.getInt32(destinationOffset + index * 4, true),
       )),
       attackWithSkillValue,
     });
@@ -254,13 +261,22 @@ export function normalizePadEnemySkillRecord(record) {
       lineSwaps: Object.freeze(lineSwaps),
     });
   }
-  if (type === PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP || record?.kind === 'poisonTypeListSwap') {
+  if (
+    type === PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT
+    || type === PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP
+    || record?.kind === 'poisonTypeListSwap'
+  ) {
     const authoredTypes = Array.isArray(record?.destinationTypes) ? record.destinationTypes : [];
+    const poisonType = type === PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT
+      ? PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT
+      : PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP;
     return Object.freeze({
-      type: PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
+      type: poisonType,
       kind: 'poisonTypeListSwap',
       supported: true,
-      presentationValue: Math.trunc(Number(record?.presentationValue) || 0),
+      ...(poisonType === PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP
+        ? { presentationValue: Math.trunc(Number(record?.presentationValue) || 0) }
+        : {}),
       destinationTypes: Object.freeze(Array.from(
         { length: 4 },
         (_, index) => Math.trunc(Number(authoredTypes[index] ?? -1)),

@@ -703,6 +703,15 @@ does no dry run, so an immediately selected all-poison 6x5 fixture spends one
 selection roll and thirty cell rolls, yielding deterministic destination
 counts of 12 fire, 9 water, and 9 wood from seed 21900.
 
+Type `80` is the direct-layout counterpart. It shares setup handler `0x620100`
+and the unconditional `0x61a630` condition with type 81, but its late dispatch
+entry resolves to `0x629d60`. All four `_doBlockSwap2` destinations come from
+definition `+0x10/+0x14/+0x18/+0x1c`; there is no leading presentation word.
+The poison-family source selection, byte truncation, balancing, lock handling,
+and saved-LCG behavior are otherwise identical. Raw decoding keeps type 80 and
+its shifted field layout distinct even though both variants execute through
+the same browser primitive.
+
 Enemy skill type `151` connects that selector to the weakened-orb primitive.
 Its `_doEnemySkill` dispatch entry resolves to `0x62afd0`, which passes
 definition `+0x10` as the type mask, converts signed percentage `+0x14` through
