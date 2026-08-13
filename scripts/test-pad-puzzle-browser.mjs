@@ -372,6 +372,19 @@ try {
     const horizontalSwapState = engine.rng.state;
     const horizontalSwapTypes = [[0, 0], [0, 1], [4, 0]]
       .map(([row, column]) => engine.board[row][column].type);
+    engine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+    engine.setRngState(21_900);
+    const passiveBlockFlag = { poisonResist: true, jammerResist: true };
+    const passivePoisonFlags = engine.doBitReplace([0b11, 0, 0, 0, 0], 7, 4, passiveBlockFlag);
+    const passiveJammerFlags = engine.doBitReplace([0b11, 0, 0, 0, 0], 6, 2, passiveBlockFlag);
+    const passiveFixedState = engine.rng.state;
+    const passiveFixedTypes = engine.board[0].slice(0, 2).map((orb) => orb.type);
+    const passiveBlockFlagByte = passiveBlockFlag.byte;
+    const passiveLineFlag = { poisonResist: true };
+    const passiveLineFlags = engine.doBlockSwapV(1, 1 << 7, 8, passiveLineFlag);
+    const passiveLineState = engine.rng.state;
+    const passiveLineTypes = engine.board.map((row) => row[0].type);
+    const passiveLineFlagByte = passiveLineFlag.byte;
     engine.reset();
     engine.start();
     return {
@@ -387,6 +400,8 @@ try {
       skillSwapChanged, skillSwapState, skillSwapCounts, skillSwapFirst,
       verticalSwapFlags, verticalSwapState, verticalSwapTypes,
       horizontalSwapFlags, horizontalSwapState, horizontalSwapTypes,
+      passivePoisonFlags, passiveJammerFlags, passiveFixedState, passiveFixedTypes,
+      passiveBlockFlagByte, passiveLineFlags, passiveLineState, passiveLineTypes, passiveLineFlagByte,
     };
   }) : null;
   const advanceLcg = (state, count) => {
@@ -433,7 +448,14 @@ try {
     poisonBlockSample.verticalSwapFlags !== 9 || poisonBlockSample.verticalSwapState !== 4_221_117_678 ||
     JSON.stringify(poisonBlockSample.verticalSwapTypes) !== JSON.stringify(['fire', 'heart', 'dark']) ||
     poisonBlockSample.horizontalSwapFlags !== 7 || poisonBlockSample.horizontalSwapState !== 2_782_038_744 ||
-    JSON.stringify(poisonBlockSample.horizontalSwapTypes) !== JSON.stringify(['dark', 'poison', 'jammer'])
+    JSON.stringify(poisonBlockSample.horizontalSwapTypes) !== JSON.stringify(['dark', 'poison', 'jammer']) ||
+    poisonBlockSample.passivePoisonFlags !== 4 || poisonBlockSample.passiveJammerFlags !== 2 ||
+    poisonBlockSample.passiveFixedState !== 21_900 ||
+    JSON.stringify(poisonBlockSample.passiveFixedTypes) !== JSON.stringify(['dark', 'dark']) ||
+    poisonBlockSample.passiveBlockFlagByte !== 0xbb || poisonBlockSample.passiveLineFlags !== 8 ||
+    poisonBlockSample.passiveLineState !== advanceLcg(21_900, 5) ||
+    JSON.stringify(poisonBlockSample.passiveLineTypes) !== JSON.stringify(Array(5).fill('dark')) ||
+    poisonBlockSample.passiveLineFlagByte !== 0x0b
   )) throw new Error(`Poison-block mismatch: ${JSON.stringify(poisonBlockSample)}`);
   if (renderAtlasSheet) {
     const sheet = page.locator('#pad-atlas-sheet');

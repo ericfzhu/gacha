@@ -320,11 +320,23 @@ The referenced integer is an accumulated presentation-category mask rather
 than a changed-cell count: ordinary colors and Bomb OR bit `1`, Poison/Mortal
 Poison OR bit `2`, and Jammer OR bit `4`; existing bits are preserved. The
 browser's `padResolveBitReplacements` and `PuzzleEngine.doBitReplace` implement
-the deterministic null-`sBLOCKFLAG` gameplay path, including lock rejection,
-per-cell random destinations, saved RNG state, category accumulation, and
-special-orb state clearing. Passive-skill resistance carried by a non-null
-`sBLOCKFLAG` remains part of the surrounding swap-family recovery rather than
-being guessed into this primitive.
+the deterministic gameplay path, including lock rejection, per-cell random
+destinations, saved RNG state, category accumulation, special-orb state
+clearing, and the non-null passive state described below.
+
+`makeBlockFlagByPassiveSkill(sBLOCKFLAG *, int)` at `0x6add50` lazily queries
+passive skill ID `12` for Jammer resistance and ID `13` for Poison resistance.
+Its shared byte uses bit `0x80` for “Jammer checked”, `0x10` for “Jammer
+resisted”, and `0x20` for “Jammer resistance presentation emitted”. Poison and
+Mortal Poison share the corresponding bits `0x08`, `0x01`, and `0x02`.
+`_doBlockSwapMain` suppresses a resisted special-orb write and sets its
+presentation bit on the first suppression. The caller has already performed
+cell selection and any random destination roll, so resistance never rewinds
+saved RNG state. Ordinary colors and Bomb bypass these passive checks.
+`padResolveBlockSwapPassive` exposes the byte contract, while every browser
+swap entry point that accepts `blockFlag` applies it after native-order
+selection. An object can provide `jammerResist`/`poisonResist` for the first
+lazy query and receives the persistent byte in its `byte` field.
 
 The public mask wrappers `_doBlockSwap4(uint16 destinationMask, sBLOCKFLAG *)`
 at `0x6af6cc` and `_doBlockSwap5(uint16 sourceMask, uint16 destinationMask,
@@ -346,8 +358,8 @@ cyclically from a random column/row for a donor assignment. Cells initially
 rolled to their current type remain untouched unless the fallback overwrites
 them. `padResolveBlockSwapNew`, `PuzzleEngine.doBlockSwap4`, and
 `PuzzleEngine.doBlockSwap5` reproduce both correction branches, mask expansion,
-poison aliasing, lock timing, effect flags, and special-orb mutation for the
-null-passive path.
+poison aliasing, lock timing, effect flags, and special-orb mutation for null
+and resisted-passive paths.
 
 Line writers `_doBlockSwapV(uint8 pattern, uint32 destinationMask, int &flags,
 sBLOCKFLAG *)` at `0x6ae64c` and `_doBlockSwapH(...)` at `0x6ae8fc` use patterns
@@ -364,7 +376,7 @@ including discarding an incoming effect-mask value. `padRelocateBoardXBits`,
 `padRelocateBoardYBits`, `padResolveLineBlockSwaps`, and the engine's
 `doBlockSwapV/H` methods reproduce canonical/noncanonical pattern placement,
 bottom-up row semantics, per-cell RNG, lock timing, effect flags, and special
-destination clearing for the null-passive path.
+destination clearing for null and resisted-passive paths.
 
 `_doBlockSwap2(int, int, int, int, sBLOCKFLAG *)` at `0x6af838` is the
 explicit-list sibling. Its first type is mandatory; it appends later arguments

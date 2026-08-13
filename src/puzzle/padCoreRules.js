@@ -679,6 +679,44 @@ export function padResolveSkillBoardSwap(state, skillTypes, boardTypes, lockedRo
   };
 }
 
+// makeBlockFlagByPassiveSkill (0x6add50) and _doBlockSwapMain share one byte:
+// checked jammer=0x80, jammer resistance=0x10, jammer presentation=0x20;
+// checked poison=0x08, poison resistance=0x01, poison presentation=0x02.
+// Resistance suppresses the write after all caller-side selection/RNG work.
+export function padResolveBlockSwapPassive(assignments, initialEffectFlags = 0, blockFlag = null) {
+  let byte = typeof blockFlag === 'number'
+    ? Number(blockFlag) & 0xff
+    : Number(blockFlag?.byte ?? 0) & 0xff;
+  let effectFlags = Number(initialEffectFlags) | 0;
+  const applied = [];
+  for (const assignment of Array.isArray(assignments) ? assignments : []) {
+    const type = Math.trunc(Number(assignment.type));
+    if (type === 6 && blockFlag !== null && blockFlag !== undefined) {
+      if ((byte & 0x80) === 0) {
+        byte |= 0x80;
+        if (typeof blockFlag === 'object' && blockFlag.jammerResist) byte |= 0x10;
+      }
+      if ((byte & 0x10) !== 0) {
+        byte |= 0x20;
+        continue;
+      }
+    } else if ((type === 7 || type === 8) && blockFlag !== null && blockFlag !== undefined) {
+      if ((byte & 0x08) === 0) {
+        byte |= 0x08;
+        if (typeof blockFlag === 'object' && blockFlag.poisonResist) byte |= 0x01;
+      }
+      if ((byte & 0x01) !== 0) {
+        byte |= 0x02;
+        continue;
+      }
+    }
+    effectFlags |= type === 6 ? 4 : type === 7 || type === 8 ? 2 : 1;
+    applied.push(assignment);
+  }
+  if (blockFlag && typeof blockFlag === 'object') blockFlag.byte = byte;
+  return { assignments: applied, effectFlags, blockFlag: byte };
+}
+
 // The same native routine builds its candidates from numeric block types
 // 0..5, optionally extends the range through jammer type 6, removes the type
 // supplied in w1, and can suppress heart type 5. It returns the first element

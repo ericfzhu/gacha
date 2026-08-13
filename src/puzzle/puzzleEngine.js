@@ -17,6 +17,7 @@ import {
   padNativeBaseAttackPower,
   padNativeRecoveryPower,
   padPoisonDamage,
+  padResolveBlockSwapPassive,
   padSecondaryAttributeAttack,
   padShuffleLockDropCandidates,
   padTertiaryAttributeAttack,
@@ -867,7 +868,7 @@ export class PuzzleEngine {
     ))), excludeHeart);
   }
 
-  doBitReplace(selectedRows, destinationType, initialEffectFlags = 0) {
+  doBitReplace(selectedRows, destinationType, initialEffectFlags = 0, blockFlag = null) {
     const boardTypes = this.board.map((row) => row.map((orb) => (
       ORB_TYPES.findIndex((candidate) => candidate.id === orb.type)
     )));
@@ -881,25 +882,18 @@ export class PuzzleEngine {
       lockedRows,
       initialEffectFlags,
     );
-    resolved.assignments.forEach(({ row, column, type }) => {
-      const orb = this.board[row][column];
-      orb.type = ORB_TYPES[type].id;
-      if (type >= 6) {
-        orb.blockFlags = (Number(orb.blockFlags) >>> 0) & ~PAD_BLOCK_SPECIAL_LOCK_CLEAR_FLAGS;
-        orb.enhancementPower = 0;
-        orb.enhanced = false;
-      }
-    });
-    return resolved.effectFlags;
+    const applied = padResolveBlockSwapPassive(resolved.assignments, initialEffectFlags, blockFlag);
+    this.applyBlockSwapAssignments(applied.assignments);
+    return applied.effectFlags;
   }
 
-  doBlockSwap5(sourceTypeMask, destinationTypeMask, initialEffectFlags = 0) {
+  doBlockSwap5(sourceTypeMask, destinationTypeMask, initialEffectFlags = 0, blockFlag = null) {
     const destinationMask = Number(destinationTypeMask) & 0xffff;
     const destinationTypes = [];
     for (let type = 0; type <= 9; type += 1) {
       if ((destinationMask & (1 << type)) !== 0) destinationTypes.push(type);
     }
-    return this.doBlockSwapTypes(destinationTypes, sourceTypeMask, initialEffectFlags);
+    return this.doBlockSwapTypes(destinationTypes, sourceTypeMask, initialEffectFlags, blockFlag);
   }
 
   doBlockSwap2(
@@ -908,6 +902,7 @@ export class PuzzleEngine {
     thirdType = -1,
     fourthType = -1,
     initialEffectFlags = 0,
+    blockFlag = null,
   ) {
     const destinationTypes = [];
     for (const value of [firstType, secondType, thirdType, fourthType]) {
@@ -915,7 +910,7 @@ export class PuzzleEngine {
       if (type < 0) break;
       if (type <= 9) destinationTypes.push(type);
     }
-    return this.doBlockSwapTypes(destinationTypes, 0, initialEffectFlags);
+    return this.doBlockSwapTypes(destinationTypes, 0, initialEffectFlags, blockFlag);
   }
 
   doBlockSwap3(skillTypes) {
@@ -939,7 +934,7 @@ export class PuzzleEngine {
     return resolved.assignments.length;
   }
 
-  doBlockSwapTypes(destinationTypes, sourceTypeMask, initialEffectFlags = 0) {
+  doBlockSwapTypes(destinationTypes, sourceTypeMask, initialEffectFlags = 0, blockFlag = null) {
     if (destinationTypes.length === 0) return Number(initialEffectFlags) | 0;
     const boardTypes = this.board.map((row) => row.map((orb) => (
       ORB_TYPES.findIndex((candidate) => candidate.id === orb.type)
@@ -954,7 +949,13 @@ export class PuzzleEngine {
       lockedRows,
       initialEffectFlags,
     );
-    resolved.assignments.forEach(({ row, column, type }) => {
+    const applied = padResolveBlockSwapPassive(resolved.assignments, initialEffectFlags, blockFlag);
+    this.applyBlockSwapAssignments(applied.assignments);
+    return applied.effectFlags;
+  }
+
+  applyBlockSwapAssignments(assignments) {
+    assignments.forEach(({ row, column, type }) => {
       const orb = this.board[row][column];
       orb.type = ORB_TYPES[type].id;
       if (type >= 6) {
@@ -963,22 +964,22 @@ export class PuzzleEngine {
         orb.enhanced = false;
       }
     });
-    return resolved.effectFlags;
   }
 
-  doBlockSwap4(destinationTypeMask, initialEffectFlags = 0) {
-    return this.doBlockSwap5(0, destinationTypeMask, initialEffectFlags);
+  doBlockSwap4(destinationTypeMask, initialEffectFlags = 0, blockFlag = null) {
+    return this.doBlockSwap5(0, destinationTypeMask, initialEffectFlags, blockFlag);
   }
 
-  doBlockSwapV(columnMask, destinationTypeMask, initialEffectFlags = 0) {
-    return this.doLineBlockSwap(columnMask, destinationTypeMask, 'vertical', initialEffectFlags);
+  doBlockSwapV(columnMask, destinationTypeMask, initialEffectFlags = 0, blockFlag = null) {
+    return this.doLineBlockSwap(columnMask, destinationTypeMask, 'vertical', initialEffectFlags, blockFlag);
   }
 
-  doBlockSwapH(rowMask, destinationTypeMask, initialEffectFlags = 0) {
-    return this.doLineBlockSwap(rowMask, destinationTypeMask, 'horizontal', initialEffectFlags);
+  doBlockSwapH(rowMask, destinationTypeMask, initialEffectFlags = 0, blockFlag = null) {
+    return this.doLineBlockSwap(rowMask, destinationTypeMask, 'horizontal', initialEffectFlags, blockFlag);
   }
 
-  doLineBlockSwap(lineMask, destinationTypeMask, orientation, initialEffectFlags) {
+  doLineBlockSwap(lineMask, destinationTypeMask, orientation, initialEffectFlags, blockFlag) {
+    if ((Number(lineMask) & 0xff) === 0) return 0;
     const boardTypes = this.board.map((row) => row.map((orb) => (
       ORB_TYPES.findIndex((candidate) => candidate.id === orb.type)
     )));
@@ -993,16 +994,9 @@ export class PuzzleEngine {
       lockedRows,
       initialEffectFlags,
     );
-    resolved.assignments.forEach(({ row, column, type }) => {
-      const orb = this.board[row][column];
-      orb.type = ORB_TYPES[type].id;
-      if (type >= 6) {
-        orb.blockFlags = (Number(orb.blockFlags) >>> 0) & ~PAD_BLOCK_SPECIAL_LOCK_CLEAR_FLAGS;
-        orb.enhancementPower = 0;
-        orb.enhanced = false;
-      }
-    });
-    return resolved.effectFlags;
+    const applied = padResolveBlockSwapPassive(resolved.assignments, initialEffectFlags, blockFlag);
+    this.applyBlockSwapAssignments(applied.assignments);
+    return applied.effectFlags;
   }
 
   isCell(row, column) {

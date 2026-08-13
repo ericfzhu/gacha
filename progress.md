@@ -2,6 +2,19 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 passive block-swap resistance
+
+- Recovered `makeBlockFlagByPassiveSkill` at `0x6add50`, including passive
+  skill IDs `12` (Jammer) and `13` (Poison), the shared checked/resisted/
+  presentation byte, and Poison/Mortal Poison aliasing.
+- Ported non-null `sBLOCKFLAG` behavior across bit, mask, explicit-list, and
+  line swap entry points. Resisted writes are suppressed only after native-order
+  selection and RNG work; ordinary colors and Bomb remain unaffected.
+- Added pure byte-state, engine, fixed-destination, pre-resistance RNG, and
+  browser fixtures. The exact inspector now checks 54 anchors.
+- Next: data-backed initial-board and skyfall constraints; preserve the private
+  account/server data boundary.
+
 ## 2026-08-14 skill-record full-board swaps
 
 - Recovered `_doBlockSwap3` at `0x6aea98` and the relevant skill record fields:

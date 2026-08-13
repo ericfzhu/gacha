@@ -23,6 +23,7 @@ import {
   padOrbMatchMultiplier,
   padPoisonDamage,
   padResolveBitReplacements,
+  padResolveBlockSwapPassive,
   padResolveBlockSwapNew,
   padResolveLineBlockSwaps,
   padResolveSkillBoardSwap,
@@ -301,6 +302,49 @@ assert.equal(horizontalLineSwap.assignments.length, 11);
 assert.ok(horizontalLineSwap.assignments.every(({ row }) => row === 0 || row === 4));
 assert.deepEqual(padResolveLineBlockSwaps(21_900, 0, 1, [[0]], 'vertical', null, 7), {
   state: 21_900, effectFlags: 0, assignments: [], relocatedMask: 0,
+});
+
+const poisonPassiveFlag = { poisonResist: true };
+assert.deepEqual(padResolveBlockSwapPassive([
+  { row: 0, column: 0, type: 7 },
+  { row: 0, column: 1, type: 8 },
+], 4, poisonPassiveFlag), {
+  assignments: [],
+  effectFlags: 4,
+  blockFlag: 0x0b,
+});
+assert.equal(poisonPassiveFlag.byte, 0x0b);
+const jammerPassiveFlag = { jammerResist: true };
+assert.deepEqual(padResolveBlockSwapPassive([
+  { row: 0, column: 0, type: 6 },
+  { row: 0, column: 1, type: 6 },
+], 2, jammerPassiveFlag), {
+  assignments: [],
+  effectFlags: 2,
+  blockFlag: 0xb0,
+});
+assert.equal(jammerPassiveFlag.byte, 0xb0);
+const checkedPassiveFlag = {};
+assert.deepEqual(padResolveBlockSwapPassive([
+  { row: 0, column: 0, type: 7 },
+  { row: 0, column: 1, type: 6 },
+], 0, checkedPassiveFlag), {
+  assignments: [
+    { row: 0, column: 0, type: 7 },
+    { row: 0, column: 1, type: 6 },
+  ],
+  effectFlags: 6,
+  blockFlag: 0x88,
+});
+assert.equal(checkedPassiveFlag.byte, 0x88);
+assert.deepEqual(padResolveBlockSwapPassive(
+  [{ row: 0, column: 0, type: 1 }],
+  0,
+  { jammerResist: true, poisonResist: true },
+), {
+  assignments: [{ row: 0, column: 0, type: 1 }],
+  effectFlags: 1,
+  blockFlag: 0,
 });
 const skillBoardSwap = padResolveSkillBoardSwap(
   21_900,
@@ -957,6 +1001,27 @@ assert.equal(lineSwapEngine.rng.state, 2_782_038_744);
 assert.equal(lineSwapEngine.board[0][0].type, 'dark');
 assert.equal(lineSwapEngine.board[0][1].type, 'poison');
 assert.equal(lineSwapEngine.board[4][0].type, 'jammer');
+assert.equal(lineSwapEngine.doBlockSwapV(0, 1 << 0, 7, { jammerResist: true }), 0);
+
+const passiveSwapEngine = new PuzzleEngine({ seed: 21_900 });
+passiveSwapEngine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+passiveSwapEngine.setRngState(21_900);
+const passiveBlockFlag = { poisonResist: true, jammerResist: true };
+assert.equal(passiveSwapEngine.doBitReplace([0b11, 0, 0, 0, 0], 7, 4, passiveBlockFlag), 4);
+assert.deepEqual(passiveSwapEngine.board[0].slice(0, 2).map((orb) => orb.type), ['dark', 'dark']);
+assert.equal(passiveSwapEngine.rng.state, 21_900);
+assert.equal(passiveBlockFlag.byte, 0x0b);
+assert.equal(passiveSwapEngine.doBitReplace([0b11, 0, 0, 0, 0], 6, 2, passiveBlockFlag), 2);
+assert.deepEqual(passiveSwapEngine.board[0].slice(0, 2).map((orb) => orb.type), ['dark', 'dark']);
+assert.equal(passiveSwapEngine.rng.state, 21_900);
+assert.equal(passiveBlockFlag.byte, 0xbb);
+const linePassiveFlag = { poisonResist: true };
+assert.equal(passiveSwapEngine.doBlockSwapV(1, 1 << 7, 8, linePassiveFlag), 8);
+assert.deepEqual(passiveSwapEngine.board.map((row) => row[0].type), Array(5).fill('dark'));
+let passiveLineExpectedState = 21_900;
+for (let index = 0; index < 5; index += 1) passiveLineExpectedState = padLcgStep(passiveLineExpectedState).state;
+assert.equal(passiveSwapEngine.rng.state, passiveLineExpectedState);
+assert.equal(linePassiveFlag.byte, 0x0b);
 assert.equal(specialLockEngine.doLockDropBits(0x3c0, 4, 0xbeef), true);
 for (let column = 0; column < 4; column += 1) {
   const orb = specialLockEngine.board[0][column];
