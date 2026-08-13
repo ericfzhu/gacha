@@ -33,6 +33,7 @@ import {
   tracePadPointerCells,
 } from './padCoreRules.js';
 import {
+  PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_SHIELD,
   PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
   PAD_ENEMY_SKILL_SELF_DESTRUCT,
@@ -65,7 +66,7 @@ import {
   decodePadEnemySkillRuntime,
   normalizePadEnemySkillRecord,
   padEnemySkillAttributeCandidates,
-  padEnemySkillAttack,
+  padEnemySkillBoostedAttack,
   padEnemySkillCurrentHpGravity,
   padEnemySkillMoveTimeSeconds,
   padEnemySkillPlayerHeal,
@@ -126,8 +127,8 @@ const PARTY = Object.freeze([
 ]);
 
 const ENEMY_TEMPLATE = Object.freeze([
-  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
-  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
+  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
+  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
 ]);
 
 function clamp(value, min, max) {
@@ -851,6 +852,7 @@ export class PuzzleEngine {
     // this order prevents a newly executed enemy skill from losing a turn
     // immediately on the same action boundary.
     this.advanceEnemyStatusShieldTurns();
+    this.advanceEnemyAttackBoostTurns();
     this.advanceEnemyAttributeAbsorbTurns();
     this.advanceMoveTimeReductionTurns();
     this.advanceBlackOrbCountdowns();
@@ -865,12 +867,23 @@ export class PuzzleEngine {
         enemy.counter = enemy.maxCounter;
         const skill = this.takeEnemySkill(index);
         if (skill) {
+          const activeBoostPercent = enemy.attackBoostTurns > 0
+            ? enemy.attackBoostPercent
+            : 100;
+          let damage = padEnemySkillBoostedAttack(
+            enemy.attack,
+            skill.attackWithSkillValue,
+            activeBoostPercent,
+          );
           this.applyEnemySkillRecord(skill, index);
-          let damage = padEnemySkillAttack(enemy.attack, skill.attackWithSkillValue);
           if (skill.kind === 'currentHpGravity') {
             damage = padEnemySkillCurrentHpGravity(this.player.hp - total, skill.damagePercent);
           } else if (skill.kind === 'scaledAttack') {
-            damage = padEnemySkillAttack(enemy.attack, skill.damagePercent);
+            damage = padEnemySkillBoostedAttack(
+              enemy.attack,
+              skill.damagePercent,
+              activeBoostPercent,
+            );
           }
           total += damage;
           this.lastEnemyActions.push({
@@ -884,9 +897,14 @@ export class PuzzleEngine {
           }
           return;
         }
-        total += enemy.attack;
-        this.lastEnemyActions.push({ enemy: index, kind: 'attack', damage: enemy.attack });
-        this.floatingText.push({ kind: 'enemy', value: enemy.attack, enemy: index, age: 0 });
+        const damage = padEnemySkillBoostedAttack(
+          enemy.attack,
+          100,
+          enemy.attackBoostTurns > 0 ? enemy.attackBoostPercent : 100,
+        );
+        total += damage;
+        this.lastEnemyActions.push({ enemy: index, kind: 'attack', damage });
+        this.floatingText.push({ kind: 'enemy', value: damage, enemy: index, age: 0 });
       }
     });
     if (total) {
@@ -915,6 +933,7 @@ export class PuzzleEngine {
       maxHp: enemy.maxHp,
       attributeAbsorbTurns: enemy.attributeAbsorbTurns,
       scaledAttackGate: enemy.scaledAttackGate,
+      enemyAttackBoostTurns: enemy.attackBoostTurns,
       enemyStatusShieldTurns: enemy.statusShieldTurns,
       moveTimeReductionTurns: this.moveTimeReduction?.turnsRemaining || 0,
       enemyAttribute: PAD_ATTRIBUTE_INDEX[enemy.attribute] ?? -1,
@@ -1133,6 +1152,16 @@ export class PuzzleEngine {
     });
   }
 
+  advanceEnemyAttackBoostTurns() {
+    this.enemies.forEach((enemy) => {
+      enemy.attackBoostTurns = Math.max(
+        0,
+        Math.trunc(Number(enemy.attackBoostTurns) || 0) - 1,
+      );
+      if (enemy.attackBoostTurns === 0) enemy.attackBoostPercent = 100;
+    });
+  }
+
   advanceMoveTimeReductionTurns() {
     if (!this.moveTimeReduction) return;
     this.moveTimeReduction.turnsRemaining = Math.max(
@@ -1269,6 +1298,14 @@ export class PuzzleEngine {
     const materialized = this.materializeEnemySkillRecord(record, enemyIndex);
     const skill = normalizePadEnemySkillRecord(materialized);
     this.lastEnemySkill = skill;
+    if (skill.supported && skill.kind === 'loneAttackBoost') {
+      const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
+      if (!enemy) return false;
+      enemy.attackBoostTurns = Math.max(0, (skill.durationTurns << 16) >> 16);
+      enemy.attackBoostPercent = skill.boostPercent;
+      this.message = `${enemy.name} raises attack to ${skill.boostPercent}% for ${enemy.attackBoostTurns} turn${enemy.attackBoostTurns === 1 ? '' : 's'}.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'statusShield') {
       const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
       if (!enemy) return false;
@@ -1494,6 +1531,7 @@ export class PuzzleEngine {
       const definition = definitionsById.get(slot.skillId);
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
       if (![
+        PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_SHIELD,
         PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
         PAD_ENEMY_SKILL_SELF_DESTRUCT,
@@ -2089,7 +2127,7 @@ export class PuzzleEngine {
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,
-      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, scaledAttackGate = 0, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0 }, index) => ({
+      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0 }, index) => ({
         id,
         name,
         attribute,
@@ -2098,6 +2136,8 @@ export class PuzzleEngine {
         counter,
         maxCounter,
         scaledAttackGate,
+        attackBoostTurns,
+        attackBoostPercent,
         statusShieldTurns,
         attributeAbsorbTurns,
         attributeAbsorbMask,

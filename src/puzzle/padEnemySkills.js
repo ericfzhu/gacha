@@ -1,3 +1,4 @@
+export const PAD_ENEMY_SKILL_LONE_ATTACK_BOOST = 17;
 export const PAD_ENEMY_SKILL_STATUS_SHIELD = 20;
 export const PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION = 39;
 export const PAD_ENEMY_SKILL_SELF_DESTRUCT = 40;
@@ -91,6 +92,17 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
     ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
     : null;
+  if (type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST) {
+    requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'loneAttackBoost',
+      supported: true,
+      durationTurns: definition.getInt32(0x14, true),
+      boostPercent: definition.getInt32(0x18, true),
+      attackWithSkillValue,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_STATUS_SHIELD) {
     return Object.freeze({
       type,
@@ -381,10 +393,25 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
 // float32, multiplies in float32, and calls izMathRound (add 0.5, truncate for
 // positive values). Keep every single-precision boundary explicit here.
 export function padEnemySkillAttack(baseAttack, attackWithSkillPercent) {
+  return padEnemySkillBoostedAttack(baseAttack, attackWithSkillPercent, 100);
+}
+
+// _setEnemyAttackMain applies the active sMONSTER+0x850 binary32 multiplier
+// to its incoming attack ratio before multiplying the enemy's protected int64
+// attack. Type 17 writes this lane from a signed authored percentage / 100.
+export function padEnemySkillBoostedAttack(
+  baseAttack,
+  attackWithSkillPercent,
+  boostPercent = 100,
+) {
   const attack = Math.max(0, Math.trunc(Number(baseAttack) || 0));
   const percent = Math.trunc(Number(attackWithSkillPercent) || 0);
   if (percent <= 0 || attack <= 0) return 0;
-  const multiplier = Math.fround(Math.fround(percent >>> 0) / Math.fround(100));
+  const attackMultiplier = Math.fround(Math.fround(percent >>> 0) / Math.fround(100));
+  const boostMultiplier = Math.fround(
+    Math.fround(Math.trunc(Number(boostPercent) || 0)) / Math.fround(100),
+  );
+  const multiplier = Math.fround(attackMultiplier * boostMultiplier);
   const scaled = Math.fround(Math.fround(attack) * multiplier);
   return Math.min(PAD_INT32_MAX, Math.max(0, Math.trunc(Math.fround(scaled + 0.5))));
 }
@@ -496,6 +523,20 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
   );
   const monster = new DataView(monsterBytes.buffer, monsterBytes.byteOffset, monsterBytes.byteLength);
   const type = definition.getInt16(PAD_ENEMY_SKILL_RUNTIME_LAYOUT.definitionTypeOffset, true);
+  if (type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST) {
+    return Object.freeze({
+      type,
+      kind: 'loneAttackBoost',
+      supported: true,
+      durationTurns: monster.getInt32(0x678, true),
+      boostPercent: monster.getInt32(0x67c, true),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_STATUS_SHIELD) {
     return Object.freeze({
       type,
@@ -657,6 +698,19 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
 
 export function normalizePadEnemySkillRecord(record) {
   const type = Math.trunc(Number(record?.type));
+  if (type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST || record?.kind === 'loneAttackBoost') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
+      kind: 'loneAttackBoost',
+      supported: true,
+      durationTurns: Math.trunc(Number(record?.durationTurns) || 0),
+      boostPercent: Math.trunc(Number(record?.boostPercent) || 0),
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
   if (type === PAD_ENEMY_SKILL_STATUS_SHIELD || record?.kind === 'statusShield') {
     return Object.freeze({
       type: PAD_ENEMY_SKILL_STATUS_SHIELD,

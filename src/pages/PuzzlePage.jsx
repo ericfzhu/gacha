@@ -278,6 +278,9 @@ function drawEnemy(ctx, enemy, index, target, time) {
   ctx.font = '600 10px "Noto Sans", sans-serif';
   ctx.fillText(`${Math.max(0, enemy.hp).toLocaleString()} / ${enemy.maxHp.toLocaleString()}`, x, 264);
   const enemyStatus = [];
+  if (Number(enemy.attackBoostTurns || 0) > 0) {
+    enemyStatus.push(`ATK ${enemy.attackBoostPercent}% ${enemy.attackBoostTurns}T`);
+  }
   if (Number(enemy.statusShieldTurns || 0) > 0) {
     enemyStatus.push(`IMMUNE ${enemy.statusShieldTurns}T`);
   }

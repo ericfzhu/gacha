@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
+  PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_SHIELD,
   PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
   PAD_ENEMY_SKILL_SELF_DESTRUCT,
@@ -32,6 +33,7 @@ import {
   decodePadEnemySkillDefinition,
   decodePadEnemySkillRuntime,
   padEnemySkillAttack,
+  padEnemySkillBoostedAttack,
   padEnemySkillAttributeCandidates,
   padEnemySkillCurrentHpGravity,
   padEnemySkillMoveTimeSeconds,
@@ -780,6 +782,42 @@ assert.equal(statusShieldRuntimeEngine.applyEnemySkillRuntime(
   statusShieldMonsterRuntime,
 ), true);
 assert.equal(statusShieldRuntimeEngine.enemies[0].statusShieldTurns, 5);
+assert.equal(padEnemySkillBoostedAttack(1_850, 100, 200), 3_700);
+assert.equal(padEnemySkillBoostedAttack(1_850, 50, 200), 1_850);
+const enemyAiLoneAttackBoostDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiLoneAttackBoostView = new DataView(enemyAiLoneAttackBoostDefinition.buffer);
+enemyAiLoneAttackBoostView.setUint32(0x00, 9_030, true);
+enemyAiLoneAttackBoostView.setInt16(0x04, PAD_ENEMY_SKILL_LONE_ATTACK_BOOST, true);
+enemyAiLoneAttackBoostView.setInt32(0x14, 3, true);
+enemyAiLoneAttackBoostView.setInt32(0x18, 200, true);
+enemyAiLoneAttackBoostView.setInt32(0x44, 50, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiLoneAttackBoostDefinition), {
+  type: 17,
+  kind: 'loneAttackBoost',
+  supported: true,
+  durationTurns: 3,
+  boostPercent: 200,
+  attackWithSkillValue: 50,
+});
+const loneAttackBoostMonsterRuntime = new Uint8Array(0x680);
+const loneAttackBoostMonsterRuntimeView = new DataView(loneAttackBoostMonsterRuntime.buffer);
+loneAttackBoostMonsterRuntimeView.setInt32(0x678, 5, true);
+loneAttackBoostMonsterRuntimeView.setInt32(0x67c, 175, true);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(
+    enemyAiLoneAttackBoostDefinition,
+    loneAttackBoostMonsterRuntime,
+  ),
+  {
+    type: 17,
+    kind: 'loneAttackBoost',
+    supported: true,
+    durationTurns: 5,
+    boostPercent: 175,
+    setupMaterialized: true,
+    attackWithSkillValue: 50,
+  },
+);
 assert.equal(padEnemySkillMoveTimeSeconds(5, 125, 0), 3.75);
 assert.equal(padEnemySkillMoveTimeSeconds(5, 125, 40), 3);
 assert.equal(padEnemySkillMoveTimeSeconds(5, -100, 0), 6);
@@ -2453,6 +2491,42 @@ assert.equal(rejectedStatusShieldEngine.applyEnemySkillDefinition(
 rejectedStatusShieldEngine.setRngState(21_900);
 assert.equal(rejectedStatusShieldEngine.takeEnemySkill(0), null);
 assert.equal(rejectedStatusShieldEngine.rng.state, 21_900);
+const loneAttackBoostMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(loneAttackBoostMonsterDefinition.buffer).setUint32(0xec, 9_030, true);
+const selectedLoneAttackBoostEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: loneAttackBoostMonsterDefinition,
+    skillDefinitions: [enemyAiLoneAttackBoostDefinition],
+  }],
+});
+selectedLoneAttackBoostEngine.enemies[1].hp = 0;
+selectedLoneAttackBoostEngine.setRngState(21_900);
+selectedLoneAttackBoostEngine.enemies[0].counter = 1;
+selectedLoneAttackBoostEngine.resolveEnemyTurn();
+const selectedLoneAttackBoostState = selectedLoneAttackBoostEngine.snapshot();
+assert.equal(selectedLoneAttackBoostState.enemies[0].attackBoostTurns, 3);
+assert.equal(selectedLoneAttackBoostState.enemies[0].attackBoostPercent, 200);
+assert.equal(selectedLoneAttackBoostState.lastEnemyActions[0].skill.type, 17);
+assert.equal(selectedLoneAttackBoostState.lastEnemyActions[0].damage, 925);
+assert.equal(selectedLoneAttackBoostState.player.hp, 11_075);
+assert.equal(selectedLoneAttackBoostEngine.rng.state, padLcgStep(21_900).state);
+selectedLoneAttackBoostEngine.enemies[0].counter = 1;
+selectedLoneAttackBoostEngine.resolveEnemyTurn();
+const boostedEnemyAttack = selectedLoneAttackBoostEngine.snapshot();
+assert.equal(boostedEnemyAttack.enemies[0].attackBoostTurns, 2);
+assert.equal(boostedEnemyAttack.lastEnemyActions[0].kind, 'attack');
+assert.equal(boostedEnemyAttack.lastEnemyActions[0].damage, 3_700);
+const rejectedLoneAttackBoostEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: loneAttackBoostMonsterDefinition,
+    skillDefinitions: [enemyAiLoneAttackBoostDefinition],
+  }],
+});
+rejectedLoneAttackBoostEngine.setRngState(21_900);
+assert.equal(rejectedLoneAttackBoostEngine.takeEnemySkill(0), null);
+assert.equal(rejectedLoneAttackBoostEngine.rng.state, 21_900);
 const selfDestructMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(selfDestructMonsterDefinition.buffer).setUint32(0xec, 9_027, true);
 const selectedSelfDestructEngine = new PuzzleEngine({

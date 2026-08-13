@@ -647,6 +647,30 @@ gate. An eligible fallback retains its authored `sENEAI+5` weight without
 scaling. The browser selector exposes this as `probabilityScale` while keeping
 the already decoded condition-owned RNG state transitions intact.
 
+Enemy skill type `17` is the lone-enemy attack boost. Its late dispatch entry
+targets shared boost handler `0x629064`, setup targets `0x61ffdc`, and AI
+condition targets `0x61acdc`. Setup copies definition duration `+0x14` to
+runtime `sMONSTER+0x678` and attack percentage `+0x18` to `+0x67c`, consuming
+no RNG. Execution writes the duration through protected signed-int16 counter
+`sMONSTER+0x860`, converts the signed percentage to binary32, divides by
+binary32 100, and writes the protected multiplier at `+0x850`.
+
+The condition first rejects an already positive `+0x860` counter, then scans
+the native monster slots and admits the action only when exactly one monster
+has positive current HP. `_incEneTurn` decrements the boost counter before a
+later enemy action. `_setEnemyAttackMain` reads the active multiplier and
+multiplies it into the incoming attack ratio in binary32 before converting the
+enemy's protected int64 attack and applying native positive rounding.
+
+The generic positive `sENEMYSKILL+0x44` accompanying hit is prepared before the
+selected skill handler executes. A type-17 record that both attacks and raises
+attack therefore uses the old multiplier for its same-action hit; the new boost
+affects subsequent ordinary, accompanying, and standalone scaled attacks. The
+browser preserves this ordering, exact one-probability-draw selection, status
+countdown, snapshot, and `ATK percent/turns` presentation. Neighboring types
+`18` and `19` share the execution handler but retain distinct setup layouts and
+conditions and are not conflated with type `17`.
+
 Enemy skill type `20` applies the enemy's status-ailment immunity shield. Its
 late dispatch entry targets `0x629534`, setup targets `0x61ff08`, and AI
 condition targets `0x61b4d8`. Setup copies signed definition integer `+0x10`

@@ -2,6 +2,22 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 lone-enemy attack boost
+
+- Identified enemy skill type `17` as the lone-enemy attack boost: shared late
+  handler `0x629064`, setup `0x61ffdc`, and condition `0x61acdc`.
+  Definition `+0x14/+0x18` materializes duration and attack percentage at
+  runtime `sMONSTER+0x678/+0x67c` without setup RNG.
+- Execution stores duration in protected signed-int16 `sMONSTER+0x860` and
+  binary32 `percent / 100` at `+0x850`. `_setEnemyAttackMain` multiplies the
+  active value into ordinary, accompanying, and standalone scaled attacks.
+- Ported the exact “boost inactive and exactly one living enemy” AI condition,
+  one-draw immediate selection, per-enemy countdown, binary32 attack scaling,
+  status snapshots/rendering, and the native order where an accompanying hit
+  resolves before the newly selected boost handler takes effect.
+- Next: separate the neighboring type `18/19` trigger variants that share the
+  execution handler but use different authored layouts and AI predicates.
+
 ## 2026-08-14 enemy status-ailment shield
 
 - Identified enemy skill type `20` as the enemy status-ailment immunity shield:

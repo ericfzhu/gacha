@@ -24,6 +24,10 @@ const HEAL_PLAYER_ENEMY_SKILL_TYPE = 55;
 const HEAL_PLAYER_HANDLER = 0x629900;
 const HEAL_PLAYER_SETUP_HANDLER = 0x620040;
 const HEAL_PLAYER_CONDITION_HANDLER = 0x61aa74;
+const LONE_ATTACK_BOOST_ENEMY_SKILL_TYPE = 17;
+const LONE_ATTACK_BOOST_HANDLER = 0x629064;
+const LONE_ATTACK_BOOST_SETUP_HANDLER = 0x61ffdc;
+const LONE_ATTACK_BOOST_CONDITION_HANDLER = 0x61acdc;
 const STATUS_SHIELD_ENEMY_SKILL_TYPE = 20;
 const STATUS_SHIELD_HANDLER = 0x629534;
 const STATUS_SHIELD_SETUP_HANDLER = 0x61ff08;
@@ -300,6 +304,27 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : healPlayerSetupTarget === HEAL_PLAYER_SETUP_HANDLER;
   const healPlayerConditionMatches = healPlayerConditionTarget === null
     ? null : healPlayerConditionTarget === HEAL_PLAYER_CONDITION_HANDLER;
+  const loneAttackBoostDispatchTarget = resolveEnemySkillTarget(
+    LONE_ATTACK_BOOST_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const loneAttackBoostSetupTarget = resolveEnemySkillTarget(
+    LONE_ATTACK_BOOST_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const loneAttackBoostConditionTarget = resolveEnemySkillTarget(
+    LONE_ATTACK_BOOST_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const loneAttackBoostDispatchMatches = loneAttackBoostDispatchTarget === null
+    ? null : loneAttackBoostDispatchTarget === LONE_ATTACK_BOOST_HANDLER;
+  const loneAttackBoostSetupMatches = loneAttackBoostSetupTarget === null
+    ? null : loneAttackBoostSetupTarget === LONE_ATTACK_BOOST_SETUP_HANDLER;
+  const loneAttackBoostConditionMatches = loneAttackBoostConditionTarget === null
+    ? null : loneAttackBoostConditionTarget === LONE_ATTACK_BOOST_CONDITION_HANDLER;
   const statusShieldDispatchTarget = resolveEnemySkillTarget(
     STATUS_SHIELD_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1121,6 +1146,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       healPlayerDispatchMatches21_9: healPlayerDispatchMatches,
       healPlayerSetupMatches21_9: healPlayerSetupMatches,
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
+      loneAttackBoostDispatchMatches21_9: loneAttackBoostDispatchMatches,
+      loneAttackBoostSetupMatches21_9: loneAttackBoostSetupMatches,
+      loneAttackBoostConditionMatches21_9: loneAttackBoostConditionMatches,
       statusShieldDispatchMatches21_9: statusShieldDispatchMatches,
       statusShieldSetupMatches21_9: statusShieldSetupMatches,
       statusShieldConditionMatches21_9: statusShieldConditionMatches,
@@ -1223,6 +1251,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       monsterAttackWithSkillOffset: 'sMONSTER+0x7e8 (uint32 converted to float32 / 100)',
       monsterDurationOffset: 'sMONSTER+0x678 (packed low 10 bits)',
       monsterHealPercentOffset: 'sMONSTER+0x678 (type 55 signed int32 percent)',
+      monsterAttackBoostMultiplierOffset: 'sMONSTER+0x850 (type 17 protected float32)',
+      monsterAttackBoostDurationOffset: 'sMONSTER+0x860 (type 17 protected signed int16)',
       monsterStatusShieldDurationOffset: 'sMONSTER+0x870 (type 20 protected signed int16)',
       moveTimeDurationOffset: 'sMONSTER+0x678 (type 39 packed low 10 bits)',
       moveTimeFixedReductionOffset: 'sMONSTER+0x67c (type 39 signed centiseconds)',
@@ -1257,6 +1287,16 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       healPlayerConditionTarget: healPlayerConditionTarget === null
         ? null : hex(healPlayerConditionTarget),
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
+      loneAttackBoostType: LONE_ATTACK_BOOST_ENEMY_SKILL_TYPE,
+      loneAttackBoostDispatchTarget: loneAttackBoostDispatchTarget === null
+        ? null : hex(loneAttackBoostDispatchTarget),
+      loneAttackBoostDispatchMatches21_9: loneAttackBoostDispatchMatches,
+      loneAttackBoostSetupTarget: loneAttackBoostSetupTarget === null
+        ? null : hex(loneAttackBoostSetupTarget),
+      loneAttackBoostSetupMatches21_9: loneAttackBoostSetupMatches,
+      loneAttackBoostConditionTarget: loneAttackBoostConditionTarget === null
+        ? null : hex(loneAttackBoostConditionTarget),
+      loneAttackBoostConditionMatches21_9: loneAttackBoostConditionMatches,
       statusShieldType: STATUS_SHIELD_ENEMY_SKILL_TYPE,
       statusShieldDispatchTarget: statusShieldDispatchTarget === null
         ? null : hex(statusShieldDispatchTarget),
@@ -1590,6 +1630,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || blackFallDispatchMatches === false || blackFallSetupMatches === false
     || healPlayerDispatchMatches === false || healPlayerSetupMatches === false
     || healPlayerConditionMatches === false
+    || loneAttackBoostDispatchMatches === false || loneAttackBoostSetupMatches === false
+    || loneAttackBoostConditionMatches === false
     || statusShieldDispatchMatches === false || statusShieldSetupMatches === false
     || statusShieldConditionMatches === false || inactiveEnemySkills21Through38Match === false
     || moveTimeReductionDispatchMatches === false || moveTimeReductionSetupMatches === false
