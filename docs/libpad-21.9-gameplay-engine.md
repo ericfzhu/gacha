@@ -158,6 +158,16 @@ a 1 MiB RGBA plane followed by 26 16-byte sprite rectangles. Base orb records ar
 and use this atlas from a user-selected APK in a Web Worker; no extracted art is
 stored in the repository or transmitted.
 
+The restored `CCardTexMana::UnZipCardBtex` call resolves through the recovered
+GOT to `cMINIZIP::getUnzipSize` (`0x348c60`) and
+`cMINIZIP::unzip4mem2` (`0x348dcc`). The misleading `IOSChyQ` prefix is a
+12-byte `IOSC` wrapper, not an opaque proprietary codec: byte 4 selects the
+compression method (`0x68` for DEFLATE), byte 5 is XORed across the stored body,
+bytes 6–7 hold an `izCrcCalc` CRC-16/CCITT result, and bytes 8–11 hold the
+expanded length. The browser archive reader now reproduces this path and
+validates both expanded length and CRC. On the exact APK it expands
+`mons_001.btex` from 8,741 bytes to its 131,120-byte `TEX1` payload.
+
 ## Exact offline boundary
 
 The native client successfully opens packaged `assets/DATA001.BIN`, creates
@@ -168,6 +178,6 @@ optional `.bin` files so legitimately retained runtime data can be mounted.
 
 This is a content boundary, not a CPU-port failure: protection, JNI, lifecycle,
 rendering, frames, and touch callbacks are all running. The remaining work for a
-fully populated offline client is data/schema recovery, the `IOSChyQ` texture
-decoder, and coverage of modern active/leader/passive mechanics in the pure rules
-harness where server datasets are unavailable.
+fully populated offline client is downloaded data/schema recovery and coverage
+of modern active/leader/passive mechanics in the pure rules harness where server
+datasets are unavailable.

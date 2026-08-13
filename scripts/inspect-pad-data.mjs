@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { ApkArchive } from '../src/binary-port/apk.js';
+import { inflateBytes } from '../src/binary-port/inflate.js';
 import { PadDataArchive, parseTex2 } from '../src/binary-port/padDataArchive.js';
 
 const apkPath = resolve(process.argv.find((argument) => argument.endsWith('.apk')) ||
@@ -29,8 +30,8 @@ if (assetArgument) {
   const record = data.find(name);
   if (!record) throw new Error(`No PAD asset named ${name}.`);
   output.asset = { ...record, flags: `0x${record.flags.toString(16)}` };
-  if (record.kind === 'resident' && !record.compressed) {
-    const bytes = data.read(record);
+  if (record.kind === 'resident') {
+    const bytes = data.read(record, inflateBytes);
     const magic = new TextDecoder('ascii').decode(bytes.subarray(0, 4));
     output.asset.magic = magic;
     if (magic === 'TEX2') {

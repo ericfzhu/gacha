@@ -5,6 +5,7 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
 ## 2026-08-13 gameplay data and rules fidelity pass
 
 - Decoded the `MCD5` shipped-asset index: 4,328 records spanning resident `DATA001.BIN`, compressed `DATA002.BIN`, WAV `DATA003.BIN`, download-only names, and reserved slots. Added a dependency-free parser, inspector, and exact-APK regression.
+- Recovered `cMINIZIP::unzip4mem2` from the restored GOT and implemented PAD's exact `IOSC` stream decoder: XOR reversal, raw DEFLATE, expanded-length validation, and its CRC-16/CCITT integrity check. The exact `mons_001.btex` fixture now expands from 8,741 bytes to a 131,120-byte `TEX1` texture.
 - Decoded `TEX2` layout and the 512x512 `block2.btex` atlas, including its 26 sprite rectangles and base-orb records 2–7.
 - Regenerated the post-protection `libpad.so` image and anchored the native movement, adjacency, swap, match flood-fill, erase, fall, combo, damage, recovery, and game-phase routines by restored symbol and address.
 - Corrected coalesced pointer movement in the JS engine. Normal `libpad` rejects diagonal neighbours, so sparse motion is now expanded into orthogonally adjacent boundary crossings instead of a direct diagonal swap.

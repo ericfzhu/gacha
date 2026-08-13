@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { ApkArchive } from '../src/binary-port/apk.js';
-import { PadDataArchive, parseTex2 } from '../src/binary-port/padDataArchive.js';
+import { inflateBytes } from '../src/binary-port/inflate.js';
+import { decodeIosc, PadDataArchive, parseTex2 } from '../src/binary-port/padDataArchive.js';
 
 const apkBytes = new Uint8Array(await readFile(new URL('../jp.gungho.pad_21.9.0-21900_minAPI24(arm64-v8a).apk', import.meta.url)));
 const archive = PadDataArchive.fromApk(new ApkArchive(apkBytes));
@@ -42,5 +43,13 @@ assert.equal(new TextDecoder('ascii').decode(archive.read(cardPlaceholder).subar
 const compressed = archive.find('mons_001.btex');
 assert.equal(compressed.containerIndex, 1);
 assert.equal(compressed.compressed, true);
-assert.throws(() => archive.read(compressed), /IOSChyQ/);
-console.log('PAD data index, resident streams, external names, and TEX2 atlas checks passed.');
+const compressedBytes = archive.readStored(compressed);
+assert.equal(new TextDecoder('ascii').decode(compressedBytes.subarray(0, 4)), 'IOSC');
+assert.deepEqual(Array.from(compressedBytes.subarray(4, 12)), [0x68, 0x79, 0x51, 0x19, 0x30, 0x00, 0x02, 0x00]);
+const monsterTexture = archive.read(compressed, inflateBytes);
+assert.equal(monsterTexture.length, 131_120);
+assert.equal(new TextDecoder('ascii').decode(monsterTexture.subarray(0, 4)), 'TEX1');
+const badChecksum = compressedBytes.slice();
+badChecksum[6] ^= 1;
+assert.throws(() => decodeIosc(badChecksum, inflateBytes), /CRC mismatch/);
+console.log('PAD data index, resident streams, IOSC decoding, external names, and TEX2 atlas checks passed.');

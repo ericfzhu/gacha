@@ -1,4 +1,5 @@
 const INDEX_MAGIC = 'MCD5';
+const IOSC_MAGIC = 'IOSC';
 const TEX2_MAGIC = 'TEX2';
 const RECORD_SIZE = 16;
 const FIXED_NAME_SIZE = 16;
@@ -22,6 +23,47 @@ function requireRange(bytes, offset, length, label) {
   if (!Number.isInteger(offset) || !Number.isInteger(length) || offset < 0 || length < 0 || offset + length > bytes.length) {
     throw new Error(`${label} range ${offset}+${length} exceeds ${bytes.length} bytes.`);
   }
+}
+
+function crc16Ccitt(bytes) {
+  let crc = 0;
+  for (const byte of bytes) {
+    crc ^= byte << 8;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = ((crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1) & 0xffff;
+    }
+  }
+  return crc;
+}
+
+export function decodeIosc(bytes, inflate) {
+  if (ascii(bytes, 0, 4) !== IOSC_MAGIC) throw new Error('Asset is not a PAD IOSC stream.');
+  if (bytes.length < 12) throw new Error('PAD IOSC header is truncated.');
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const method = bytes[4];
+  const xorKey = bytes[5];
+  const expectedCrc = view.getUint16(6, true);
+  const expectedLength = view.getUint32(8, true);
+  const payload = bytes.slice(12);
+  for (let index = 0; index < payload.length; index += 1) payload[index] ^= xorKey;
+
+  let output;
+  if (method === 0) {
+    output = payload.slice(0, expectedLength);
+  } else if (method === 0x68) {
+    if (typeof inflate !== 'function') throw new Error('PAD IOSC DEFLATE decoder is unavailable.');
+    output = inflate(payload, -15);
+  } else {
+    throw new Error(`Unsupported PAD IOSC compression method 0x${method.toString(16)}.`);
+  }
+  if (output.length !== expectedLength) {
+    throw new Error(`PAD IOSC expanded to ${output.length} bytes; expected ${expectedLength}.`);
+  }
+  const actualCrc = crc16Ccitt(output);
+  if (actualCrc !== expectedCrc) {
+    throw new Error(`PAD IOSC CRC mismatch: 0x${actualCrc.toString(16)} != 0x${expectedCrc.toString(16)}.`);
+  }
+  return output;
 }
 
 function classifyRecord(flags) {
@@ -102,18 +144,26 @@ export class PadDataArchive {
     return this.byName.get(String(name).toLowerCase()) || null;
   }
 
-  read(nameOrRecord) {
+  readStored(nameOrRecord) {
     const record = typeof nameOrRecord === 'string' ? this.find(nameOrRecord) : nameOrRecord;
     if (!record) return null;
     if (record.kind === 'external') throw new Error(`${record.name} is a download-only PAD asset and is not stored in this APK.`);
     if (record.kind !== 'resident') throw new Error(`${record.name || `record ${record.index}`} is not a readable resident asset.`);
-    if (record.compressed) {
-      throw new Error(`${record.name} uses PAD's IOSChyQ compressed texture stream; decoding is not implemented yet.`);
-    }
     const container = this.containers[record.containerIndex];
     if (!container) throw new Error(`Missing ${this.containerNames[record.containerIndex]}.`);
     requireRange(container, record.offset, record.storedLength, record.name);
     return container.subarray(record.offset, record.offset + record.storedLength);
+  }
+
+  read(nameOrRecord, inflate = null) {
+    const record = typeof nameOrRecord === 'string' ? this.find(nameOrRecord) : nameOrRecord;
+    const stored = this.readStored(record);
+    if (!record.compressed) return stored;
+    const output = decodeIosc(stored, inflate);
+    if (record.logicalLength && output.length !== record.logicalLength) {
+      throw new Error(`${record.name} expanded to ${output.length} bytes; index expects ${record.logicalLength}.`);
+    }
+    return output;
   }
 
   summary() {
