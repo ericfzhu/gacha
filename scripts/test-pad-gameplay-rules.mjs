@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
+  PAD_ENEMY_SKILL_SELF_DESTRUCT,
   PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
   PAD_ENEMY_SKILL_SCALED_ATTACK,
   PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
@@ -745,6 +746,33 @@ assert.deepEqual(
     attackWithSkillValue: 0,
   },
 );
+const enemyAiSelfDestructDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiSelfDestructView = new DataView(enemyAiSelfDestructDefinition.buffer);
+enemyAiSelfDestructView.setUint32(0x00, 9_027, true);
+enemyAiSelfDestructView.setInt16(0x04, PAD_ENEMY_SKILL_SELF_DESTRUCT, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiSelfDestructDefinition), {
+  type: 40,
+  kind: 'selfDestruct',
+  supported: true,
+  attackWithSkillValue: 0,
+});
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiSelfDestructDefinition, new Uint8Array(0x680)),
+  {
+    type: 40,
+    kind: 'selfDestruct',
+    supported: true,
+    attackWithSkillValue: 0,
+  },
+);
+const selfDestructRuntimeEngine = new PuzzleEngine({ seed: 21_900 });
+selfDestructRuntimeEngine.setRngState(21_900);
+assert.equal(selfDestructRuntimeEngine.applyEnemySkillRuntime(
+  enemyAiSelfDestructDefinition,
+  new Uint8Array(0x680),
+), true);
+assert.equal(selfDestructRuntimeEngine.enemies[0].hp, 0);
+assert.equal(selfDestructRuntimeEngine.rng.state, 21_900);
 const enemyAiChangeAttributeDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiChangeAttributeView = new DataView(enemyAiChangeAttributeDefinition.buffer);
 enemyAiChangeAttributeView.setUint32(0x00, 9_025, true);
@@ -2261,6 +2289,41 @@ rejectedHealPlayerEngine.player.hp = 3_060;
 rejectedHealPlayerEngine.setRngState(21_900);
 assert.equal(rejectedHealPlayerEngine.takeEnemySkill(0), null);
 assert.equal(rejectedHealPlayerEngine.rng.state, 21_900);
+const selfDestructMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(selfDestructMonsterDefinition.buffer).setUint32(0xec, 9_027, true);
+const selectedSelfDestructEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: selfDestructMonsterDefinition,
+    skillDefinitions: [enemyAiSelfDestructDefinition],
+  }],
+});
+selectedSelfDestructEngine.setRngState(21_900);
+selectedSelfDestructEngine.enemies[0].counter = 1;
+selectedSelfDestructEngine.enemies[1].counter = 99;
+selectedSelfDestructEngine.resolveEnemyTurn();
+const selectedSelfDestructState = selectedSelfDestructEngine.snapshot();
+assert.equal(selectedSelfDestructState.enemies[0].hp, 0);
+assert.equal(selectedSelfDestructState.enemies[1].hp, 76_000);
+assert.equal(selectedSelfDestructState.lastEnemyActions[0].skill.type, 40);
+assert.equal(selectedSelfDestructState.lastEnemyActions[0].skill.skillId, 9_027);
+assert.equal(selectedSelfDestructState.enemies[0].enemyAiBudget, 80);
+assert.equal(selectedSelfDestructEngine.rng.state, padLcgStep(21_900).state);
+const selfDestructVictoryEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemySkillQueues: [[enemyAiSelfDestructDefinition], [enemyAiSelfDestructDefinition]],
+});
+selfDestructVictoryEngine.start();
+selfDestructVictoryEngine.turn = 1;
+selfDestructVictoryEngine.phase = 'enemy';
+selfDestructVictoryEngine.phaseTimer = 0;
+selfDestructVictoryEngine.enemies[0].counter = 1;
+selfDestructVictoryEngine.enemies[1].counter = 1;
+selfDestructVictoryEngine.update(0.01);
+assert.equal(selfDestructVictoryEngine.mode, 'victory');
+assert.equal(selfDestructVictoryEngine.phase, 'complete');
+assert.equal(selfDestructVictoryEngine.enemies[0].hp, 0);
+assert.equal(selfDestructVictoryEngine.enemies[1].hp, 0);
 const changeAttributeMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(changeAttributeMonsterDefinition.buffer).setUint32(0xec, 9_025, true);
 const selectedChangeAttributeEngine = new PuzzleEngine({

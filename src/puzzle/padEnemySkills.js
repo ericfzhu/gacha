@@ -1,3 +1,4 @@
+export const PAD_ENEMY_SKILL_SELF_DESTRUCT = 40;
 export const PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE = 46;
 export const PAD_ENEMY_SKILL_SCALED_ATTACK = 47;
 export const PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY = 50;
@@ -88,6 +89,14 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
     ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
     : null;
+  if (type === PAD_ENEMY_SKILL_SELF_DESTRUCT) {
+    return Object.freeze({
+      type,
+      kind: 'selfDestruct',
+      supported: true,
+      attackWithSkillValue,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE) {
     requireLength(definitionBytes, 0x24, 'PAD enemy-skill definition');
     return Object.freeze({
@@ -439,6 +448,17 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
   );
   const monster = new DataView(monsterBytes.buffer, monsterBytes.byteOffset, monsterBytes.byteLength);
   const type = definition.getInt16(PAD_ENEMY_SKILL_RUNTIME_LAYOUT.definitionTypeOffset, true);
+  if (type === PAD_ENEMY_SKILL_SELF_DESTRUCT) {
+    return Object.freeze({
+      type,
+      kind: 'selfDestruct',
+      supported: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE) {
     requireLength(definitionBytes, 0x24, 'PAD enemy-skill definition');
     return Object.freeze({
@@ -561,6 +581,16 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
 
 export function normalizePadEnemySkillRecord(record) {
   const type = Math.trunc(Number(record?.type));
+  if (type === PAD_ENEMY_SKILL_SELF_DESTRUCT || record?.kind === 'selfDestruct') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_SELF_DESTRUCT,
+      kind: 'selfDestruct',
+      supported: true,
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
   if (type === PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE || record?.kind === 'changeEnemyAttribute') {
     const authored = Array.isArray(record?.candidateAttributes) ? record.candidateAttributes : [];
     const targetPresent = record?.targetAttribute !== undefined && record?.targetAttribute !== null;

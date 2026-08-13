@@ -21,6 +21,7 @@ const renderBindState = process.argv.includes('--bind-render');
 const renderAttributeAbsorbState = process.argv.includes('--attribute-absorb-render');
 const renderReviveState = process.argv.includes('--revive-render');
 const renderAttributeChangeState = process.argv.includes('--attribute-change-render');
+const renderSelfDestructState = process.argv.includes('--self-destruct-render');
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 980, height: 900 } });
 const consoleMessages = [];
@@ -947,6 +948,23 @@ try {
     engine.setRngState(21_900);
     const rejectedHealPlayerSkill = engine.takeEnemySkill(0);
     const rejectedHealPlayerState = engine.snapshot();
+    const selfDestructMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(selfDestructMonsterDefinition.buffer).setUint32(0xec, 9_027, true);
+    const selfDestructDefinition = sourceToPoisonDefinition.slice();
+    const selfDestructView = new DataView(selfDestructDefinition.buffer);
+    selfDestructView.setUint32(0x00, 9_027, true);
+    selfDestructView.setInt16(0x04, 40, true);
+    engine.reset();
+    engine.setEnemyAiDefinitionPool(
+      0,
+      selfDestructMonsterDefinition,
+      [selfDestructDefinition],
+    );
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedSelfDestructAi = engine.snapshot();
     const changeAttributeMonsterDefinition = enemyAiMonsterDefinition.slice();
     new DataView(changeAttributeMonsterDefinition.buffer).setUint32(0xec, 9_025, true);
     const changeAttributeDefinition = sourceToPoisonDefinition.slice();
@@ -956,6 +974,7 @@ try {
     [0, 2, 1, 3, 9].forEach((attribute, index) => {
       changeAttributeView.setInt32(0x10 + index * 4, attribute, true);
     });
+    engine.reset();
     engine.enemies[0].attribute = 'wood';
     engine.setEnemyAiDefinitionPool(
       0,
@@ -1164,6 +1183,7 @@ try {
       rejectedScaledSourceToPoisonSkill, rejectedScaledSourceToPoisonState,
       selectedSourceToMortalPoisonAi, selectedSourceToMortalPoisonCount,
       selectedHealPlayerAi, rejectedHealPlayerSkill, rejectedHealPlayerState,
+      selectedSelfDestructAi,
       selectedChangeAttributeAi,
       rejectedChangeAttributeSkill, rejectedChangeAttributeState,
       selectedScaledAttackAi, rejectedScaledAttackSkill, rejectedScaledAttackState,
@@ -1406,6 +1426,12 @@ try {
     poisonBlockSample.selectedHealPlayerAi.enemies?.[0]?.enemyAiBudget !== 80 ||
     poisonBlockSample.rejectedHealPlayerSkill !== null ||
     poisonBlockSample.rejectedHealPlayerState.rngState !== 21_900 ||
+    poisonBlockSample.selectedSelfDestructAi.enemies?.[0]?.hp !== 0 ||
+    poisonBlockSample.selectedSelfDestructAi.enemies?.[1]?.hp !== 76_000 ||
+    poisonBlockSample.selectedSelfDestructAi.lastEnemyActions?.[0]?.skill?.type !== 40 ||
+    poisonBlockSample.selectedSelfDestructAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_027 ||
+    poisonBlockSample.selectedSelfDestructAi.rngState !== advanceLcg(21_900, 1) ||
+    poisonBlockSample.selectedSelfDestructAi.enemies?.[0]?.enemyAiBudget !== 80 ||
     poisonBlockSample.selectedChangeAttributeAi.enemies?.[0]?.attribute !== 'water' ||
     poisonBlockSample.selectedChangeAttributeAi.lastEnemyActions?.[0]?.skill?.type !== 46 ||
     poisonBlockSample.selectedChangeAttributeAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_025 ||
@@ -1769,10 +1795,27 @@ try {
     || attributeChangeRenderState.enemy?.attribute !== 'fire'
   )) throw new Error(`Attribute-change render-state mismatch: ${JSON.stringify(attributeChangeRenderState)}`);
   if (attributeChangeRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
+  const selfDestructRenderState = renderSelfDestructState ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    engine.reset();
+    engine.start();
+    const applied = engine.applyEnemySkillRecord({
+      type: 40,
+      kind: 'selfDestruct',
+      supported: true,
+      attackWithSkillValue: 0,
+    }, 0);
+    return { applied, enemy: engine.snapshot().enemies[0] };
+  }) : null;
+  if (selfDestructRenderState && (
+    selfDestructRenderState.applied !== true
+    || selfDestructRenderState.enemy?.hp !== 0
+  )) throw new Error(`Self-destruct render-state mismatch: ${JSON.stringify(selfDestructRenderState)}`);
+  if (selfDestructRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, attributeChangeRenderState, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, attributeChangeRenderState, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

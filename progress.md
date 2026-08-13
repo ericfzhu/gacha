@@ -2,6 +2,24 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 enemy self-defeat
+
+- Identified enemy skill type `40` as an unconditional self-defeat action:
+  late handler `0x629660`, generic setup tail `0x6217c0`, and unconditional
+  condition `0x61a630`. The record has no effect-specific authored parameters
+  and setup consumes no RNG.
+- Execution writes zero to both protected current-HP halves at
+  `sMONSTER+0x3c/+0x4c` and their displayed-HP mirror at `+0xd4/+0xe4`, updates
+  the HP gauge, and marks the monster's terminal presentation state.
+- Ported definition/runtime decoding, immediate new-AI selection, exact
+  one-probability-draw behavior, per-enemy death, enemy-phase victory handling,
+  browser rendering, and exact table checks.
+- Confirmed types `41..45` all share native rejected-control entries:
+  no-effect dispatch `0x62be50`, selection-clearing setup `0x621c94`, and false
+  condition `0x61c01c`. They remain unsupported instead of gaining invented
+  gameplay behavior.
+- Next: inspect the next real pre-40 handler.
+
 ## 2026-08-14 enemy attribute change
 
 - Identified enemy skill type `46` as an enemy-element transition: late handler
@@ -16,7 +34,7 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
 - Ported raw definition/runtime decoding, current-attribute eligibility,
   exact three-draw selection, multi-enemy application, state/UI color changes,
   browser fixtures, and exact dispatch/setup/condition inspection.
-- Next: inspect neighboring enemy skill type `45`.
+- Next: continue the neighboring enemy-action audit.
 
 ## 2026-08-14 standalone scaled enemy attack
 

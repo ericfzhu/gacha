@@ -33,6 +33,7 @@ import {
   tracePadPointerCells,
 } from './padCoreRules.js';
 import {
+  PAD_ENEMY_SKILL_SELF_DESTRUCT,
   PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
   PAD_ENEMY_SKILL_SCALED_ATTACK,
   PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
@@ -599,6 +600,12 @@ export class PuzzleEngine {
     }
     if (this.phase === 'enemy') {
       this.resolveEnemyTurn();
+      if (this.enemies.every((enemy) => enemy.hp <= 0)) {
+        this.mode = 'victory';
+        this.phase = 'complete';
+        this.message = `Victory in ${this.turn} turn${this.turn === 1 ? '' : 's'}!`;
+        return;
+      }
       if (this.player.hp <= 0) {
         this.mode = 'defeat';
         this.phase = 'complete';
@@ -1231,6 +1238,13 @@ export class PuzzleEngine {
     const materialized = this.materializeEnemySkillRecord(record, enemyIndex);
     const skill = normalizePadEnemySkillRecord(materialized);
     this.lastEnemySkill = skill;
+    if (skill.supported && skill.kind === 'selfDestruct') {
+      const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
+      if (!enemy || enemy.hp <= 0) return false;
+      enemy.hp = 0;
+      this.message = `${enemy.name} defeated itself.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'changeEnemyAttribute') {
       const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
       const attribute = ORB_TYPES[skill.targetAttribute]?.id;
@@ -1425,6 +1439,7 @@ export class PuzzleEngine {
       const definition = definitionsById.get(slot.skillId);
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
       if (![
+        PAD_ENEMY_SKILL_SELF_DESTRUCT,
         PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
         PAD_ENEMY_SKILL_SCALED_ATTACK,
         PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,

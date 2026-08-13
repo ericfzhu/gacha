@@ -647,6 +647,26 @@ gate. An eligible fallback retains its authored `sENEAI+5` weight without
 scaling. The browser selector exposes this as `probabilityScale` while keeping
 the already decoded condition-owned RNG state transitions intact.
 
+Enemy skill type `40` makes the acting monster defeat itself. Its late dispatch
+entry targets `0x629660`, its setup entry targets the generic tail at
+`0x6217c0`, and its condition is the unconditional `1.0` return at `0x61a630`.
+The skill has no effect-specific authored or runtime parameters, and setup
+consumes no RNG. An admitted immediate new-AI record therefore spends only its
+ordinary probability-test draw.
+
+Execution writes zero through the two protected halves of current HP at
+`sMONSTER+0x3c/+0x4c`, then zeroes the matching displayed-HP mirror at
+`+0xd4/+0xe4`. It forwards the resulting zero to the HP-gauge animation with a
+half-second transition and sets the monster's terminal presentation flags at
+`+0x204`. The browser applies zero HP to the acting enemy, leaves other enemies
+untouched, and checks for victory after the enemy phase so a floor whose last
+monster uses this action can actually complete.
+
+Types `41`, `42`, `43`, `44`, and `45` are not live gameplay actions in this
+build. Every one resolves to no-effect finalizer `0x62be50`, selection-clearing
+setup `0x621c94`, and false condition `0x61c01c`. They remain explicitly
+unsupported control/sentinel records in the browser port.
+
 Enemy skill type `46` changes the acting monster's attribute. Its late dispatch
 entry targets `0x629708`, setup targets `0x621504`, and AI condition targets
 `0x61b520`. Five signed definition integers at `+0x10`, `+0x14`, `+0x18`,

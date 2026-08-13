@@ -1,5 +1,6 @@
 import { padLcgStep } from './padCoreRules.js';
 import {
+  PAD_ENEMY_SKILL_SELF_DESTRUCT,
   PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
   PAD_ENEMY_SKILL_SCALED_ATTACK,
   PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
@@ -122,6 +123,7 @@ function normalizeDefinitionMap(definitions) {
 
 function isStaticallyEligible(definition, state) {
   if (!definition.effect.supported || ![
+    PAD_ENEMY_SKILL_SELF_DESTRUCT,
     PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
     PAD_ENEMY_SKILL_SCALED_ATTACK,
     PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
@@ -161,7 +163,10 @@ function evaluateCondition(definition, state, rngState) {
     const eligible = !state.blackFallActive;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
-  if (definition.effect.type === PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY) {
+  if (
+    definition.effect.type === PAD_ENEMY_SKILL_SELF_DESTRUCT
+    || definition.effect.type === PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY
+  ) {
     return { eligible: true, probabilityScale: 1, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE) {

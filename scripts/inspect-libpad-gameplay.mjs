@@ -24,6 +24,14 @@ const HEAL_PLAYER_ENEMY_SKILL_TYPE = 55;
 const HEAL_PLAYER_HANDLER = 0x629900;
 const HEAL_PLAYER_SETUP_HANDLER = 0x620040;
 const HEAL_PLAYER_CONDITION_HANDLER = 0x61aa74;
+const SELF_DESTRUCT_ENEMY_SKILL_TYPE = 40;
+const SELF_DESTRUCT_HANDLER = 0x629660;
+const SELF_DESTRUCT_SETUP_HANDLER = 0x6217c0;
+const SELF_DESTRUCT_CONDITION_HANDLER = 0x61a630;
+const INACTIVE_ENEMY_SKILL_TYPES = Object.freeze([41, 42, 43, 44, 45]);
+const INACTIVE_ENEMY_SKILL_HANDLER = 0x62be50;
+const INACTIVE_ENEMY_SKILL_SETUP_HANDLER = 0x621c94;
+const INACTIVE_ENEMY_SKILL_CONDITION_HANDLER = 0x61c01c;
 const CHANGE_ATTRIBUTE_ENEMY_SKILL_TYPE = 46;
 const CHANGE_ATTRIBUTE_HANDLER = 0x629708;
 const CHANGE_ATTRIBUTE_SETUP_HANDLER = 0x621504;
@@ -277,6 +285,42 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : healPlayerSetupTarget === HEAL_PLAYER_SETUP_HANDLER;
   const healPlayerConditionMatches = healPlayerConditionTarget === null
     ? null : healPlayerConditionTarget === HEAL_PLAYER_CONDITION_HANDLER;
+  const selfDestructDispatchTarget = resolveEnemySkillTarget(
+    SELF_DESTRUCT_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const selfDestructSetupTarget = resolveEnemySkillTarget(
+    SELF_DESTRUCT_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const selfDestructConditionTarget = resolveEnemySkillTarget(
+    SELF_DESTRUCT_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const selfDestructDispatchMatches = selfDestructDispatchTarget === null
+    ? null : selfDestructDispatchTarget === SELF_DESTRUCT_HANDLER;
+  const selfDestructSetupMatches = selfDestructSetupTarget === null
+    ? null : selfDestructSetupTarget === SELF_DESTRUCT_SETUP_HANDLER;
+  const selfDestructConditionMatches = selfDestructConditionTarget === null
+    ? null : selfDestructConditionTarget === SELF_DESTRUCT_CONDITION_HANDLER;
+  const inactiveEnemySkillTargets = INACTIVE_ENEMY_SKILL_TYPES.map((type) => ({
+    type,
+    dispatchTarget: resolveEnemySkillTarget(
+      type, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+    ),
+    setupTarget: resolveEnemySkillTarget(type, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE),
+    conditionTarget: resolveEnemySkillTarget(
+      type, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+    ),
+  }));
+  const inactiveEnemySkillsMatch = restoredElf === null ? null : inactiveEnemySkillTargets.every((entry) => (
+    entry.dispatchTarget === INACTIVE_ENEMY_SKILL_HANDLER
+    && entry.setupTarget === INACTIVE_ENEMY_SKILL_SETUP_HANDLER
+    && entry.conditionTarget === INACTIVE_ENEMY_SKILL_CONDITION_HANDLER
+  ));
   const changeAttributeDispatchTarget = resolveEnemySkillTarget(
     CHANGE_ATTRIBUTE_ENEMY_SKILL_TYPE,
     ENEMY_SKILL_DISPATCH_TABLE,
@@ -1007,6 +1051,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       healPlayerDispatchMatches21_9: healPlayerDispatchMatches,
       healPlayerSetupMatches21_9: healPlayerSetupMatches,
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
+      selfDestructDispatchMatches21_9: selfDestructDispatchMatches,
+      selfDestructSetupMatches21_9: selfDestructSetupMatches,
+      selfDestructConditionMatches21_9: selfDestructConditionMatches,
+      inactiveEnemySkillTypes41Through45Match21_9: inactiveEnemySkillsMatch,
       changeAttributeDispatchMatches21_9: changeAttributeDispatchMatches,
       changeAttributeSetupMatches21_9: changeAttributeSetupMatches,
       changeAttributeConditionMatches21_9: changeAttributeConditionMatches,
@@ -1098,6 +1146,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       monsterAttackWithSkillOffset: 'sMONSTER+0x7e8 (uint32 converted to float32 / 100)',
       monsterDurationOffset: 'sMONSTER+0x678 (packed low 10 bits)',
       monsterHealPercentOffset: 'sMONSTER+0x678 (type 55 signed int32 percent)',
+      monsterCurrentHpOffset: 'sMONSTER+0x3c/+0x4c (protected int64; type 40 writes zero)',
+      monsterDisplayedHpOffset: 'sMONSTER+0xd4/+0xe4 (protected int64 mirror; type 40 writes zero)',
       monsterAttributeTargetOffset: 'sMONSTER+0x678 (type 46 signed attribute index)',
       monsterAttributeOverrideOffset: 'sMONSTER+0x22f (signed byte; negative uses definition+0x0c)',
       monsterScaledAttackPercentOffset: 'sMONSTER+0x678 (type 47 signed int32 percent)',
@@ -1126,6 +1176,23 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       healPlayerConditionTarget: healPlayerConditionTarget === null
         ? null : hex(healPlayerConditionTarget),
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
+      selfDestructType: SELF_DESTRUCT_ENEMY_SKILL_TYPE,
+      selfDestructDispatchTarget: selfDestructDispatchTarget === null
+        ? null : hex(selfDestructDispatchTarget),
+      selfDestructDispatchMatches21_9: selfDestructDispatchMatches,
+      selfDestructSetupTarget: selfDestructSetupTarget === null
+        ? null : hex(selfDestructSetupTarget),
+      selfDestructSetupMatches21_9: selfDestructSetupMatches,
+      selfDestructConditionTarget: selfDestructConditionTarget === null
+        ? null : hex(selfDestructConditionTarget),
+      selfDestructConditionMatches21_9: selfDestructConditionMatches,
+      inactiveEnemySkillTypes: inactiveEnemySkillTargets.map((entry) => ({
+        type: entry.type,
+        dispatchTarget: entry.dispatchTarget === null ? null : hex(entry.dispatchTarget),
+        setupTarget: entry.setupTarget === null ? null : hex(entry.setupTarget),
+        conditionTarget: entry.conditionTarget === null ? null : hex(entry.conditionTarget),
+      })),
+      inactiveEnemySkillTypes41Through45Match21_9: inactiveEnemySkillsMatch,
       changeAttributeType: CHANGE_ATTRIBUTE_ENEMY_SKILL_TYPE,
       changeAttributeDispatchTarget: changeAttributeDispatchTarget === null
         ? null : hex(changeAttributeDispatchTarget),
@@ -1415,6 +1482,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || blackFallDispatchMatches === false || blackFallSetupMatches === false
     || healPlayerDispatchMatches === false || healPlayerSetupMatches === false
     || healPlayerConditionMatches === false
+    || selfDestructDispatchMatches === false || selfDestructSetupMatches === false
+    || selfDestructConditionMatches === false || inactiveEnemySkillsMatch === false
     || changeAttributeDispatchMatches === false || changeAttributeSetupMatches === false
     || changeAttributeConditionMatches === false
     || scaledAttackDispatchMatches === false || scaledAttackSetupMatches === false
