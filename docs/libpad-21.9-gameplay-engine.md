@@ -108,6 +108,14 @@ board dimensions. `_checkFlood2` performs a second connected-component pass over
 marked cells. This confirms that intersecting horizontal/vertical runs of the
 same attribute become one combo, rather than separate row and column combos.
 
+Board dimensions are runtime state rather than a hard-coded 6-by-5 assumption.
+`cGAMEMAIN::_getBoardSize` (`0x651f24`) normally reads the column and row bytes at
+`cGAMEMAIN+0x70/+0x71`; its override path unpacks two four-bit dimensions from
+game-work offset `0x877f4`. The browser engine therefore accepts dimensions up
+to the native packed limit of 15 and passes them through input traversal,
+matching, skills, falls, refills, validation, and snapshots. The visible lab
+continues to start in the normal 6-by-5 layout.
+
 The native combo list is a fixed list of 88-byte `sCOMBO` records with linked-list
 indices stored around game-work offset `0x57a8`. Version 21.9 also records modern
 shape metadata and passive-skill flags. The browser rules layer now returns mass

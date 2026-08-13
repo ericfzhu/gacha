@@ -76,9 +76,19 @@ function leaderMultiplier(combos) {
 }
 
 export class PuzzleEngine {
-  constructor({ seed = 21900, moveTime = PAD_DEFAULT_MOVE_TIME_SECONDS } = {}) {
+  constructor({
+    seed = 21900,
+    moveTime = PAD_DEFAULT_MOVE_TIME_SECONDS,
+    columns = PAD_BOARD_COLUMNS,
+    rows = PAD_BOARD_ROWS,
+  } = {}) {
+    if (![columns, rows].every(Number.isInteger) || columns < 1 || columns > 15 || rows < 1 || rows > 15) {
+      throw new Error('PAD board dimensions must be integers from 1 through 15.');
+    }
     this.seed = seed;
     this.moveTime = moveTime;
+    this.columns = columns;
+    this.rows = rows;
     this.rng = makeRng(seed);
     this.orbSerial = 0;
     this.visualTime = 0;
@@ -128,9 +138,9 @@ export class PuzzleEngine {
   }
 
   createStableBoard() {
-    const board = Array.from({ length: BOARD_ROWS }, () => Array(BOARD_COLUMNS).fill(null));
-    for (let row = 0; row < BOARD_ROWS; row += 1) {
-      for (let column = 0; column < BOARD_COLUMNS; column += 1) {
+    const board = Array.from({ length: this.rows }, () => Array(this.columns).fill(null));
+    for (let row = 0; row < this.rows; row += 1) {
+      for (let column = 0; column < this.columns; column += 1) {
         const blocked = new Set();
         if (column >= 2 && board[row][column - 1]?.type === board[row][column - 2]?.type) blocked.add(board[row][column - 1].type);
         if (row >= 2 && board[row - 1][column]?.type === board[row - 2][column]?.type) blocked.add(board[row - 1][column].type);
@@ -167,9 +177,11 @@ export class PuzzleEngine {
       this.drag.gridRow,
       gridColumn,
       gridRow,
+      this.rows,
+      this.columns,
     );
-    this.drag.gridColumn = Math.max(0, Math.min(BOARD_COLUMNS - Number.EPSILON * BOARD_COLUMNS, gridColumn));
-    this.drag.gridRow = Math.max(0, Math.min(BOARD_ROWS - Number.EPSILON * BOARD_ROWS, gridRow));
+    this.drag.gridColumn = Math.max(0, Math.min(this.columns - Number.EPSILON * this.columns, gridColumn));
+    this.drag.gridRow = Math.max(0, Math.min(this.rows - Number.EPSILON * this.rows, gridRow));
     if (!path.length) return false;
     for (const { row: nextRow, column: nextColumn } of path) {
       const crossedOrb = this.board[nextRow][nextColumn];
@@ -213,9 +225,9 @@ export class PuzzleEngine {
   useSkill() {
     if (this.mode !== 'playing' || this.phase !== 'input' || this.drag || this.skill.cooldown > 0) return false;
     const candidates = [];
-    for (let row = 0; row < BOARD_ROWS; row += 1) {
-      for (let column = 0; column < BOARD_COLUMNS; column += 1) {
-      if (this.board[row][column].type !== 'water' && !this.board[row][column].locked) candidates.push([row, column]);
+    for (let row = 0; row < this.rows; row += 1) {
+      for (let column = 0; column < this.columns; column += 1) {
+        if (this.board[row][column].type !== 'water' && !this.board[row][column].locked) candidates.push([row, column]);
       }
     }
     candidates.sort((a, b) => {
@@ -340,10 +352,10 @@ export class PuzzleEngine {
   }
 
   collapseAndRefill() {
-    for (let column = 0; column < BOARD_COLUMNS; column += 1) {
+    for (let column = 0; column < this.columns; column += 1) {
       const survivors = [];
-      for (let row = BOARD_ROWS - 1; row >= 0; row -= 1) if (this.board[row][column]) survivors.push(this.board[row][column]);
-      for (let row = BOARD_ROWS - 1, index = 0; row >= 0; row -= 1, index += 1) {
+      for (let row = this.rows - 1; row >= 0; row -= 1) if (this.board[row][column]) survivors.push(this.board[row][column]);
+      for (let row = this.rows - 1, index = 0; row >= 0; row -= 1, index += 1) {
         this.board[row][column] = survivors[index] || this.createOrb(NATURAL_ORB_TYPES[Math.floor(this.rng() * NATURAL_ORB_TYPES.length)].id);
       }
     }
@@ -426,7 +438,9 @@ export class PuzzleEngine {
   }
 
   setBoardFromCodes(rows) {
-    if (!Array.isArray(rows) || rows.length !== BOARD_ROWS || rows.some((row) => typeof row !== 'string' || row.length !== BOARD_COLUMNS)) throw new Error('Board must be five strings of six orb codes.');
+    if (!Array.isArray(rows) || rows.length !== this.rows || rows.some((row) => typeof row !== 'string' || row.length !== this.columns)) {
+      throw new Error(`Board must be ${this.rows} strings of ${this.columns} orb codes.`);
+    }
     this.board = rows.map((row) => [...row].map((code) => {
       const type = ORB_BY_CODE[code]?.id;
       if (!type) throw new Error(`Unknown orb code: ${code}`);
@@ -452,12 +466,13 @@ export class PuzzleEngine {
   }
 
   isCell(row, column) {
-    return row >= 0 && row < BOARD_ROWS && column >= 0 && column < BOARD_COLUMNS;
+    return row >= 0 && row < this.rows && column >= 0 && column < this.columns;
   }
 
   snapshot() {
     return {
-      coordinateSystem: `board origin top-left; rows 0-${BOARD_ROWS - 1} downward; columns 0-${BOARD_COLUMNS - 1} rightward`,
+      coordinateSystem: `board origin top-left; rows 0-${this.rows - 1} downward; columns 0-${this.columns - 1} rightward`,
+      boardDimensions: { rows: this.rows, columns: this.columns },
       mode: this.mode,
       phase: this.phase,
       turn: this.turn,

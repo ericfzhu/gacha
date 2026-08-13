@@ -122,6 +122,24 @@ assert.equal(engine.moveDrag(1, 1, 120, 120), true);
 assert.equal(engine.drag.pathLength, 2);
 assert.deepEqual(engine.snapshot().board.slice(0, 2), ['BLGHLD', 'GRDBHR']);
 
+const largeBoardEngine = new PuzzleEngine({ seed: 7, columns: 7, rows: 6 });
+largeBoardEngine.setBoardFromCodes([
+  'RBGHLDR',
+  'GLDBHRG',
+  'BHRDGLB',
+  'DLGRHBD',
+  'HRBGLDH',
+  'RGLDBHR',
+]);
+assert.deepEqual(largeBoardEngine.snapshot().boardDimensions, { rows: 6, columns: 7 });
+largeBoardEngine.start();
+assert.equal(largeBoardEngine.startDrag(5, 5, 385, 735, 5.5, 5.5), true);
+assert.equal(largeBoardEngine.moveDrag(5, 6, 420, 735, 6.5, 5.5), true);
+assert.equal(largeBoardEngine.drag.column, 6);
+assert.equal(largeBoardEngine.drag.pathLength, 1);
+assert.equal(largeBoardEngine.snapshot().board[5], 'RGLDBRH');
+assert.throws(() => new PuzzleEngine({ columns: 16, rows: 6 }), /1 through 15/);
+
 const poisonEngine = new PuzzleEngine({ seed: 2 });
 poisonEngine.setBoardFromCodes(['PPPBGH', 'HHHLDB', 'BGHRDL', 'DLGRHB', 'HRBGLD']);
 poisonEngine.player.hp = poisonEngine.player.maxHp;
