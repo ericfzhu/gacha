@@ -56,6 +56,25 @@ export function createPadLcg(seed = 0) {
   };
 }
 
+// cGAMEMAIN::_getRandomBlock (0x617874) advances the saved game-work LCG
+// exactly twice, combines the high halves of those two states into a temporary
+// seed, then performs a forward Fisher-Yates pass over its eligible block
+// list. The temporary shuffle advances are deliberately not written back to
+// game work. Candidate eligibility is caller-specific, so keep that separate
+// from this exact ordering primitive.
+export function padShuffleBlockCandidates(state, candidates) {
+  const first = padLcgStep(state);
+  const second = padLcgStep(first.state);
+  let localState = ((first.state & 0xffff0000) | (second.state >>> 16)) >>> 0;
+  const shuffled = [...candidates];
+  for (let index = 1; index < shuffled.length; index += 1) {
+    localState = padLcgStep(localState).state;
+    const target = (((localState >>> 16) * (index + 1)) >>> 16);
+    [shuffled[index], shuffled[target]] = [shuffled[target], shuffled[index]];
+  }
+  return { state: second.state, candidates: shuffled };
+}
+
 export function padAttributeMultiplier(attacker, defender) {
   if ((attacker === 'fire' && defender === 'wood') ||
       (attacker === 'wood' && defender === 'water') ||

@@ -17,6 +17,7 @@ import {
   padOrbMatchMultiplier,
   padPoisonDamage,
   padSecondaryAttributeAttack,
+  padShuffleBlockCandidates,
   padTertiaryAttributeAttack,
   padLcgStep,
   padThornDamage,
@@ -30,6 +31,14 @@ assert.deepEqual(
   Array.from({ length: 5 }, () => nativeRng()),
   [6_018, 58_043, 29_441, 14_031, 28_211].map((value) => value / 65_536),
 );
+assert.deepEqual(padShuffleBlockCandidates(21_900, [0, 1, 2, 3, 4, 5]), {
+  state: 3_803_934_822,
+  candidates: [1, 3, 2, 4, 5, 0],
+});
+assert.deepEqual(padShuffleBlockCandidates(21_900, ['heart']), {
+  state: 3_803_934_822,
+  candidates: ['heart'],
+});
 assert.deepEqual(new PuzzleEngine({ seed: 21_900 }).snapshot().board, [
   'RHGBGG',
   'BBGHRL',
