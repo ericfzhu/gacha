@@ -222,6 +222,19 @@ board walk. `PuzzleEngine.setBlockPowup` exposes that same state transition and
 returns the native-style affected-cell count. The routine's optional sound and
 effect allocation remain presentation work rather than puzzle state.
 
+The enemy inverse is `_doBlockMinus(bool, uint32 mask, float, int)` at
+`0x61caa0`. Only cells whose type bit is in the mask and whose current power is
+non-negative are eligible; applying the effect stores the negated binary32
+argument at `sBLOCK+8`. A non-positive limit processes every eligible cell in
+board order without consuming RNG. A positive limit builds the eligible cell
+list, consumes exactly one saved LCG advance even when that list is empty, and
+shuffles from a temporary LCG seeded by the saved state's high 16 bits. For each
+index `i` from one onward it swaps with `floor(random16 * i / 65536)`, then
+applies at most the requested number of cells. The temporary advances are not
+persisted. `PuzzleEngine.doBlockMinus` and
+`padShuffleBlockMinusCandidates` reproduce both branches, including dry-run
+counting and the distinct RNG contract.
+
 Bombs and burst drops are distinct native mechanisms. `_doMakeBurDrop` writes a
 one-byte descriptor at `sBLOCK+0x0c` on an otherwise normally typed orb;
 `sGAMEWORK::setBurBlockFlag` uses flag `0x80000`. A true bomb is block type `9`.

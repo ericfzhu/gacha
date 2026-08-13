@@ -620,6 +620,26 @@ export class PuzzleEngine {
     return changed;
   }
 
+  doBlockMinus(apply, typeMask, power, limit = 0) {
+    const mask = Number(typeMask) >>> 0;
+    const minusPower = Math.fround(-normalizeEnhancementPower(power));
+    let candidates = [];
+    this.board.forEach((row, rowIndex) => row.forEach((orb, columnIndex) => {
+      const type = ORB_TYPES.findIndex((candidate) => candidate.id === orb.type);
+      if (type >= 0 && (mask & (1 << type)) !== 0 && normalizeEnhancementPower(orb.enhancementPower) >= 0) {
+        candidates.push({ row: rowIndex, column: columnIndex });
+      }
+    }));
+    const capped = Math.trunc(Number(limit) || 0);
+    if (capped > 0) candidates = this.rng.shuffleBlockMinusCandidates(candidates).slice(0, capped);
+    if (apply) candidates.forEach(({ row, column }) => {
+      const orb = this.board[row][column];
+      orb.enhancementPower = minusPower;
+      orb.enhanced = minusPower > 0;
+    });
+    return candidates.length;
+  }
+
   isCell(row, column) {
     return row >= 0 && row < this.rows && column >= 0 && column < this.columns;
   }

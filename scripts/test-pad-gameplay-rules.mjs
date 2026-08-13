@@ -22,6 +22,7 @@ import {
   padPoisonDamage,
   padSecondaryAttributeAttack,
   padShuffleBlockCandidates,
+  padShuffleBlockMinusCandidates,
   padTertiaryAttributeAttack,
   padLcgStep,
   padThornDamage,
@@ -52,6 +53,14 @@ assert.deepEqual(padShuffleBlockCandidates(21_900, [0, 1, 2, 3, 4, 5]), {
 assert.deepEqual(padShuffleBlockCandidates(21_900, ['heart']), {
   state: 3_803_934_822,
   candidates: ['heart'],
+});
+assert.deepEqual(padShuffleBlockMinusCandidates(21_900, [0, 1, 2, 3, 4]), {
+  state: 394_448_415,
+  candidates: [3, 0, 4, 2, 1],
+});
+assert.deepEqual(padShuffleBlockMinusCandidates(21_900, []), {
+  state: 394_448_415,
+  candidates: [],
 });
 assert.deepEqual(padGetRandomBlock(21_900), { state: 3_803_934_822, type: 1 });
 assert.deepEqual(padGetRandomBlock(21_900, 1), { state: 3_803_934_822, type: 2 });
@@ -464,6 +473,19 @@ assert.equal(blockPowupEngine.board[0][2].enhancementPower, Math.fround(0.1));
 assert.equal(blockPowupEngine.setBlockPowup(0, 0.1), 2);
 assert.equal(blockPowupEngine.setBlockPowup('jammer', 0.1), 0);
 assert.equal(blockPowupEngine.setBlockPowup(6, 0.1), 0);
+
+const blockMinusEngine = new PuzzleEngine({ seed: 4 });
+blockMinusEngine.setBoardFromCodes(['RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
+const blockMinusStartState = blockMinusEngine.rng.state;
+assert.equal(blockMinusEngine.doBlockMinus(false, 0b11, 0.2), 4);
+assert.equal(blockMinusEngine.rng.state, blockMinusStartState);
+assert.equal(blockMinusEngine.board[0].filter((orb) => orb.enhancementPower < 0).length, 0);
+blockMinusEngine.setOrbState(0, 2, { enhancementPower: -0.5 });
+assert.equal(blockMinusEngine.doBlockMinus(true, 0b11, 0.2, 2), 2);
+assert.equal(blockMinusEngine.rng.state, padLcgStep(blockMinusStartState).state);
+assert.equal(blockMinusEngine.board[0].filter((orb) => orb.enhancementPower < 0).length, 3);
+assert.equal(blockMinusEngine.doBlockMinus(true, 0b11, 0.1), 1);
+assert.equal(blockMinusEngine.board[0].filter((orb) => orb.enhancementPower < 0).length, 4);
 
 const thornEngine = new PuzzleEngine({ seed: 5 });
 thornEngine.setBoardFromCodes(['RBGHLD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD']);

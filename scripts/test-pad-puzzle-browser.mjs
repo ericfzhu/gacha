@@ -169,6 +169,32 @@ try {
     blockPowupSample.powers[0] !== Math.fround(0.1) || blockPowupSample.powers[1] !== 0.25 ||
     blockPowupSample.powers[2] !== Math.fround(0.1)
   )) throw new Error(`Block-powup mismatch: ${JSON.stringify(blockPowupSample)}`);
+  const blockMinusSample = showOrbStates ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    engine.reset();
+    engine.setBoardFromCodes(['RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
+    const startState = engine.rng.state;
+    const dryCount = engine.doBlockMinus(false, 0b11, 0.2);
+    const dryState = engine.rng.state;
+    engine.setOrbState(0, 2, { enhancementPower: -0.5 });
+    const cappedCount = engine.doBlockMinus(true, 0b11, 0.2, 2);
+    const cappedState = engine.rng.state;
+    const cappedNegatives = engine.snapshot().boardState[0].filter((orb) => orb.enhancementPower < 0).length;
+    const allCount = engine.doBlockMinus(true, 0b11, 0.1);
+    const allNegatives = engine.snapshot().boardState[0].filter((orb) => orb.enhancementPower < 0).length;
+    engine.reset();
+    engine.start();
+    return { startState, dryCount, dryState, cappedCount, cappedState, cappedNegatives, allCount, allNegatives };
+  }) : null;
+  const expectedBlockMinusState = blockMinusSample
+    ? (Math.imul(blockMinusSample.startState, 0x343fd) + 0x269ec3) >>> 0
+    : null;
+  if (blockMinusSample && (
+    blockMinusSample.dryCount !== 4 || blockMinusSample.dryState !== blockMinusSample.startState ||
+    blockMinusSample.cappedCount !== 2 || blockMinusSample.cappedState !== expectedBlockMinusState ||
+    blockMinusSample.cappedNegatives !== 3 ||
+    blockMinusSample.allCount !== 1 || blockMinusSample.allNegatives !== 4
+  )) throw new Error(`Block-minus mismatch: ${JSON.stringify(blockMinusSample)}`);
   if (renderAtlasSheet) {
     const sheet = page.locator('#pad-atlas-sheet');
     await page.evaluate(() => {
@@ -380,9 +406,9 @@ try {
     moveDeadline.drag !== null || moveDeadline.turn !== 1 || moveDeadline.phase !== 'detect'
   )) throw new Error(`Move deadline mismatch: ${JSON.stringify(moveDeadline)}`);
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

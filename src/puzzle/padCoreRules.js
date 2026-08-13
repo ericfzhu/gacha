@@ -69,6 +69,11 @@ export function createPadRng(seed = 0) {
       state = shuffled.state;
       return shuffled.candidates;
     },
+    shuffleBlockMinusCandidates(candidates) {
+      const shuffled = padShuffleBlockMinusCandidates(state, candidates);
+      state = shuffled.state;
+      return shuffled.candidates;
+    },
     getRandomBlock(excludedType = -1, includeJammer = false, includeHeart = true) {
       const result = padGetRandomBlock(state, excludedType, includeJammer, includeHeart);
       state = result.state;
@@ -104,6 +109,22 @@ export function padShuffleBlockCandidates(state, candidates) {
     [shuffled[index], shuffled[target]] = [shuffled[target], shuffled[index]];
   }
   return { state: second.state, candidates: shuffled };
+}
+
+// _doBlockMinus (0x61caa0) uses a separate shuffle contract for a capped
+// enemy debuff. It persists one LCG advance even for zero/one candidates, seeds
+// a temporary LCG from that state's high 16 bits, then swaps every index i with
+// a target in [0, i). The temporary advances are not written back to game work.
+export function padShuffleBlockMinusCandidates(state, candidates) {
+  const persisted = padLcgStep(state);
+  let localState = persisted.value;
+  const shuffled = [...candidates];
+  for (let index = 1; index < shuffled.length; index += 1) {
+    localState = padLcgStep(localState).state;
+    const target = (((localState >>> 16) * index) >>> 16);
+    [shuffled[index], shuffled[target]] = [shuffled[target], shuffled[index]];
+  }
+  return { state: persisted.state, candidates: shuffled };
 }
 
 // The same native routine builds its candidates from numeric block types
