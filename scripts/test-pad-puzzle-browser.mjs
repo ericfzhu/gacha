@@ -502,7 +502,7 @@ try {
     engine.setEnhancedFallAwakenings(Array(6).fill(0));
     engine.setEnhancedFallModifier(null);
     const blackFallSkillDefinition = new Uint8Array(6);
-    new DataView(blackFallSkillDefinition.buffer).setInt16(4, 127, true);
+    new DataView(blackFallSkillDefinition.buffer).setInt16(4, 128, true);
     const blackFallMonsterRuntime = new Uint8Array(0x680);
     const blackFallMonsterView = new DataView(blackFallMonsterRuntime.buffer);
     blackFallMonsterView.setUint16(0x678, 2, true);

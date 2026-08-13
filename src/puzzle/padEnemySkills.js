@@ -1,4 +1,4 @@
-export const PAD_ENEMY_SKILL_BLACK_FALL = 127;
+export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 
 export const PAD_ENEMY_SKILL_RUNTIME_LAYOUT = Object.freeze({
   definitionTypeOffset: 0x04,
@@ -19,7 +19,7 @@ function requireLength(bytes, minimum, label) {
   }
 }
 
-// _doEnemySkill's second jump table dispatches signed type 127 to 0x62a7d4.
+// _doEnemySkill's second jump table dispatches signed type 128 to 0x62a854.
 // That handler reads the selected definition type at +0x04, the active
 // monster's packed duration at +0x678, and its chance parameter at +0x67c.
 // The duration is stored in a signed ten-bit status lane; the later spawn test

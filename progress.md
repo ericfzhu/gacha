@@ -2,14 +2,26 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 black-fall dispatch correction
+
+- Cross-checked both `_setupEnemyAttackSub` and `_doEnemySkill` jump tables and
+  corrected black-fall from type `127` to type `128`: setup entry `0x4af`
+  targets `0x6211a0`, and execution entry `0x61d` targets `0x62a854`.
+- Type `127` is the adjacent `0x62a7d4` status handler and does not read the
+  monster duration/chance fields. Updated the decoder, fixtures, inspector, and
+  documentation so the prior one-entry error cannot silently regress.
+- Next: materialize type-128 runtime fields from definition `+0x10/+0x14`, then
+  attach decoded enemy-skill execution to the recovered attack-counter boundary.
+
 ## 2026-08-14 black-fall enemy-skill runtime decode
 
-- Recovered `_doEnemySkill`'s second dispatch table: signed type `127`, table
-  entry `0x5fd`, resolves to the black-fall handler at `0x62a7d4`.
+- Recovered `_doEnemySkill`'s second dispatch table. A later cross-check of the
+  adjacent entries corrected black-fall to signed type `128`, table entry
+  `0x61d`, resolving to the handler at `0x62a854`.
 - Added a byte-exact runtime decoder for definition type `+0x04`, monster
   duration `+0x678`, and signed chance `+0x67c`, plus an engine application
   boundary that rejects unsupported types without changing fall state.
-- Routed engine and browser fixtures through the decoded type-127 record and
+- Routed engine and browser fixtures through the decoded type-128 record and
   made the exact inspector verify both the `0x6285a4` `_doEnemySkill` anchor and
   jump-table target (71 symbols total).
 - Next: recover the enemy-skill scheduler/selection boundary and add the next

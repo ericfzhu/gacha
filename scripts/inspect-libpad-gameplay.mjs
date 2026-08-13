@@ -11,8 +11,11 @@ const PAD_21_9_LIBPAD_SHA256 = '785ffa641837c528864cfbeb9716e340c9d948ba3a37bca3
 const PAD_21_9_RESTORED_SHA256 = '91223570f42247f155e50fba03e529f2a21b936021bd1525928237a5c87cd99a';
 const ENEMY_SKILL_DISPATCH_TABLE = 0xd3cbe0;
 const ENEMY_SKILL_DISPATCH_BASE = 0x628fe0;
-const BLACK_FALL_ENEMY_SKILL_TYPE = 127;
-const BLACK_FALL_HANDLER = 0x62a7d4;
+const ENEMY_SKILL_SETUP_TABLE = 0xd3c99c;
+const ENEMY_SKILL_SETUP_BASE = 0x61fee4;
+const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
+const BLACK_FALL_HANDLER = 0x62a854;
+const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
 
 const GAMEPLAY_SYMBOLS = Object.freeze([
   ['input', 'walk1step', '_ZN9cGAMEMAIN10_walk1stepEv', 0x647c28],
@@ -146,12 +149,25 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       ENEMY_SKILL_DISPATCH_TABLE + (BLACK_FALL_ENEMY_SKILL_TYPE - 1) * 2,
     )
     : null;
+  const blackFallSetupEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      ENEMY_SKILL_SETUP_TABLE + (BLACK_FALL_ENEMY_SKILL_TYPE - 1) * 2,
+    )
+    : null;
   const blackFallDispatchTarget = blackFallDispatchEntry === null
     ? null
     : ENEMY_SKILL_DISPATCH_BASE + blackFallDispatchEntry * 4;
   const blackFallDispatchMatches = blackFallDispatchTarget === null
     ? null
     : blackFallDispatchTarget === BLACK_FALL_HANDLER;
+  const blackFallSetupTarget = blackFallSetupEntry === null
+    ? null
+    : ENEMY_SKILL_SETUP_BASE + blackFallSetupEntry * 4;
+  const blackFallSetupMatches = blackFallSetupTarget === null
+    ? null
+    : blackFallSetupTarget === BLACK_FALL_SETUP_HANDLER;
 
   const symbols = GAMEPLAY_SYMBOLS.map(([group, label, mangledName, expectedAddress]) => {
     const symbol = restoredSymbols.get(mangledName) || null;
@@ -184,6 +200,7 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       allAnchorsPresent: missing.length === 0,
       allAddressesMatch21_9: mismatches.length === 0,
       blackFallDispatchMatches21_9: blackFallDispatchMatches,
+      blackFallSetupMatches21_9: blackFallSetupMatches,
     } : null,
     layout: {
       boardColumnsOffset: 'cGAMEMAIN+0x70',
@@ -208,6 +225,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       dispatchEntry: blackFallDispatchEntry === null ? null : hex(blackFallDispatchEntry),
       dispatchTarget: blackFallDispatchTarget === null ? null : hex(blackFallDispatchTarget),
       dispatchMatches21_9: blackFallDispatchMatches,
+      setupEntry: blackFallSetupEntry === null ? null : hex(blackFallSetupEntry),
+      setupTarget: blackFallSetupTarget === null ? null : hex(blackFallSetupTarget),
+      setupMatches21_9: blackFallSetupMatches,
     },
     symbols,
   };
@@ -244,5 +264,5 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     }
   }
 
-  if (missing.length || mismatches.length || blackFallDispatchMatches === false) process.exitCode = 1;
+  if (missing.length || mismatches.length || blackFallDispatchMatches === false || blackFallSetupMatches === false) process.exitCode = 1;
 }

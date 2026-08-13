@@ -254,7 +254,7 @@ const blackFallMonsterView = new DataView(blackFallMonsterRuntime.buffer);
 blackFallMonsterView.setUint16(0x678, 3, true);
 blackFallMonsterView.setUint32(0x67c, 7_500, true);
 assert.deepEqual(decodePadEnemySkillRuntime(blackFallSkillDefinition, blackFallMonsterRuntime), {
-  type: 127,
+  type: 128,
   kind: 'blackFall',
   supported: true,
   durationTurns: 3,
@@ -886,7 +886,7 @@ assert.equal(blackFallEngine.applyEnemySkillRuntime(
   blackFallMonsterRuntime,
 ), true);
 assert.deepEqual(blackFallEngine.snapshot().lastEnemySkill, {
-  type: 127,
+  type: 128,
   kind: 'blackFall',
   supported: true,
   durationTurns: 2,
