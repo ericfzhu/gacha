@@ -25,6 +25,7 @@ import {
   padResolveBitReplacements,
   padResolveBlockSwapNew,
   padResolveLineBlockSwaps,
+  padResolveSkillBoardSwap,
   padRelocateBoardXBits,
   padRelocateBoardYBits,
   padSecondaryAttributeAttack,
@@ -301,6 +302,21 @@ assert.ok(horizontalLineSwap.assignments.every(({ row }) => row === 0 || row ===
 assert.deepEqual(padResolveLineBlockSwaps(21_900, 0, 1, [[0]], 'vertical', null, 7), {
   state: 21_900, effectFlags: 0, assignments: [], relocatedMask: 0,
 });
+const skillBoardSwap = padResolveSkillBoardSwap(
+  21_900,
+  [0, 1, 2, -1, 9],
+  Array.from({ length: 5 }, () => Array(6).fill(9)),
+  [1, 0, 0, 0, 0],
+);
+assert.equal(skillBoardSwap.state, 4_172_709_003);
+assert.equal(skillBoardSwap.assignments.length, 29);
+assert.deepEqual(skillBoardSwap.distribution, [
+  0, 2, 0, 0, 0, 1, 1, 0, 2, 0, 2, 2, 0, 1, 2,
+  0, 0, 2, 0, 2, 1, 1, 1, 2, 0, 1, 1, 0, 1, 0,
+]);
+assert.deepEqual(Array.from({ length: 3 }, (_, type) => (
+  skillBoardSwap.distribution.filter((value) => value === type).length
+)), [13, 9, 8]);
 assert.deepEqual(padGetRandomBlock(21_900), { state: 3_803_934_822, type: 1 });
 assert.deepEqual(padGetRandomBlock(21_900, 1), { state: 3_803_934_822, type: 2 });
 assert.deepEqual(padGetRandomBlock(21_900, -1, true, true), { state: 3_803_934_822, type: 1 });
@@ -911,6 +927,19 @@ poisonSwapEngine.setRngState(21_900);
 assert.equal(poisonSwapEngine.doBlockSwap2(2, 2), 1);
 assert.equal(poisonSwapEngine.board[0][0].type, 'wood');
 assert.equal(poisonSwapEngine.board[0][1].type, 'wood');
+const skillSwapEngine = new PuzzleEngine({ seed: 21_900 });
+skillSwapEngine.setBoardFromCodes(Array(5).fill('XXXXXX'));
+skillSwapEngine.setRngState(21_900);
+skillSwapEngine.setOrbState(0, 0, { locked: true });
+skillSwapEngine.setOrbState(0, 1, { enhancementPower: 0.5 });
+assert.equal(skillSwapEngine.doBlockSwap3({ types: [0, 1, 2, -1, 9] }), 29);
+assert.equal(skillSwapEngine.rng.state, 4_172_709_003);
+assert.equal(skillSwapEngine.board[0][0].type, 'bomb');
+assert.equal(skillSwapEngine.board[0][1].type, 'wood');
+assert.equal(skillSwapEngine.board[0][1].enhancementPower, 0.5);
+assert.deepEqual(['fire', 'water', 'wood', 'bomb'].map((type) => (
+  skillSwapEngine.board.flat().filter((orb) => orb.type === type).length
+)), [12, 9, 8, 1]);
 const lineSwapEngine = new PuzzleEngine({ seed: 21_900 });
 lineSwapEngine.setBoardFromCodes(['DDDDHD', 'GLDHRG', 'HBGDGL', 'DLGHHB', 'HBGGLD']);
 lineSwapEngine.setRngState(21_900);

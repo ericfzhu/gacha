@@ -2,6 +2,22 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 skill-record full-board swaps
+
+- Recovered `_doBlockSwap3` at `0x6aea98` and the relevant skill record fields:
+  up to seven signed destination types at offsets `+0x14..+0x2c`, terminated by
+  the first negative value.
+- Ported its three-copies-per-type prefix, saved-LCG random fill, two-step
+  combined-seed forward shuffle, row-major slot consumption, same-type skip,
+  locked-cell rejection, and natural/special mutation state.
+- Added exact distribution, RNG, sentinel, lock, same-source, enhancement,
+  engine, and browser fixtures. The exact inspector now checks 53 anchors.
+- Verification passed: rules, production build, exact binary inspection,
+  exhaustive browser mechanics, generic tap-turn/text state, clean console,
+  and screenshot inspection.
+- Next: non-null `sBLOCKFLAG` passive resistance and data-backed initial-board/
+  skyfall constraints; preserve the private account/server data boundary.
+
 ## 2026-08-14 explicit-list poison swaps
 
 - Recovered `_doBlockSwap2` at `0x6af838`: one mandatory destination followed

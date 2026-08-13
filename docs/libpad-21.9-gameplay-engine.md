@@ -374,6 +374,24 @@ mask zero, selecting poison/mortal-poison through the default-source rule.
 `PuzzleEngine.doBlockSwap2` keeps that ordered/sentinel contract and therefore
 does not collapse repeated types into a bit mask.
 
+`_doBlockSwap3(sSKILLDATA const *)` at `0x6aea98` is a full-board distribution
+writer. It reads at most seven 32-bit destination types beginning at skill-record
+offset `+0x14`, stopping at the first negative. The native work list begins with
+three copies of every listed type. It then consumes one saved LCG step while its
+fill counter runs from the number of listed types to the active board-cell count;
+because the three-copy prefix is already present, only the prefix through the
+board-cell count is ultimately used. Finally it consumes two saved steps, builds
+the standard combined local seed, and forward-shuffles that distribution.
+
+Shuffled entries are consumed row-major. An already-matching cell or a locked
+cell uses its entry without changing; lock is checked after the equality test.
+Successful natural writes retain enhancement, while special writes clear power
+and flags `0x28000`. `padResolveSkillBoardSwap` reproduces the three-copy
+guarantee, otherwise-random fill, saved/local RNG split, sentinel parsing, and
+slot consumption. `PuzzleEngine.doBlockSwap3` accepts either the type array or
+`{types}` and returns the number of successful browser-model mutations; the
+native routine itself uses that count only for presentation.
+
 The enemy inverse is `_doBlockMinus(bool, uint32 mask, float, int)` at
 `0x61caa0`. Only cells whose type bit is in the mask and whose current power is
 non-negative are eligible; applying the effect stores the negated binary32

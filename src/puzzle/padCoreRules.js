@@ -165,6 +165,11 @@ export function createPadRng(seed = 0) {
       state = resolved.state;
       return resolved;
     },
+    resolveSkillBoardSwap(skillTypes, boardTypes, lockedRows = null) {
+      const resolved = padResolveSkillBoardSwap(state, skillTypes, boardTypes, lockedRows);
+      state = resolved.state;
+      return resolved;
+    },
     getRandomBlock(excludedType = -1, includeJammer = false, includeHeart = true) {
       const result = padGetRandomBlock(state, excludedType, includeJammer, includeHeart);
       state = result.state;
@@ -623,6 +628,55 @@ export function padResolveLineBlockSwaps(
     }
   }
   return { state: savedState, effectFlags, assignments, relocatedMask };
+}
+
+// _doBlockSwap3 (0x6aea98) reads up to seven non-negative types from its skill
+// record, seeds three copies of each, fills the remaining distribution with
+// saved-LCG choices, and finally performs the ordinary two-step combined-seed
+// shuffle. Locked/already-matching cells consume their row-major shuffled slot.
+export function padResolveSkillBoardSwap(state, skillTypes, boardTypes, lockedRows = null) {
+  const rows = Array.isArray(boardTypes) ? boardTypes.length : 0;
+  const columns = rows > 0 && Array.isArray(boardTypes[0]) ? boardTypes[0].length : 0;
+  const validBoard = rows > 0 && columns > 0
+    && boardTypes.every((row) => Array.isArray(row) && row.length === columns);
+  let savedState = Number(state) >>> 0;
+  if (!validBoard) return { state: savedState, assignments: [], distribution: [] };
+  const destinations = [];
+  for (const value of (Array.isArray(skillTypes) ? skillTypes : []).slice(0, 7)) {
+    const type = Math.trunc(Number(value));
+    if (type < 0) break;
+    if (type <= 9) destinations.push(type);
+  }
+  if (destinations.length === 0) return { state: savedState, assignments: [], distribution: [] };
+  const cellCount = rows * columns;
+  const workingTypes = destinations.flatMap((type) => [type, type, type]);
+  let nativeFillCount = destinations.length;
+  while (nativeFillCount < cellCount) {
+    const roll = padLcgStep(savedState);
+    savedState = roll.state;
+    const index = Math.floor(roll.value * destinations.length / 0x10000);
+    workingTypes.push(destinations[index]);
+    nativeFillCount += 1;
+  }
+  const shuffled = padShuffleBlockCandidates(savedState, workingTypes.slice(0, nativeFillCount));
+  savedState = shuffled.state;
+  const assignments = [];
+  let distributionIndex = 0;
+  for (let row = 0; row < rows; row += 1) {
+    const lockedBits = Number(lockedRows?.[row] ?? 0) & 0xffff;
+    for (let column = 0; column < columns; column += 1) {
+      const type = shuffled.candidates[distributionIndex];
+      distributionIndex += 1;
+      if (type === undefined || type === Math.trunc(Number(boardTypes[row][column]))
+        || (lockedBits & (1 << column)) !== 0) continue;
+      assignments.push({ row, column, type });
+    }
+  }
+  return {
+    state: savedState,
+    assignments,
+    distribution: shuffled.candidates.slice(0, cellCount),
+  };
 }
 
 // The same native routine builds its candidates from numeric block types

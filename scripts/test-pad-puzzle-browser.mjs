@@ -348,6 +348,16 @@ try {
     const explicitSwapFlags = engine.doBlockSwap2(2, 3, -1, 9, 4);
     const explicitSwapState = engine.rng.state;
     const explicitSwapTypes = engine.board[0].slice(0, 2).map((orb) => orb.type);
+    engine.setBoardFromCodes(Array(5).fill('XXXXXX'));
+    engine.setRngState(21_900);
+    engine.setOrbState(0, 0, { locked: true });
+    engine.setOrbState(0, 1, { enhancementPower: 0.5 });
+    const skillSwapChanged = engine.doBlockSwap3({ types: [0, 1, 2, -1, 9] });
+    const skillSwapState = engine.rng.state;
+    const skillSwapCounts = ['fire', 'water', 'wood', 'bomb'].map((type) => (
+      engine.board.flat().filter((orb) => orb.type === type).length
+    ));
+    const skillSwapFirst = engine.snapshot().boardState[0].slice(0, 2);
     engine.setBoardFromCodes(['DDDDHD', 'GLDHRG', 'HBGDGL', 'DLGHHB', 'HBGGLD']);
     engine.setRngState(21_900);
     engine.setOrbState(2, 3, { locked: true });
@@ -374,6 +384,7 @@ try {
       maskSwapFlags, maskSwapState, maskSwapTypes,
       poisonSwapFlags, poisonSwapState, poisonSwapTypes,
       explicitSwapFlags, explicitSwapState, explicitSwapTypes,
+      skillSwapChanged, skillSwapState, skillSwapCounts, skillSwapFirst,
       verticalSwapFlags, verticalSwapState, verticalSwapTypes,
       horizontalSwapFlags, horizontalSwapState, horizontalSwapTypes,
     };
@@ -414,6 +425,11 @@ try {
     JSON.stringify(poisonBlockSample.poisonSwapTypes) !== JSON.stringify(['fire', 'mortalPoison']) ||
     poisonBlockSample.explicitSwapFlags !== 5 || poisonBlockSample.explicitSwapState !== 919_597_584 ||
     JSON.stringify(poisonBlockSample.explicitSwapTypes) !== JSON.stringify(['wood', 'mortalPoison']) ||
+    poisonBlockSample.skillSwapChanged !== 29 || poisonBlockSample.skillSwapState !== 4_172_709_003 ||
+    JSON.stringify(poisonBlockSample.skillSwapCounts) !== JSON.stringify([12, 9, 8, 1]) ||
+    poisonBlockSample.skillSwapFirst[0].code !== 'X' || !poisonBlockSample.skillSwapFirst[0].locked ||
+    poisonBlockSample.skillSwapFirst[1].code !== 'G' ||
+    poisonBlockSample.skillSwapFirst[1].enhancementPower !== 0.5 ||
     poisonBlockSample.verticalSwapFlags !== 9 || poisonBlockSample.verticalSwapState !== 4_221_117_678 ||
     JSON.stringify(poisonBlockSample.verticalSwapTypes) !== JSON.stringify(['fire', 'heart', 'dark']) ||
     poisonBlockSample.horizontalSwapFlags !== 7 || poisonBlockSample.horizontalSwapState !== 2_782_038_744 ||
