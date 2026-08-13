@@ -286,6 +286,14 @@ export class PuzzleEngine {
           size: match.size,
           enhancedCount: match.cells.reduce((count, { row, column }) => count + (this.board[row][column]?.enhanced ? 1 : 0), 0),
           isMassAttack: match.isMassAttack,
+          isHorizontal: match.isHorizontal,
+          isVertical: match.isVertical,
+          isRow: match.isRow,
+          isColumn: match.isColumn,
+          isBox: match.isBox,
+          isCross: match.isCross,
+          isL: match.isL,
+          cascadeDepth: this.cascadeDepth + 1,
         })));
         this.comboCount += matches.length;
         if (matches.length) this.cascadeDepth += 1;
@@ -500,6 +508,7 @@ export class PuzzleEngine {
       }))),
       drag: this.drag ? { row: this.drag.row, column: this.drag.column, remainingSeconds: Number(this.drag.remaining.toFixed(2)), pathLength: this.drag.pathLength } : null,
       comboCount: this.comboCount,
+      turnMatches: this.turnMatches.map((match) => ({ ...match })),
       lastComboCount: this.lastComboCount,
       lastDamage: this.lastDamage,
       lastHealing: this.lastHealing,

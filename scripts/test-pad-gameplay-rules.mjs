@@ -81,6 +81,28 @@ assert.equal(fullRowMatches[0].size, 8);
 assert.equal(fullRowMatches[0].isHorizontal, false);
 assert.equal(fullRowMatches[0].isRow, true);
 
+const shapeEngine = new PuzzleEngine({ seed: 10 });
+shapeEngine.setBoardFromCodes(['RRRRRR', 'BGRDLH', 'GLRHBJ', 'LDHBRG', 'DHBGGL']);
+shapeEngine.start();
+shapeEngine.phase = 'detect';
+shapeEngine.phaseTimer = 0;
+shapeEngine.advancePhase();
+assert.equal(shapeEngine.turnMatches.length, 1);
+assert.deepEqual(shapeEngine.snapshot().turnMatches[0], {
+  type: 'fire',
+  size: 8,
+  enhancedCount: 0,
+  isMassAttack: true,
+  isHorizontal: false,
+  isVertical: false,
+  isRow: true,
+  isColumn: false,
+  isBox: false,
+  isCross: false,
+  isL: false,
+  cascadeDepth: 1,
+});
+
 assert.equal(padOrbMatchMultiplier(3), 1);
 assert.equal(padOrbMatchMultiplier(5), 1.5);
 assert.equal(padComboMultiplier(1), 1);

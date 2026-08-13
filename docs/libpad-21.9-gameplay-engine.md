@@ -135,6 +135,9 @@ attack, full-row, full-column, cross, L, and 3x3 box metadata for each connected
 match. Horizontal/vertical orientation is tracked separately: an ordinary
 three-orb horizontal match is not incorrectly reported as a full row, while a
 full row remains flagged if a perpendicular marked run joins the same combo.
+Those flags and the cascade depth are retained in the turn-level combo record,
+so combat/passive consumers and `render_game_to_text()` see the native shape
+semantics after the matched cells themselves have been erased.
 
 Native block types `0`–`5` are fire, water, wood, light, dark, and heart;
 `_doPoisonBlockN` explicitly treats types `7` and `8` as the two poison classes,
