@@ -1,3 +1,5 @@
+export const PAD_ENEMY_SKILL_POISON_BLOCKS = 57;
+export const PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS = 59;
 export const PAD_ENEMY_SKILL_POISON_BLOCK_N = 64;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES_4 = 76;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES = 77;
@@ -74,6 +76,20 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
     ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
     : null;
+  if (
+    type === PAD_ENEMY_SKILL_POISON_BLOCKS
+    || type === PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS
+  ) {
+    return Object.freeze({
+      type,
+      kind: 'poisonBlocks',
+      supported: true,
+      count: definition.getInt32(0x10, true),
+      excludeHeart: definition.getInt32(0x14, true) !== 0,
+      destinationType: type === PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS ? 8 : 7,
+      attackWithSkillValue,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_POISON_BLOCK_N) {
     requireLength(definitionBytes, 0x20, 'PAD enemy-skill definition');
     return Object.freeze({
@@ -257,6 +273,24 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
 
 export function normalizePadEnemySkillRecord(record) {
   const type = Math.trunc(Number(record?.type));
+  if (
+    type === PAD_ENEMY_SKILL_POISON_BLOCKS
+    || type === PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS
+    || record?.kind === 'poisonBlocks'
+  ) {
+    const poisonBlocksType = type === PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS
+      || Number(record?.destinationType) === 8
+      ? PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS
+      : PAD_ENEMY_SKILL_POISON_BLOCKS;
+    return Object.freeze({
+      type: poisonBlocksType,
+      kind: 'poisonBlocks',
+      supported: true,
+      count: Math.trunc(Number(record?.count) || 0),
+      excludeHeart: Boolean(record?.excludeHeart),
+      destinationType: poisonBlocksType === PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS ? 8 : 7,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_POISON_BLOCK_N || record?.kind === 'poisonBlockN') {
     return Object.freeze({
       type: PAD_ENEMY_SKILL_POISON_BLOCK_N,

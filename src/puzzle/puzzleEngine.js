@@ -34,6 +34,8 @@ import {
 } from './padCoreRules.js';
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
+  PAD_ENEMY_SKILL_POISON_BLOCKS,
+  PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS,
   PAD_ENEMY_SKILL_POISON_BLOCK_N,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES_4,
@@ -884,6 +886,15 @@ export class PuzzleEngine {
           )));
           return { eligible, rngState: this.rng.state };
         }
+        if (definition.effect.kind === 'poisonBlocks') {
+          const represented = this.faceTypes.filter((type) => (
+            this.countBlockBits(1 << type) > 0
+          ));
+          const eligible = represented.some((type) => (
+            !definition.effect.excludeHeart || type !== 5
+          )) && represented.length >= definition.effect.count;
+          return { eligible, rngState: this.rng.state };
+        }
         return { eligible: false, rngState: this.rng.state };
       },
     });
@@ -1069,6 +1080,15 @@ export class PuzzleEngine {
       this.message = `${changed} orb${changed === 1 ? '' : 's'} became poison.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'poisonBlocks') {
+      const changed = this.doPoisonBlocks(
+        skill.destinationType,
+        skill.count,
+        skill.excludeHeart,
+      );
+      this.message = `${changed} orb${changed === 1 ? '' : 's'} became poison.`;
+      return true;
+    }
     if (!skill.supported || skill.kind !== 'blackFall') return false;
     this.setBlackFallRule({
       chanceBasisPoints: skill.chanceBasisPoints,
@@ -1121,6 +1141,8 @@ export class PuzzleEngine {
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
       if (![
         PAD_ENEMY_SKILL_BLACK_FALL,
+        PAD_ENEMY_SKILL_POISON_BLOCKS,
+        PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS,
         PAD_ENEMY_SKILL_POISON_BLOCK_N,
         PAD_ENEMY_SKILL_HORIZONTAL_LINES,
         PAD_ENEMY_SKILL_HORIZONTAL_LINES_4,

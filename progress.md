@@ -2,6 +2,23 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 whole-color enemy poison writers
+
+- Identified types `57` and `59` as a paired family sharing late handler
+  `0x6291b8`, setup `0x61fee4`, and condition `0x61a6a0`; type 57 writes poison
+  and type 59 writes mortal poison.
+- Decoded `+0x10` as the requested represented-face-color count and nonzero
+  `+0x14` as Heart exclusion. The native condition first requires a represented
+  non-Heart eligible color, then compares the requested count against all
+  represented face colors, including Heart.
+- Reused the exact `_doPoisonBlocks` two-saved-roll whole-color shuffle. Pure
+  and browser fixtures select skill IDs 9013/9014, preserve Heart, convert the
+  same two source colors, consume three total LCG advances including AI, and
+  update budget 100 -> 80. An all-Heart fixture is rejected without RNG cost.
+- Exact restored-table inspection, rule tests, production build, exhaustive
+  browser regression, generic gameplay client, and both visual captures pass.
+- Next: commit the pair and continue the remaining enemy-skill condition audit.
+
 ## 2026-08-14 count-limited enemy poison writer
 
 - Mapped enemy skill type `64` through the early dispatch table to `0x628ccc`,

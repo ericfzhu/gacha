@@ -638,6 +638,29 @@ this raw record path into enemy turns and reports the chosen skill ID, budget,
 and RNG state. Other condition callbacks, flow-control records, and the legacy
 selector are rejected explicitly until decoded rather than approximated.
 
+Enemy skill types `57` and `59` are the whole-color poison writers. Both use
+the late dispatch handler `0x6291b8`, setup `0x61fee4`, and AI condition
+`0x61a6a0`. Definition `+0x10` is the requested number of represented dungeon
+face colors and nonzero `+0x14` excludes Heart from the eligible replacement
+list. Type 57 writes poison type 7; type 59 writes mortal poison type 8.
+
+The condition first requires at least one represented face color after the
+optional Heart exclusion, then separately requires that the total number of
+represented face colors—including Heart—be at least the requested count. It
+does not consume RNG. This distinction means a Fire-plus-Heart board can pass a
+request for two represented colors while the executor still converts only the
+Fire group when Heart is excluded; an all-Heart board fails the first gate.
+
+Execution calls `_doPoisonBlocks` (`0x626e78`). Native filters the ordered
+dungeon face list by current board presence and the Heart flag, then always
+spends two saved-LCG advances to seed a temporary shuffle when that list is
+nonempty. The temporary shuffle does not alter the saved state further. The
+first requested color groups are converted in full, subject to per-cell lock
+rejection. Browser fixtures for types 57/59 consume one new-AI roll plus the
+two saved shuffle rolls, preserve Heart, choose the same two source colors,
+and produce six new poison or six new mortal-poison cells; the mortal fixture
+also retains its one pre-existing mortal-poison cell.
+
 Enemy skill type `64` is the count-limited individual poison writer. Its early
 dispatch entry resolves to `0x628ccc`, setup to `0x6203f8`, and AI condition to
 `0x61aac4`. Definition `+0x10` is presentation data; signed `+0x14` is the

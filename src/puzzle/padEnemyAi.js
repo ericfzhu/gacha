@@ -1,6 +1,8 @@
 import { padLcgStep } from './padCoreRules.js';
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
+  PAD_ENEMY_SKILL_POISON_BLOCKS,
+  PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS,
   PAD_ENEMY_SKILL_POISON_BLOCK_N,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES_4,
@@ -108,6 +110,8 @@ function normalizeDefinitionMap(definitions) {
 function isStaticallyEligible(definition, state) {
   if (!definition.effect.supported || ![
     PAD_ENEMY_SKILL_BLACK_FALL,
+    PAD_ENEMY_SKILL_POISON_BLOCKS,
+    PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS,
     PAD_ENEMY_SKILL_POISON_BLOCK_N,
     PAD_ENEMY_SKILL_HORIZONTAL_LINES,
     PAD_ENEMY_SKILL_HORIZONTAL_LINES_4,
