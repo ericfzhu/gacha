@@ -606,6 +606,20 @@ export class PuzzleEngine {
     };
   }
 
+  setBlockPowup(type, power) {
+    const orbType = typeof type === 'number' ? ORB_TYPES[type]?.id : type;
+    if (!NATURAL_ORB_TYPES.some((candidate) => candidate.id === orbType)) return 0;
+    const requestedPower = normalizeEnhancementPower(power);
+    let changed = 0;
+    this.board.forEach((row) => row.forEach((orb) => {
+      if (orb.type !== orbType || normalizeEnhancementPower(orb.enhancementPower) > requestedPower) return;
+      orb.enhancementPower = requestedPower;
+      orb.enhanced = requestedPower > 0;
+      changed += 1;
+    }));
+    return changed;
+  }
+
   isCell(row, column) {
     return row >= 0 && row < this.rows && column >= 0 && column < this.columns;
   }

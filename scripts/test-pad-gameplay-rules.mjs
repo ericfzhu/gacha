@@ -453,6 +453,18 @@ assert.equal(poweredFireMatch.enhancedCount, 2);
 assert.equal(poweredFireMatch.enhancementMultiplier, 3.25);
 assert.equal(padNativeBaseAttackPower(100, [poweredFireMatch], 1), 325);
 
+const blockPowupEngine = new PuzzleEngine({ seed: 4 });
+blockPowupEngine.setBoardFromCodes(['RRRBHD', 'GLDBHG', 'BHGDGL', 'DLGHHB', 'HBGGLD']);
+blockPowupEngine.setOrbState(0, 1, { enhancementPower: 0.25 });
+blockPowupEngine.setOrbState(0, 2, { enhancementPower: -0.5 });
+assert.equal(blockPowupEngine.setBlockPowup('fire', 0.1), 2);
+assert.equal(blockPowupEngine.board[0][0].enhancementPower, Math.fround(0.1));
+assert.equal(blockPowupEngine.board[0][1].enhancementPower, 0.25);
+assert.equal(blockPowupEngine.board[0][2].enhancementPower, Math.fround(0.1));
+assert.equal(blockPowupEngine.setBlockPowup(0, 0.1), 2);
+assert.equal(blockPowupEngine.setBlockPowup('jammer', 0.1), 0);
+assert.equal(blockPowupEngine.setBlockPowup(6, 0.1), 0);
+
 const thornEngine = new PuzzleEngine({ seed: 5 });
 thornEngine.setBoardFromCodes(['RBGHLD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD']);
 thornEngine.setOrbState(0, 1, { thornPercent: 4 });

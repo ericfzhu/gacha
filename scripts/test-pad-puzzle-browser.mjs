@@ -152,6 +152,23 @@ try {
     orbStateSample[0].code !== 'X' || orbStateSample[0].enhanced !== false || orbStateSample[0].enhancementPower !== 0 ||
     orbStateSample[0].locked !== true || orbStateSample[4].enhancementPower !== 2.5
   )) throw new Error(`Numeric orb-state mismatch: ${JSON.stringify(orbStateSample)}`);
+  const blockPowupSample = showOrbStates ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    engine.setBoardFromCodes(['RRRBHD', 'GLDBHG', 'BHGDGL', 'DLGHHB', 'HBGGLD']);
+    engine.setOrbState(0, 1, { enhancementPower: 0.25 });
+    engine.setOrbState(0, 2, { enhancementPower: -0.5 });
+    const changed = engine.setBlockPowup('fire', 0.1);
+    const rejected = engine.setBlockPowup('jammer', 0.1);
+    const powers = engine.snapshot().boardState[0].slice(0, 3).map((orb) => orb.enhancementPower);
+    engine.reset();
+    engine.start();
+    return { changed, rejected, powers };
+  }) : null;
+  if (blockPowupSample && (
+    blockPowupSample.changed !== 2 || blockPowupSample.rejected !== 0 ||
+    blockPowupSample.powers[0] !== Math.fround(0.1) || blockPowupSample.powers[1] !== 0.25 ||
+    blockPowupSample.powers[2] !== Math.fround(0.1)
+  )) throw new Error(`Block-powup mismatch: ${JSON.stringify(blockPowupSample)}`);
   if (renderAtlasSheet) {
     const sheet = page.locator('#pad-atlas-sheet');
     await page.evaluate(() => {
@@ -363,9 +380,9 @@ try {
     moveDeadline.drag !== null || moveDeadline.turn !== 1 || moveDeadline.phase !== 'detect'
   )) throw new Error(`Move deadline mismatch: ${JSON.stringify(moveDeadline)}`);
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

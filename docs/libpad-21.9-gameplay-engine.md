@@ -212,6 +212,16 @@ resulting `enhancementMultiplier`; `enhancedCount` remains an effect and
 diagnostic count only. Original atlas overlays 22 and 25 render the enhanced and
 locked states.
 
+The active-skill writer has its own overwrite rule. `_setBlockPowup`
+(`0x6b0db4`) accepts only native types `0` through `5`, traverses the live board,
+and changes a matching cell only when its current `sBLOCK+8` value is less than
+or equal to the requested float. A stronger existing value is preserved; an
+equal value is still counted as an affected cell and retriggers the native
+effect. Jammer, poison, mortal-poison, and bomb types are rejected before the
+board walk. `PuzzleEngine.setBlockPowup` exposes that same state transition and
+returns the native-style affected-cell count. The routine's optional sound and
+effect allocation remain presentation work rather than puzzle state.
+
 Bombs and burst drops are distinct native mechanisms. `_doMakeBurDrop` writes a
 one-byte descriptor at `sBLOCK+0x0c` on an otherwise normally typed orb;
 `sGAMEWORK::setBurBlockFlag` uses flag `0x80000`. A true bomb is block type `9`.
