@@ -2,6 +2,18 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 drop-rate lane summary
+
+- Recovered `_buildBlockList` at `0x6615e8` through its final ten binary32
+  lanes: sequential sum, `float32(total * 100000)`, native ceiling, and positive
+  type mask.
+- Closed `__initBlocks`' saturated-rate branch, including its unsigned shifted
+  threshold and RNG-free numeric-type rotation past opening-run masks.
+- Added binary32 unit/mask and defensive saturated-fallback fixtures. The exact
+  inspector now checks 58 anchors.
+- Next: map raw dungeon/passive drop records into the final lanes and continue
+  the recovered board/fall state machine.
+
 ## 2026-08-14 native initial-board traversal
 
 - Recovered the gameplay loop in `__initBlocks` at `0x661f10`: top-down,

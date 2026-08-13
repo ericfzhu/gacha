@@ -189,8 +189,19 @@ three-orb run without rerolling or rescaling the random value; each ordinary
 cell still consumes exactly one saved LCG step. `padCreateInitialBoard` and
 `PuzzleEngine.createStableBoard` now reproduce the row-major traversal,
 horizontal/vertical mask union, forward face rotation, and dynamic dimensions.
-The body's saturated active-rate correction remains a separate data-dependent
-branch to map before claiming every authored dungeon-opening distribution.
+
+The upstream `_buildBlockList(float rates[10], uint32 excludedMask)` at
+`0x6615e8` clears ten lanes, applies dungeon/passive additions, sequentially
+adds the resulting binary32 values, multiplies the binary32 total by
+`100000.0f`, and returns `izMathCeiling`. The browser accepts those final lanes
+as `dropRates`; `padSummarizeDropRates` preserves their narrowing, integer-unit
+summary, and positive-type mask. `__initBlocks` treats the unsigned expression
+`ceil(total * 100000) >> 5 >= 3125` as saturated. If spawning then falls back
+to a type outside the positive-rate mask, it scans numeric types `0..9` forward
+with wraparound for the first positive type not blocked by the opening-run
+mask, without another RNG advance. That defensive saturated-rate correction is
+also reproduced. Mapping every raw dungeon/passive record into the ten lanes is
+still an upstream content-data task rather than an unresolved board algorithm.
 
 The native combo list is a fixed list of 88-byte `sCOMBO` records with linked-list
 indices stored around game-work offset `0x57a8`. Version 21.9 also records modern

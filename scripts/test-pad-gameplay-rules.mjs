@@ -40,6 +40,7 @@ import {
   padShuffleLockDropCandidates,
   padSpawnNewBlock,
   padSpawnNewBlockInBits,
+  padSummarizeDropRates,
   padTertiaryAttributeAttack,
   padLcgStep,
   padThornDamage,
@@ -70,6 +71,14 @@ assert.deepEqual(padSpawnNewBlock(21_900, [], [0, 1, 2, 3, 4, 5]), {
   weighted: false,
   scripted: false,
 });
+assert.deepEqual(padSummarizeDropRates([0.1, 0.2]), {
+  rates: [Math.fround(0.1), Math.fround(0.2), 0, 0, 0, 0, 0, 0, 0, 0],
+  total: Math.fround(Math.fround(0.1) + Math.fround(0.2)),
+  units: 30_001,
+  positiveMask: 0b11,
+});
+assert.equal(padSummarizeDropRates([1]).units, 100_000);
+assert.equal(padSummarizeDropRates([1]).positiveMask, 1);
 assert.deepEqual(padSpawnNewBlock(21_900, [0.1], [0, 1, 2, 3, 4, 5]), {
   state: 3_803_934_822,
   type: 0,
@@ -121,6 +130,10 @@ assert.deepEqual(padCreateInitialBoard(21_900, 5, 6, [], [0, 1, 2, 3, 4, 5]), {
 assert.deepEqual(padCreateInitialBoard(21_900, 1, 1, [0.1], [0, 1, 2, 3, 4, 5]), {
   state: 3_803_934_822,
   board: [[0]],
+});
+assert.deepEqual(padCreateInitialBoard(21_900, 1, 1, [-2, 1], [0, 1, 2, 3, 4, 5]), {
+  state: 394_448_415,
+  board: [[1]],
 });
 assert.deepEqual(padShuffleBlockCandidates(21_900, [0, 1, 2, 3, 4, 5]), {
   state: 3_803_934_822,

@@ -220,10 +220,9 @@ export function padSpawnNewBlock(
   if (scriptedType !== null && scriptedType !== undefined && Number.isInteger(scripted)) {
     return { state: Number(state) >>> 0, type: scripted, spawnFlags: 0, weighted: false, scripted: true };
   }
-  const rates = Array.from({ length: 10 }, (_, index) => (
-    Math.fround(Number(dropRates?.[index]) || 0)
-  ));
-  const hasActiveRates = rates.some((rate) => rate !== 0);
+  const rateSummary = padSummarizeDropRates(dropRates);
+  const { rates } = rateSummary;
+  const hasActiveRates = rateSummary.units >= 1;
   const first = padLcgStep(state);
   let type = -1;
   let faceRoll = first;
@@ -256,6 +255,24 @@ export function padSpawnNewBlock(
     type = faces[(start + offset + 1) % faces.length];
   }
   return { state: faceRoll.state, type, spawnFlags: 0, weighted: false, scripted: false };
+}
+
+// _buildBlockList (0x6615e8) emits ten float32 lanes, adds them sequentially,
+// multiplies the final binary32 total by 100000.0f, and returns
+// izMathCeiling(result). The raw dungeon/passive records are upstream inputs;
+// this helper preserves the exact final-lane summary consumed by spawning.
+export function padSummarizeDropRates(dropRates) {
+  const rates = Array.from({ length: 10 }, (_, index) => (
+    Math.fround(Number(dropRates?.[index]) || 0)
+  ));
+  let total = Math.fround(0);
+  let positiveMask = 0;
+  rates.forEach((rate, type) => {
+    total = Math.fround(total + rate);
+    if (rate > 0) positiveMask |= 1 << type;
+  });
+  const units = Math.ceil(Math.fround(total * Math.fround(100_000)));
+  return { rates, total, units, positiveMask };
 }
 
 // _spawnNewBlockInBits (0x62771c) counts every bit in its uint16 mask and
@@ -300,6 +317,8 @@ export function padCreateInitialBoard(
   const width = Math.max(0, Math.trunc(Number(columns) || 0));
   const runLength = Math.max(2, Math.trunc(Number(minimumMatch) || PAD_MINIMUM_MATCH));
   const board = Array.from({ length: height }, () => Array(width).fill(-1));
+  const rateSummary = padSummarizeDropRates(dropRates);
+  const saturatedRates = (rateSummary.units >>> 5) >= 3_125;
   let savedState = Number(state) >>> 0;
   for (let row = 0; row < height; row += 1) {
     for (let column = 0; column < width; column += 1) {
@@ -322,7 +341,18 @@ export function padCreateInitialBoard(
       }
       const spawned = padSpawnNewBlock(savedState, dropRates, faceTypes, excludedMask);
       savedState = spawned.state;
-      board[row][column] = spawned.type;
+      let type = spawned.type;
+      if (saturatedRates && (rateSummary.positiveMask & (1 << type)) === 0) {
+        for (let offset = 1; offset <= 10; offset += 1) {
+          const candidate = (type + offset) % 10;
+          const candidateBit = 1 << candidate;
+          if ((excludedMask & candidateBit) === 0 && (rateSummary.positiveMask & candidateBit) !== 0) {
+            type = candidate;
+            break;
+          }
+        }
+      }
+      board[row][column] = type;
     }
   }
   return { state: savedState, board };
