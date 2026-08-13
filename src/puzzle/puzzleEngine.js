@@ -67,6 +67,11 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function normalizeEnhancementPower(value) {
+  const numeric = Number(value);
+  return Math.fround(Math.max(0, Number.isFinite(numeric) ? numeric : 0));
+}
+
 function copyEnemies() {
   return ENEMY_TEMPLATE.map((enemy) => ({ ...enemy, hp: enemy.maxHp, counter: enemy.maxCounter }));
 }
@@ -137,7 +142,18 @@ export class PuzzleEngine {
   }
 
   createOrb(type, state = {}) {
-    return { id: ++this.orbSerial, type, enhanced: false, locked: false, thornPercent: 0, ...state };
+    const enhancementPower = normalizeEnhancementPower(
+      state.enhancementPower === undefined ? (state.enhanced ? 1 : 0) : state.enhancementPower,
+    );
+    return {
+      id: ++this.orbSerial,
+      type,
+      locked: false,
+      thornPercent: 0,
+      ...state,
+      enhancementPower,
+      enhanced: enhancementPower > 0,
+    };
   }
 
   createStableBoard() {
@@ -556,11 +572,21 @@ export class PuzzleEngine {
       : Math.max(0, Math.min(0x7f, Math.trunc(Number(state.thornPercent) || 0)));
     const specialType = ['jammer', 'poison', 'mortalPoison', 'bomb'].includes(orb.type);
     const locked = state.locked === undefined ? orb.locked : Boolean(state.locked);
+    const currentEnhancementPower = normalizeEnhancementPower(
+      orb.enhancementPower === undefined ? (orb.enhanced ? 1 : 0) : orb.enhancementPower,
+    );
+    const requestedEnhancementPower = state.enhancementPower !== undefined
+      ? normalizeEnhancementPower(state.enhancementPower)
+      : state.enhanced === undefined
+        ? currentEnhancementPower
+        : state.enhanced ? (currentEnhancementPower || 1) : 0;
+    const enhancementPower = specialType && (thornPercent > 0 || locked)
+      ? 0
+      : requestedEnhancementPower;
     this.board[row][column] = {
       ...orb,
-      enhanced: specialType && (thornPercent > 0 || locked)
-        ? false
-        : state.enhanced === undefined ? orb.enhanced : Boolean(state.enhanced),
+      enhancementPower,
+      enhanced: enhancementPower > 0,
       locked,
       thornPercent,
     };
@@ -582,6 +608,7 @@ export class PuzzleEngine {
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({
         code: ORB_BY_ID[orb.type].code,
+        enhancementPower: orb.enhancementPower,
         enhanced: orb.enhanced,
         locked: orb.locked,
         thornPercent: orb.thornPercent,

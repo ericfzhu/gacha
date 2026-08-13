@@ -189,12 +189,16 @@ before the HP clamp, matching
 
 Orb state remains separate from type. In native `sBLOCK`, type is the signed
 byte at `+0`, the flag word is at `+4`, and the enhancement value is the float at
-`+8`. `_doLockDropBits` tests and sets flag `0x800`; locking a special type also
-clears its enhancement value. The browser orb record therefore carries
-`enhanced` and `locked` alongside `type`. Locked orbs still move and match but
-are skipped by conversion skills, while enhanced orbs retain their type and add
-the classic 6% per enhanced orb in that match. Original atlas overlays 22 and 25
-render the enhanced and locked states.
+`+8`. `setBlockPowup(type, float, bool)` compares and writes that value without
+coercing it to a boolean. `_doLockDropBits` tests and sets flag `0x800`; locking
+a special type also clears its enhancement value. The browser orb record
+therefore preserves a float32 `enhancementPower` and derives its visual
+`enhanced` flag from whether that value is positive. Locked orbs still move and
+match but are skipped by conversion skills. The classic pure-rules calculation
+currently treats each positive value as one enhanced orb and adds 6% per orb;
+the restored code proves numeric storage but not yet that the magnitude weights
+classic match damage, so the port does not invent that behavior. Original atlas
+overlays 22 and 25 render the enhanced and locked states.
 
 Bombs and burst drops are distinct native mechanisms. `_doMakeBurDrop` writes a
 one-byte descriptor at `sBLOCK+0x0c` on an otherwise normally typed orb;

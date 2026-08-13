@@ -398,11 +398,16 @@ assert.equal(stateEngine.board[0][0].enhanced, true);
 assert.equal(stateEngine.board[0][0].locked, true);
 
 stateEngine.setBoardFromCodes(['XPMJRD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD']);
-stateEngine.setOrbState(0, 0, { enhanced: true, locked: false });
+stateEngine.setOrbState(0, 0, { enhancementPower: 2.5, locked: false });
 assert.equal(stateEngine.board[0][0].enhanced, true);
+assert.equal(stateEngine.board[0][0].enhancementPower, 2.5);
 stateEngine.setOrbState(0, 0, { locked: true });
 assert.equal(stateEngine.board[0][0].enhanced, false);
+assert.equal(stateEngine.board[0][0].enhancementPower, 0);
 assert.equal(stateEngine.board[0][0].locked, true);
+stateEngine.setOrbState(0, 4, { enhancementPower: 1.75 });
+assert.equal(stateEngine.board[0][4].enhanced, true);
+assert.equal(stateEngine.snapshot().boardState[0][4].enhancementPower, 1.75);
 
 const thornEngine = new PuzzleEngine({ seed: 5 });
 thornEngine.setBoardFromCodes(['RBGHLD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD']);

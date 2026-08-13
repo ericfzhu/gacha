@@ -6,8 +6,8 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
 
 - Added a reproducible `libpad:inspect` command that validates the exact
   protected `libpad.so` hash, distinguishes it from the restored image, and
-  verifies 31 recovered input, board, match, hazard, combat, targeting, and
-  recovery routine addresses and sizes.
+  verifies 35 recovered input, board, orb-state, match, hazard, combat,
+  targeting, and recovery routine addresses and sizes.
 - Ported the exact `izRndLcGet` primitive and `_getRandomBlock` selection:
   two persisted global LCG advances, high-half temporary seed construction,
   forward Fisher-Yates candidate ordering, type exclusion, and jammer/heart
