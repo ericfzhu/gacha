@@ -24,6 +24,10 @@ const HEAL_PLAYER_ENEMY_SKILL_TYPE = 55;
 const HEAL_PLAYER_HANDLER = 0x629900;
 const HEAL_PLAYER_SETUP_HANDLER = 0x620040;
 const HEAL_PLAYER_CONDITION_HANDLER = 0x61aa74;
+const ATTRIBUTE_ABSORB_ENEMY_SKILL_TYPE = 53;
+const ATTRIBUTE_ABSORB_HANDLER = 0x6298ac;
+const ATTRIBUTE_ABSORB_SETUP_HANDLER = 0x61ffe8;
+const ATTRIBUTE_ABSORB_CONDITION_HANDLER = 0x61ae34;
 const BIND_LEADER_HELPER_ENEMY_SKILL_TYPE = 54;
 const BIND_LEADER_HELPER_HANDLER = 0x628fe0;
 const BIND_LEADER_HELPER_SETUP_HANDLER = 0x621008;
@@ -152,6 +156,8 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['enemy-ai', 'doBind', '_ZN9cGAMEMAIN7_doBindEPK8sMONSTERjib', 0x616de4],
   ['enemy-ai', 'hasPassiveSkillsCard', '_ZNK9cGAMEMAIN17_hasPassiveSkillsEPK5sCARDi', 0x640a90],
   ['enemy-ai', 'isValidCardNumber', '_ZN9cSAVEDATA17isValidCardNumberEib', 0x74393c],
+  ['combat', 'checkMonsterAbsorb', '_ZN9cGAMEMAIN18_checkMonterAbsorbEv', 0x6239dc],
+  ['combat', 'calcFinalDamage', '_ZN9cGAMEMAIN16_calcFinalDamageEbPK5sCARDPNS0_7sATKINFExRiP8sMONSTERiRbS8_S8_', 0x623b40],
   ['math', 'roundDouble', 'izMathRoundD', 0x36b2ec],
   ['math', 'signedIntMultiplyAdd', 'izMathSint32MulAdd', 0x36b3fc],
   ['combat', 'setEnemyAttackMain', '_ZN9cGAMEMAIN20__setEnemyAttackMainEP8sMONSTERbfi', 0x62c2cc],
@@ -254,6 +260,27 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : healPlayerSetupTarget === HEAL_PLAYER_SETUP_HANDLER;
   const healPlayerConditionMatches = healPlayerConditionTarget === null
     ? null : healPlayerConditionTarget === HEAL_PLAYER_CONDITION_HANDLER;
+  const attributeAbsorbDispatchTarget = resolveEnemySkillTarget(
+    ATTRIBUTE_ABSORB_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const attributeAbsorbSetupTarget = resolveEnemySkillTarget(
+    ATTRIBUTE_ABSORB_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const attributeAbsorbConditionTarget = resolveEnemySkillTarget(
+    ATTRIBUTE_ABSORB_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const attributeAbsorbDispatchMatches = attributeAbsorbDispatchTarget === null
+    ? null : attributeAbsorbDispatchTarget === ATTRIBUTE_ABSORB_HANDLER;
+  const attributeAbsorbSetupMatches = attributeAbsorbSetupTarget === null
+    ? null : attributeAbsorbSetupTarget === ATTRIBUTE_ABSORB_SETUP_HANDLER;
+  const attributeAbsorbConditionMatches = attributeAbsorbConditionTarget === null
+    ? null : attributeAbsorbConditionTarget === ATTRIBUTE_ABSORB_CONDITION_HANDLER;
   const bindLeaderHelperDispatchTarget = resolveEnemySkillTarget(
     BIND_LEADER_HELPER_ENEMY_SKILL_TYPE,
     ENEMY_SKILL_DISPATCH_TABLE,
@@ -885,6 +912,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       healPlayerDispatchMatches21_9: healPlayerDispatchMatches,
       healPlayerSetupMatches21_9: healPlayerSetupMatches,
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
+      attributeAbsorbDispatchMatches21_9: attributeAbsorbDispatchMatches,
+      attributeAbsorbSetupMatches21_9: attributeAbsorbSetupMatches,
+      attributeAbsorbConditionMatches21_9: attributeAbsorbConditionMatches,
       bindLeaderHelperDispatchMatches21_9: bindLeaderHelperDispatchMatches,
       bindLeaderHelperSetupMatches21_9: bindLeaderHelperSetupMatches,
       bindLeaderHelperConditionMatches21_9: bindLeaderHelperConditionMatches,
@@ -961,6 +991,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       monsterAttackWithSkillOffset: 'sMONSTER+0x7e8 (uint32 converted to float32 / 100)',
       monsterDurationOffset: 'sMONSTER+0x678 (packed low 10 bits)',
       monsterHealPercentOffset: 'sMONSTER+0x678 (type 55 signed int32 percent)',
+      monsterAttributeAbsorbDurationOffset: 'sMONSTER+0x890 (type 53 TCHKVAL<int16>)',
+      monsterAttributeAbsorbMaskOffset: 'sMONSTER+0x880 (type 53 TCHKVAL<int16>)',
       monsterBindTargetMaskOffset: 'sMONSTER+0x674 (type 54 uint16 party mask)',
       monsterBindSetupDurationOffset: 'sMONSTER+0x678 (type 54 signed int32; execution rerolls)',
       monsterChanceOffset: 'sMONSTER+0x67c (signed low 16 bits)',
@@ -980,6 +1012,16 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       healPlayerConditionTarget: healPlayerConditionTarget === null
         ? null : hex(healPlayerConditionTarget),
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
+      attributeAbsorbType: ATTRIBUTE_ABSORB_ENEMY_SKILL_TYPE,
+      attributeAbsorbDispatchTarget: attributeAbsorbDispatchTarget === null
+        ? null : hex(attributeAbsorbDispatchTarget),
+      attributeAbsorbDispatchMatches21_9: attributeAbsorbDispatchMatches,
+      attributeAbsorbSetupTarget: attributeAbsorbSetupTarget === null
+        ? null : hex(attributeAbsorbSetupTarget),
+      attributeAbsorbSetupMatches21_9: attributeAbsorbSetupMatches,
+      attributeAbsorbConditionTarget: attributeAbsorbConditionTarget === null
+        ? null : hex(attributeAbsorbConditionTarget),
+      attributeAbsorbConditionMatches21_9: attributeAbsorbConditionMatches,
       bindLeaderHelperType: BIND_LEADER_HELPER_ENEMY_SKILL_TYPE,
       bindLeaderHelperDispatchTarget: bindLeaderHelperDispatchTarget === null
         ? null : hex(bindLeaderHelperDispatchTarget),
@@ -1219,6 +1261,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || blackFallDispatchMatches === false || blackFallSetupMatches === false
     || healPlayerDispatchMatches === false || healPlayerSetupMatches === false
     || healPlayerConditionMatches === false
+    || attributeAbsorbDispatchMatches === false || attributeAbsorbSetupMatches === false
+    || attributeAbsorbConditionMatches === false
     || bindLeaderHelperDispatchMatches === false || bindLeaderHelperSetupMatches === false
     || bindLeaderHelperConditionMatches === false
     || sourceToPoisonDispatchMatches === false || sourceToPoisonSetupMatches === false

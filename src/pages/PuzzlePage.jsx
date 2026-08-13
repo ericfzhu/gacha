@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ORB_BY_ID, PuzzleEngine } from '../puzzle/puzzleEngine.js';
+import { ORB_BY_ID, ORB_TYPES, PuzzleEngine } from '../puzzle/puzzleEngine.js';
 
 const WIDTH = 450;
 const HEIGHT = 820;
@@ -277,6 +277,15 @@ function drawEnemy(ctx, enemy, index, target, time) {
   ctx.fillStyle = '#d7dce7';
   ctx.font = '600 10px "Noto Sans", sans-serif';
   ctx.fillText(`${Math.max(0, enemy.hp).toLocaleString()} / ${enemy.maxHp.toLocaleString()}`, x, 264);
+  if (Number(enemy.attributeAbsorbTurns || 0) > 0) {
+    const attributes = ORB_TYPES.slice(0, 6)
+      .filter((_, attributeIndex) => (enemy.attributeAbsorbMask & (1 << attributeIndex)) !== 0)
+      .map((orb) => orb.code)
+      .join('/');
+    ctx.fillStyle = '#bfe9ff';
+    ctx.font = '800 9px "Barlow Condensed", sans-serif';
+    ctx.fillText(`ABS ${attributes} · ${enemy.attributeAbsorbTurns}`, x, 278);
+  }
   if (alive) {
     ctx.fillStyle = enemy.counter === 1 ? '#ff6f62' : '#f4cf69';
     ctx.beginPath();
@@ -492,7 +501,7 @@ function render(ctx, engine) {
     ctx.textAlign = 'center';
     ctx.font = '900 22px "Barlow Condensed", sans-serif';
     ctx.fillStyle = item.kind === 'heal' ? '#83ef9d' : item.kind === 'poison' ? '#d995ef' : item.kind === 'bomb' ? '#ffb45f' : item.kind === 'thorn' || item.kind === 'nail' ? '#e4edf3' : item.kind === 'enemy' ? '#ff8b7f' : ORB_BY_ID[item.attribute]?.highlight || '#fff';
-    ctx.fillText(`${item.kind === 'heal' ? '+' : '-'}${item.value.toLocaleString()}`, x, y);
+    ctx.fillText(`${item.kind === 'heal' || item.kind === 'absorb' ? '+' : '-'}${item.value.toLocaleString()}`, x, y);
     ctx.globalAlpha = 1;
   });
 

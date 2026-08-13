@@ -1,5 +1,6 @@
 import { padLcgStep } from './padCoreRules.js';
 import {
+  PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
   PAD_ENEMY_SKILL_BIND_LEADER_HELPER,
   PAD_ENEMY_SKILL_HEAL_PLAYER,
   PAD_ENEMY_SKILL_BLACK_FALL,
@@ -116,6 +117,7 @@ function normalizeDefinitionMap(definitions) {
 
 function isStaticallyEligible(definition, state) {
   if (!definition.effect.supported || ![
+    PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
     PAD_ENEMY_SKILL_BIND_LEADER_HELPER,
     PAD_ENEMY_SKILL_HEAL_PLAYER,
     PAD_ENEMY_SKILL_BLACK_FALL,
@@ -148,6 +150,10 @@ function evaluateCondition(definition, state, rngState) {
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_BLACK_FALL) {
     const eligible = !state.blackFallActive;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB) {
+    const eligible = state.attributeAbsorbTurns <= 0;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_BIND_LEADER_HELPER) {
@@ -230,6 +236,7 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     maxHp: Math.max(0, Number(state.maxHp) || 0),
     playerCurrentHp: Math.max(0, Number(state.playerCurrentHp) || 0),
     playerMaxHp: Math.max(0, Number(state.playerMaxHp) || 0),
+    attributeAbsorbTurns: Math.max(0, Math.trunc(Number(state.attributeAbsorbTurns) || 0)),
     party: Array.isArray(state.party) ? state.party : [],
     aiBudget: Math.max(0, Math.trunc(Number(state.aiBudget ?? monster.budgetCap) || 0)),
     blackFallActive: Boolean(state.blackFallActive),

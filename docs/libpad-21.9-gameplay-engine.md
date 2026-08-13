@@ -647,6 +647,31 @@ gate. An eligible fallback retains its authored `sENEAI+5` weight without
 scaling. The browser selector exposes this as `probabilityScale` while keeping
 the already decoded condition-owned RNG state transitions intact.
 
+Enemy skill type `53` grants one enemy attribute-damage absorption. Its late
+dispatch entry targets `0x6298ac`, setup targets `0x61ffe8`, and AI condition
+targets `0x61ae34`. Signed definition integers `+0x10/+0x14` form the inclusive
+duration range; `+0x18` supplies a mask whose low six bits map to Fire, Water,
+Wood, Light, Dark, and Heart attack attributes.
+
+The condition reads the protected signed-short duration at `sMONSTER+0x890`
+and admits the skill only below one, without consuming RNG. Setup consumes one
+ordinary LCG draw to materialize the inclusive range into runtime `+0x678` and
+copies the authored mask to runtime `+0x67c`. Execution writes those values to
+the protected duration and mask fields at `sMONSTER+0x890/+0x880`; there is no
+execution reroll. An admitted new-AI skill therefore spends two draws in total:
+one probability test and one setup-duration roll. With seed 21900 and range
+2–4, the stored duration is 4 and RNG state becomes `3803934822`.
+
+`_calcFinalDamage` (`0x623b40`) first requires an active duration, limits this
+mask path to attack attributes 0–5, and tests `mask & (1 << attribute)`. A match
+marks the hit as absorption and the later attack path applies the negated hit,
+healing the monster up to max HP instead of reducing it. The fixed nail-damage
+path is independent. `_incEneTurn` decrements existing monster statuses before
+the next enemy attack is prepared, so a newly applied duration remains intact
+for the following player action. The browser mirrors this ordering, reports
+absorbed damage separately from dealt damage, and exposes an `ABS` status label
+with the active attribute codes and remaining duration.
+
 Enemy skill type `54` binds the leader, helper, or both. Its late dispatch
 entry targets `0x628fe0`, setup targets `0x621008`, and AI condition targets
 `0x61aa5c`. Authored byte `+0x10` bit 0 selects party index 0 (leader) and bit

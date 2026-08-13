@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
+  PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
   PAD_ENEMY_SKILL_BIND_LEADER_HELPER,
   PAD_ENEMY_SKILL_HEAL_PLAYER,
   PAD_ENEMY_SKILL_BLACK_FALL,
@@ -756,6 +757,49 @@ assert.equal(bindRuntimeEngine.party[5].bindTurns, 2);
 assert.equal(bindRuntimeEngine.lastEnemySkill.setupDurationTurns, 4);
 assert.equal(bindRuntimeEngine.lastEnemySkill.durationTurns, 2);
 assert.equal(bindRuntimeEngine.rng.state, padLcgStep(21_900).state);
+const enemyAiAttributeAbsorbDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiAttributeAbsorbView = new DataView(enemyAiAttributeAbsorbDefinition.buffer);
+enemyAiAttributeAbsorbView.setUint32(0x00, 9_021, true);
+enemyAiAttributeAbsorbView.setInt16(0x04, PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB, true);
+enemyAiAttributeAbsorbView.setInt32(0x10, 2, true);
+enemyAiAttributeAbsorbView.setInt32(0x14, 4, true);
+enemyAiAttributeAbsorbView.setUint32(0x18, 0x03, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiAttributeAbsorbDefinition), {
+  type: 53,
+  kind: 'attributeAbsorb',
+  supported: true,
+  durationMin: 2,
+  durationMax: 4,
+  attributeMask: 0x03,
+  attackWithSkillValue: 0,
+});
+const attributeAbsorbMonsterRuntime = new Uint8Array(0x680);
+const attributeAbsorbMonsterRuntimeView = new DataView(attributeAbsorbMonsterRuntime.buffer);
+attributeAbsorbMonsterRuntimeView.setInt32(0x678, 3, true);
+attributeAbsorbMonsterRuntimeView.setUint32(0x67c, 0x05, true);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiAttributeAbsorbDefinition, attributeAbsorbMonsterRuntime),
+  {
+    type: 53,
+    kind: 'attributeAbsorb',
+    supported: true,
+    durationMin: 2,
+    durationMax: 4,
+    attributeMask: 0x05,
+    durationTurns: 3,
+    setupMaterialized: true,
+    attackWithSkillValue: 0,
+  },
+);
+const attributeAbsorbRuntimeEngine = new PuzzleEngine({ seed: 21_900 });
+attributeAbsorbRuntimeEngine.setRngState(21_900);
+assert.equal(attributeAbsorbRuntimeEngine.applyEnemySkillRuntime(
+  enemyAiAttributeAbsorbDefinition,
+  attributeAbsorbMonsterRuntime,
+), true);
+assert.equal(attributeAbsorbRuntimeEngine.enemies[0].attributeAbsorbTurns, 3);
+assert.equal(attributeAbsorbRuntimeEngine.enemies[0].attributeAbsorbMask, 0x05);
+assert.equal(attributeAbsorbRuntimeEngine.rng.state, 21_900);
 const enemyAiPoisonBlockNCountedDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiPoisonBlockNCountedView = new DataView(enemyAiPoisonBlockNCountedDefinition.buffer);
 enemyAiPoisonBlockNCountedView.setUint32(0x00, 9_015, true);
@@ -2145,6 +2189,58 @@ bindTurnEngine.resolvePlayerTurn();
 assert.equal(bindTurnEngine.lastLeaderMultiplier, 1);
 assert.equal(bindTurnEngine.party[0].bindTurns, 1);
 assert.equal(bindTurnEngine.party[5].bindTurns, 1);
+const attributeAbsorbMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(attributeAbsorbMonsterDefinition.buffer).setUint32(0xec, 9_021, true);
+const selectedAttributeAbsorbEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: attributeAbsorbMonsterDefinition,
+    skillDefinitions: [enemyAiAttributeAbsorbDefinition],
+  }],
+});
+selectedAttributeAbsorbEngine.setRngState(21_900);
+selectedAttributeAbsorbEngine.enemies[0].counter = 1;
+selectedAttributeAbsorbEngine.enemies[1].counter = 99;
+selectedAttributeAbsorbEngine.resolveEnemyTurn();
+const selectedAttributeAbsorbState = selectedAttributeAbsorbEngine.snapshot();
+assert.equal(selectedAttributeAbsorbState.lastEnemyActions[0].skill.type, 53);
+assert.equal(selectedAttributeAbsorbState.lastEnemyActions[0].skill.skillId, 9_021);
+assert.equal(selectedAttributeAbsorbState.lastEnemyActions[0].skill.durationTurns, 4);
+assert.equal(selectedAttributeAbsorbState.enemies[0].attributeAbsorbTurns, 4);
+assert.equal(selectedAttributeAbsorbState.enemies[0].attributeAbsorbMask, 0x03);
+assert.equal(selectedAttributeAbsorbState.enemies[0].enemyAiBudget, 80);
+assert.equal(
+  selectedAttributeAbsorbEngine.rng.state,
+  padLcgStep(padLcgStep(21_900).state).state,
+);
+const rejectedAttributeAbsorbEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: attributeAbsorbMonsterDefinition,
+    skillDefinitions: [enemyAiAttributeAbsorbDefinition],
+  }],
+});
+rejectedAttributeAbsorbEngine.enemies[0].attributeAbsorbTurns = 1;
+rejectedAttributeAbsorbEngine.setRngState(21_900);
+assert.equal(rejectedAttributeAbsorbEngine.takeEnemySkill(0), null);
+assert.equal(rejectedAttributeAbsorbEngine.rng.state, 21_900);
+const attributeAbsorbDamageEngine = new PuzzleEngine({ seed: 21_900 });
+attributeAbsorbDamageEngine.enemies[0].hp = 50_000;
+attributeAbsorbDamageEngine.enemies[0].attributeAbsorbTurns = 2;
+attributeAbsorbDamageEngine.enemies[0].attributeAbsorbMask = 1 << 0;
+attributeAbsorbDamageEngine.enemies[1].hp = 0;
+attributeAbsorbDamageEngine.comboCount = 1;
+attributeAbsorbDamageEngine.turnMatches = [{
+  type: 'fire', size: 3, enhancedCount: 0, enhancementMultiplier: 1, isMassAttack: false,
+}];
+attributeAbsorbDamageEngine.resolvePlayerTurn();
+assert.equal(attributeAbsorbDamageEngine.lastDamage, 0);
+assert.ok(attributeAbsorbDamageEngine.lastAbsorbedDamage > 0);
+assert.ok(attributeAbsorbDamageEngine.enemies[0].hp > 50_000);
+assert.equal(attributeAbsorbDamageEngine.enemies[0].attributeAbsorbTurns, 2);
+attributeAbsorbDamageEngine.enemies[0].counter = 99;
+attributeAbsorbDamageEngine.resolveEnemyTurn();
+assert.equal(attributeAbsorbDamageEngine.enemies[0].attributeAbsorbTurns, 1);
 const poisonFamilySwapEngine = new PuzzleEngine({ seed: 21_900 });
 poisonFamilySwapEngine.setBoardFromCodes([
   'PMBBBB', 'BBBBBB', 'BBBBBB', 'BBBBBB', 'BBBBBB',

@@ -1,3 +1,4 @@
+export const PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB = 53;
 export const PAD_ENEMY_SKILL_BIND_LEADER_HELPER = 54;
 export const PAD_ENEMY_SKILL_HEAL_PLAYER = 55;
 export const PAD_ENEMY_SKILL_SOURCE_TO_POISON = 56;
@@ -83,6 +84,21 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
     ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
     : null;
+  if (type === PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB) {
+    requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    const durationMin = definition.getInt32(0x10, true);
+    const durationMax = definition.getInt32(0x14, true);
+    const attributeMask = definition.getUint32(0x18, true) & 0x3f;
+    return Object.freeze({
+      type,
+      kind: 'attributeAbsorb',
+      supported: attributeMask !== 0 && durationMax >= durationMin,
+      durationMin,
+      durationMax,
+      attributeMask,
+      attackWithSkillValue,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_BIND_LEADER_HELPER) {
     requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
     const targetFlags = definition.getUint8(0x10) & 0x03;
@@ -347,6 +363,26 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
   );
   const monster = new DataView(monsterBytes.buffer, monsterBytes.byteOffset, monsterBytes.byteLength);
   const type = definition.getInt16(PAD_ENEMY_SKILL_RUNTIME_LAYOUT.definitionTypeOffset, true);
+  if (type === PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB) {
+    requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    const durationMin = definition.getInt32(0x10, true);
+    const durationMax = definition.getInt32(0x14, true);
+    const attributeMask = monster.getUint32(0x67c, true) & 0x3f;
+    return Object.freeze({
+      type,
+      kind: 'attributeAbsorb',
+      supported: attributeMask !== 0 && durationMax >= durationMin,
+      durationMin,
+      durationMax,
+      attributeMask,
+      durationTurns: monster.getInt32(0x678, true),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_BIND_LEADER_HELPER) {
     requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
     const targetFlags = definition.getUint8(0x10) & 0x03;
@@ -392,6 +428,24 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
 
 export function normalizePadEnemySkillRecord(record) {
   const type = Math.trunc(Number(record?.type));
+  if (type === PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB || record?.kind === 'attributeAbsorb') {
+    const durationMin = Math.trunc(Number(record?.durationMin) || 0);
+    const durationMax = Math.trunc(Number(record?.durationMax) || 0);
+    const attributeMask = Math.trunc(Number(record?.attributeMask) || 0) & 0x3f;
+    const durationPresent = record?.durationTurns !== undefined && record?.durationTurns !== null;
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
+      kind: 'attributeAbsorb',
+      supported: attributeMask !== 0 && durationMax >= durationMin,
+      durationMin,
+      durationMax,
+      attributeMask,
+      ...(durationPresent
+        ? { durationTurns: Math.trunc(Number(record.durationTurns) || 0) }
+        : {}),
+      setupMaterialized: Boolean(record?.setupMaterialized || durationPresent),
+    });
+  }
   if (type === PAD_ENEMY_SKILL_BIND_LEADER_HELPER || record?.kind === 'bindLeaderHelper') {
     const durationMin = Math.trunc(Number(record?.durationMin) || 0);
     const durationMax = Math.trunc(Number(record?.durationMax) || 0);

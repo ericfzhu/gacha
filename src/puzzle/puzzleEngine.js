@@ -33,6 +33,7 @@ import {
   tracePadPointerCells,
 } from './padCoreRules.js';
 import {
+  PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
   PAD_ENEMY_SKILL_BIND_LEADER_HELPER,
   PAD_ENEMY_SKILL_HEAL_PLAYER,
   PAD_ENEMY_SKILL_BLACK_FALL,
@@ -92,6 +93,9 @@ const PAD_BLOCK_BURST_FLAG = 0x80000;
 
 export const ORB_BY_ID = Object.freeze(Object.fromEntries(ORB_TYPES.map((orb) => [orb.id, orb])));
 export const ORB_BY_CODE = Object.freeze(Object.fromEntries(ORB_TYPES.map((orb) => [orb.code, orb])));
+const PAD_ATTRIBUTE_INDEX = Object.freeze(Object.fromEntries(
+  ORB_TYPES.slice(0, 6).map((orb, index) => [orb.id, index]),
+));
 
 const DEMO_COMBO_LEADER = Object.freeze({
   type: 'comboAttack',
@@ -111,8 +115,8 @@ const PARTY = Object.freeze([
 ]);
 
 const ENEMY_TEMPLATE = Object.freeze([
-  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2 },
-  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3 },
+  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
+  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
 ]);
 
 function clamp(value, min, max) {
@@ -208,6 +212,7 @@ export class PuzzleEngine {
     this.cascadeDepth = 0;
     this.lastComboCount = 0;
     this.lastDamage = 0;
+    this.lastAbsorbedDamage = 0;
     this.lastNailDamage = 0;
     this.lastHealing = 0;
     this.lastPoisonDamage = 0;
@@ -727,6 +732,7 @@ export class PuzzleEngine {
     this.applyPlayerHpResolution(healing, poisonDamage);
 
     let totalDamage = 0;
+    let absorbedDamage = 0;
     const attackRounds = [
       (member) => ({ attribute: member.attribute, attack: member.attack }),
       (member) => ({
@@ -761,6 +767,17 @@ export class PuzzleEngine {
             enemy.defense,
             member.damageCap,
           );
+          const attributeIndex = PAD_ATTRIBUTE_INDEX[lane.attribute];
+          if (
+            Number(enemy.attributeAbsorbTurns || 0) > 0
+            && Number.isInteger(attributeIndex)
+            && (Number(enemy.attributeAbsorbMask || 0) & (1 << attributeIndex)) !== 0
+          ) {
+            enemy.hp = Math.min(enemy.maxHp, enemy.hp + damage);
+            absorbedDamage += damage;
+            this.floatingText.push({ kind: 'absorb', value: damage, enemy: enemyIndex, attribute: lane.attribute, age: 0 });
+            return;
+          }
           enemy.hp = Math.max(0, enemy.hp - damage);
           totalDamage += damage;
           this.floatingText.push({ kind: 'damage', value: damage, enemy: enemyIndex, attribute: lane.attribute, age: 0 });
@@ -783,9 +800,10 @@ export class PuzzleEngine {
       if (nextAlive >= 0) this.targetEnemy = nextAlive;
     }
     this.lastNailDamage = nailDamage;
+    this.lastAbsorbedDamage = absorbedDamage;
     this.lastDamage = totalDamage + nailDamage;
     this.advancePartyBindTurns();
-    this.message = `${this.comboCount} combo${this.comboCount === 1 ? '' : 's'} · ${this.lastDamage.toLocaleString()} total damage${this.lastNailDamage ? ` · ${this.lastNailDamage.toLocaleString()} nails` : ''}${this.lastHealing ? ` · +${this.lastHealing.toLocaleString()} HP` : ''}${this.lastPoisonDamage ? ` · -${this.lastPoisonDamage.toLocaleString()} poison` : ''}${this.lastBombDamage ? ` · -${this.lastBombDamage.toLocaleString()} bombs` : ''}${this.lastThornDamage ? ` · -${this.lastThornDamage.toLocaleString()} thorns` : ''}`;
+    this.message = `${this.comboCount} combo${this.comboCount === 1 ? '' : 's'} · ${this.lastDamage.toLocaleString()} total damage${this.lastAbsorbedDamage ? ` · ${this.lastAbsorbedDamage.toLocaleString()} absorbed` : ''}${this.lastNailDamage ? ` · ${this.lastNailDamage.toLocaleString()} nails` : ''}${this.lastHealing ? ` · +${this.lastHealing.toLocaleString()} HP` : ''}${this.lastPoisonDamage ? ` · -${this.lastPoisonDamage.toLocaleString()} poison` : ''}${this.lastBombDamage ? ` · -${this.lastBombDamage.toLocaleString()} bombs` : ''}${this.lastThornDamage ? ` · -${this.lastThornDamage.toLocaleString()} thorns` : ''}`;
   }
 
   applyPlayerHpResolution(healing = 0, poisonDamage = 0) {
@@ -811,6 +829,7 @@ export class PuzzleEngine {
     // admits monsters whose sMONSTER+0x120 counter has reached zero. Keeping
     // this order prevents a newly executed enemy skill from losing a turn
     // immediately on the same action boundary.
+    this.advanceEnemyAttributeAbsorbTurns();
     this.advanceBlackOrbCountdowns();
     if (this.blackFallRule?.active && this.blackFallRule.turnsRemaining !== null) {
       this.blackFallRule.turnsRemaining = Math.max(0, this.blackFallRule.turnsRemaining - 1);
@@ -823,7 +842,7 @@ export class PuzzleEngine {
         enemy.counter = enemy.maxCounter;
         const skill = this.takeEnemySkill(index);
         if (skill) {
-          this.applyEnemySkillRecord(skill);
+          this.applyEnemySkillRecord(skill, index);
           const damage = padEnemySkillAttack(enemy.attack, skill.attackWithSkillValue);
           total += damage;
           this.lastEnemyActions.push({
@@ -866,6 +885,7 @@ export class PuzzleEngine {
     const selection = selectPadEnemyAiNew(pool.monster, pool.definitions, {
       currentHp: enemy.hp,
       maxHp: enemy.maxHp,
+      attributeAbsorbTurns: enemy.attributeAbsorbTurns,
       playerCurrentHp: this.player.hp,
       playerMaxHp: this.player.maxHp,
       party: this.party.map((member) => ({
@@ -953,6 +973,13 @@ export class PuzzleEngine {
 
   materializeEnemySkillRecord(record) {
     const skill = normalizePadEnemySkillRecord(record);
+    if (skill.supported && skill.kind === 'attributeAbsorb' && !skill.setupMaterialized) {
+      return Object.freeze({
+        ...record,
+        durationTurns: this.rollEnemySkillDuration(skill.durationMin, skill.durationMax),
+        setupMaterialized: true,
+      });
+    }
     if (!skill.supported || skill.kind !== 'bindLeaderHelper' || skill.setupMaterialized) {
       return record;
     }
@@ -1013,6 +1040,15 @@ export class PuzzleEngine {
   advancePartyBindTurns() {
     this.party.forEach((member) => {
       member.bindTurns = Math.max(0, Math.trunc(Number(member.bindTurns) || 0) - 1);
+    });
+  }
+
+  advanceEnemyAttributeAbsorbTurns() {
+    this.enemies.forEach((enemy) => {
+      enemy.attributeAbsorbTurns = Math.max(
+        0,
+        Math.trunc(Number(enemy.attributeAbsorbTurns) || 0) - 1,
+      );
     });
   }
 
@@ -1136,10 +1172,18 @@ export class PuzzleEngine {
     };
   }
 
-  applyEnemySkillRecord(record) {
+  applyEnemySkillRecord(record, enemyIndex = 0) {
     const materialized = this.materializeEnemySkillRecord(record);
     const skill = normalizePadEnemySkillRecord(materialized);
     this.lastEnemySkill = skill;
+    if (skill.supported && skill.kind === 'attributeAbsorb') {
+      const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
+      if (!enemy) return false;
+      enemy.attributeAbsorbTurns = skill.durationTurns;
+      enemy.attributeAbsorbMask = skill.attributeMask;
+      this.message = `Enemy absorbs selected attributes for ${skill.durationTurns} turn${skill.durationTurns === 1 ? '' : 's'}.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'bindLeaderHelper') {
       const durationTurns = this.rollEnemySkillDuration(skill.durationMin, skill.durationMax);
       const result = this.doBind(skill.targetMask || 0, durationTurns);
@@ -1296,6 +1340,7 @@ export class PuzzleEngine {
       const definition = definitionsById.get(slot.skillId);
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
       if (![
+        PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
         PAD_ENEMY_SKILL_BIND_LEADER_HELPER,
         PAD_ENEMY_SKILL_HEAL_PLAYER,
         PAD_ENEMY_SKILL_BLACK_FALL,
@@ -1848,6 +1893,7 @@ export class PuzzleEngine {
       turnMatches: this.turnMatches.map((match) => ({ ...match })),
       lastComboCount: this.lastComboCount,
       lastDamage: this.lastDamage,
+      lastAbsorbedDamage: this.lastAbsorbedDamage,
       lastNailDamage: this.lastNailDamage,
       lastHealing: this.lastHealing,
       lastPoisonDamage: this.lastPoisonDamage,
@@ -1879,7 +1925,7 @@ export class PuzzleEngine {
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,
-      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter }, index) => ({
+      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, attributeAbsorbTurns = 0, attributeAbsorbMask = 0 }, index) => ({
         id,
         name,
         attribute,
@@ -1887,6 +1933,8 @@ export class PuzzleEngine {
         maxHp,
         counter,
         maxCounter,
+        attributeAbsorbTurns,
+        attributeAbsorbMask,
         queuedEnemySkills: Math.max(
           0,
           (this.enemySkillQueues[index]?.records.length || 0) - (this.enemySkillQueues[index]?.position || 0),

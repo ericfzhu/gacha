@@ -2,6 +2,28 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 enemy attribute absorption
+
+- Identified enemy skill type `53` as attribute-damage absorption: late handler
+  `0x6298ac`, setup `0x61ffe8`, and condition `0x61ae34`. Definition
+  `+0x10/+0x14` is an inclusive duration range and `+0x18` is the six natural
+  attribute bits.
+- Setup consumes one ordinary LCG draw, stores duration at runtime `+0x678`,
+  and copies the mask to `+0x67c`. Execution writes the materialized values to
+  `sMONSTER+0x890/+0x880`; unlike type 54, it does not reroll at execution.
+- Ported the per-enemy status lifecycle and `_calcFinalDamage` mask gate.
+  Matching attributed attacks become capped enemy healing; unmasked attacks
+  continue through normal damage, and fixed nail damage remains independent.
+- Added raw definition/runtime decoding, new-AI reapplication rejection,
+  enemy-turn countdowns, status snapshots, absorbed-damage reporting, floating
+  feedback, and an `ABS R/B · N` enemy indicator.
+- Exact dispatch/setup/condition checks plus `_checkMonterAbsorb` and
+  `_calcFinalDamage` symbol anchors pass. Pure fixtures cover seed-21900 RNG,
+  runtime materialization, healing, and countdown; exhaustive browser coverage,
+  production build, input smoke, and visual inspection pass.
+- Next: inspect type `52` and preserve any damage-status interaction rather
+  than treating neighboring shield mechanics as interchangeable.
+
 ## 2026-08-14 leader/helper bind skill
 
 - Mapped enemy skill type `54` to late handler `0x628fe0`, setup `0x621008`,
@@ -22,8 +44,7 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
 - Raw definition/runtime decoding, new-AI eligibility, exact restored-table and
   symbol anchors, pure RNG/resistance fixtures, exhaustive browser regression,
   generic input-client smoke test, production build, and visual inspection pass.
-- Next: continue the neighboring enemy-skill audit, prioritizing type `53` and
-  its party-status behavior.
+- Next: continue the neighboring enemy-status audit.
 
 ## 2026-08-14 enemy player-heal skill
 
