@@ -8,12 +8,29 @@ import { AARCH64_SYSCALL, VirtualLinux } from '../src/binary-port/virtualLinux.j
 import { VirtualJni } from '../src/binary-port/virtualJni.js';
 import { ANDROID_TOUCH_ACTION, PadBrowserInputModel, createPadTouchFrame } from '../src/binary-port/padInputModel.js';
 import { inflateBytes } from '../src/binary-port/inflate.js';
+import { canonicalPadRuntimePath, mountPadRuntimeFiles } from '../src/binary-port/padRuntimeFiles.js';
 
 const project = resolve(import.meta.dirname, '..');
 const apk = resolve(project, 'jp.gungho.pad_21.9.0-21900_minAPI24(arm64-v8a).apk');
 const wasm = await readFile(resolve(project, 'public/wasm/arm64_core.wasm'));
 const libpad = execFileSync('unzip', ['-p', apk, 'lib/arm64-v8a/libpad.so'], { maxBuffer: 40 * 1024 * 1024 });
 const sha256 = createHash('sha256').update(libpad).digest('hex');
+
+if (canonicalPadRuntimePath('DATA030.BIN') !== '/data/user/0/jp.gungho.pad/cache/data030.bin' ||
+    canonicalPadRuntimePath('retained/DATA048.BIN') !== '/data/user/0/jp.gungho.pad/files/data048.bin' ||
+    canonicalPadRuntimePath('boot.bin') !== '/data/user/0/jp.gungho.pad/files/boot.bin') {
+  throw new Error('PAD supplementary runtime paths were not canonicalized to native private storage');
+}
+const mountProbe = { paths: [], mount(path, bytes) { this.paths.push([path, bytes.length]); } };
+const mountedProbePaths = mountPadRuntimeFiles(mountProbe, [
+  { name: 'DATA030.BIN', bytes: new Uint8Array(3) },
+  { name: 'DATA048.BIN', bytes: new Uint8Array(4) },
+]);
+if (mountedProbePaths[0] !== '/data/user/0/jp.gungho.pad/cache/data030.bin' ||
+    mountedProbePaths[1] !== '/data/user/0/jp.gungho.pad/files/data048.bin' ||
+    mountProbe.paths[0][1] !== 3 || mountProbe.paths[1][1] !== 4) {
+  throw new Error('PAD supplementary runtime files were not mounted at their native paths');
+}
 
 const inflateFixture = new TextEncoder().encode('libpad browser inflate fixture '.repeat(2048));
 for (const [compressed, windowBits] of [

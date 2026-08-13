@@ -260,7 +260,11 @@ The native client successfully opens packaged `assets/DATA001.BIN`, creates
 `files/boot.bin`, and then requests `files/data048.bin` and `cache/data030.bin`.
 Those downloaded datasets are not in this APK. Without them, the faithful binary
 client remains on its real Japanese startup warning. The browser UI accepts
-optional `.bin` files so legitimately retained runtime data can be mounted.
+optional `.bin` files so legitimately retained runtime data can be mounted. It
+canonicalizes selected names to Android's case-sensitive private paths:
+`data048.bin` under `files/`, `data030.bin` under `cache/`, and other retained
+`.bin` files under `files/`. This also makes uppercase host filenames usable
+without changing the path requested by `libpad.so`.
 
 This is a content boundary, not a CPU-port failure: protection, JNI, lifecycle,
 rendering, frames, and touch callbacks are all running. The remaining work for a

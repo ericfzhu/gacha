@@ -2,6 +2,7 @@ import { Arm64Runtime, LIBPAD_CONSTRUCTOR_ADDRESS } from './arm64Runtime.js';
 import { VirtualLinux } from './virtualLinux.js';
 import { VirtualJni } from './virtualJni.js';
 import { Gles1Renderer } from './gles1Renderer.js';
+import { mountPadRuntimeFiles } from './padRuntimeFiles.js';
 
 const SYSTEM_LIBRARIES = [
   'libz.so', 'libm.so', 'liblog.so', 'libandroid.so', 'libEGL.so', 'libGLESv1_CM.so',
@@ -106,12 +107,7 @@ self.onmessage = async ({ data }) => {
       linux.mount('/data/app/jp.gungho.pad/base.apk', runtimeFiles.baseApk);
       linux.mountApk(runtimeFiles.baseApk);
     }
-    for (const file of runtimeFiles.extraFiles ?? []) {
-      const root = file.name.toLowerCase() === 'data030.bin'
-        ? '/data/user/0/jp.gungho.pad/cache'
-        : '/data/user/0/jp.gungho.pad/files';
-      linux.mount(`${root}/${file.name}`, file.bytes);
-    }
+    const mountedRuntimeFiles = mountPadRuntimeFiles(linux, runtimeFiles.extraFiles);
     linux.mount('/data/app/jp.gungho.pad/assets/6dba/data1.dat', runtimeFiles.protectionData);
     const stubs = new Map(await Promise.all(SYSTEM_LIBRARIES.map(async (name) => [name, await loadAndroidStub(name)])));
     for (const name of SYSTEM_LIBRARIES) linux.mountSharedObject(`/system/lib64/${name}`, stubs.get(name));
@@ -375,6 +371,7 @@ self.onmessage = async ({ data }) => {
         lifecycleExports: lifecycleNames.filter((name) => symbols[name]).length,
         firstFrameDrawCalls: renderer?.drawCalls ?? 0,
         loadSequence: 'lib__6dba__.so → libopenal.so → libpad.so',
+        mountedRuntimeFiles,
         dependencyPath: null,
         deepStatus: deepRun.exited
           ? `guest exit(${deepRun.exitCode})${finalState ? ` · protection state ${finalState}` : ''}`
