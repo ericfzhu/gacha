@@ -66,12 +66,16 @@ export function padDamageAfterDefense(attack, attributeMultiplier, defense) {
   return Math.max(1, Math.ceil(attack * attributeMultiplier) - Math.max(0, defense));
 }
 
+// _calcCharge (0x64f220) runs izMathCeiling for every poison combo before it
+// adds that combo to the deferred HP-damage accumulator at game-work+0x8aacc.
 export function padPoisonDamage(maxHp, poisonMatchSizes = [], mortalPoisonMatchSizes = []) {
-  const ratio = poisonMatchSizes.reduce((total, size) =>
-    total + PAD_POISON_MAX_HP_RATIO * padOrbMatchMultiplier(size), 0) +
-    mortalPoisonMatchSizes.reduce((total, size) =>
-      total + PAD_MORTAL_POISON_MAX_HP_RATIO * padOrbMatchMultiplier(size), 0);
-  return Math.floor(Math.max(0, maxHp) * ratio);
+  const hp = Math.max(0, Number(maxHp) || 0);
+  const damageForMatches = (matchSizes, ratio) => matchSizes.reduce(
+    (total, size) => total + Math.ceil(hp * ratio * padOrbMatchMultiplier(size)),
+    0,
+  );
+  return damageForMatches(poisonMatchSizes, PAD_POISON_MAX_HP_RATIO) +
+    damageForMatches(mortalPoisonMatchSizes, PAD_MORTAL_POISON_MAX_HP_RATIO);
 }
 
 // cGAMEMAIN::_checkBomb (0x66a9f8) calculates and accumulates the HP hit once

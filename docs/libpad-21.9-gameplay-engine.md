@@ -121,8 +121,11 @@ non-sequential fuse-and-bomb sprite `20`.
 The browser rules layer clears and counts jammer/poison matches as combos, but
 only attribute/heart classes feed attacks or recovery. Poison costs 20% of
 maximum HP for a three-orb group and mortal poison 50%, with the same 25%
-per-extra-orb group scaling. Recovery and poison are netted before the HP clamp,
-matching `_applyHpRecAndPoisonDamage` rather than healing to the cap first.
+per-extra-orb group scaling. `_calcCharge` (`0x64f220`) passes each poison
+group's HP cost through `izMathCeiling` before adding it to game-work offset
+`0x8aacc`; two groups therefore round independently rather than as one combined
+percentage. Recovery and poison are netted before the HP clamp, matching
+`_applyHpRecAndPoisonDamage` rather than healing to the cap first.
 
 Orb state remains separate from type. In native `sBLOCK`, type is the signed
 byte at `+0`, the flag word is at `+4`, and the enhancement value is the float at
