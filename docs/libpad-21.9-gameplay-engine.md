@@ -57,6 +57,12 @@ to native code is adjusted by `2 * viewScale + statusBarHeight`. Native receives
 X/Y floats, pointer index zero, a reserved zero, pointer count, raw Android
 action, event time, and masked action.
 
+The browser adapter binds a move to the pointer that initiated it. Movement,
+release, cancel, skill, and target events from any other simultaneous pointer
+are ignored until that primary pointer ends. This preserves the single sampled
+Android pointer instead of allowing a second browser touch to steer or release
+the held orb.
+
 ## Board and drag behavior
 
 Relevant restored symbols are:

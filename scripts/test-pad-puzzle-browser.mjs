@@ -13,6 +13,7 @@ const testLargeBoard = process.argv.includes('--large-board');
 const testTapTurn = process.argv.includes('--tap-turn');
 const testMatchShapes = process.argv.includes('--match-shapes');
 const testAttackRounds = process.argv.includes('--attack-rounds');
+const testPointerIdentity = process.argv.includes('--pointer-identity');
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 980, height: 900 } });
 const consoleMessages = [];
@@ -276,10 +277,55 @@ try {
     attackRounds.resolvedTarget !== 1 || attackRounds.resolvedManually !== false ||
     attackRounds.diagonalComboDamage !== 200
   )) throw new Error(`Attack round retarget mismatch: ${JSON.stringify(attackRounds)}`);
+  const pointerIdentity = testPointerIdentity ? await (async () => {
+    await page.evaluate(() => {
+      window.__puzzleGame.reset();
+      window.__puzzleGame.start();
+    });
+    const pointerFrom = internalPoint(box, 35, 447);
+    const pointerTo = internalPoint(box, 105, 447);
+    await page.mouse.move(pointerFrom.x, pointerFrom.y);
+    await page.mouse.down();
+    const started = JSON.parse(await page.evaluate(() => window.render_game_to_text()));
+    await page.evaluate(({ x, y }) => {
+      const canvas = document.querySelector('canvas[aria-label^="Orb Battle Lab"]');
+      for (const type of ['pointermove', 'pointerup']) {
+        canvas.dispatchEvent(new PointerEvent(type, {
+          bubbles: true,
+          clientX: x,
+          clientY: y,
+          pointerId: 99,
+          pointerType: 'touch',
+        }));
+      }
+    }, pointerTo);
+    const afterForeignPointer = JSON.parse(await page.evaluate(() => window.render_game_to_text()));
+    await page.mouse.move(pointerTo.x, pointerTo.y);
+    const afterActivePointer = JSON.parse(await page.evaluate(() => window.render_game_to_text()));
+    await page.mouse.up();
+    const released = JSON.parse(await page.evaluate(() => window.render_game_to_text()));
+    await page.evaluate(() => {
+      window.__puzzleGame.reset();
+      window.__puzzleGame.start();
+    });
+    return {
+      startedPathLength: started.drag?.pathLength,
+      foreignPathLength: afterForeignPointer.drag?.pathLength,
+      foreignKeptDrag: Boolean(afterForeignPointer.drag),
+      activePathLength: afterActivePointer.drag?.pathLength,
+      releasedDrag: released.drag,
+      releasedTurn: released.turn,
+    };
+  })() : null;
+  if (pointerIdentity && (
+    pointerIdentity.startedPathLength !== 0 || pointerIdentity.foreignPathLength !== 0 ||
+    pointerIdentity.foreignKeptDrag !== true || pointerIdentity.activePathLength !== 1 ||
+    pointerIdentity.releasedDrag !== null || pointerIdentity.releasedTurn !== 1
+  )) throw new Error(`Pointer identity mismatch: ${JSON.stringify(pointerIdentity)}`);
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, largeBoard, tapTurn, matchShape, attackRounds, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, largeBoard, tapTurn, matchShape, attackRounds, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

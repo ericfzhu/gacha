@@ -513,6 +513,7 @@ export default function PuzzlePage() {
     let frame = 0;
     let lastTime = performance.now();
     let manualTime = false;
+    let activePointerId = null;
 
     const pointFromEvent = (event) => {
       const rect = canvas.getBoundingClientRect();
@@ -527,9 +528,15 @@ export default function PuzzlePage() {
         gridRow: (point.y - board.y) / board.cell,
       };
     };
-    const restart = () => { engine.reset(); engine.start(); render(context, engine); };
+    const restart = () => {
+      activePointerId = null;
+      engine.reset();
+      engine.start();
+      render(context, engine);
+    };
 
     const onPointerDown = (event) => {
+      if (activePointerId !== null && event.pointerId !== activePointerId) return;
       const point = pointFromEvent(event);
       if (engine.mode === 'ready' && inside(point, START_RECT)) { engine.start(); render(context, engine); return; }
       if ((engine.mode === 'victory' || engine.mode === 'defeat') && inside(point, { x: 105, y: 404, width: 240, height: 58 })) { restart(); return; }
@@ -549,13 +556,14 @@ export default function PuzzlePage() {
         cell.gridColumn,
         cell.gridRow,
       )) {
+        activePointerId = event.pointerId;
         canvas.setPointerCapture?.(event.pointerId);
         event.preventDefault();
         render(context, engine);
       }
     };
     const onPointerMove = (event) => {
-      if (!engine.drag) return;
+      if (!engine.drag || event.pointerId !== activePointerId) return;
       const point = pointFromEvent(event);
       const cell = cellFromPoint(point);
       engine.moveDrag(
@@ -570,9 +578,12 @@ export default function PuzzlePage() {
       render(context, engine);
     };
     const onPointerUp = (event) => {
-      if (!engine.drag) return;
-      engine.endDrag();
+      if (event.pointerId !== activePointerId) return;
+      const endedDrag = Boolean(engine.drag);
+      if (endedDrag) engine.endDrag();
       canvas.releasePointerCapture?.(event.pointerId);
+      activePointerId = null;
+      if (!endedDrag) return;
       event.preventDefault();
       render(context, engine);
     };
