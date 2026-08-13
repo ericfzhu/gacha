@@ -138,11 +138,15 @@ try {
 
   const orbStateSample = showOrbStates ? await page.evaluate(() => {
     window.__puzzleGame.setBoardFromCodes(['XJPMRB', 'HRBGDL', 'BGHRDL', 'DLGRHB', 'HRBGLD']);
+    window.__puzzleGame.setOrbState(0, 0, { enhanced: true, locked: true });
     window.__puzzleGame.setOrbState(0, 3, { enhanced: true, locked: false });
     window.__puzzleGame.setOrbState(0, 4, { enhanced: true, locked: true });
     window.__puzzleGame.setOrbState(0, 5, { thornPercent: 4 });
     return window.__puzzleGame.snapshot().boardState[0];
   }) : null;
+  if (orbStateSample && (
+    orbStateSample[0].code !== 'X' || orbStateSample[0].enhanced !== false || orbStateSample[0].locked !== true
+  )) throw new Error(`Special locked-orb state mismatch: ${JSON.stringify(orbStateSample[0])}`);
   if (renderAtlasSheet) {
     const sheet = page.locator('#pad-atlas-sheet');
     await page.evaluate(() => {

@@ -540,12 +540,13 @@ export class PuzzleEngine {
       ? orb.thornPercent
       : Math.max(0, Math.min(0x7f, Math.trunc(Number(state.thornPercent) || 0)));
     const specialType = ['jammer', 'poison', 'mortalPoison', 'bomb'].includes(orb.type);
+    const locked = state.locked === undefined ? orb.locked : Boolean(state.locked);
     this.board[row][column] = {
       ...orb,
-      enhanced: thornPercent > 0 && specialType
+      enhanced: specialType && (thornPercent > 0 || locked)
         ? false
         : state.enhanced === undefined ? orb.enhanced : Boolean(state.enhanced),
-      locked: state.locked === undefined ? orb.locked : Boolean(state.locked),
+      locked,
       thornPercent,
     };
   }

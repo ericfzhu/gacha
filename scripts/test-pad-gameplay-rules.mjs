@@ -342,6 +342,13 @@ assert.equal(stateEngine.board[0][0].type, 'wood');
 assert.equal(stateEngine.board[0][0].enhanced, true);
 assert.equal(stateEngine.board[0][0].locked, true);
 
+stateEngine.setBoardFromCodes(['XPMJRD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD']);
+stateEngine.setOrbState(0, 0, { enhanced: true, locked: false });
+assert.equal(stateEngine.board[0][0].enhanced, true);
+stateEngine.setOrbState(0, 0, { locked: true });
+assert.equal(stateEngine.board[0][0].enhanced, false);
+assert.equal(stateEngine.board[0][0].locked, true);
+
 const thornEngine = new PuzzleEngine({ seed: 5 });
 thornEngine.setBoardFromCodes(['RBGHLD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD']);
 thornEngine.setOrbState(0, 1, { thornPercent: 4 });
