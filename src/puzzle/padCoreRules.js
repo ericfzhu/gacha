@@ -43,19 +43,22 @@ export function padEnhancedOrbMultiplier(enhancedCount) {
   return 1 + PAD_ENHANCED_ORB_BONUS * Math.max(0, Number(enhancedCount) || 0);
 }
 
-// libpad keeps attack lanes as integers. _applyComboMul routes each matched
-// lane through sCARD::dmgUpBase, which uses izMathCeiling, while later attack
-// multipliers route through sCARD::dmgUp and round positive values with +0.5.
-// _calcAttackPow then applies elemental advantage with izMathCeilingSint64.
+// libpad keeps a per-card integer base lane. _calcCharge adds each same-color
+// match to that lane before _gamePhaseComboWait invokes _applyComboMul for the
+// completed combo. sCARD::dmgUpBase then recomputes the current lane from the
+// accumulated base with izMathCeiling. Keep the two rounding boundaries
+// separate: round each match into the integer base, sum, then round the final
+// combo multiplication once. Later attack multipliers route through
+// sCARD::dmgUp and round positive values with +0.5. _calcAttackPow then applies
+// elemental advantage with izMathCeilingSint64.
 export function padNativeBaseAttackPower(attack, matchSizes, combos) {
   const comboMultiplier = padComboMultiplier(combos);
-  return matchSizes.reduce((total, match) => {
+  const baseAttack = matchSizes.reduce((total, match) => {
     const size = typeof match === 'number' ? match : match.size;
     const enhancedCount = typeof match === 'number' ? 0 : match.enhancedCount || 0;
-    return total + Math.ceil(
-      attack * padOrbMatchMultiplier(size) * padEnhancedOrbMultiplier(enhancedCount) * comboMultiplier,
-    );
+    return total + Math.ceil(attack * padOrbMatchMultiplier(size) * padEnhancedOrbMultiplier(enhancedCount));
   }, 0);
+  return Math.ceil(baseAttack * comboMultiplier);
 }
 
 export function padApplyAttackMultipliers(attack, multipliers) {

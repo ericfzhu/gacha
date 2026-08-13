@@ -223,12 +223,17 @@ defense, recovery, targeting, mass-attack, and enemy-turn core. The exact binary
 path remains authoritative for the very large modern skill/passive matrix.
 
 Numeric staging is preserved in the classic harness rather than collapsing the
-formula into one floating expression. `_applyComboMul` calls
-`sCARD::dmgUpBase`, which rounds each attack lane upward through
-`izMathCeiling`; later attack multipliers call `sCARD::dmgUp`, which rounds
-positive values to nearest with `+0.5`; `_calcAttackPow` applies elemental
-advantage/disadvantage with `izMathCeilingSint64` before defense. Recovery uses
-positive `fcvtzs` truncation in `_recPowSet`, matching a floor operation.
+formula into one floating expression. `_calcCharge` adds each match's integer
+contribution into the card's base attack lane. As combo animations complete,
+`_gamePhaseComboWait` invokes the combo helper; `_applyComboMul` advances the
+global combo multiplier and `sCARD::dmgUpBase` recomputes each current lane from
+its accumulated base through `izMathCeiling`. Same-attribute matches are
+therefore summed before the final combo-multiplier ceiling, rather than each
+being independently multiplied and rounded. Later attack multipliers call
+`sCARD::dmgUp`, which rounds positive values to nearest with `+0.5`;
+`_calcAttackPow` applies elemental advantage/disadvantage with
+`izMathCeilingSint64` before defense. Recovery uses positive `fcvtzs`
+truncation in `_recPowSet`, matching a floor operation.
 
 ## Shipped asset containers
 
