@@ -170,6 +170,16 @@ export function createPadRng(seed = 0) {
       state = resolved.state;
       return resolved;
     },
+    spawnNewBlock(dropRates, faceTypes, excludedTypeMask = 0, scriptedType = null) {
+      const result = padSpawnNewBlock(state, dropRates, faceTypes, excludedTypeMask, scriptedType);
+      state = result.state;
+      return result.type;
+    },
+    spawnNewBlockInBits(typeMask, faceTypes) {
+      const result = padSpawnNewBlockInBits(state, typeMask, faceTypes);
+      state = result.state;
+      return result.type;
+    },
     getRandomBlock(excludedType = -1, includeJammer = false, includeHeart = true) {
       const result = padGetRandomBlock(state, excludedType, includeJammer, includeHeart);
       state = result.state;
@@ -186,6 +196,86 @@ export function createPadRng(seed = 0) {
 export function createPadLcg(seed = 0) {
   const rng = createPadRng(seed);
   return () => rng.nextFloat();
+}
+
+// _spawnNewBlock (0x661978) uses one saved LCG roll for the ordinary face-list
+// path. When at least one of ten binary32 drop-rate lanes is active, it instead
+// consumes a first roll against those lanes scaled by 10,000 and always advances
+// once more: the second roll is discarded after a weighted win or selects the
+// fallback face after a miss. Only the face fallback honors excludedTypeMask.
+// A scripted drop bypasses random advances and is the optional final argument.
+export function padSpawnNewBlock(
+  state,
+  dropRates,
+  faceTypes,
+  excludedTypeMask = 0,
+  scriptedType = null,
+) {
+  const scripted = Number(scriptedType);
+  if (scriptedType !== null && scriptedType !== undefined && Number.isInteger(scripted)) {
+    return { state: Number(state) >>> 0, type: scripted, spawnFlags: 0, weighted: false, scripted: true };
+  }
+  const rates = Array.from({ length: 10 }, (_, index) => (
+    Math.fround(Number(dropRates?.[index]) || 0)
+  ));
+  const hasActiveRates = rates.some((rate) => rate !== 0);
+  const first = padLcgStep(state);
+  let type = -1;
+  let faceRoll = first;
+  if (hasActiveRates) {
+    let remaining = Math.fround(Math.floor(first.value * 10_000 / 0x10000));
+    for (let index = 0; index < 10; index += 1) {
+      const rate = rates[index];
+      if (rate === 0) continue;
+      remaining = Math.fround(remaining - Math.fround(rate * Math.fround(10_000)));
+      if (remaining < 0) {
+        type = index;
+        break;
+      }
+    }
+    faceRoll = padLcgStep(first.state);
+  }
+  if (type >= 0) {
+    return { state: faceRoll.state, type, spawnFlags: 0, weighted: true, scripted: false };
+  }
+  const faces = (Array.isArray(faceTypes) ? faceTypes : [])
+    .map((value) => Math.trunc(Number(value)))
+    .filter((value) => value >= 0 && value <= 9);
+  if (faces.length === 0) {
+    return { state: faceRoll.state, type: -1, spawnFlags: 0, weighted: false, scripted: false };
+  }
+  const start = Math.floor(faceRoll.value * faces.length / 0x10000);
+  const excluded = Number(excludedTypeMask) >>> 0;
+  type = faces[start];
+  for (let offset = 0; offset < faces.length && (excluded & (1 << type)) !== 0; offset += 1) {
+    type = faces[(start + offset + 1) % faces.length];
+  }
+  return { state: faceRoll.state, type, spawnFlags: 0, weighted: false, scripted: false };
+}
+
+// _spawnNewBlockInBits (0x62771c) counts every bit in its uint16 mask and
+// consumes one roll to select an enabled bit. Bits 0..5 return directly. A
+// selected higher bit (or an empty mask) consumes a second roll and returns a
+// uniformly selected active face type instead.
+export function padSpawnNewBlockInBits(state, typeMask, faceTypes) {
+  const mask = Number(typeMask) & 0xffff;
+  let count = 0;
+  for (let bits = mask; bits !== 0; bits >>>= 1) count += bits & 1;
+  const first = padLcgStep(state);
+  let selectedIndex = Math.floor(first.value * count / 0x10000);
+  for (let type = 0; type <= 5; type += 1) {
+    if ((mask & (1 << type)) === 0) continue;
+    if (selectedIndex === 0) return { state: first.state, type, usedFaceFallback: false };
+    selectedIndex -= 1;
+  }
+  const second = padLcgStep(first.state);
+  const faces = (Array.isArray(faceTypes) ? faceTypes : [])
+    .map((value) => Math.trunc(Number(value)))
+    .filter((value) => value >= 0 && value <= 9);
+  const type = faces.length > 0
+    ? faces[Math.floor(second.value * faces.length / 0x10000)]
+    : -1;
+  return { state: second.state, type, usedFaceFallback: true };
 }
 
 // cGAMEMAIN::_getRandomBlock (0x617874) advances the saved game-work LCG

@@ -92,6 +92,8 @@ export class PuzzleEngine {
     rows = PAD_BOARD_ROWS,
     allowDiagonalMoves = false,
     faceTypes = [0, 1, 2, 3, 4, 5],
+    dropRates = Array(10).fill(0),
+    skyfallExclusionMask = 0,
   } = {}) {
     if (![columns, rows].every(Number.isInteger) || columns < 1 || columns > 15 || rows < 1 || rows > 15) {
       throw new Error('PAD board dimensions must be integers from 1 through 15.');
@@ -102,6 +104,8 @@ export class PuzzleEngine {
     this.rows = rows;
     this.allowDiagonalMoves = Boolean(allowDiagonalMoves);
     this.setFaceTypes(faceTypes);
+    this.setDropRates(dropRates);
+    this.skyfallExclusionMask = Number(skyfallExclusionMask) >>> 0;
     this.rng = createPadRng(seed);
     this.orbSerial = 0;
     this.visualTime = 0;
@@ -479,7 +483,12 @@ export class PuzzleEngine {
       const survivors = [];
       for (let row = this.rows - 1; row >= 0; row -= 1) if (this.board[row][column]) survivors.push(this.board[row][column]);
       for (let row = this.rows - 1, index = 0; row >= 0; row -= 1, index += 1) {
-        this.board[row][column] = survivors[index] || this.createOrb(NATURAL_ORB_TYPES[Math.floor(this.rng.nextFloat() * NATURAL_ORB_TYPES.length)].id);
+        if (survivors[index]) {
+          this.board[row][column] = survivors[index];
+          continue;
+        }
+        const type = this.rng.spawnNewBlock(this.dropRates, this.faceTypes, this.skyfallExclusionMask);
+        this.board[row][column] = this.createOrb(ORB_TYPES[type]?.id || NATURAL_ORB_TYPES[0].id);
       }
     }
   }
@@ -613,6 +622,13 @@ export class PuzzleEngine {
       !Number.isInteger(Number(type)) || Number(type) < 0 || Number(type) >= ORB_TYPES.length
     ))) throw new Error('PAD face types must contain at most 16 native orb type indices.');
     this.faceTypes = types.map((type) => Number(type));
+  }
+
+  setDropRates(rates) {
+    if (!Array.isArray(rates) || rates.length > 10 || rates.some((rate) => !Number.isFinite(Number(rate)))) {
+      throw new Error('PAD drop rates must contain at most ten finite numeric lanes.');
+    }
+    this.dropRates = Array.from({ length: 10 }, (_, index) => Math.fround(Number(rates[index]) || 0));
   }
 
   setOrbState(row, column, state) {
@@ -1013,6 +1029,8 @@ export class PuzzleEngine {
       turn: this.turn,
       rngState: this.rng.state,
       faceTypes: [...this.faceTypes],
+      dropRates: [...this.dropRates],
+      skyfallExclusionMask: this.skyfallExclusionMask,
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({
         code: ORB_BY_ID[orb.type].code,

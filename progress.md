@@ -2,6 +2,21 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 native skyfall selection
+
+- Recovered `_spawnNewBlock` at `0x661978`: single-step ordinary face-list
+  selection, ten binary32 drop-rate lanes, mandatory second advance only when
+  rates are active, strict-negative thresholding, fallback-only exclusions,
+  forward rotation, and RNG-free scripted drops.
+- Recovered `_spawnNewBlockInBits` at `0x62771c`, including its one-step natural
+  mask path and two-step face-list fallback for high or empty masks.
+- Ported both primitives and routed browser cascade refills through the native
+  selector with configurable dungeon face types, rates, and exclusion mask.
+- Added deterministic pure, engine, weighted/fallback/exclusion, and browser
+  fixtures. The exact inspector now checks 56 anchors.
+- Next: recover initial-board construction and the remaining data mapping from
+  dungeon drop records; preserve the private account/server data boundary.
+
 ## 2026-08-14 passive block-swap resistance
 
 - Recovered `makeBlockFlagByPassiveSkill` at `0x6add50`, including passive

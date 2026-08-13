@@ -21,6 +21,8 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['board', 'getRandomBlock', '_ZN9cGAMEMAIN15_getRandomBlockEibb', 0x617874],
   ['board', 'getRandomBlockOnFace', '_ZN9cGAMEMAIN21_getRandomBlockOnFaceEPibbb', 0x6179fc],
   ['board', 'countBlockBits', '_ZNK9cGAMEMAIN15_countBlockBitsEt', 0x651fa4],
+  ['board', 'spawnNewBlock', '_ZN9cGAMEMAIN14_spawnNewBlockERjj', 0x661978],
+  ['board', 'spawnNewBlockInBits', '_ZN9cGAMEMAIN20_spawnNewBlockInBitsEt', 0x62771c],
   ['orb-state', 'setupPlusBoostEffect', '_ZN9cGAMEMAIN21_setupPlusBoostEffectEPK6sBLOCKRf', 0x4361dc],
   ['orb-state', 'makeBlockFlagByPassiveSkill', '_ZN9cGAMEMAIN27makeBlockFlagByPassiveSkillEP10sBLOCKFLAGi', 0x6add50],
   ['orb-state', 'doLockDropBits', '_ZN9cGAMEMAIN15_doLockDropBitsEjit', 0x62676c],

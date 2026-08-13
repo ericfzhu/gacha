@@ -385,6 +385,26 @@ try {
     const passiveLineState = engine.rng.state;
     const passiveLineTypes = engine.board.map((row) => row[0].type);
     const passiveLineFlagByte = passiveLineFlag.byte;
+    engine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+    engine.setRngState(21_900);
+    engine.board[0][0] = null;
+    engine.collapseAndRefill();
+    const skyfallType = engine.board[0][0].type;
+    const skyfallState = engine.rng.state;
+    engine.setDropRates([0.1]);
+    engine.setRngState(21_900);
+    engine.board[0][0] = null;
+    engine.collapseAndRefill();
+    const weightedSkyfallType = engine.board[0][0].type;
+    const weightedSkyfallState = engine.rng.state;
+    engine.setDropRates([]);
+    engine.skyfallExclusionMask = 1 << 0;
+    engine.setRngState(21_900);
+    engine.board[0][0] = null;
+    engine.collapseAndRefill();
+    const excludedSkyfallType = engine.board[0][0].type;
+    const excludedSkyfallState = engine.rng.state;
+    engine.skyfallExclusionMask = 0;
     engine.reset();
     engine.start();
     return {
@@ -402,6 +422,8 @@ try {
       horizontalSwapFlags, horizontalSwapState, horizontalSwapTypes,
       passivePoisonFlags, passiveJammerFlags, passiveFixedState, passiveFixedTypes,
       passiveBlockFlagByte, passiveLineFlags, passiveLineState, passiveLineTypes, passiveLineFlagByte,
+      skyfallType, skyfallState, weightedSkyfallType, weightedSkyfallState,
+      excludedSkyfallType, excludedSkyfallState,
     };
   }) : null;
   const advanceLcg = (state, count) => {
@@ -455,7 +477,12 @@ try {
     poisonBlockSample.passiveBlockFlagByte !== 0xbb || poisonBlockSample.passiveLineFlags !== 8 ||
     poisonBlockSample.passiveLineState !== advanceLcg(21_900, 5) ||
     JSON.stringify(poisonBlockSample.passiveLineTypes) !== JSON.stringify(Array(5).fill('dark')) ||
-    poisonBlockSample.passiveLineFlagByte !== 0x0b
+    poisonBlockSample.passiveLineFlagByte !== 0x0b || poisonBlockSample.skyfallType !== 'fire' ||
+    poisonBlockSample.skyfallState !== 394_448_415 ||
+    poisonBlockSample.weightedSkyfallType !== 'fire' ||
+    poisonBlockSample.weightedSkyfallState !== 3_803_934_822 ||
+    poisonBlockSample.excludedSkyfallType !== 'water' ||
+    poisonBlockSample.excludedSkyfallState !== 394_448_415
   )) throw new Error(`Poison-block mismatch: ${JSON.stringify(poisonBlockSample)}`);
   if (renderAtlasSheet) {
     const sheet = page.locator('#pad-atlas-sheet');

@@ -155,6 +155,29 @@ matching, skills, falls, refills, validation, and snapshots. The visible lab
 continues to start in the normal 6-by-5 layout and exposes the native 7-by-6
 layout through its board-size control.
 
+Skyfall type selection is centralized in `_spawnNewBlock(uint32 &, uint32)` at
+`0x661978`. With no active drop-rate lanes it consumes one saved LCG step and
+uniformly indexes the ordered dungeon face list. If that fallback type is named
+by the supplied exclusion mask, native rotates forward through the face list,
+wrapping until it finds an allowed type. The mask does not reject a type chosen
+by an explicit drop-rate lane.
+
+When at least one of ten binary32 rate lanes is active, native consumes a first
+LCG value, maps it to integer `0..9999`, and sequentially subtracts each nonzero
+`float32(rate * 10000)` value. The first lane making the binary32 remainder
+negative wins, so an exact zero remains a miss. A second saved LCG advance then
+always occurs: it is discarded after a weighted win or selects the fallback
+face after all rate lanes miss. A configured scripted-drop byte bypasses both
+random advances. `padSpawnNewBlock` and `PuzzleEngine.collapseAndRefill` preserve
+these one-step, two-step, exclusion, and binary32 boundaries; the engine exposes
+ten `dropRates` lanes and a `skyfallExclusionMask` for data-backed dungeons.
+
+`_spawnNewBlockInBits(uint16)` at `0x62771c` is a separate skill/data helper. It
+counts all 16 mask bits, spends one roll selecting an enabled-bit ordinal, and
+returns natural bits `0..5` directly. Selecting any higher bit—or supplying an
+empty mask—spends a second roll and returns a uniform dungeon face type instead.
+`padSpawnNewBlockInBits` keeps that intentionally asymmetric fallback contract.
+
 The native combo list is a fixed list of 88-byte `sCOMBO` records with linked-list
 indices stored around game-work offset `0x57a8`. Version 21.9 also records modern
 shape metadata and passive-skill flags. The browser rules layer now returns mass

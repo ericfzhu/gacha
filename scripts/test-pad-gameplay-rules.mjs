@@ -37,6 +37,8 @@ import {
   padShuffleBlockMinusCandidates,
   padShuffleBurDropCandidates,
   padShuffleLockDropCandidates,
+  padSpawnNewBlock,
+  padSpawnNewBlockInBits,
   padTertiaryAttributeAttack,
   padLcgStep,
   padThornDamage,
@@ -60,6 +62,43 @@ assert.deepEqual(statefulNativeRng.shuffleBlockCandidates([0, 1, 2]), [2, 1, 0])
 assert.equal(statefulNativeRng.state, 919_597_584);
 assert.equal(statefulNativeRng.getRandomBlock(), 3);
 assert.equal(statefulNativeRng.state, 1_569_558_794);
+assert.deepEqual(padSpawnNewBlock(21_900, [], [0, 1, 2, 3, 4, 5]), {
+  state: 394_448_415,
+  type: 0,
+  spawnFlags: 0,
+  weighted: false,
+  scripted: false,
+});
+assert.deepEqual(padSpawnNewBlock(21_900, [0.1], [0, 1, 2, 3, 4, 5]), {
+  state: 3_803_934_822,
+  type: 0,
+  spawnFlags: 0,
+  weighted: true,
+  scripted: false,
+});
+assert.equal(padSpawnNewBlock(21_900, [], [0, 1, 2, 3, 4, 5], 1 << 0).type, 1);
+assert.deepEqual(padSpawnNewBlock(21_900, [], [0, 1, 2, 3, 4, 5], 0, 7), {
+  state: 21_900,
+  type: 7,
+  spawnFlags: 0,
+  weighted: false,
+  scripted: true,
+});
+assert.deepEqual(padSpawnNewBlockInBits(21_900, 0b101010, [0, 1, 2, 3, 4, 5]), {
+  state: 394_448_415,
+  type: 1,
+  usedFaceFallback: false,
+});
+assert.deepEqual(padSpawnNewBlockInBits(394_448_415, (1 << 0) | (1 << 6), [0, 1, 2, 3, 4, 5]), {
+  state: 1_929_471_377,
+  type: 2,
+  usedFaceFallback: true,
+});
+assert.deepEqual(padSpawnNewBlockInBits(21_900, 0, [0, 1, 2, 3, 4, 5]), {
+  state: 3_803_934_822,
+  type: 5,
+  usedFaceFallback: true,
+});
 assert.deepEqual(padShuffleBlockCandidates(21_900, [0, 1, 2, 3, 4, 5]), {
   state: 3_803_934_822,
   candidates: [1, 3, 2, 4, 5, 0],
@@ -396,6 +435,30 @@ assert.deepEqual(new PuzzleEngine({ seed: 21_900 }).snapshot().board, [
   'LRLDHR',
 ]);
 assert.equal(new PuzzleEngine({ seed: 21_900 }).snapshot().rngState, 79_238_434);
+
+const skyfallEngine = new PuzzleEngine({ seed: 21_900 });
+skyfallEngine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+skyfallEngine.setRngState(21_900);
+skyfallEngine.board[0][0] = null;
+skyfallEngine.collapseAndRefill();
+assert.equal(skyfallEngine.board[0][0].type, 'fire');
+assert.equal(skyfallEngine.rng.state, 394_448_415);
+assert.deepEqual(skyfallEngine.snapshot().dropRates, Array(10).fill(0));
+assert.equal(skyfallEngine.snapshot().skyfallExclusionMask, 0);
+const weightedSkyfallEngine = new PuzzleEngine({ seed: 21_900, dropRates: [0.1] });
+weightedSkyfallEngine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+weightedSkyfallEngine.setRngState(21_900);
+weightedSkyfallEngine.board[0][0] = null;
+weightedSkyfallEngine.collapseAndRefill();
+assert.equal(weightedSkyfallEngine.board[0][0].type, 'fire');
+assert.equal(weightedSkyfallEngine.rng.state, 3_803_934_822);
+const excludedSkyfallEngine = new PuzzleEngine({ seed: 21_900, skyfallExclusionMask: 1 << 0 });
+excludedSkyfallEngine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+excludedSkyfallEngine.setRngState(21_900);
+excludedSkyfallEngine.board[0][0] = null;
+excludedSkyfallEngine.collapseAndRefill();
+assert.equal(excludedSkyfallEngine.board[0][0].type, 'water');
+assert.equal(excludedSkyfallEngine.rng.state, 394_448_415);
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);
 assert.deepEqual(tracePadDragCells(0, 0, 2, 2, true), [{ row: 1, column: 1 }, { row: 2, column: 2 }]);
