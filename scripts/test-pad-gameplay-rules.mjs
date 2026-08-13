@@ -11,6 +11,7 @@ import {
   padComboLeaderMultiplier,
   padDamageAfterDefense,
   padEnhancedOrbMultiplier,
+  padGetRandomBlock,
   padMatchPower,
   padNativeBaseAttackPower,
   padNativeRecoveryPower,
@@ -39,6 +40,10 @@ assert.deepEqual(padShuffleBlockCandidates(21_900, ['heart']), {
   state: 3_803_934_822,
   candidates: ['heart'],
 });
+assert.deepEqual(padGetRandomBlock(21_900), { state: 3_803_934_822, type: 1 });
+assert.deepEqual(padGetRandomBlock(21_900, 1), { state: 3_803_934_822, type: 2 });
+assert.deepEqual(padGetRandomBlock(21_900, -1, true, true), { state: 3_803_934_822, type: 1 });
+assert.deepEqual(padGetRandomBlock(21_900, -1, false, false), { state: 3_803_934_822, type: 1 });
 assert.deepEqual(new PuzzleEngine({ seed: 21_900 }).snapshot().board, [
   'RHGBGG',
   'BBGHRL',

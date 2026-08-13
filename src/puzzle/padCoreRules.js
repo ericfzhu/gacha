@@ -75,6 +75,25 @@ export function padShuffleBlockCandidates(state, candidates) {
   return { state: second.state, candidates: shuffled };
 }
 
+// The same native routine builds its candidates from numeric block types
+// 0..5, optionally extends the range through jammer type 6, removes the type
+// supplied in w1, and can suppress heart type 5. It returns the first element
+// of the shuffled list while persisting only the two global LCG advances.
+export function padGetRandomBlock(
+  state,
+  excludedType = -1,
+  includeJammer = false,
+  includeHeart = true,
+) {
+  const candidates = [];
+  const typeCount = includeJammer ? 7 : 6;
+  for (let type = 0; type < typeCount; type += 1) {
+    if (type !== excludedType && (type !== 5 || includeHeart)) candidates.push(type);
+  }
+  const shuffled = padShuffleBlockCandidates(state, candidates);
+  return { state: shuffled.state, type: shuffled.candidates[0] ?? 0 };
+}
+
 export function padAttributeMultiplier(attacker, defender) {
   if ((attacker === 'fire' && defender === 'wood') ||
       (attacker === 'wood' && defender === 'water') ||
