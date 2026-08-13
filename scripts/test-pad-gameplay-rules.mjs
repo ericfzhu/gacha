@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
+  PAD_ENEMY_SKILL_SCALED_ATTACK,
   PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
   PAD_ENEMY_SKILL_REVIVE_ENEMY,
   PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
@@ -715,6 +716,30 @@ assert.deepEqual(
     supported: true,
     thresholdPercent: 25,
     healPercent: 37,
+    attackWithSkillValue: 0,
+  },
+);
+const enemyAiScaledAttackDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiScaledAttackView = new DataView(enemyAiScaledAttackDefinition.buffer);
+enemyAiScaledAttackView.setUint32(0x00, 9_024, true);
+enemyAiScaledAttackView.setInt16(0x04, PAD_ENEMY_SKILL_SCALED_ATTACK, true);
+enemyAiScaledAttackView.setInt32(0x14, 50, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiScaledAttackDefinition), {
+  type: 47,
+  kind: 'scaledAttack',
+  supported: true,
+  damagePercent: 50,
+  attackWithSkillValue: 0,
+});
+const scaledAttackMonsterRuntime = new Uint8Array(0x680);
+new DataView(scaledAttackMonsterRuntime.buffer).setInt32(0x678, 75, true);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiScaledAttackDefinition, scaledAttackMonsterRuntime),
+  {
+    type: 47,
+    kind: 'scaledAttack',
+    supported: true,
+    damagePercent: 75,
     attackWithSkillValue: 0,
   },
 );
@@ -2185,6 +2210,37 @@ rejectedHealPlayerEngine.player.hp = 3_060;
 rejectedHealPlayerEngine.setRngState(21_900);
 assert.equal(rejectedHealPlayerEngine.takeEnemySkill(0), null);
 assert.equal(rejectedHealPlayerEngine.rng.state, 21_900);
+const scaledAttackMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(scaledAttackMonsterDefinition.buffer).setUint32(0xec, 9_024, true);
+const selectedScaledAttackEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: scaledAttackMonsterDefinition,
+    skillDefinitions: [enemyAiScaledAttackDefinition],
+  }],
+});
+selectedScaledAttackEngine.setRngState(21_900);
+selectedScaledAttackEngine.enemies[0].counter = 1;
+selectedScaledAttackEngine.enemies[1].counter = 99;
+selectedScaledAttackEngine.resolveEnemyTurn();
+const selectedScaledAttackState = selectedScaledAttackEngine.snapshot();
+assert.equal(selectedScaledAttackState.player.hp, 11_075);
+assert.equal(selectedScaledAttackState.lastEnemyActions[0].skill.type, 47);
+assert.equal(selectedScaledAttackState.lastEnemyActions[0].skill.skillId, 9_024);
+assert.equal(selectedScaledAttackState.lastEnemyActions[0].damage, 925);
+assert.equal(selectedScaledAttackState.enemies[0].enemyAiBudget, 80);
+assert.equal(selectedScaledAttackEngine.rng.state, padLcgStep(21_900).state);
+const rejectedScaledAttackEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: scaledAttackMonsterDefinition,
+    skillDefinitions: [enemyAiScaledAttackDefinition],
+  }],
+});
+rejectedScaledAttackEngine.enemies[0].scaledAttackGate = 1;
+rejectedScaledAttackEngine.setRngState(21_900);
+assert.equal(rejectedScaledAttackEngine.takeEnemySkill(0), null);
+assert.equal(rejectedScaledAttackEngine.rng.state, 21_900);
 const currentHpGravityMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(currentHpGravityMonsterDefinition.buffer).setUint32(0xec, 9_023, true);
 const selectedCurrentHpGravityEngine = new PuzzleEngine({

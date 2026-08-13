@@ -1,3 +1,4 @@
+export const PAD_ENEMY_SKILL_SCALED_ATTACK = 47;
 export const PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY = 50;
 export const PAD_ENEMY_SKILL_REVIVE_ENEMY = 52;
 export const PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB = 53;
@@ -86,6 +87,15 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
     ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
     : null;
+  if (type === PAD_ENEMY_SKILL_SCALED_ATTACK) {
+    return Object.freeze({
+      type,
+      kind: 'scaledAttack',
+      supported: true,
+      damagePercent: definition.getInt32(0x14, true),
+      attackWithSkillValue,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY) {
     return Object.freeze({
       type,
@@ -406,6 +416,18 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
   );
   const monster = new DataView(monsterBytes.buffer, monsterBytes.byteOffset, monsterBytes.byteLength);
   const type = definition.getInt16(PAD_ENEMY_SKILL_RUNTIME_LAYOUT.definitionTypeOffset, true);
+  if (type === PAD_ENEMY_SKILL_SCALED_ATTACK) {
+    return Object.freeze({
+      type,
+      kind: 'scaledAttack',
+      supported: true,
+      damagePercent: monster.getInt32(0x678, true),
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY) {
     return Object.freeze({
       type,
@@ -498,6 +520,14 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
 
 export function normalizePadEnemySkillRecord(record) {
   const type = Math.trunc(Number(record?.type));
+  if (type === PAD_ENEMY_SKILL_SCALED_ATTACK || record?.kind === 'scaledAttack') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_SCALED_ATTACK,
+      kind: 'scaledAttack',
+      supported: true,
+      damagePercent: Math.trunc(Number(record?.damagePercent) || 0),
+    });
+  }
   if (type === PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY || record?.kind === 'currentHpGravity') {
     return Object.freeze({
       type: PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,

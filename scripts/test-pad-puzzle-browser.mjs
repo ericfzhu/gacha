@@ -946,6 +946,27 @@ try {
     engine.setRngState(21_900);
     const rejectedHealPlayerSkill = engine.takeEnemySkill(0);
     const rejectedHealPlayerState = engine.snapshot();
+    const scaledAttackMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(scaledAttackMonsterDefinition.buffer).setUint32(0xec, 9_024, true);
+    const scaledAttackDefinition = sourceToPoisonDefinition.slice();
+    const scaledAttackView = new DataView(scaledAttackDefinition.buffer);
+    scaledAttackView.setUint32(0x00, 9_024, true);
+    scaledAttackView.setInt16(0x04, 47, true);
+    scaledAttackView.setInt32(0x14, 50, true);
+    engine.setEnemyAiDefinitionPool(0, scaledAttackMonsterDefinition, [scaledAttackDefinition]);
+    engine.player.hp = 12_000;
+    engine.enemies[0].scaledAttackGate = 0;
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedScaledAttackAi = engine.snapshot();
+    engine.setEnemyAiDefinitionPool(0, scaledAttackMonsterDefinition, [scaledAttackDefinition]);
+    engine.enemies[0].scaledAttackGate = 1;
+    engine.setRngState(21_900);
+    const rejectedScaledAttackSkill = engine.takeEnemySkill(0);
+    const rejectedScaledAttackState = engine.snapshot();
+    engine.enemies[0].scaledAttackGate = 0;
     const currentHpGravityMonsterDefinition = enemyAiMonsterDefinition.slice();
     new DataView(currentHpGravityMonsterDefinition.buffer).setUint32(0xec, 9_023, true);
     const currentHpGravityDefinition = sourceToPoisonDefinition.slice();
@@ -1105,6 +1126,7 @@ try {
       rejectedScaledSourceToPoisonSkill, rejectedScaledSourceToPoisonState,
       selectedSourceToMortalPoisonAi, selectedSourceToMortalPoisonCount,
       selectedHealPlayerAi, rejectedHealPlayerSkill, rejectedHealPlayerState,
+      selectedScaledAttackAi, rejectedScaledAttackSkill, rejectedScaledAttackState,
       selectedCurrentHpGravityAi,
       selectedReviveEnemyAi, rejectedReviveEnemySkill, rejectedReviveEnemyState,
       selectedBindLeaderHelperAi,
@@ -1344,6 +1366,14 @@ try {
     poisonBlockSample.selectedHealPlayerAi.enemies?.[0]?.enemyAiBudget !== 80 ||
     poisonBlockSample.rejectedHealPlayerSkill !== null ||
     poisonBlockSample.rejectedHealPlayerState.rngState !== 21_900 ||
+    poisonBlockSample.selectedScaledAttackAi.player.hp !== 11_075 ||
+    poisonBlockSample.selectedScaledAttackAi.lastEnemyActions?.[0]?.skill?.type !== 47 ||
+    poisonBlockSample.selectedScaledAttackAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_024 ||
+    poisonBlockSample.selectedScaledAttackAi.lastEnemyActions?.[0]?.damage !== 925 ||
+    poisonBlockSample.selectedScaledAttackAi.rngState !== advanceLcg(21_900, 1) ||
+    poisonBlockSample.selectedScaledAttackAi.enemies?.[0]?.enemyAiBudget !== 80 ||
+    poisonBlockSample.rejectedScaledAttackSkill !== null ||
+    poisonBlockSample.rejectedScaledAttackState.rngState !== 21_900 ||
     poisonBlockSample.selectedCurrentHpGravityAi.player.hp !== 9_000 ||
     poisonBlockSample.selectedCurrentHpGravityAi.lastEnemyActions?.[0]?.skill?.type !== 50 ||
     poisonBlockSample.selectedCurrentHpGravityAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_023 ||

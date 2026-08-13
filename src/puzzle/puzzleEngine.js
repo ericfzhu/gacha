@@ -33,6 +33,7 @@ import {
   tracePadPointerCells,
 } from './padCoreRules.js';
 import {
+  PAD_ENEMY_SKILL_SCALED_ATTACK,
   PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
   PAD_ENEMY_SKILL_REVIVE_ENEMY,
   PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
@@ -119,8 +120,8 @@ const PARTY = Object.freeze([
 ]);
 
 const ENEMY_TEMPLATE = Object.freeze([
-  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
-  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
+  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
+  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
 ]);
 
 function clamp(value, min, max) {
@@ -848,9 +849,12 @@ export class PuzzleEngine {
         const skill = this.takeEnemySkill(index);
         if (skill) {
           this.applyEnemySkillRecord(skill, index);
-          const damage = skill.kind === 'currentHpGravity'
-            ? padEnemySkillCurrentHpGravity(this.player.hp - total, skill.damagePercent)
-            : padEnemySkillAttack(enemy.attack, skill.attackWithSkillValue);
+          let damage = padEnemySkillAttack(enemy.attack, skill.attackWithSkillValue);
+          if (skill.kind === 'currentHpGravity') {
+            damage = padEnemySkillCurrentHpGravity(this.player.hp - total, skill.damagePercent);
+          } else if (skill.kind === 'scaledAttack') {
+            damage = padEnemySkillAttack(enemy.attack, skill.damagePercent);
+          }
           total += damage;
           this.lastEnemyActions.push({
             enemy: index,
@@ -893,6 +897,7 @@ export class PuzzleEngine {
       currentHp: enemy.hp,
       maxHp: enemy.maxHp,
       attributeAbsorbTurns: enemy.attributeAbsorbTurns,
+      scaledAttackGate: enemy.scaledAttackGate,
       playerCurrentHp: this.player.hp,
       playerMaxHp: this.player.maxHp,
       party: this.party.map((member) => ({
@@ -1203,6 +1208,10 @@ export class PuzzleEngine {
     const materialized = this.materializeEnemySkillRecord(record);
     const skill = normalizePadEnemySkillRecord(materialized);
     this.lastEnemySkill = skill;
+    if (skill.supported && skill.kind === 'scaledAttack') {
+      this.message = `Enemy attacks at ${skill.damagePercent}% power.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'currentHpGravity') {
       this.message = `Enemy gravity deals ${skill.damagePercent}% of current HP.`;
       return true;
@@ -1385,6 +1394,7 @@ export class PuzzleEngine {
       const definition = definitionsById.get(slot.skillId);
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
       if (![
+        PAD_ENEMY_SKILL_SCALED_ATTACK,
         PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
         PAD_ENEMY_SKILL_REVIVE_ENEMY,
         PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
@@ -1972,7 +1982,7 @@ export class PuzzleEngine {
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,
-      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, attributeAbsorbTurns = 0, attributeAbsorbMask = 0 }, index) => ({
+      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, scaledAttackGate = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0 }, index) => ({
         id,
         name,
         attribute,
@@ -1980,6 +1990,7 @@ export class PuzzleEngine {
         maxHp,
         counter,
         maxCounter,
+        scaledAttackGate,
         attributeAbsorbTurns,
         attributeAbsorbMask,
         queuedEnemySkills: Math.max(

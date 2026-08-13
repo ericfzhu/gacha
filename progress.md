@@ -2,6 +2,22 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 standalone scaled enemy attack
+
+- Identified enemy skill type `47` as a standalone percentage-scaled attack:
+  late handler `0x62972c`, setup `0x620040`, and condition `0x61b54c`.
+  Definition `+0x14` is copied to runtime `sMONSTER+0x678`; setup consumes no
+  RNG and execution passes its binary32 ratio to `_setEnemyAttackMain`.
+- Ported the distinct action instead of conflating it with the common positive
+  `+0x44` accompanying-attack field. Both share the exact float32 scaling and
+  positive rounding primitive, but have separate native dispatch/data paths.
+- Added the native `sMONSTER+0x6c0 == 0` selection gate as explicit per-enemy
+  state, authored/runtime decoding, AI acceptance and rejection fixtures,
+  enemy-turn damage, snapshots, browser coverage, and exact table checks.
+- An admitted immediate skill consumes one AI probability draw; a nonzero gate
+  rejects it without advancing the LCG.
+- Next: inspect type `46`'s enemy-attribute transition.
+
 ## 2026-08-14 current-HP gravity
 
 - Identified enemy skill type `50` as fixed current-HP gravity: late handler

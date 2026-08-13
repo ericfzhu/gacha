@@ -647,6 +647,27 @@ gate. An eligible fallback retains its authored `sENEAI+5` weight without
 scaling. The browser selector exposes this as `probabilityScale` while keeping
 the already decoded condition-owned RNG state transitions intact.
 
+Enemy skill type `47` is a standalone percentage-scaled enemy attack. Its late
+dispatch entry targets `0x62972c`, setup targets `0x620040`, and AI condition
+targets `0x61b54c`. Setup copies signed definition integer `+0x14` to runtime
+`sMONSTER+0x678` without consuming RNG. The condition admits the record only
+while native `sMONSTER+0x6c0` is zero; the browser exposes that field as
+`scaledAttackGate` so the same rejection boundary remains testable.
+
+Execution converts runtime `+0x678` to binary32, divides by binary32 100, and
+passes the ratio to `_setEnemyAttackMain` with no positive fixed-damage
+override. That routine converts the enemy's protected int64 attack to binary32,
+multiplies in binary32, and rounds the positive result. The browser reuses the
+same `padEnemySkillAttack` numeric primitive already validated for accompanying
+attacks, while retaining type 47's distinct decoder and dispatch path. With the
+demo enemy's attack 1,850, an authored 50% record deals 925 damage.
+
+This is deliberately separate from the generic positive `sENEMYSKILL+0x44`
+accompanying-attack field: type 47 uses `+0x14`, materializes it through
+`sMONSTER+0x678`, and is itself the attack. An admitted immediate new-AI record
+spends one probability draw and no setup draw; a nonzero gate rejects it before
+that probability roll.
+
 Enemy skill type `50` deals fixed damage equal to a percentage of the player's
 current HP. Its late dispatch entry targets `0x62974c`, setup targets `0x621530`,
 and its unconditional AI condition targets `0x61a630`. Setup copies signed
