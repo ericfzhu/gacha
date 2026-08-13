@@ -1,8 +1,9 @@
 import { parseElf64 } from './elf64.js';
 
-export const ARM64_STATUS = Object.freeze({ RUNNING: 0, HALTED: 1, SYSCALL: 2, UNKNOWN_INSTRUCTION: -1, MEMORY: -2, ALIGNMENT: -3 });
+export const ARM64_STATUS = Object.freeze({ RUNNING: 0, HALTED: 1, SYSCALL: 2, HOSTCALL: 3, TRACEPOINT: 4, WATCHPOINT: 5, UNKNOWN_INSTRUCTION: -1, MEMORY: -2, ALIGNMENT: -3 });
 export const LIBPAD_PROBE_ADDRESS = 0x3323c0;
 export const LIBPAD_CONSTRUCTOR_ADDRESS = 0x332cf0;
+export const DEFAULT_ELF_LOAD_BIAS = 0x1000000;
 export const LIBPAD_PROBE_BYTES = new Uint8Array([
   0x20, 0x1c, 0x80, 0x52, // mov w0, #0xe1
   0xc0, 0x03, 0x5f, 0xd6, // ret
@@ -10,9 +11,16 @@ export const LIBPAD_PROBE_BYTES = new Uint8Array([
 
 const PAGE_BYTES = 65536;
 const DEFAULT_MEMORY_PAGES = 768;
-const DEFAULT_MAXIMUM_PAGES = 2048;
+// The protector temporarily maps several decoded stages at once. Once the
+// Android shared-object/bridge arenas are correctly reserved, those mappings
+// can extend beyond 128 MiB even though committed memory starts at 48 MiB.
+const DEFAULT_MAXIMUM_PAGES = 4096;
 const DEFAULT_MEMORY_BIAS = 0x200000;
 const RETURN_SENTINEL = 0xffffffffffffffffn;
+const R_AARCH64_RELATIVE = 1027;
+const R_AARCH64_ABS64 = 257;
+const R_AARCH64_GLOB_DAT = 1025;
+const R_AARCH64_JUMP_SLOT = 1026;
 
 function hex(value, width = 0) {
   const rendered = BigInt(value).toString(16);
@@ -37,6 +45,7 @@ export class Arm64Runtime {
     this.memory = memory;
     this.exports = instance.exports;
     this.memoryBias = memoryBias;
+    this.loadBias = 0;
     this.loadedElf = null;
     this.exports.arm64_set_memory_bias(memoryBias);
   }
@@ -45,7 +54,17 @@ export class Arm64Runtime {
     const required = this.memoryBias + guestEnd;
     const current = this.memory.buffer.byteLength;
     if (required <= current) return;
-    this.memory.grow(Math.ceil((required - current) / PAGE_BYTES));
+    const growth = Math.ceil((required - current) / PAGE_BYTES);
+    try {
+      this.memory.grow(growth);
+    } catch (error) {
+      const caller = new Error().stack?.split('\n').slice(2, 8).join(' <- ') ?? '';
+      throw new Error(
+        `ARM64 guest requested memory through 0x${guestEnd.toString(16)} ` +
+        `(${Math.ceil(required / (1024 * 1024))} MiB including bias; current ${current / (1024 * 1024)} MiB): ` +
+        `${error instanceof Error ? error.message : String(error)}; ${caller}`,
+      );
+    }
   }
 
   loadBytes(virtualAddress, bytes) {
@@ -53,19 +72,55 @@ export class Arm64Runtime {
     new Uint8Array(this.memory.buffer, this.memoryBias + virtualAddress, bytes.length).set(bytes);
   }
 
-  loadElf(input) {
+  writeBytes(virtualAddress, bytes) {
+    this.loadBytes(virtualAddress, bytes);
+  }
+
+  readBytes(virtualAddress, length) {
+    this.ensureCapacity(virtualAddress + length);
+    const start = this.memoryBias + virtualAddress;
+    return new Uint8Array(this.memory.buffer.slice(start, start + length));
+  }
+
+  fillBytes(virtualAddress, length, value = 0) {
+    this.ensureCapacity(virtualAddress + length);
+    new Uint8Array(this.memory.buffer, this.memoryBias + virtualAddress, length).fill(value);
+  }
+
+  writeUint64(virtualAddress, value) {
+    this.ensureCapacity(virtualAddress + 8);
+    new DataView(this.memory.buffer).setBigUint64(this.memoryBias + virtualAddress, BigInt.asUintN(64, BigInt(value)), true);
+  }
+
+  loadElf(input, loadBias = DEFAULT_ELF_LOAD_BIAS) {
     const elf = parseElf64(input);
-    this.ensureCapacity(elf.maximumAddress);
+    this.ensureCapacity(loadBias + elf.maximumAddress);
     const memoryBytes = new Uint8Array(this.memory.buffer);
     for (const segment of elf.loadSegments) {
-      const start = this.memoryBias + segment.virtualAddress;
+      const start = this.memoryBias + loadBias + segment.virtualAddress;
       const fileEnd = segment.fileOffset + segment.fileSize;
       if (fileEnd > elf.bytes.length) throw new Error(`PT_LOAD ${segment.index} extends beyond the file`);
       memoryBytes.fill(0, start, start + segment.memorySize);
       memoryBytes.set(elf.bytes.subarray(segment.fileOffset, fileEnd), start);
     }
+    for (const relocation of elf.relocations) {
+      if (relocation.type === R_AARCH64_RELATIVE) {
+        this.writeUint64(loadBias + relocation.offset, BigInt(loadBias) + BigInt(relocation.addend));
+      } else if (relocation.type === R_AARCH64_ABS64 || relocation.type === R_AARCH64_GLOB_DAT || relocation.type === R_AARCH64_JUMP_SLOT) {
+        const symbol = elf.dynamicSymbols[relocation.symbol];
+        if (symbol?.sectionIndex) {
+          const addend = relocation.type === R_AARCH64_ABS64 ? relocation.addend : 0;
+          this.writeUint64(loadBias + relocation.offset, BigInt(loadBias + symbol.value + addend));
+        }
+      }
+    }
     this.loadedElf = elf;
+    this.loadBias = loadBias;
     return elf;
+  }
+
+  elfAddress(relativeAddress) {
+    return this.loadBias + relativeAddress;
   }
 
   peek32(virtualAddress) {
@@ -82,7 +137,8 @@ export class Arm64Runtime {
     return new TextDecoder().decode(bytes.subarray(start, start + length));
   }
 
-  reset(pc, stackPointer = 0x1f00000n) {
+  reset(pc, stackPointer = 0x3f00000n) {
+    this.ensureCapacity(Number(stackPointer));
     this.exports.arm64_reset(BigInt(pc));
     this.exports.arm64_set_sp(BigInt(stackPointer));
     this.exports.arm64_set_register(30, RETURN_SENTINEL);
@@ -101,8 +157,9 @@ export class Arm64Runtime {
   }
 
   runLibpadProbe(useLoadedElf = false) {
-    if (!useLoadedElf) this.loadBytes(LIBPAD_PROBE_ADDRESS, LIBPAD_PROBE_BYTES);
-    this.reset(LIBPAD_PROBE_ADDRESS);
+    const address = useLoadedElf ? this.elfAddress(LIBPAD_PROBE_ADDRESS) : LIBPAD_PROBE_ADDRESS;
+    if (!useLoadedElf) this.loadBytes(address, LIBPAD_PROBE_BYTES);
+    this.reset(address);
     const trace = this.trace(8);
     return {
       passed: this.exports.arm64_get_status() === ARM64_STATUS.HALTED && this.exports.arm64_get_register(0) === 225n,
@@ -123,7 +180,16 @@ export class Arm64Runtime {
     };
   }
 
-  runToFirstSyscall(pc = LIBPAD_CONSTRUCTOR_ADDRESS, maximumSteps = 2000) {
+  hostcallSnapshot() {
+    if (this.exports.arm64_get_status() !== ARM64_STATUS.HOSTCALL) return null;
+    return {
+      arguments: Array.from({ length: 8 }, (_, index) => this.exports.arm64_get_register(index)),
+      pc: this.exports.arm64_get_pc(),
+      address: this.exports.arm64_get_fault_address(),
+    };
+  }
+
+  runToFirstSyscall(pc = this.elfAddress(LIBPAD_CONSTRUCTOR_ADDRESS), maximumSteps = 2000) {
     this.reset(pc);
     const trace = this.trace(maximumSteps);
     const syscall = this.syscallSnapshot();

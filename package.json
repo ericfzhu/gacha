@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "wasm:build": "bash scripts/build-arm64-wasm.sh",
     "wasm:test": "npm run wasm:build && node scripts/test-arm64-core.mjs",
+    "android-stubs:build": "bash scripts/build-android-stubs.sh",
     "api:dev": "wrangler dev",
     "api:deploy": "wrangler deploy",
     "db:migrate": "wrangler d1 execute fleet-collection --file worker/schema.sql"

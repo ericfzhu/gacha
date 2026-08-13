@@ -1,9 +1,16 @@
 const ELF_MAGIC = [0x7f, 0x45, 0x4c, 0x46];
 const PT_LOAD = 1;
+const PT_DYNAMIC = 2;
 const EM_AARCH64 = 183;
+const SHT_RELA = 4;
 
 function safeNumber(value, label) {
   if (value > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error(`${label} exceeds JavaScript's safe integer range`);
+  return Number(value);
+}
+
+function safeSignedNumber(value, label) {
+  if (value > BigInt(Number.MAX_SAFE_INTEGER) || value < BigInt(Number.MIN_SAFE_INTEGER)) throw new Error(`${label} exceeds JavaScript's safe integer range`);
   return Number(value);
 }
 
@@ -62,22 +69,74 @@ export function parseElf64(input) {
       virtualAddress: safeNumber(view.getBigUint64(offset + 16, true), 'section virtual address'),
       fileOffset: safeNumber(view.getBigUint64(offset + 24, true), 'section file offset'),
       size: safeNumber(view.getBigUint64(offset + 32, true), 'section size'),
+      link: view.getUint32(offset + 40, true),
+      info: view.getUint32(offset + 44, true),
+      alignment: safeNumber(view.getBigUint64(offset + 48, true), 'section alignment'),
+      entrySize: safeNumber(view.getBigUint64(offset + 56, true), 'section entry size'),
     });
   }
 
   const namesSection = rawSections[sectionNameIndex];
   const names = namesSection ? bytes.subarray(namesSection.fileOffset, namesSection.fileOffset + namesSection.size) : new Uint8Array();
   const sections = rawSections.map((section) => ({ ...section, name: readString(names, section.nameOffset) }));
+  const dynamicSymbols = [];
+  const symbolsSection = sections.find((section) => section.name === '.dynsym');
+  if (symbolsSection?.entrySize >= 24) {
+    const stringsSection = sections[symbolsSection.link];
+    const strings = stringsSection ? bytes.subarray(stringsSection.fileOffset, stringsSection.fileOffset + stringsSection.size) : new Uint8Array();
+    for (let entryOffset = 0; entryOffset + 24 <= symbolsSection.size; entryOffset += symbolsSection.entrySize) {
+      const offset = symbolsSection.fileOffset + entryOffset;
+      const info = view.getUint8(offset + 4);
+      dynamicSymbols.push({
+        index: dynamicSymbols.length,
+        name: readString(strings, view.getUint32(offset, true)),
+        binding: info >> 4,
+        type: info & 15,
+        visibility: view.getUint8(offset + 5) & 3,
+        sectionIndex: view.getUint16(offset + 6, true),
+        value: safeNumber(view.getBigUint64(offset + 8, true), 'symbol value'),
+        size: safeNumber(view.getBigUint64(offset + 16, true), 'symbol size'),
+      });
+    }
+  }
+  const relocations = [];
+  for (const section of sections.filter((item) => item.type === SHT_RELA && item.entrySize >= 24)) {
+    for (let entryOffset = 0; entryOffset + 24 <= section.size; entryOffset += section.entrySize) {
+      const offset = section.fileOffset + entryOffset;
+      const info = view.getBigUint64(offset + 8, true);
+      relocations.push({
+        section: section.name,
+        offset: safeNumber(view.getBigUint64(offset, true), 'relocation offset'),
+        symbol: Number(info >> 32n),
+        type: Number(info & 0xffffffffn),
+        addend: safeSignedNumber(view.getBigInt64(offset + 16, true), 'relocation addend'),
+      });
+    }
+  }
   const loadSegments = programHeaders.filter((header) => header.type === PT_LOAD);
+  const dynamicEntries = [];
+  const dynamicHeader = programHeaders.find((header) => header.type === PT_DYNAMIC);
+  if (dynamicHeader) {
+    for (let offset = dynamicHeader.fileOffset; offset + 16 <= dynamicHeader.fileOffset + dynamicHeader.fileSize; offset += 16) {
+      const tag = safeSignedNumber(view.getBigInt64(offset, true), 'dynamic tag');
+      const value = safeNumber(view.getBigUint64(offset + 8, true), 'dynamic value');
+      dynamicEntries.push({ tag, value });
+      if (tag === 0) break;
+    }
+  }
   const maximumAddress = loadSegments.reduce((maximum, segment) => Math.max(maximum, segment.virtualAddress + segment.memorySize), 0);
 
   return {
     bytes,
     machine,
     entry,
+    programOffset,
     programHeaders,
     loadSegments,
+    dynamicEntries,
     sections,
+    dynamicSymbols,
+    relocations,
     maximumAddress,
     customSections: sections.filter((section) => section.type >= 0x80000000),
   };
