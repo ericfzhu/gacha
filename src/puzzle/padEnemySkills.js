@@ -1,3 +1,4 @@
+export const PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE = 46;
 export const PAD_ENEMY_SKILL_SCALED_ATTACK = 47;
 export const PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY = 50;
 export const PAD_ENEMY_SKILL_REVIVE_ENEMY = 52;
@@ -87,6 +88,19 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
     ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
     : null;
+  if (type === PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE) {
+    requireLength(definitionBytes, 0x24, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'changeEnemyAttribute',
+      supported: true,
+      candidateAttributes: Object.freeze(Array.from(
+        { length: 5 },
+        (_, index) => definition.getInt32(0x10 + index * 4, true),
+      )),
+      attackWithSkillValue,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_SCALED_ATTACK) {
     return Object.freeze({
       type,
@@ -391,6 +405,15 @@ export function padEnemySkillCurrentHpGravity(currentHp, damagePercent) {
   return Math.max(0, Math.trunc(Math.fround(scaled + 0.5)));
 }
 
+export function padEnemySkillAttributeCandidates(candidateAttributes, currentAttribute) {
+  const current = Math.trunc(Number(currentAttribute));
+  const authored = Array.isArray(candidateAttributes) ? candidateAttributes : [];
+  return authored
+    .slice(0, 5)
+    .map((attribute) => Math.trunc(Number(attribute)))
+    .filter((attribute) => attribute >= 0 && attribute < 5 && attribute !== current);
+}
+
 // _doEnemySkill's second jump table dispatches signed type 128 to 0x62a854.
 // That handler reads the selected definition type at +0x04, the active
 // monster's packed duration at +0x678, and its chance parameter at +0x67c.
@@ -416,6 +439,24 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
   );
   const monster = new DataView(monsterBytes.buffer, monsterBytes.byteOffset, monsterBytes.byteLength);
   const type = definition.getInt16(PAD_ENEMY_SKILL_RUNTIME_LAYOUT.definitionTypeOffset, true);
+  if (type === PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE) {
+    requireLength(definitionBytes, 0x24, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'changeEnemyAttribute',
+      supported: true,
+      candidateAttributes: Object.freeze(Array.from(
+        { length: 5 },
+        (_, index) => definition.getInt32(0x10 + index * 4, true),
+      )),
+      targetAttribute: monster.getInt32(0x678, true),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_SCALED_ATTACK) {
     return Object.freeze({
       type,
@@ -520,6 +561,23 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
 
 export function normalizePadEnemySkillRecord(record) {
   const type = Math.trunc(Number(record?.type));
+  if (type === PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE || record?.kind === 'changeEnemyAttribute') {
+    const authored = Array.isArray(record?.candidateAttributes) ? record.candidateAttributes : [];
+    const targetPresent = record?.targetAttribute !== undefined && record?.targetAttribute !== null;
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
+      kind: 'changeEnemyAttribute',
+      supported: true,
+      candidateAttributes: Object.freeze(Array.from(
+        { length: 5 },
+        (_, index) => Math.trunc(Number(authored[index] ?? -1)),
+      )),
+      ...(targetPresent
+        ? { targetAttribute: Math.trunc(Number(record.targetAttribute)) }
+        : {}),
+      setupMaterialized: Boolean(record?.setupMaterialized || targetPresent),
+    });
+  }
   if (type === PAD_ENEMY_SKILL_SCALED_ATTACK || record?.kind === 'scaledAttack') {
     return Object.freeze({
       type: PAD_ENEMY_SKILL_SCALED_ATTACK,

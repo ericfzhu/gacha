@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
+  PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
   PAD_ENEMY_SKILL_SCALED_ATTACK,
   PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
   PAD_ENEMY_SKILL_REVIVE_ENEMY,
@@ -28,6 +29,7 @@ import {
   decodePadEnemySkillDefinition,
   decodePadEnemySkillRuntime,
   padEnemySkillAttack,
+  padEnemySkillAttributeCandidates,
   padEnemySkillCurrentHpGravity,
   padEnemySkillPlayerHeal,
   padEnemySkillPlayerHpCondition,
@@ -743,6 +745,55 @@ assert.deepEqual(
     attackWithSkillValue: 0,
   },
 );
+const enemyAiChangeAttributeDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiChangeAttributeView = new DataView(enemyAiChangeAttributeDefinition.buffer);
+enemyAiChangeAttributeView.setUint32(0x00, 9_025, true);
+enemyAiChangeAttributeView.setInt16(0x04, PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE, true);
+[0, 2, 1, 3, 9].forEach((attribute, index) => {
+  enemyAiChangeAttributeView.setInt32(0x10 + index * 4, attribute, true);
+});
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiChangeAttributeDefinition), {
+  type: 46,
+  kind: 'changeEnemyAttribute',
+  supported: true,
+  candidateAttributes: [0, 2, 1, 3, 9],
+  attackWithSkillValue: 0,
+});
+assert.deepEqual(padEnemySkillAttributeCandidates([0, 0, 2, 1, 9], 2), [0, 0, 1]);
+const changeAttributeMonsterRuntime = new Uint8Array(0x680);
+new DataView(changeAttributeMonsterRuntime.buffer).setInt32(0x678, 4, true);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiChangeAttributeDefinition, changeAttributeMonsterRuntime),
+  {
+    type: 46,
+    kind: 'changeEnemyAttribute',
+    supported: true,
+    candidateAttributes: [0, 2, 1, 3, 9],
+    targetAttribute: 4,
+    setupMaterialized: true,
+    attackWithSkillValue: 0,
+  },
+);
+const changeAttributeRuntimeEngine = new PuzzleEngine({ seed: 21_900 });
+changeAttributeRuntimeEngine.setRngState(21_900);
+assert.equal(changeAttributeRuntimeEngine.applyEnemySkillRuntime(
+  enemyAiChangeAttributeDefinition,
+  changeAttributeMonsterRuntime,
+  0,
+), true);
+assert.equal(changeAttributeRuntimeEngine.enemies[0].attribute, 'dark');
+assert.equal(changeAttributeRuntimeEngine.rng.state, 21_900);
+const changeAttributeTargetEngine = new PuzzleEngine({ seed: 21_900 });
+changeAttributeTargetEngine.setRngState(21_900);
+const untouchedAttribute = changeAttributeTargetEngine.enemies[0].attribute;
+changeAttributeTargetEngine.enemies[1].attribute = 'dark';
+assert.equal(changeAttributeTargetEngine.applyEnemySkillRecord(
+  decodePadEnemySkillDefinition(enemyAiChangeAttributeDefinition),
+  1,
+), true);
+assert.equal(changeAttributeTargetEngine.enemies[0].attribute, untouchedAttribute);
+assert.equal(changeAttributeTargetEngine.enemies[1].attribute, 'fire');
+assert.equal(changeAttributeTargetEngine.rng.state, padLcgStep(21_900).state);
 const enemyAiCurrentHpGravityDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiCurrentHpGravityView = new DataView(enemyAiCurrentHpGravityDefinition.buffer);
 enemyAiCurrentHpGravityView.setUint32(0x00, 9_023, true);
@@ -2210,6 +2261,49 @@ rejectedHealPlayerEngine.player.hp = 3_060;
 rejectedHealPlayerEngine.setRngState(21_900);
 assert.equal(rejectedHealPlayerEngine.takeEnemySkill(0), null);
 assert.equal(rejectedHealPlayerEngine.rng.state, 21_900);
+const changeAttributeMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(changeAttributeMonsterDefinition.buffer).setUint32(0xec, 9_025, true);
+const selectedChangeAttributeEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: changeAttributeMonsterDefinition,
+    skillDefinitions: [enemyAiChangeAttributeDefinition],
+  }],
+});
+selectedChangeAttributeEngine.enemies[0].attribute = 'wood';
+selectedChangeAttributeEngine.setRngState(21_900);
+selectedChangeAttributeEngine.enemies[0].counter = 1;
+selectedChangeAttributeEngine.enemies[1].counter = 99;
+selectedChangeAttributeEngine.resolveEnemyTurn();
+const selectedChangeAttributeState = selectedChangeAttributeEngine.snapshot();
+assert.equal(selectedChangeAttributeState.enemies[0].attribute, 'water');
+assert.equal(selectedChangeAttributeState.lastEnemyActions[0].skill.type, 46);
+assert.equal(selectedChangeAttributeState.lastEnemyActions[0].skill.skillId, 9_025);
+assert.equal(selectedChangeAttributeState.lastEnemyActions[0].skill.targetAttribute, 1);
+assert.equal(selectedChangeAttributeState.enemies[0].enemyAiBudget, 80);
+assert.equal(
+  selectedChangeAttributeEngine.rng.state,
+  padLcgStep(padLcgStep(padLcgStep(21_900).state).state).state,
+);
+const rejectedChangeAttributeDefinition = enemyAiChangeAttributeDefinition.slice();
+const rejectedChangeAttributeView = new DataView(rejectedChangeAttributeDefinition.buffer);
+rejectedChangeAttributeView.setUint32(0x00, 9_026, true);
+[2, 2, -1, 9, 99].forEach((attribute, index) => {
+  rejectedChangeAttributeView.setInt32(0x10 + index * 4, attribute, true);
+});
+const rejectedChangeAttributeMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(rejectedChangeAttributeMonsterDefinition.buffer).setUint32(0xec, 9_026, true);
+const rejectedChangeAttributeEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: rejectedChangeAttributeMonsterDefinition,
+    skillDefinitions: [rejectedChangeAttributeDefinition],
+  }],
+});
+rejectedChangeAttributeEngine.enemies[0].attribute = 'wood';
+rejectedChangeAttributeEngine.setRngState(21_900);
+assert.equal(rejectedChangeAttributeEngine.takeEnemySkill(0), null);
+assert.equal(rejectedChangeAttributeEngine.rng.state, 21_900);
 const scaledAttackMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(scaledAttackMonsterDefinition.buffer).setUint32(0xec, 9_024, true);
 const selectedScaledAttackEngine = new PuzzleEngine({

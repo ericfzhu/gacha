@@ -24,6 +24,10 @@ const HEAL_PLAYER_ENEMY_SKILL_TYPE = 55;
 const HEAL_PLAYER_HANDLER = 0x629900;
 const HEAL_PLAYER_SETUP_HANDLER = 0x620040;
 const HEAL_PLAYER_CONDITION_HANDLER = 0x61aa74;
+const CHANGE_ATTRIBUTE_ENEMY_SKILL_TYPE = 46;
+const CHANGE_ATTRIBUTE_HANDLER = 0x629708;
+const CHANGE_ATTRIBUTE_SETUP_HANDLER = 0x621504;
+const CHANGE_ATTRIBUTE_CONDITION_HANDLER = 0x61b520;
 const SCALED_ATTACK_ENEMY_SKILL_TYPE = 47;
 const SCALED_ATTACK_HANDLER = 0x62972c;
 const SCALED_ATTACK_SETUP_HANDLER = 0x620040;
@@ -273,6 +277,27 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : healPlayerSetupTarget === HEAL_PLAYER_SETUP_HANDLER;
   const healPlayerConditionMatches = healPlayerConditionTarget === null
     ? null : healPlayerConditionTarget === HEAL_PLAYER_CONDITION_HANDLER;
+  const changeAttributeDispatchTarget = resolveEnemySkillTarget(
+    CHANGE_ATTRIBUTE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const changeAttributeSetupTarget = resolveEnemySkillTarget(
+    CHANGE_ATTRIBUTE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const changeAttributeConditionTarget = resolveEnemySkillTarget(
+    CHANGE_ATTRIBUTE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const changeAttributeDispatchMatches = changeAttributeDispatchTarget === null
+    ? null : changeAttributeDispatchTarget === CHANGE_ATTRIBUTE_HANDLER;
+  const changeAttributeSetupMatches = changeAttributeSetupTarget === null
+    ? null : changeAttributeSetupTarget === CHANGE_ATTRIBUTE_SETUP_HANDLER;
+  const changeAttributeConditionMatches = changeAttributeConditionTarget === null
+    ? null : changeAttributeConditionTarget === CHANGE_ATTRIBUTE_CONDITION_HANDLER;
   const scaledAttackDispatchTarget = resolveEnemySkillTarget(
     SCALED_ATTACK_ENEMY_SKILL_TYPE,
     ENEMY_SKILL_DISPATCH_TABLE,
@@ -982,6 +1007,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       healPlayerDispatchMatches21_9: healPlayerDispatchMatches,
       healPlayerSetupMatches21_9: healPlayerSetupMatches,
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
+      changeAttributeDispatchMatches21_9: changeAttributeDispatchMatches,
+      changeAttributeSetupMatches21_9: changeAttributeSetupMatches,
+      changeAttributeConditionMatches21_9: changeAttributeConditionMatches,
       scaledAttackDispatchMatches21_9: scaledAttackDispatchMatches,
       scaledAttackSetupMatches21_9: scaledAttackSetupMatches,
       scaledAttackConditionMatches21_9: scaledAttackConditionMatches,
@@ -1070,6 +1098,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       monsterAttackWithSkillOffset: 'sMONSTER+0x7e8 (uint32 converted to float32 / 100)',
       monsterDurationOffset: 'sMONSTER+0x678 (packed low 10 bits)',
       monsterHealPercentOffset: 'sMONSTER+0x678 (type 55 signed int32 percent)',
+      monsterAttributeTargetOffset: 'sMONSTER+0x678 (type 46 signed attribute index)',
+      monsterAttributeOverrideOffset: 'sMONSTER+0x22f (signed byte; negative uses definition+0x0c)',
       monsterScaledAttackPercentOffset: 'sMONSTER+0x678 (type 47 signed int32 percent)',
       monsterScaledAttackGateOffset: 'sMONSTER+0x6c0 (type 47 must equal zero)',
       monsterCurrentHpGravityPercentOffset: 'sMONSTER+0x678 (type 50 signed int32 percent)',
@@ -1096,6 +1126,16 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       healPlayerConditionTarget: healPlayerConditionTarget === null
         ? null : hex(healPlayerConditionTarget),
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
+      changeAttributeType: CHANGE_ATTRIBUTE_ENEMY_SKILL_TYPE,
+      changeAttributeDispatchTarget: changeAttributeDispatchTarget === null
+        ? null : hex(changeAttributeDispatchTarget),
+      changeAttributeDispatchMatches21_9: changeAttributeDispatchMatches,
+      changeAttributeSetupTarget: changeAttributeSetupTarget === null
+        ? null : hex(changeAttributeSetupTarget),
+      changeAttributeSetupMatches21_9: changeAttributeSetupMatches,
+      changeAttributeConditionTarget: changeAttributeConditionTarget === null
+        ? null : hex(changeAttributeConditionTarget),
+      changeAttributeConditionMatches21_9: changeAttributeConditionMatches,
       scaledAttackType: SCALED_ATTACK_ENEMY_SKILL_TYPE,
       scaledAttackDispatchTarget: scaledAttackDispatchTarget === null
         ? null : hex(scaledAttackDispatchTarget),
@@ -1375,6 +1415,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || blackFallDispatchMatches === false || blackFallSetupMatches === false
     || healPlayerDispatchMatches === false || healPlayerSetupMatches === false
     || healPlayerConditionMatches === false
+    || changeAttributeDispatchMatches === false || changeAttributeSetupMatches === false
+    || changeAttributeConditionMatches === false
     || scaledAttackDispatchMatches === false || scaledAttackSetupMatches === false
     || scaledAttackConditionMatches === false
     || currentHpGravityDispatchMatches === false || currentHpGravitySetupMatches === false

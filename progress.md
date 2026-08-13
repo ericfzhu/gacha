@@ -2,6 +2,22 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 enemy attribute change
+
+- Identified enemy skill type `46` as an enemy-element transition: late handler
+  `0x629708`, setup `0x621504`, and condition `0x61b520`.
+- Definition signed integers `+0x10..+0x20` are five candidate attributes.
+  Values outside `0..4` and the monster's current attribute are ignored, while
+  authored order and duplicate entries remain as native selection weights.
+- The condition consumes one LCG draw whenever any candidate is available even
+  though its random choice is discarded. Immediate AI then consumes its normal
+  probability draw, and setup consumes a third draw to select the actual value
+  stored at runtime `sMONSTER+0x678`.
+- Ported raw definition/runtime decoding, current-attribute eligibility,
+  exact three-draw selection, multi-enemy application, state/UI color changes,
+  browser fixtures, and exact dispatch/setup/condition inspection.
+- Next: inspect neighboring enemy skill type `45`.
+
 ## 2026-08-14 standalone scaled enemy attack
 
 - Identified enemy skill type `47` as a standalone percentage-scaled attack:
@@ -16,7 +32,7 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
   enemy-turn damage, snapshots, browser coverage, and exact table checks.
 - An admitted immediate skill consumes one AI probability draw; a nonzero gate
   rejects it without advancing the LCG.
-- Next: inspect type `46`'s enemy-attribute transition.
+- Next: continue the neighboring enemy-action audit.
 
 ## 2026-08-14 current-HP gravity
 

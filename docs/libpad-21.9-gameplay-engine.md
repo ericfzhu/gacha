@@ -647,6 +647,32 @@ gate. An eligible fallback retains its authored `sENEAI+5` weight without
 scaling. The browser selector exposes this as `probabilityScale` while keeping
 the already decoded condition-owned RNG state transitions intact.
 
+Enemy skill type `46` changes the acting monster's attribute. Its late dispatch
+entry targets `0x629708`, setup targets `0x621504`, and AI condition targets
+`0x61b520`. Five signed definition integers at `+0x10`, `+0x14`, `+0x18`,
+`+0x1c`, and `+0x20` form the authored candidate list. Values below zero or
+above four are ignored, as is the monster's current attribute. Valid duplicate
+entries are retained, so they weight selection exactly as authored.
+
+The current attribute comes from signed override byte `sMONSTER+0x22f` when it
+is nonnegative; otherwise native reads byte `+0x0c` of the base monster
+definition. The condition rebuilds the candidate list and rejects an empty
+one without touching RNG. When candidates exist, it consumes one ordinary LCG
+draw and randomly reads a candidate merely to prove the selected signed byte is
+nonnegative. Because invalid entries were already removed, that selected value
+does not otherwise affect admission—the condition-owned draw is intentionally
+discarded.
+
+Setup rebuilds the list, consumes another LCG draw, selects the actual target,
+and stores it at runtime `sMONSTER+0x678`. Execution clears the monster's
+protected transient attribute state, invokes the native attribute-transition
+path with that runtime value, and clears its presentation latch. Thus an
+immediate AI selection spends three draws in order: discarded condition choice,
+probability test, and setup choice. With seed 21900, current Wood, and authored
+list `[Fire, Wood, Water, Light, invalid]`, the target is Water and final RNG
+state is `1929471377`. The browser keeps this exact stream and changes the
+enemy's attribute used by rendering and subsequent damage calculations.
+
 Enemy skill type `47` is a standalone percentage-scaled enemy attack. Its late
 dispatch entry targets `0x62972c`, setup targets `0x620040`, and AI condition
 targets `0x61b54c`. Setup copies signed definition integer `+0x14` to runtime

@@ -33,6 +33,7 @@ import {
   tracePadPointerCells,
 } from './padCoreRules.js';
 import {
+  PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
   PAD_ENEMY_SKILL_SCALED_ATTACK,
   PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
   PAD_ENEMY_SKILL_REVIVE_ENEMY,
@@ -60,6 +61,7 @@ import {
   decodePadEnemySkillDefinition,
   decodePadEnemySkillRuntime,
   normalizePadEnemySkillRecord,
+  padEnemySkillAttributeCandidates,
   padEnemySkillAttack,
   padEnemySkillCurrentHpGravity,
   padEnemySkillPlayerHeal,
@@ -887,7 +889,7 @@ export class PuzzleEngine {
       if (queue.position < queue.records.length) {
         const skill = queue.records[queue.position];
         queue.position += 1;
-        return this.materializeEnemySkillRecord(skill);
+        return this.materializeEnemySkillRecord(skill, enemyIndex);
       }
     }
     const pool = this.enemyAiPools[enemyIndex];
@@ -898,6 +900,7 @@ export class PuzzleEngine {
       maxHp: enemy.maxHp,
       attributeAbsorbTurns: enemy.attributeAbsorbTurns,
       scaledAttackGate: enemy.scaledAttackGate,
+      enemyAttribute: PAD_ATTRIBUTE_INDEX[enemy.attribute] ?? -1,
       playerCurrentHp: this.player.hp,
       playerMaxHp: this.player.maxHp,
       party: this.party.map((member) => ({
@@ -972,7 +975,10 @@ export class PuzzleEngine {
     this.rng.setState(selection.rngState);
     pool.aiBudget = selection.aiBudget;
     return selection.effect
-      ? this.materializeEnemySkillRecord({ ...selection.effect, skillId: selection.skillId })
+      ? this.materializeEnemySkillRecord(
+        { ...selection.effect, skillId: selection.skillId },
+        enemyIndex,
+      )
       : null;
   }
 
@@ -984,8 +990,25 @@ export class PuzzleEngine {
     return (minimum + (Math.imul(roll, width) >>> 16)) | 0;
   }
 
-  materializeEnemySkillRecord(record) {
+  materializeEnemySkillRecord(record, enemyIndex = 0) {
     const skill = normalizePadEnemySkillRecord(record);
+    if (skill.supported && skill.kind === 'changeEnemyAttribute' && !skill.setupMaterialized) {
+      const index = Math.trunc(Number(enemyIndex));
+      const enemy = this.enemies[index] || this.enemies[0];
+      const currentAttribute = PAD_ATTRIBUTE_INDEX[enemy?.attribute] ?? -1;
+      const candidates = padEnemySkillAttributeCandidates(
+        skill.candidateAttributes,
+        currentAttribute,
+      );
+      const targetAttribute = candidates.length > 0
+        ? candidates[Math.imul(this.rng.nextUint16(), candidates.length) >>> 16]
+        : 0;
+      return Object.freeze({
+        ...record,
+        targetAttribute,
+        setupMaterialized: true,
+      });
+    }
     if (skill.supported && skill.kind === 'reviveEnemy' && !skill.setupMaterialized) {
       const candidates = this.enemies
         .map((enemy, index) => ({ enemy, index }))
@@ -1205,9 +1228,17 @@ export class PuzzleEngine {
   }
 
   applyEnemySkillRecord(record, enemyIndex = 0) {
-    const materialized = this.materializeEnemySkillRecord(record);
+    const materialized = this.materializeEnemySkillRecord(record, enemyIndex);
     const skill = normalizePadEnemySkillRecord(materialized);
     this.lastEnemySkill = skill;
+    if (skill.supported && skill.kind === 'changeEnemyAttribute') {
+      const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
+      const attribute = ORB_TYPES[skill.targetAttribute]?.id;
+      if (!enemy || skill.targetAttribute < 0 || skill.targetAttribute >= 5 || !attribute) return false;
+      enemy.attribute = attribute;
+      this.message = `${enemy.name} changed attribute to ${ORB_TYPES[skill.targetAttribute].label}.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'scaledAttack') {
       this.message = `Enemy attacks at ${skill.damagePercent}% power.`;
       return true;
@@ -1394,6 +1425,7 @@ export class PuzzleEngine {
       const definition = definitionsById.get(slot.skillId);
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
       if (![
+        PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
         PAD_ENEMY_SKILL_SCALED_ATTACK,
         PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
         PAD_ENEMY_SKILL_REVIVE_ENEMY,

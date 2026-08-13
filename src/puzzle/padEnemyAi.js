@@ -1,5 +1,6 @@
 import { padLcgStep } from './padCoreRules.js';
 import {
+  PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
   PAD_ENEMY_SKILL_SCALED_ATTACK,
   PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
   PAD_ENEMY_SKILL_REVIVE_ENEMY,
@@ -25,6 +26,7 @@ import {
   PAD_ENEMY_SKILL_BLOCK_MINUS,
   PAD_ENEMY_SKILL_BUR_DROP,
   decodePadEnemySkillDefinition,
+  padEnemySkillAttributeCandidates,
   padEnemySkillPlayerHpCondition,
 } from './padEnemySkills.js';
 
@@ -120,6 +122,7 @@ function normalizeDefinitionMap(definitions) {
 
 function isStaticallyEligible(definition, state) {
   if (!definition.effect.supported || ![
+    PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
     PAD_ENEMY_SKILL_SCALED_ATTACK,
     PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
     PAD_ENEMY_SKILL_REVIVE_ENEMY,
@@ -160,6 +163,16 @@ function evaluateCondition(definition, state, rngState) {
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY) {
     return { eligible: true, probabilityScale: 1, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE) {
+    const candidates = padEnemySkillAttributeCandidates(
+      definition.effect.candidateAttributes,
+      state.enemyAttribute,
+    );
+    if (candidates.length === 0) {
+      return { eligible: false, probabilityScale: 0, rngState };
+    }
+    return { eligible: true, probabilityScale: 1, rngState: padLcgStep(rngState).state };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_SCALED_ATTACK) {
     const eligible = state.scaledAttackGate === 0;
@@ -255,6 +268,7 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     playerMaxHp: Math.max(0, Number(state.playerMaxHp) || 0),
     attributeAbsorbTurns: Math.max(0, Math.trunc(Number(state.attributeAbsorbTurns) || 0)),
     scaledAttackGate: Math.trunc(Number(state.scaledAttackGate) || 0),
+    enemyAttribute: Math.trunc(Number(state.enemyAttribute)),
     enemies: Array.isArray(state.enemies) ? state.enemies : [],
     party: Array.isArray(state.party) ? state.party : [],
     aiBudget: Math.max(0, Math.trunc(Number(state.aiBudget ?? monster.budgetCap) || 0)),
