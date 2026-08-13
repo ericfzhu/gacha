@@ -8,6 +8,8 @@ import {
   PAD_ENEMY_SKILL_VERTICAL_LINES_4,
   PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
   PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT,
+  PAD_ENEMY_SKILL_POISON_MASK_SWAP,
+  PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT,
   PAD_ENEMY_SKILL_BLOCK_MINUS,
   PAD_ENEMY_SKILL_BUR_DROP,
   decodePadEnemySkillDefinition,
@@ -556,6 +558,32 @@ assert.deepEqual(decodePadEnemySkillDefinition(enemyAiPoisonTypeListDirectDefini
   kind: 'poisonTypeListSwap',
   supported: true,
   destinationTypes: [0, 1, 2, -1],
+  attackWithSkillValue: 0,
+});
+const enemyAiPoisonMaskDirectDefinition = enemyAiPoisonTypeListDefinition.slice();
+const enemyAiPoisonMaskDirectView = new DataView(enemyAiPoisonMaskDirectDefinition.buffer);
+enemyAiPoisonMaskDirectView.setUint32(0x00, 9_010, true);
+enemyAiPoisonMaskDirectView.setInt16(0x04, PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT, true);
+enemyAiPoisonMaskDirectView.setUint32(0x10, 0b111, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiPoisonMaskDirectDefinition), {
+  type: 84,
+  kind: 'poisonMaskSwap',
+  supported: true,
+  destinationTypeMask: 0b111,
+  attackWithSkillValue: 0,
+});
+const enemyAiPoisonMaskDefinition = enemyAiPoisonMaskDirectDefinition.slice();
+const enemyAiPoisonMaskView = new DataView(enemyAiPoisonMaskDefinition.buffer);
+enemyAiPoisonMaskView.setUint32(0x00, 9_011, true);
+enemyAiPoisonMaskView.setInt16(0x04, PAD_ENEMY_SKILL_POISON_MASK_SWAP, true);
+enemyAiPoisonMaskView.setInt32(0x10, 12, true);
+enemyAiPoisonMaskView.setUint32(0x14, 0b111, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiPoisonMaskDefinition), {
+  type: 85,
+  kind: 'poisonMaskSwap',
+  supported: true,
+  presentationValue: 12,
+  destinationTypeMask: 0b111,
   attackWithSkillValue: 0,
 });
 assert.deepEqual(padResolveEnhancementFall(21_900, 0, Array(6).fill(0)), {
@@ -1497,6 +1525,54 @@ assert.deepEqual(['fire', 'water', 'wood'].map((type) => (
 )), [12, 9, 9]);
 assert.equal(selectedPoisonTypeListDirectAiEngine.rng.state, poisonTypeListExpectedState);
 assert.equal(poisonTypeListDirectAiState.enemies[0].enemyAiBudget, 80);
+const poisonMaskDirectAiMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(poisonMaskDirectAiMonsterDefinition.buffer).setUint32(0xec, 9_010, true);
+const selectedPoisonMaskDirectAiEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: poisonMaskDirectAiMonsterDefinition,
+    skillDefinitions: [enemyAiPoisonMaskDirectDefinition],
+  }],
+});
+selectedPoisonMaskDirectAiEngine.setBoardFromCodes([
+  'PMPMPM', 'MPMPMP', 'PMPMPM', 'MPMPMP', 'PMPMPM',
+]);
+selectedPoisonMaskDirectAiEngine.setRngState(21_900);
+selectedPoisonMaskDirectAiEngine.enemies[0].counter = 1;
+selectedPoisonMaskDirectAiEngine.enemies[1].counter = 99;
+selectedPoisonMaskDirectAiEngine.resolveEnemyTurn();
+const poisonMaskDirectAiState = selectedPoisonMaskDirectAiEngine.snapshot();
+assert.equal(poisonMaskDirectAiState.lastEnemyActions[0].skill.type, 84);
+assert.equal(poisonMaskDirectAiState.lastEnemyActions[0].skill.skillId, 9_010);
+assert.deepEqual(['fire', 'water', 'wood'].map((type) => (
+  selectedPoisonMaskDirectAiEngine.board.flat().filter((orb) => orb.type === type).length
+)), [12, 9, 9]);
+assert.equal(selectedPoisonMaskDirectAiEngine.rng.state, poisonTypeListExpectedState);
+assert.equal(poisonMaskDirectAiState.enemies[0].enemyAiBudget, 80);
+const poisonMaskAiMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(poisonMaskAiMonsterDefinition.buffer).setUint32(0xec, 9_011, true);
+const selectedPoisonMaskAiEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: poisonMaskAiMonsterDefinition,
+    skillDefinitions: [enemyAiPoisonMaskDefinition],
+  }],
+});
+selectedPoisonMaskAiEngine.setBoardFromCodes([
+  'PMPMPM', 'MPMPMP', 'PMPMPM', 'MPMPMP', 'PMPMPM',
+]);
+selectedPoisonMaskAiEngine.setRngState(21_900);
+selectedPoisonMaskAiEngine.enemies[0].counter = 1;
+selectedPoisonMaskAiEngine.enemies[1].counter = 99;
+selectedPoisonMaskAiEngine.resolveEnemyTurn();
+const poisonMaskAiState = selectedPoisonMaskAiEngine.snapshot();
+assert.equal(poisonMaskAiState.lastEnemyActions[0].skill.type, 85);
+assert.equal(poisonMaskAiState.lastEnemyActions[0].skill.skillId, 9_011);
+assert.deepEqual(['fire', 'water', 'wood'].map((type) => (
+  selectedPoisonMaskAiEngine.board.flat().filter((orb) => orb.type === type).length
+)), [12, 9, 9]);
+assert.equal(selectedPoisonMaskAiEngine.rng.state, poisonTypeListExpectedState);
+assert.equal(poisonMaskAiState.enemies[0].enemyAiBudget, 80);
 assert.equal(blackFallEngine.board[0][0].nail, false);
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);

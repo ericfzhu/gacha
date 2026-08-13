@@ -2,6 +2,26 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 enemy poison-mask conversions
+
+- Mapped enemy skill type `84` through the late dispatch table to `0x629d84`
+  and type `85` through the early table to `0x628e48`; both use setup
+  `0x62004c` and unconditional AI condition `0x61a630`.
+- Recovered their shifted raw layouts: type 84 reads its destination-type mask
+  directly from `+0x10`, while type 85 uses `+0x10` for presentation and reads
+  the mask from `+0x14`.
+- Both handlers call `_doBlockSwap4`, whose zero source mask selects only native
+  poison types 7/8 before distributing cells across the effective uint16
+  destination mask. Decoder, normalizer, new-AI admission, and engine execution
+  preserve the two original type IDs.
+- Pure and browser fixtures select skill IDs 9010/9011 from raw tables and prove
+  an identical 12/9/9 fire-water-wood distribution, 31 saved-LCG advances, AI
+  budget 100 -> 80, and complete poison-family removal on a 6x5 fixture.
+- Exact restored-table inspection, rule tests, production build, exhaustive
+  browser regression, generic gameplay client, and both visual captures pass.
+- Next: commit this exact paired family independently, then resume the remaining
+  condition/dispatch audit without treating data-dependent records as static.
+
 ## 2026-08-14 direct poison type-list conversion
 
 - Mapped type `80` to unconditional condition `0x61a630`, shared setup

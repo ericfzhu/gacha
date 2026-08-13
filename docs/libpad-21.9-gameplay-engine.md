@@ -712,6 +712,22 @@ and saved-LCG behavior are otherwise identical. Raw decoding keeps type 80 and
 its shifted field layout distinct even though both variants execute through
 the same browser primitive.
 
+Types `84` and `85` are the bit-mask counterparts to that destination-list
+pair. Both use setup handler `0x62004c`, unconditional condition `0x61a630`,
+and `_doBlockSwap4` (`0x6af6cc`), which forwards source mask zero plus the
+decoded destination mask to `_doBlockSwap5`. Consequently their source is the
+same native poison/mortal-poison family, while each set bit in the effective
+unsigned 16-bit destination mask is an eligible replacement type. Type 84's
+late-table handler `0x629d84` reads that mask directly from definition `+0x10`.
+Type 85's early-table handler `0x628e48` instead uses `+0x10` for presentation
+and reads the mask from `+0x14`.
+
+The browser decoder preserves those distinct layouts and type IDs, then runs
+both through the exact `doBlockSwap4` primitive. With destination bits 0, 1,
+and 2 enabled, an immediately selected all-poison 6x5 board consumes one AI
+selection roll plus thirty cell rolls and produces the same deterministic
+12-fire, 9-water, 9-wood distribution from seed 21900 for either raw layout.
+
 Enemy skill type `151` connects that selector to the weakened-orb primitive.
 Its `_doEnemySkill` dispatch entry resolves to `0x62afd0`, which passes
 definition `+0x10` as the type mask, converts signed percentage `+0x14` through

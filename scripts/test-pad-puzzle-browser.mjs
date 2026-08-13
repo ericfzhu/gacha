@@ -734,6 +734,45 @@ try {
     const selectedPoisonTypeListDirectCounts = ['fire', 'water', 'wood'].map((type) => (
       engine.board.flat().filter((orb) => orb.type === type).length
     ));
+    const poisonMaskDirectAiMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(poisonMaskDirectAiMonsterDefinition.buffer).setUint32(0xec, 9_010, true);
+    const poisonMaskDirectAiDefinition = poisonTypeListDirectAiDefinition.slice();
+    const poisonMaskDirectAiView = new DataView(poisonMaskDirectAiDefinition.buffer);
+    poisonMaskDirectAiView.setUint32(0x00, 9_010, true);
+    poisonMaskDirectAiView.setInt16(0x04, 84, true);
+    poisonMaskDirectAiView.setUint32(0x10, 0b000111, true);
+    engine.setEnemyAiDefinitionPool(
+      0,
+      poisonMaskDirectAiMonsterDefinition,
+      [poisonMaskDirectAiDefinition],
+    );
+    engine.setBoardFromCodes(['PMPMPM', 'MPMPMP', 'PMPMPM', 'MPMPMP', 'PMPMPM']);
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedPoisonMaskDirectAi = engine.snapshot();
+    const selectedPoisonMaskDirectCounts = ['fire', 'water', 'wood'].map((type) => (
+      engine.board.flat().filter((orb) => orb.type === type).length
+    ));
+    const poisonMaskAiMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(poisonMaskAiMonsterDefinition.buffer).setUint32(0xec, 9_011, true);
+    const poisonMaskAiDefinition = poisonMaskDirectAiDefinition.slice();
+    const poisonMaskAiView = new DataView(poisonMaskAiDefinition.buffer);
+    poisonMaskAiView.setUint32(0x00, 9_011, true);
+    poisonMaskAiView.setInt16(0x04, 85, true);
+    poisonMaskAiView.setInt32(0x10, 12, true);
+    poisonMaskAiView.setUint32(0x14, 0b000111, true);
+    engine.setEnemyAiDefinitionPool(0, poisonMaskAiMonsterDefinition, [poisonMaskAiDefinition]);
+    engine.setBoardFromCodes(['PMPMPM', 'MPMPMP', 'PMPMPM', 'MPMPMP', 'PMPMPM']);
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedPoisonMaskAi = engine.snapshot();
+    const selectedPoisonMaskCounts = ['fire', 'water', 'wood'].map((type) => (
+      engine.board.flat().filter((orb) => orb.type === type).length
+    ));
     engine.setEnemyAiDefinitionPool(0, null);
     engine.setBlackFallRule(null);
     engine.reset();
@@ -776,6 +815,8 @@ try {
       selectedHorizontalLines4Ai, selectedVerticalLines4Ai,
       selectedPoisonTypeListAi, selectedPoisonTypeListCounts,
       selectedPoisonTypeListDirectAi, selectedPoisonTypeListDirectCounts,
+      selectedPoisonMaskDirectAi, selectedPoisonMaskDirectCounts,
+      selectedPoisonMaskAi, selectedPoisonMaskCounts,
       initialBoard, initialBoardState,
     };
   }) : null;
@@ -942,6 +983,18 @@ try {
     poisonBlockSample.selectedPoisonTypeListDirectAi.enemies?.[0]?.enemyAiBudget !== 80 ||
     JSON.stringify(poisonBlockSample.selectedPoisonTypeListDirectCounts) !== JSON.stringify([12, 9, 9]) ||
     /[PM]/.test(poisonBlockSample.selectedPoisonTypeListDirectAi.board.join('')) ||
+    poisonBlockSample.selectedPoisonMaskDirectAi.lastEnemyActions?.[0]?.skill?.type !== 84 ||
+    poisonBlockSample.selectedPoisonMaskDirectAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_010 ||
+    poisonBlockSample.selectedPoisonMaskDirectAi.rngState !== advanceLcg(21_900, 31) ||
+    poisonBlockSample.selectedPoisonMaskDirectAi.enemies?.[0]?.enemyAiBudget !== 80 ||
+    JSON.stringify(poisonBlockSample.selectedPoisonMaskDirectCounts) !== JSON.stringify([12, 9, 9]) ||
+    /[PM]/.test(poisonBlockSample.selectedPoisonMaskDirectAi.board.join('')) ||
+    poisonBlockSample.selectedPoisonMaskAi.lastEnemyActions?.[0]?.skill?.type !== 85 ||
+    poisonBlockSample.selectedPoisonMaskAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_011 ||
+    poisonBlockSample.selectedPoisonMaskAi.rngState !== advanceLcg(21_900, 31) ||
+    poisonBlockSample.selectedPoisonMaskAi.enemies?.[0]?.enemyAiBudget !== 80 ||
+    JSON.stringify(poisonBlockSample.selectedPoisonMaskCounts) !== JSON.stringify([12, 9, 9]) ||
+    /[PM]/.test(poisonBlockSample.selectedPoisonMaskAi.board.join('')) ||
     JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
       'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',
     ]) || poisonBlockSample.initialBoardState !== 79_238_434

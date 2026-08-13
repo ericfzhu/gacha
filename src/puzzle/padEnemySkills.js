@@ -5,6 +5,8 @@ export const PAD_ENEMY_SKILL_HORIZONTAL_LINES_4 = 78;
 export const PAD_ENEMY_SKILL_HORIZONTAL_LINES = 79;
 export const PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT = 80;
 export const PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP = 81;
+export const PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT = 84;
+export const PAD_ENEMY_SKILL_POISON_MASK_SWAP = 85;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
 
@@ -118,6 +120,23 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
         { length: 4 },
         (_, index) => definition.getInt32(destinationOffset + index * 4, true),
       )),
+      attackWithSkillValue,
+    });
+  }
+  if (
+    type === PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT
+    || type === PAD_ENEMY_SKILL_POISON_MASK_SWAP
+  ) {
+    const maskOffset = type === PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT ? 0x10 : 0x14;
+    requireLength(definitionBytes, maskOffset + 4, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'poisonMaskSwap',
+      supported: true,
+      ...(type === PAD_ENEMY_SKILL_POISON_MASK_SWAP
+        ? { presentationValue: definition.getInt32(0x10, true) }
+        : {}),
+      destinationTypeMask: definition.getUint32(maskOffset, true) & 0xffff,
       attackWithSkillValue,
     });
   }
@@ -281,6 +300,24 @@ export function normalizePadEnemySkillRecord(record) {
         { length: 4 },
         (_, index) => Math.trunc(Number(authoredTypes[index] ?? -1)),
       )),
+    });
+  }
+  if (
+    type === PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT
+    || type === PAD_ENEMY_SKILL_POISON_MASK_SWAP
+    || record?.kind === 'poisonMaskSwap'
+  ) {
+    const poisonMaskType = type === PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT
+      ? PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT
+      : PAD_ENEMY_SKILL_POISON_MASK_SWAP;
+    return Object.freeze({
+      type: poisonMaskType,
+      kind: 'poisonMaskSwap',
+      supported: true,
+      ...(poisonMaskType === PAD_ENEMY_SKILL_POISON_MASK_SWAP
+        ? { presentationValue: Math.trunc(Number(record?.presentationValue) || 0) }
+        : {}),
+      destinationTypeMask: Number(record?.destinationTypeMask) & 0xffff,
     });
   }
   if (type === PAD_ENEMY_SKILL_BLOCK_MINUS || record?.kind === 'blockMinus') {

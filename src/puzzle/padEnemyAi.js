@@ -7,6 +7,8 @@ import {
   PAD_ENEMY_SKILL_VERTICAL_LINES_4,
   PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
   PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT,
+  PAD_ENEMY_SKILL_POISON_MASK_SWAP,
+  PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT,
   PAD_ENEMY_SKILL_BLOCK_MINUS,
   PAD_ENEMY_SKILL_BUR_DROP,
   decodePadEnemySkillDefinition,
@@ -111,6 +113,8 @@ function isStaticallyEligible(definition, state) {
     PAD_ENEMY_SKILL_VERTICAL_LINES_4,
     PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
     PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT,
+    PAD_ENEMY_SKILL_POISON_MASK_SWAP,
+    PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT,
     PAD_ENEMY_SKILL_BLOCK_MINUS,
     PAD_ENEMY_SKILL_BUR_DROP,
   ].includes(definition.effect.type)) return false;
@@ -133,6 +137,8 @@ function evaluateCondition(definition, state, rngState) {
     || definition.effect.type === PAD_ENEMY_SKILL_VERTICAL_LINES_4
     || definition.effect.type === PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP
     || definition.effect.type === PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT
+    || definition.effect.type === PAD_ENEMY_SKILL_POISON_MASK_SWAP
+    || definition.effect.type === PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT
   ) {
     return { eligible: true, rngState };
   }

@@ -40,6 +40,8 @@ import {
   PAD_ENEMY_SKILL_VERTICAL_LINES_4,
   PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
   PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT,
+  PAD_ENEMY_SKILL_POISON_MASK_SWAP,
+  PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT,
   PAD_ENEMY_SKILL_BLOCK_MINUS,
   PAD_ENEMY_SKILL_BUR_DROP,
   decodePadEnemySkillDefinition,
@@ -1044,6 +1046,11 @@ export class PuzzleEngine {
       this.message = `Enemy converted poison orbs (effect ${effectFlags}).`;
       return true;
     }
+    if (skill.supported && skill.kind === 'poisonMaskSwap') {
+      const effectFlags = this.doBlockSwap4(skill.destinationTypeMask);
+      this.message = `Enemy converted poison orbs (effect ${effectFlags}).`;
+      return true;
+    }
     if (!skill.supported || skill.kind !== 'blackFall') return false;
     this.setBlackFallRule({
       chanceBasisPoints: skill.chanceBasisPoints,
@@ -1102,6 +1109,8 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_VERTICAL_LINES_4,
         PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
         PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT,
+        PAD_ENEMY_SKILL_POISON_MASK_SWAP,
+        PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT,
         PAD_ENEMY_SKILL_BLOCK_MINUS,
         PAD_ENEMY_SKILL_BUR_DROP,
       ].includes(definition.effect.type) || !definition.effect.supported) {
