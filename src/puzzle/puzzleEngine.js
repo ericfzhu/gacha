@@ -2,6 +2,7 @@ import {
   PAD_BOARD_COLUMNS,
   PAD_BOARD_ROWS,
   PAD_DEFAULT_MOVE_TIME_SECONDS,
+  PAD_INT32_MAX,
   createPadLcg,
   findPadBombDetonations,
   findPadMatches,
@@ -190,7 +191,7 @@ export class PuzzleEngine {
       const crossedOrb = this.board[nextRow][nextColumn];
       if (crossedOrb.thornPercent > 0) {
         const damage = padThornDamage(this.player.maxHp, crossedOrb.thornPercent);
-        this.lastThornDamage += damage;
+        this.lastThornDamage = Math.min(PAD_INT32_MAX, this.lastThornDamage + damage);
       }
       [this.board[fromRow][fromColumn], this.board[nextRow][nextColumn]] = [this.board[nextRow][nextColumn], this.board[fromRow][fromColumn]];
       fromRow = nextRow;
@@ -497,7 +498,10 @@ export class PuzzleEngine {
     this.hpResolutionApplied = true;
     this.lastHealing = Math.max(0, Math.trunc(Number(healing) || 0));
     this.lastPoisonDamage = Math.max(0, Math.trunc(Number(poisonDamage) || 0));
-    const pendingDamage = this.lastPoisonDamage + this.lastBombDamage + this.lastThornDamage;
+    const pendingDamage = Math.min(
+      PAD_INT32_MAX,
+      this.lastPoisonDamage + this.lastBombDamage + this.lastThornDamage,
+    );
     this.player.hp = clamp(this.player.hp + this.lastHealing - pendingDamage, 0, this.player.maxHp);
     if (this.lastHealing > 0) this.floatingText.push({ kind: 'heal', value: this.lastHealing, enemy: -1, age: 0 });
     if (this.lastPoisonDamage > 0) this.floatingText.push({ kind: 'poison', value: this.lastPoisonDamage, enemy: -1, age: 0 });

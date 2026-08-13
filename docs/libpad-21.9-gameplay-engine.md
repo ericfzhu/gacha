@@ -167,7 +167,10 @@ percentage. Its operation order is observable too: the extra-orb multiplier is
 formed in binary32, widened to binary64, then evaluated as
 `maxHP * orbMultiplier * percent / 100` before the ceiling. Reassociating that
 expression can over-round an exact integer (four poison orbs at 12 maximum HP
-deal 3, not 4). Recovery and poison are netted before the HP clamp, matching
+deal 3, not 4). After every hazard addition, the shared 32-bit pending-damage
+field is capped at `0x7fffffff`; the browser applies the same saturation across
+poison, bombs, and repeated thorn crossings. Recovery and poison are netted
+before the HP clamp, matching
 `_applyHpRecAndPoisonDamage` rather than healing to the cap first.
 
 Orb state remains separate from type. In native `sBLOCK`, type is the signed

@@ -14,6 +14,7 @@ export const PAD_CHANGED_SECONDARY_ATTRIBUTE_RATIO = 0.15;
 export const PAD_TERTIARY_ATTRIBUTE_RATIO = 0.05;
 export const PAD_LCG_MULTIPLIER = 0x343fd;
 export const PAD_LCG_INCREMENT = 0x269ec3;
+export const PAD_INT32_MAX = 0x7fffffff;
 
 // Version 21.9.0's restored image exposes the corresponding native routines as
 // cGAMEMAIN::_isNeighborBlock (0x673e24), _swapBlock (0x67ab14),
@@ -159,19 +160,18 @@ export function padDamageAfterDefense(attack, attributeMultiplier, defense) {
 // adds that combo to the deferred HP-damage accumulator at game-work+0x8aacc.
 export function padPoisonDamage(maxHp, poisonMatchSizes = [], mortalPoisonMatchSizes = []) {
   const hp = Math.max(0, Number(maxHp) || 0);
-  const damageForMatches = (matchSizes, percent) => matchSizes.reduce(
-    (total, size) => {
-      // _calcCharge builds the +25%-per-extra-orb factor in s registers,
-      // widens it to d, then multiplies max HP, percentage, and divides by
-      // 100 before izMathCeiling. Preserve that order: hp * 0.2 first is not
-      // equivalent at every binary64 integer boundary.
-      const orbMultiplier = Math.fround(padOrbMatchMultiplier(size));
-      return total + Math.ceil((hp * orbMultiplier * percent) / 100);
-    },
-    0,
-  );
-  return damageForMatches(poisonMatchSizes, PAD_POISON_MAX_HP_RATIO * 100) +
-    damageForMatches(mortalPoisonMatchSizes, PAD_MORTAL_POISON_MAX_HP_RATIO * 100);
+  let total = 0;
+  const addMatches = (matchSizes, percent) => matchSizes.forEach((size) => {
+    // _calcCharge builds the +25%-per-extra-orb factor in s registers,
+    // widens it to d, then multiplies max HP, percentage, and divides by
+    // 100 before izMathCeiling. Preserve that order: hp * 0.2 first is not
+    // equivalent at every binary64 integer boundary.
+    const orbMultiplier = Math.fround(padOrbMatchMultiplier(size));
+    total = Math.min(PAD_INT32_MAX, total + Math.ceil((hp * orbMultiplier * percent) / 100));
+  });
+  addMatches(poisonMatchSizes, PAD_POISON_MAX_HP_RATIO * 100);
+  addMatches(mortalPoisonMatchSizes, PAD_MORTAL_POISON_MAX_HP_RATIO * 100);
+  return total;
 }
 
 // cGAMEMAIN::_checkBomb (0x66a9f8) calculates and accumulates the HP hit once
@@ -180,7 +180,8 @@ export function padPoisonDamage(maxHp, poisonMatchSizes = [], mortalPoisonMatchS
 export function padBombDamage(maxHp, bombCount = 1) {
   const hp = Math.max(0, Number(maxHp) || 0);
   const count = Math.max(0, Math.trunc(Number(bombCount) || 0));
-  return Math.ceil(hp * PAD_BOMB_MAX_HP_RATIO) * count;
+  const perBomb = Math.ceil((hp * (PAD_BOMB_MAX_HP_RATIO * 100)) / 100);
+  return Math.min(PAD_INT32_MAX, perBomb * count);
 }
 
 // _swapBlockMain (0x67a7a0) reads sBLOCK+0x0c & 0x7f, divides by 100,
