@@ -8,6 +8,7 @@ const showOrbStates = process.argv.includes('--orb-states');
 const renderAtlasSheet = process.argv.includes('--atlas-sheet');
 const testBombResolution = process.argv.includes('--bomb-resolution');
 const testThornInput = process.argv.includes('--thorn-input');
+const testLargeBoard = process.argv.includes('--large-board');
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 980, height: 900 } });
 const consoleMessages = [];
@@ -170,10 +171,36 @@ try {
     });
     await sheet.screenshot({ path: `${outputPath}.atlas.png` });
   }
+  const largeBoard = testLargeBoard ? await (async () => {
+    await page.getByRole('button', { name: '7 by 6 board' }).click();
+    await page.waitForFunction(() => JSON.parse(window.render_game_to_text()).boardDimensions?.columns === 7);
+    const ready = JSON.parse(await page.evaluate(() => window.render_game_to_text()));
+    const startPoint = internalPoint(box, 225, 570);
+    await page.mouse.click(startPoint.x, startPoint.y);
+    const from = internalPoint(box, 341.67, 760.83);
+    const to = internalPoint(box, 400, 760.83);
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(to.x, to.y, { steps: 1 });
+    const duringDrag = JSON.parse(await page.evaluate(() => window.render_game_to_text()));
+    await page.mouse.up();
+    return {
+      dimensions: ready.boardDimensions,
+      rowCount: ready.board.length,
+      columnCount: ready.board[0].length,
+      dragColumn: duringDrag.drag?.column,
+      pathLength: duringDrag.drag?.pathLength,
+    };
+  })() : null;
+  if (largeBoard && (
+    largeBoard.dimensions.rows !== 6 || largeBoard.dimensions.columns !== 7 ||
+    largeBoard.rowCount !== 6 || largeBoard.columnCount !== 7 ||
+    largeBoard.dragColumn !== 6 || largeBoard.pathLength !== 1
+  )) throw new Error(`Large board mismatch: ${JSON.stringify(largeBoard)}`);
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, largeBoard, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, largeBoard, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

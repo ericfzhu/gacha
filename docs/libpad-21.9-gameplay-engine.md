@@ -114,7 +114,8 @@ Board dimensions are runtime state rather than a hard-coded 6-by-5 assumption.
 game-work offset `0x877f4`. The browser engine therefore accepts dimensions up
 to the native packed limit of 15 and passes them through input traversal,
 matching, skills, falls, refills, validation, and snapshots. The visible lab
-continues to start in the normal 6-by-5 layout.
+continues to start in the normal 6-by-5 layout and exposes the native 7-by-6
+layout through its board-size control.
 
 The native combo list is a fixed list of 88-byte `sCOMBO` records with linked-list
 indices stored around game-work offset `0x57a8`. Version 21.9 also records modern

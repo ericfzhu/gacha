@@ -1,18 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BOARD_COLUMNS, BOARD_ROWS, ORB_BY_ID, PuzzleEngine } from '../puzzle/puzzleEngine.js';
+import { ORB_BY_ID, PuzzleEngine } from '../puzzle/puzzleEngine.js';
 
 const WIDTH = 450;
 const HEIGHT = 820;
-const BOARD_X = 15;
-const BOARD_Y = 440;
-const CELL = 70;
+const BOARD_TOP = 440;
+const MAX_BOARD_WIDTH = 420;
+const MAX_BOARD_HEIGHT = 350;
 const SKILL_RECT = { x: 291, y: 353, width: 144, height: 64 };
 const RESET_RECT = { x: 15, y: 353, width: 48, height: 48 };
 const START_RECT = { x: 95, y: 541, width: 260, height: 58 };
 const PAD_ORB_SPRITES = Object.freeze({ fire: 2, water: 3, wood: 4, light: 5, dark: 6, heart: 7, jammer: 8, poison: 9, mortalPoison: 10, bomb: 20 });
 let activePadOrbAtlas = null;
 let activePadMonsterArt = [];
+
+const BOARD_PRESETS = Object.freeze({
+  normal: { columns: 6, rows: 5, label: '6 × 5' },
+  expanded: { columns: 7, rows: 6, label: '7 × 6' },
+});
+
+function boardLayout(engine) {
+  const cell = Math.min(70, MAX_BOARD_WIDTH / engine.columns, MAX_BOARD_HEIGHT / engine.rows);
+  const width = cell * engine.columns;
+  const height = cell * engine.rows;
+  return { cell, width, height, x: (WIDTH - width) / 2, y: BOARD_TOP };
+}
 
 function roundedRect(ctx, x, y, width, height, radius) {
   const r = Math.min(radius, width / 2, height / 2);
@@ -274,7 +286,7 @@ function drawButton(ctx, rect, label, sublabel, enabled = true, accent = false) 
   }
 }
 
-function drawReadyOverlay(ctx) {
+function drawReadyOverlay(ctx, engine) {
   ctx.fillStyle = 'rgba(8, 14, 27, .78)';
   roundedRect(ctx, 36, 185, 378, 442, 26);
   ctx.fill();
@@ -290,7 +302,7 @@ function drawReadyOverlay(ctx) {
   ctx.fillStyle = '#c4ccda';
   ctx.font = '500 14px "Noto Sans", sans-serif';
   const lines = [
-    'Drag one orb freely through the 6 × 5 board.',
+    `Drag one orb freely through the ${engine.columns} × ${engine.rows} board.`,
     'Crossed cells swap. Release to resolve the turn.',
     'Match 3+ · Hearts heal · 5+ hits every enemy.',
     'Cascades, attributes, skills, and enemy timers apply.',
@@ -320,6 +332,7 @@ function drawEndOverlay(ctx, engine) {
 }
 
 function render(ctx, engine) {
+  const board = boardLayout(engine);
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
   const backdrop = ctx.createLinearGradient(0, 0, 0, HEIGHT);
   backdrop.addColorStop(0, '#111a30');
@@ -367,7 +380,7 @@ function render(ctx, engine) {
 
   if (engine.drag) {
     const ratio = engine.drag.remaining / engine.moveTime;
-    drawBar(ctx, BOARD_X, 421, BOARD_COLUMNS * CELL, 9, ratio, ratio < 0.28 ? ['#ff6a66', '#ffba54'] : ['#5dd8e9', '#79efaa']);
+    drawBar(ctx, board.x, 421, board.width, 9, ratio, ratio < 0.28 ? ['#ff6a66', '#ffba54'] : ['#5dd8e9', '#79efaa']);
     ctx.textAlign = 'right';
     ctx.fillStyle = '#eff8ff';
     ctx.font = '800 12px "Barlow Condensed", sans-serif';
@@ -379,23 +392,23 @@ function render(ctx, engine) {
     ctx.fillText(engine.message, 225, 429);
   }
 
-  for (let row = 0; row < BOARD_ROWS; row += 1) {
-    for (let column = 0; column < BOARD_COLUMNS; column += 1) {
-      const x = BOARD_X + column * CELL;
-      const y = BOARD_Y + row * CELL;
+  for (let row = 0; row < engine.rows; row += 1) {
+    for (let column = 0; column < engine.columns; column += 1) {
+      const x = board.x + column * board.cell;
+      const y = board.y + row * board.cell;
       ctx.fillStyle = (row + column) % 2 ? '#222b3d' : '#1b2435';
-      ctx.fillRect(x, y, CELL, CELL);
+      ctx.fillRect(x, y, board.cell, board.cell);
       ctx.strokeStyle = 'rgba(255,255,255,.055)';
-      ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
+      ctx.strokeRect(x + 0.5, y + 0.5, board.cell - 1, board.cell - 1);
       const orb = engine.board[row][column];
       if (!orb) continue;
       const isHeld = engine.drag?.row === row && engine.drag?.column === column;
       if (isHeld) {
         ctx.fillStyle = 'rgba(255,255,255,.08)';
         ctx.beginPath();
-        ctx.arc(x + CELL / 2, y + CELL / 2, 25, 0, Math.PI * 2);
+        ctx.arc(x + board.cell / 2, y + board.cell / 2, board.cell * 0.36, 0, Math.PI * 2);
         ctx.fill();
-      } else drawOrb(ctx, orb, x + CELL / 2, y + CELL / 2, 27);
+      } else drawOrb(ctx, orb, x + board.cell / 2, y + board.cell / 2, board.cell * 0.386);
     }
   }
 
@@ -432,7 +445,7 @@ function render(ctx, engine) {
   ctx.font = '600 9px "Noto Sans", sans-serif';
   ctx.fillText('Touch an enemy to target · 5+ same-color orbs attacks all enemies', 225, 806);
 
-  if (engine.mode === 'ready') drawReadyOverlay(ctx);
+  if (engine.mode === 'ready') drawReadyOverlay(ctx, engine);
   if (engine.mode === 'victory' || engine.mode === 'defeat') drawEndOverlay(ctx, engine);
 }
 
@@ -446,6 +459,7 @@ export default function PuzzlePage() {
   const engineRef = useRef(null);
   const assetWorkerRef = useRef(null);
   const [atlasStatus, setAtlasStatus] = useState('Use your 21.9.0 APK for original orb art');
+  const [boardPreset, setBoardPreset] = useState('normal');
 
   const loadOriginalOrbArt = async (event) => {
     const file = event.target.files?.[0];
@@ -493,7 +507,7 @@ export default function PuzzlePage() {
   useEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
-    const engine = new PuzzleEngine();
+    const engine = new PuzzleEngine(BOARD_PRESETS[boardPreset]);
     engineRef.current = engine;
     let frame = 0;
     let lastTime = performance.now();
@@ -503,7 +517,15 @@ export default function PuzzlePage() {
       const rect = canvas.getBoundingClientRect();
       return { x: ((event.clientX - rect.left) / rect.width) * WIDTH, y: ((event.clientY - rect.top) / rect.height) * HEIGHT };
     };
-    const cellFromPoint = (point) => ({ row: Math.floor((point.y - BOARD_Y) / CELL), column: Math.floor((point.x - BOARD_X) / CELL) });
+    const cellFromPoint = (point) => {
+      const board = boardLayout(engine);
+      return {
+        row: Math.floor((point.y - board.y) / board.cell),
+        column: Math.floor((point.x - board.x) / board.cell),
+        gridColumn: (point.x - board.x) / board.cell,
+        gridRow: (point.y - board.y) / board.cell,
+      };
+    };
     const restart = () => { engine.reset(); engine.start(); render(context, engine); };
 
     const onPointerDown = (event) => {
@@ -523,8 +545,8 @@ export default function PuzzlePage() {
         cell.column,
         point.x,
         point.y,
-        (point.x - BOARD_X) / CELL,
-        (point.y - BOARD_Y) / CELL,
+        cell.gridColumn,
+        cell.gridRow,
       )) {
         canvas.setPointerCapture?.(event.pointerId);
         event.preventDefault();
@@ -540,8 +562,8 @@ export default function PuzzlePage() {
         cell.column,
         point.x,
         point.y,
-        (point.x - BOARD_X) / CELL,
-        (point.y - BOARD_Y) / CELL,
+        cell.gridColumn,
+        cell.gridRow,
       );
       event.preventDefault();
       render(context, engine);
@@ -592,11 +614,14 @@ export default function PuzzlePage() {
       delete window.render_game_to_text;
       delete window.advanceTime;
       delete window.__puzzleGame;
-      assetWorkerRef.current?.terminate();
-      assetWorkerRef.current = null;
-      activePadOrbAtlas = null;
-      activePadMonsterArt = [];
     };
+  }, [boardPreset]);
+
+  useEffect(() => () => {
+    assetWorkerRef.current?.terminate();
+    assetWorkerRef.current = null;
+    activePadOrbAtlas = null;
+    activePadMonsterArt = [];
   }, []);
 
   return (
@@ -606,6 +631,20 @@ export default function PuzzlePage() {
         <input type="file" accept=".apk,application/vnd.android.package-archive" onChange={loadOriginalOrbArt} />
         <span>{atlasStatus}</span>
       </label>
+      <div className="puzzle-board-size" role="group" aria-label="Board size; changing it restarts the battle">
+        <span>BOARD</span>
+        {Object.entries(BOARD_PRESETS).map(([id, preset]) => (
+          <button
+            key={id}
+            type="button"
+            aria-label={`${preset.columns} by ${preset.rows} board`}
+            aria-pressed={boardPreset === id}
+            onClick={() => setBoardPreset(id)}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
       <div className="puzzle-canvas-shell">
         <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} aria-label="Orb Battle Lab. Drag colored orbs to form matches and battle two enemies." />
       </div>
