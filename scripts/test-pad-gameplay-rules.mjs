@@ -352,6 +352,17 @@ autoTargetEngine.enemies[0] = { ...autoTargetEngine.enemies[0], hp: 1_000, attri
 autoTargetEngine.enemies[1] = { ...autoTargetEngine.enemies[1], hp: 100, attribute: 'light', defense: 0 };
 assert.equal(autoTargetEngine.chooseAttackTarget('fire', 30), 0);
 
+const damageCapEngine = new PuzzleEngine({ seed: 16 });
+damageCapEngine.party = [{ id: 'capped', name: 'Capped', attribute: 'fire', attack: 100, recovery: 0, damageCap: 50 }];
+damageCapEngine.enemies[0] = { ...damageCapEngine.enemies[0], hp: 1_000, attribute: 'light', defense: 10 };
+damageCapEngine.enemies[1].hp = 0;
+damageCapEngine.comboCount = 1;
+damageCapEngine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+damageCapEngine.resolvePlayerTurn();
+assert.equal(damageCapEngine.lastDamage, 40);
+assert.equal(damageCapEngine.enemies[0].hp, 960);
+assert.equal(damageCapEngine.snapshot().party[0].damageCap, 50);
+
 const massTargetEngine = new PuzzleEngine({ seed: 15 });
 massTargetEngine.party = [{ id: 'mass', name: 'Mass', attribute: 'fire', attack: 100, recovery: 0 }];
 massTargetEngine.enemies[0] = { ...massTargetEngine.enemies[0], hp: 10, attribute: 'light', defense: 0 };
