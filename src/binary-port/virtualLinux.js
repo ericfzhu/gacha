@@ -1280,6 +1280,7 @@ export class VirtualLinux {
         const directory = this.directories.has(path);
         event.path = path;
         event.flags = flags;
+        event.fileSize = data?.length ?? (directory ? 0 : null);
         if (!data && !directory && (flags & O_CREAT)) {
           data = new Uint8Array();
           this.files.set(path, data);
@@ -1360,11 +1361,17 @@ export class VirtualLinux {
         const offset = Number(signed(x1));
         const whence = Number(x2);
         event.fd = fd;
+        event.path = descriptor?.path ?? null;
+        event.fileOffset = descriptor?.offset ?? null;
         if (!descriptor) result = -9n;
         else {
           const base = whence === SEEK_SET ? 0 : whence === SEEK_CUR ? descriptor.offset : whence === SEEK_END ? descriptor.data.length : null;
           if (base === null || base + offset < 0) result = -22n;
-          else { descriptor.offset = base + offset; result = BigInt(descriptor.offset); }
+          else {
+            descriptor.offset = base + offset;
+            event.nextFileOffset = descriptor.offset;
+            result = BigInt(descriptor.offset);
+          }
         }
         break;
       }
@@ -1555,6 +1562,8 @@ export class VirtualLinux {
       case AARCH64_SYSCALL.FSTAT: {
         event.name = 'fstat';
         const descriptor = this.descriptors.get(Number(x0));
+        event.path = descriptor?.path ?? null;
+        event.fileSize = descriptor?.data.length ?? null;
         if (!descriptor) result = -9n;
         else { this.writeStat(Number(x1), descriptor.data.length, descriptor.directory); result = 0n; }
         break;
@@ -1565,6 +1574,7 @@ export class VirtualLinux {
         const data = this.files.get(path);
         const directory = this.directories.has(path);
         event.path = path;
+        event.fileSize = data?.length ?? (directory ? 0 : null);
         if (!data && !directory) result = -2n;
         else { this.writeStat(Number(x2), data?.length ?? 0, directory); result = 0n; }
         break;
@@ -1688,6 +1698,10 @@ export class VirtualLinux {
         path: event.path,
         flags: event.flags ?? null,
         count: event.count ?? null,
+        fileSize: event.fileSize ?? null,
+        fileOffset: event.fileOffset ?? null,
+        nextFileOffset: event.nextFileOffset ?? null,
+        firstBytes: event.firstBytes ?? null,
         result: Number(result),
       });
       if (this.recentFileEvents.length > 50) this.recentFileEvents.shift();
