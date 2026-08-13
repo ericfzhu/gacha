@@ -281,6 +281,13 @@ JavaScript `Math.fround`; this avoids binary64 artifacts at integer boundaries
 (for example, 75 attack with two enhanced orbs is exactly 84 in the native
 single-precision path, not 85).
 
+`_calcAttackPow` clamps the attribute-scaled integer to the attacking card's
+damage cap before subtracting enemy defense, then applies the caller's minimum
+damage (normally one). A null-card calculation uses `0x7fffffff`; the browser
+uses that classic default while allowing a card record to provide a larger
+modern cap. This order matters near the cap because subtracting defense before
+the clamp would award too much damage.
+
 The attack records contain independent main, tertiary, and secondary attribute
 lanes. `_gamePhaseAttackExec` resolves them as global rounds: all six main
 attacks, then all six tertiary attacks, then all six secondary attacks. A later

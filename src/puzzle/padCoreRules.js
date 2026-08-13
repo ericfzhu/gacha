@@ -190,8 +190,21 @@ export function padNativeRecoveryPower(
   return Math.trunc(total);
 }
 
-export function padDamageAfterDefense(attack, attributeMultiplier, defense) {
-  return Math.max(1, Math.ceil(attack * attributeMultiplier) - Math.max(0, defense));
+export function padDamageAfterDefense(
+  attack,
+  attributeMultiplier,
+  defense,
+  damageCap = PAD_INT32_MAX,
+  minimumDamage = 1,
+) {
+  // _calcAttackPow (0x67f198) rounds attribute scaling first, clamps that
+  // integer lane to the card's damage cap, subtracts defense, and only then
+  // applies the caller-supplied minimum damage. A null card takes INT32_MAX as
+  // its cap; modern cap-breaking cards can supply a larger 64-bit value.
+  const attributeDamage = Math.ceil(Math.max(0, Number(attack) || 0) * Math.max(0, Number(attributeMultiplier) || 0));
+  const cap = Math.max(0, Math.trunc(Number(damageCap) || 0));
+  const defended = Math.min(attributeDamage, cap) - Math.max(0, Math.trunc(Number(defense) || 0));
+  return Math.max(Math.max(0, Math.trunc(Number(minimumDamage) || 0)), defended);
 }
 
 // _calcCharge (0x64f220) runs izMathCeiling for every poison combo before it

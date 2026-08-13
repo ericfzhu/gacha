@@ -235,7 +235,7 @@ export class PuzzleEngine {
     this.manualTarget = true;
   }
 
-  chooseAttackTarget(attribute, attack) {
+  chooseAttackTarget(attribute, attack, damageCap = PAD_INT32_MAX) {
     if (this.manualTarget && this.enemies[this.targetEnemy]?.hp > 0) return this.targetEnemy;
     this.manualTarget = false;
     const candidates = this.enemies.map((enemy, index) => {
@@ -245,6 +245,7 @@ export class PuzzleEngine {
         attack,
         attributeMultiplier,
         enemy.defense,
+        damageCap,
       );
       return {
         index,
@@ -479,10 +480,15 @@ export class PuzzleEngine {
         const matchAttack = padNativeBaseAttackPower(lane.attack, matches, this.comboCount, extraComboBonus);
         const raw = padApplyAttackMultipliers(matchAttack, [leader, helper]);
         const isMassAttack = matches.some((match) => match.size >= 5);
-        const target = isMassAttack ? -1 : this.chooseAttackTarget(lane.attribute, raw);
+        const target = isMassAttack ? -1 : this.chooseAttackTarget(lane.attribute, raw, member.damageCap);
         this.enemies.forEach((enemy, enemyIndex) => {
           if (enemy.hp <= 0 || (!isMassAttack && enemyIndex !== target)) return;
-          const damage = padDamageAfterDefense(raw, padAttributeMultiplier(lane.attribute, enemy.attribute), enemy.defense);
+          const damage = padDamageAfterDefense(
+            raw,
+            padAttributeMultiplier(lane.attribute, enemy.attribute),
+            enemy.defense,
+            member.damageCap,
+          );
           enemy.hp = Math.max(0, enemy.hp - damage);
           totalDamage += damage;
           this.floatingText.push({ kind: 'damage', value: damage, enemy: enemyIndex, attribute: lane.attribute, age: 0 });
@@ -590,7 +596,7 @@ export class PuzzleEngine {
       lastThornDamage: this.lastThornDamage,
       leaderPairMultiplier: this.lastLeaderMultiplier,
       player: { ...this.player },
-      party: this.party.map(({ id, name, attribute, secondaryAttribute, tertiaryAttribute, secondaryAttributeChanged = false, attack, recovery, helper = false, leaderSkill = null }) => ({
+      party: this.party.map(({ id, name, attribute, secondaryAttribute, tertiaryAttribute, secondaryAttributeChanged = false, attack, recovery, damageCap, helper = false, leaderSkill = null }) => ({
         id,
         name,
         attribute,
@@ -599,6 +605,7 @@ export class PuzzleEngine {
         secondaryAttributeChanged,
         attack,
         recovery,
+        damageCap,
         helper,
         leaderSkill,
       })),
