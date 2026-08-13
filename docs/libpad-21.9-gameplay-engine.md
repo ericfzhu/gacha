@@ -202,7 +202,11 @@ Classic base multipliers recovered in the calculation path are:
 - five or more connected attack orbs: mass attack
 
 Skyfall collapse is column-based and matching is repeated until no marked group
-remains.
+remains. Seeded fallback boards and replacement drops use the binary's exported
+`izRndLcGet` sequence: a wrapping 32-bit
+`state = state * 0x343fd + 0x269ec3`, with the unsigned high 16 bits returned
+for each draw. This makes browser seeds reproducible against the native random
+primitive rather than merely deterministic within JavaScript.
 
 ## Damage and recovery pipeline
 

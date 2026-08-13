@@ -249,13 +249,16 @@ try {
     engine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
     engine.resolvePlayerTurn();
     const resolved = engine.snapshot();
-    return {
+    const result = {
       selectedTarget: selected.targetEnemy,
       selectedManually: selected.manualTarget,
       damageTargets: engine.floatingText.filter(({ kind }) => kind === 'damage').map(({ enemy }) => enemy),
       resolvedTarget: resolved.targetEnemy,
       resolvedManually: resolved.manualTarget,
     };
+    engine.reset();
+    engine.start();
+    return result;
   }) : null;
   if (attackRounds && (
     attackRounds.selectedTarget !== 0 || attackRounds.selectedManually !== true ||

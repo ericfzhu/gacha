@@ -2,6 +2,7 @@ import {
   PAD_BOARD_COLUMNS,
   PAD_BOARD_ROWS,
   PAD_DEFAULT_MOVE_TIME_SECONDS,
+  createPadLcg,
   findPadBombDetonations,
   findPadMatches,
   padApplyAttackMultipliers,
@@ -65,16 +66,6 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function makeRng(seed) {
-  let state = seed >>> 0 || 0x51f15e;
-  return () => {
-    state ^= state << 13;
-    state ^= state >>> 17;
-    state ^= state << 5;
-    return (state >>> 0) / 4294967296;
-  };
-}
-
 function copyEnemies() {
   return ENEMY_TEMPLATE.map((enemy) => ({ ...enemy, hp: enemy.maxHp, counter: enemy.maxCounter }));
 }
@@ -95,14 +86,14 @@ export class PuzzleEngine {
     this.columns = columns;
     this.rows = rows;
     this.allowDiagonalMoves = Boolean(allowDiagonalMoves);
-    this.rng = makeRng(seed);
+    this.rng = createPadLcg(seed);
     this.orbSerial = 0;
     this.visualTime = 0;
     this.reset();
   }
 
   reset() {
-    this.rng = makeRng(this.seed);
+    this.rng = createPadLcg(this.seed);
     this.orbSerial = 0;
     this.mode = 'ready';
     this.phase = 'input';

@@ -12,6 +12,8 @@ export const PAD_DEFAULT_THORN_HP_PERCENT = 4;
 export const PAD_ENHANCED_ORB_BONUS = 0.06;
 export const PAD_CHANGED_SECONDARY_ATTRIBUTE_RATIO = 0.15;
 export const PAD_TERTIARY_ATTRIBUTE_RATIO = 0.05;
+export const PAD_LCG_MULTIPLIER = 0x343fd;
+export const PAD_LCG_INCREMENT = 0x269ec3;
 
 // Version 21.9.0's restored image exposes the corresponding native routines as
 // cGAMEMAIN::_isNeighborBlock (0x673e24), _swapBlock (0x67ab14),
@@ -35,6 +37,22 @@ export function padComboLeaderMultiplier(combos, leaderSkill) {
     const candidate = Math.max(0, Number(threshold.multiplier) || 0);
     return combos >= minimum ? Math.max(multiplier, candidate) : multiplier;
   }, 1);
+}
+
+// libpad's exported izRndLcGet (0x3741d8) advances a 32-bit LCG and returns
+// the unsigned high 16 bits. Math.imul preserves the native low-32-bit product.
+export function padLcgStep(state) {
+  const nextState = (Math.imul(Number(state) >>> 0, PAD_LCG_MULTIPLIER) + PAD_LCG_INCREMENT) >>> 0;
+  return { state: nextState, value: nextState >>> 16 };
+}
+
+export function createPadLcg(seed = 0) {
+  let state = Number(seed) >>> 0;
+  return () => {
+    const next = padLcgStep(state);
+    state = next.state;
+    return next.value / 0x10000;
+  };
 }
 
 export function padAttributeMultiplier(attacker, defender) {

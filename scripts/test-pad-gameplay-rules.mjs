@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
+  createPadLcg,
   findPadMatches,
   findPadBombDetonations,
   padApplyAttackMultipliers,
@@ -17,10 +18,25 @@ import {
   padPoisonDamage,
   padSecondaryAttributeAttack,
   padTertiaryAttributeAttack,
+  padLcgStep,
   padThornDamage,
   tracePadDragCells,
   tracePadPointerCells,
 } from '../src/puzzle/padCoreRules.js';
+
+assert.deepEqual(padLcgStep(21_900), { state: 394_448_415, value: 6_018 });
+const nativeRng = createPadLcg(21_900);
+assert.deepEqual(
+  Array.from({ length: 5 }, () => nativeRng()),
+  [6_018, 58_043, 29_441, 14_031, 28_211].map((value) => value / 65_536),
+);
+assert.deepEqual(new PuzzleEngine({ seed: 21_900 }).snapshot().board, [
+  'RHGBGG',
+  'BBGHRL',
+  'LDBRHR',
+  'BHLDBH',
+  'LRLDHR',
+]);
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);
 assert.deepEqual(tracePadDragCells(0, 0, 2, 2, true), [{ row: 1, column: 1 }, { row: 2, column: 2 }]);
