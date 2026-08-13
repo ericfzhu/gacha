@@ -19,6 +19,7 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['input', 'gamePhaseMove', '_ZN9cGAMEMAIN14_gamePhaseMoveEv', 0x680854],
   ['board', 'getBoardSize', '_ZNK9cGAMEMAIN13_getBoardSizeEP9IS_V2D_SB', 0x651f24],
   ['board', 'getRandomBlock', '_ZN9cGAMEMAIN15_getRandomBlockEibb', 0x617874],
+  ['board', 'getRandomBlockOnFace', '_ZN9cGAMEMAIN21_getRandomBlockOnFaceEPibbb', 0x6179fc],
   ['orb-state', 'setupPlusBoostEffect', '_ZN9cGAMEMAIN21_setupPlusBoostEffectEPK6sBLOCKRf', 0x4361dc],
   ['orb-state', 'doLockDropBits', '_ZN9cGAMEMAIN15_doLockDropBitsEjit', 0x62676c],
   ['orb-state', 'hasBlockPowup', '_ZN9cGAMEMAIN14_hasBlockPowupEi', 0x6b0cc8],

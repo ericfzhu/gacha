@@ -13,6 +13,7 @@ import {
   padDamageAfterDefense,
   padEnhancedOrbMultiplier,
   padGetRandomBlock,
+  padGetRandomBlockOnFace,
   padMatchPower,
   padNativeBaseAttackPower,
   padNativeRecoveryPower,
@@ -55,6 +56,29 @@ assert.deepEqual(padGetRandomBlock(21_900), { state: 3_803_934_822, type: 1 });
 assert.deepEqual(padGetRandomBlock(21_900, 1), { state: 3_803_934_822, type: 2 });
 assert.deepEqual(padGetRandomBlock(21_900, -1, true, true), { state: 3_803_934_822, type: 1 });
 assert.deepEqual(padGetRandomBlock(21_900, -1, false, false), { state: 3_803_934_822, type: 1 });
+assert.deepEqual(padGetRandomBlockOnFace(21_900, [1, 1, 1, 1, 1, 1]), {
+  state: 3_803_934_822,
+  type: 1,
+  alternateType: 3,
+});
+assert.deepEqual(padGetRandomBlockOnFace(21_900, [0, 4, 0, 2, 0, 9], false), {
+  state: 3_803_934_822,
+  type: 3,
+  alternateType: 1,
+});
+assert.deepEqual(padGetRandomBlockOnFace(21_900, new Map([[4, 2]])), {
+  state: 3_803_934_822,
+  type: 4,
+  alternateType: null,
+});
+assert.deepEqual(padGetRandomBlockOnFace(21_900, {}), {
+  state: 21_900,
+  type: -1,
+  alternateType: null,
+});
+const faceRng = createPadRng(21_900);
+assert.deepEqual(faceRng.getRandomBlockOnFace([1, 1, 1, 1, 1, 1]), { type: 1, alternateType: 3 });
+assert.equal(faceRng.state, 3_803_934_822);
 assert.deepEqual(new PuzzleEngine({ seed: 21_900 }).snapshot().board, [
   'RHGBGG',
   'BBGHRL',

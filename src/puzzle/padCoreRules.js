@@ -74,6 +74,11 @@ export function createPadRng(seed = 0) {
       state = result.state;
       return result.type;
     },
+    getRandomBlockOnFace(faceCounts, includeHeart = true) {
+      const result = padGetRandomBlockOnFace(state, faceCounts, includeHeart);
+      state = result.state;
+      return { type: result.type, alternateType: result.alternateType };
+    },
   };
 }
 
@@ -118,6 +123,33 @@ export function padGetRandomBlock(
   }
   const shuffled = padShuffleBlockCandidates(state, candidates);
   return { state: shuffled.state, type: shuffled.candidates[0] ?? 0 };
+}
+
+// cGAMEMAIN::_getRandomBlockOnFace (0x6179fc) queries types 0..4 and, when
+// enabled, heart type 5. A type is eligible when the query returns at least
+// one. An empty face returns -1 without consuming RNG; every non-empty face
+// uses the same two persisted LCG advances and local forward shuffle as
+// _getRandomBlock. Its optional pointer receives the second shuffled type.
+// Keep the face-count query outside this primitive because the native source
+// depends on live board/game-work data that is not packaged in the APK.
+export function padGetRandomBlockOnFace(state, faceCounts, includeHeart = true) {
+  const candidates = [];
+  const typeCount = includeHeart ? 6 : 5;
+  for (let type = 0; type < typeCount; type += 1) {
+    const count = Array.isArray(faceCounts)
+      ? faceCounts[type]
+      : faceCounts instanceof Map ? faceCounts.get(type) : faceCounts?.[type];
+    if (Number(count) >= 1) candidates.push(type);
+  }
+  if (!candidates.length) {
+    return { state: Number(state) >>> 0, type: -1, alternateType: null };
+  }
+  const shuffled = padShuffleBlockCandidates(state, candidates);
+  return {
+    state: shuffled.state,
+    type: shuffled.candidates[0],
+    alternateType: shuffled.candidates[1] ?? null,
+  };
 }
 
 export function padAttributeMultiplier(attacker, defender) {

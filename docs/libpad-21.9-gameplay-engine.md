@@ -250,6 +250,15 @@ seeds reproducible against the native random primitive rather than merely
 deterministic within JavaScript; it does not make the absent weighted drop
 tables or opening-board constraints implicit.
 
+`_getRandomBlockOnFace` uses the same shuffle but derives its candidate list
+from live face queries: types 0 through 4 are included when their query returns
+at least one, and Heart type 5 is queried only when the caller enables it. An
+empty candidate list returns `-1` without advancing saved RNG state; a
+non-empty list always performs both saved advances, even for one candidate. It
+returns the first shuffled type and can write the second when present. The pure
+rules API accepts those face counts explicitly rather than fabricating the
+native board/game-work query behind them.
+
 ## Damage and recovery pipeline
 
 The main boundaries are `_calcCards` (`0x6537c4`), `_calcDamage` (`0x659b4c`),
