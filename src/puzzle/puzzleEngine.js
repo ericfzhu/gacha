@@ -34,6 +34,7 @@ import {
 } from './padCoreRules.js';
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
+  PAD_ENEMY_SKILL_POISON_BLOCK_N,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES_4,
   PAD_ENEMY_SKILL_VERTICAL_LINES,
@@ -875,6 +876,14 @@ export class PuzzleEngine {
           ) >= 1;
           return { eligible, rngState: this.rng.state };
         }
+        if (definition.effect.kind === 'poisonBlockN') {
+          const eligible = this.board.some((row) => row.some((orb) => (
+            orb.type !== 'poison'
+            && orb.type !== 'mortalPoison'
+            && (!definition.effect.excludeHeart || orb.type !== 'heart')
+          )));
+          return { eligible, rngState: this.rng.state };
+        }
         return { eligible: false, rngState: this.rng.state };
       },
     });
@@ -1051,6 +1060,15 @@ export class PuzzleEngine {
       this.message = `Enemy converted poison orbs (effect ${effectFlags}).`;
       return true;
     }
+    if (skill.supported && skill.kind === 'poisonBlockN') {
+      const changed = this.doPoisonBlockN(
+        skill.destinationType,
+        skill.count,
+        skill.excludeHeart,
+      );
+      this.message = `${changed} orb${changed === 1 ? '' : 's'} became poison.`;
+      return true;
+    }
     if (!skill.supported || skill.kind !== 'blackFall') return false;
     this.setBlackFallRule({
       chanceBasisPoints: skill.chanceBasisPoints,
@@ -1103,6 +1121,7 @@ export class PuzzleEngine {
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
       if (![
         PAD_ENEMY_SKILL_BLACK_FALL,
+        PAD_ENEMY_SKILL_POISON_BLOCK_N,
         PAD_ENEMY_SKILL_HORIZONTAL_LINES,
         PAD_ENEMY_SKILL_HORIZONTAL_LINES_4,
         PAD_ENEMY_SKILL_VERTICAL_LINES,

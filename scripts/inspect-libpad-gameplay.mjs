@@ -20,6 +20,10 @@ const ENEMY_SKILL_CONDITION_BASE = 0x61a630;
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
+const POISON_BLOCK_N_ENEMY_SKILL_TYPE = 64;
+const POISON_BLOCK_N_HANDLER = 0x628ccc;
+const POISON_BLOCK_N_SETUP_HANDLER = 0x6203f8;
+const POISON_BLOCK_N_CONDITION_HANDLER = 0x61aac4;
 const HORIZONTAL_LINES_ENEMY_SKILL_TYPE = 79;
 const HORIZONTAL_LINES_HANDLER = 0x6287f8;
 const HORIZONTAL_LINES_SETUP_HANDLER = 0x61ff14;
@@ -224,6 +228,45 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
   const blackFallSetupMatches = blackFallSetupTarget === null
     ? null
     : blackFallSetupTarget === BLACK_FALL_SETUP_HANDLER;
+  const poisonBlockNDispatchEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      EARLY_ENEMY_SKILL_DISPATCH_TABLE + (POISON_BLOCK_N_ENEMY_SKILL_TYPE - 5) * 2,
+    )
+    : null;
+  const poisonBlockNSetupEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      ENEMY_SKILL_SETUP_TABLE + (POISON_BLOCK_N_ENEMY_SKILL_TYPE - 1) * 2,
+    )
+    : null;
+  const poisonBlockNConditionEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      ENEMY_SKILL_CONDITION_TABLE + (POISON_BLOCK_N_ENEMY_SKILL_TYPE - 1) * 2,
+    )
+    : null;
+  const poisonBlockNDispatchTarget = poisonBlockNDispatchEntry === null
+    ? null
+    : EARLY_ENEMY_SKILL_DISPATCH_BASE + poisonBlockNDispatchEntry * 4;
+  const poisonBlockNSetupTarget = poisonBlockNSetupEntry === null
+    ? null
+    : ENEMY_SKILL_SETUP_BASE + poisonBlockNSetupEntry * 4;
+  const poisonBlockNConditionTarget = poisonBlockNConditionEntry === null
+    ? null
+    : ENEMY_SKILL_CONDITION_BASE + poisonBlockNConditionEntry * 4;
+  const poisonBlockNDispatchMatches = poisonBlockNDispatchTarget === null
+    ? null
+    : poisonBlockNDispatchTarget === POISON_BLOCK_N_HANDLER;
+  const poisonBlockNSetupMatches = poisonBlockNSetupTarget === null
+    ? null
+    : poisonBlockNSetupTarget === POISON_BLOCK_N_SETUP_HANDLER;
+  const poisonBlockNConditionMatches = poisonBlockNConditionTarget === null
+    ? null
+    : poisonBlockNConditionTarget === POISON_BLOCK_N_CONDITION_HANDLER;
   const horizontalLinesDispatchEntry = restoredElf
     ? readUint16Virtual(
       restoredElf,
@@ -647,6 +690,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       allAddressesMatch21_9: mismatches.length === 0,
       blackFallDispatchMatches21_9: blackFallDispatchMatches,
       blackFallSetupMatches21_9: blackFallSetupMatches,
+      poisonBlockNDispatchMatches21_9: poisonBlockNDispatchMatches,
+      poisonBlockNSetupMatches21_9: poisonBlockNSetupMatches,
+      poisonBlockNConditionMatches21_9: poisonBlockNConditionMatches,
       horizontalLinesDispatchMatches21_9: horizontalLinesDispatchMatches,
       horizontalLinesSetupMatches21_9: horizontalLinesSetupMatches,
       horizontalLinesConditionMatches21_9: horizontalLinesConditionMatches,
@@ -706,6 +752,16 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       setupEntry: blackFallSetupEntry === null ? null : hex(blackFallSetupEntry),
       setupTarget: blackFallSetupTarget === null ? null : hex(blackFallSetupTarget),
       setupMatches21_9: blackFallSetupMatches,
+      poisonBlockNType: POISON_BLOCK_N_ENEMY_SKILL_TYPE,
+      poisonBlockNDispatchTarget: poisonBlockNDispatchTarget === null
+        ? null : hex(poisonBlockNDispatchTarget),
+      poisonBlockNDispatchMatches21_9: poisonBlockNDispatchMatches,
+      poisonBlockNSetupTarget: poisonBlockNSetupTarget === null
+        ? null : hex(poisonBlockNSetupTarget),
+      poisonBlockNSetupMatches21_9: poisonBlockNSetupMatches,
+      poisonBlockNConditionTarget: poisonBlockNConditionTarget === null
+        ? null : hex(poisonBlockNConditionTarget),
+      poisonBlockNConditionMatches21_9: poisonBlockNConditionMatches,
       horizontalLinesType: HORIZONTAL_LINES_ENEMY_SKILL_TYPE,
       horizontalLinesDispatchTarget: horizontalLinesDispatchTarget === null
         ? null : hex(horizontalLinesDispatchTarget),
@@ -864,6 +920,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
   if (
     missing.length || mismatches.length
     || blackFallDispatchMatches === false || blackFallSetupMatches === false
+    || poisonBlockNDispatchMatches === false || poisonBlockNSetupMatches === false
+    || poisonBlockNConditionMatches === false
     || horizontalLinesDispatchMatches === false || horizontalLinesSetupMatches === false
     || horizontalLinesConditionMatches === false
     || horizontalLines4DispatchMatches === false || horizontalLines4SetupMatches === false

@@ -1,6 +1,7 @@
 import { padLcgStep } from './padCoreRules.js';
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
+  PAD_ENEMY_SKILL_POISON_BLOCK_N,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES_4,
   PAD_ENEMY_SKILL_VERTICAL_LINES,
@@ -107,6 +108,7 @@ function normalizeDefinitionMap(definitions) {
 function isStaticallyEligible(definition, state) {
   if (!definition.effect.supported || ![
     PAD_ENEMY_SKILL_BLACK_FALL,
+    PAD_ENEMY_SKILL_POISON_BLOCK_N,
     PAD_ENEMY_SKILL_HORIZONTAL_LINES,
     PAD_ENEMY_SKILL_HORIZONTAL_LINES_4,
     PAD_ENEMY_SKILL_VERTICAL_LINES,
@@ -169,7 +171,7 @@ function immediateProbability(definition, slot) {
 }
 
 // Supported subset of chooseEnemyAiNew (0x61d450). Flow-control definitions
-// and condition callbacks other than type 128 remain outside this boundary.
+// and condition callbacks outside the explicitly decoded set remain rejected.
 // The native scan performs immediate probability rolls in slot order, then a
 // single weighted fallback roll across eligible +0xf1 entries.
 export function selectPadEnemyAiNew(monster, definitions, state = {}) {

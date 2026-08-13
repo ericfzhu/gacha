@@ -1,4 +1,4 @@
-export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
+export const PAD_ENEMY_SKILL_POISON_BLOCK_N = 64;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES_4 = 76;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES = 77;
 export const PAD_ENEMY_SKILL_HORIZONTAL_LINES_4 = 78;
@@ -7,6 +7,7 @@ export const PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT = 80;
 export const PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP = 81;
 export const PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT = 84;
 export const PAD_ENEMY_SKILL_POISON_MASK_SWAP = 85;
+export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
 
@@ -73,6 +74,19 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
     ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
     : null;
+  if (type === PAD_ENEMY_SKILL_POISON_BLOCK_N) {
+    requireLength(definitionBytes, 0x20, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'poisonBlockN',
+      supported: true,
+      presentationValue: definition.getInt32(0x10, true),
+      count: definition.getInt32(0x14, true),
+      excludeHeart: definition.getInt32(0x18, true) !== 0,
+      destinationType: definition.getInt32(0x1c, true) === 1 ? 8 : 7,
+      attackWithSkillValue,
+    });
+  }
   if ([
     PAD_ENEMY_SKILL_HORIZONTAL_LINES_4,
     PAD_ENEMY_SKILL_HORIZONTAL_LINES,
@@ -243,6 +257,17 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
 
 export function normalizePadEnemySkillRecord(record) {
   const type = Math.trunc(Number(record?.type));
+  if (type === PAD_ENEMY_SKILL_POISON_BLOCK_N || record?.kind === 'poisonBlockN') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_POISON_BLOCK_N,
+      kind: 'poisonBlockN',
+      supported: true,
+      presentationValue: Math.trunc(Number(record?.presentationValue) || 0),
+      count: Math.trunc(Number(record?.count) || 0),
+      excludeHeart: Boolean(record?.excludeHeart),
+      destinationType: Number(record?.destinationType) === 8 ? 8 : 7,
+    });
+  }
   if (
     type === PAD_ENEMY_SKILL_HORIZONTAL_LINES
     || type === PAD_ENEMY_SKILL_HORIZONTAL_LINES_4

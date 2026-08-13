@@ -2,6 +2,26 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 count-limited enemy poison writer
+
+- Mapped enemy skill type `64` through the early dispatch table to `0x628ccc`,
+  setup `0x6203f8`, and live-board AI condition `0x61aac4`.
+- Decoded raw fields `+0x10` presentation, signed `+0x14` requested count,
+  nonzero `+0x18` Heart exclusion, and `+0x1c == 1` mortal-poison selection
+  (all other selector values choose ordinary poison).
+- Recovered the condition exactly: it consumes no RNG and requires at least one
+  non-poison-family board cell, optionally excluding Heart, without considering
+  the cell's lock flag.
+- Wired the existing exact `_doPoisonBlockN` primitive into raw enemy AI. A
+  selected five-cell fixture consumes one probability roll plus ten writer
+  rolls, writes five mortal-poison cells, preserves every Heart, and updates AI
+  budget 100 -> 80. An all poison/mortal/Heart fixture is rejected without an
+  RNG advance.
+- Exact restored-table inspection, rule tests, production build, exhaustive
+  browser regression, generic gameplay client, and both visual captures pass.
+- Next: commit type 64 independently, then audit the adjacent whole-color
+  poison skill instead of assuming its condition.
+
 ## 2026-08-14 enemy poison-mask conversions
 
 - Mapped enemy skill type `84` through the late dispatch table to `0x629d84`

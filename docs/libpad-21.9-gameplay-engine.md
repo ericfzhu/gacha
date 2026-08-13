@@ -638,6 +638,29 @@ this raw record path into enemy turns and reports the chosen skill ID, budget,
 and RNG state. Other condition callbacks, flow-control records, and the legacy
 selector are rejected explicitly until decoded rather than approximated.
 
+Enemy skill type `64` is the count-limited individual poison writer. Its early
+dispatch entry resolves to `0x628ccc`, setup to `0x6203f8`, and AI condition to
+`0x61aac4`. Definition `+0x10` is presentation data; signed `+0x14` is the
+requested cell count; nonzero `+0x18` excludes Heart; and `+0x1c == 1` selects
+mortal poison type 8, with every other selector value producing poison type 7.
+Setup copies those four words to `sMONSTER+0x680/+0x684/+0x688/+0x68c`.
+
+The condition scans the live board dimensions and admits the skill only when
+at least one cell is neither poison nor mortal poison, also rejecting Heart
+when the exclusion flag is set. It ignores locks, exactly like native, and
+consumes no RNG. Execution calls `_doPoisonBlockN` (`0x626bf0`), which spends
+two saved-LCG advances for every requested cell to choose a starting column and
+row, then scans forward with wrap to the first unselected eligible cell. Lock
+rejection occurs only when applying the selected cell, so a board containing
+only locked-but-otherwise-eligible cells can pass the AI condition while making
+no visible change.
+
+The browser raw-record path preserves this distinction. A fixture requesting
+five mortal-poison cells while excluding Heart spends one new-AI probability
+roll plus ten writer rolls, changes exactly five eligible cells, leaves the
+Heart count intact, and updates budget from 100 to 80. A board containing only
+poison, mortal poison, and Heart fails the condition without spending RNG.
+
 Enemy skill type `79` is the horizontal-line board rewrite. It uses the early
 `_doEnemySkill` table at `0xd3caea`, indexed from type 5; its entry resolves
 from base `0x6286b4` to handler `0x6287f8`. The setup entry at `0x61ff14`

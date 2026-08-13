@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
+  PAD_ENEMY_SKILL_POISON_BLOCK_N,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES_4,
   PAD_ENEMY_SKILL_VERTICAL_LINES,
@@ -584,6 +585,24 @@ assert.deepEqual(decodePadEnemySkillDefinition(enemyAiPoisonMaskDefinition), {
   supported: true,
   presentationValue: 12,
   destinationTypeMask: 0b111,
+  attackWithSkillValue: 0,
+});
+const enemyAiPoisonBlockNDefinition = enemyAiPoisonTypeListDefinition.slice();
+const enemyAiPoisonBlockNView = new DataView(enemyAiPoisonBlockNDefinition.buffer);
+enemyAiPoisonBlockNView.setUint32(0x00, 9_012, true);
+enemyAiPoisonBlockNView.setInt16(0x04, PAD_ENEMY_SKILL_POISON_BLOCK_N, true);
+enemyAiPoisonBlockNView.setInt32(0x10, 12, true);
+enemyAiPoisonBlockNView.setInt32(0x14, 5, true);
+enemyAiPoisonBlockNView.setInt32(0x18, 1, true);
+enemyAiPoisonBlockNView.setInt32(0x1c, 1, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiPoisonBlockNDefinition), {
+  type: 64,
+  kind: 'poisonBlockN',
+  supported: true,
+  presentationValue: 12,
+  count: 5,
+  excludeHeart: true,
+  destinationType: 8,
   attackWithSkillValue: 0,
 });
 assert.deepEqual(padResolveEnhancementFall(21_900, 0, Array(6).fill(0)), {
@@ -1573,6 +1592,51 @@ assert.deepEqual(['fire', 'water', 'wood'].map((type) => (
 )), [12, 9, 9]);
 assert.equal(selectedPoisonMaskAiEngine.rng.state, poisonTypeListExpectedState);
 assert.equal(poisonMaskAiState.enemies[0].enemyAiBudget, 80);
+const poisonBlockNAiMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(poisonBlockNAiMonsterDefinition.buffer).setUint32(0xec, 9_012, true);
+const selectedPoisonBlockNAiEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: poisonBlockNAiMonsterDefinition,
+    skillDefinitions: [enemyAiPoisonBlockNDefinition],
+  }],
+});
+selectedPoisonBlockNAiEngine.setBoardFromCodes([
+  'RHRHRH', 'BRGBRG', 'LDBRHR', 'BHLDBH', 'LRLDHR',
+]);
+const poisonBlockNHeartCount = selectedPoisonBlockNAiEngine.board.flat()
+  .filter((orb) => orb.type === 'heart').length;
+selectedPoisonBlockNAiEngine.setRngState(21_900);
+selectedPoisonBlockNAiEngine.enemies[0].counter = 1;
+selectedPoisonBlockNAiEngine.enemies[1].counter = 99;
+selectedPoisonBlockNAiEngine.resolveEnemyTurn();
+const poisonBlockNAiState = selectedPoisonBlockNAiEngine.snapshot();
+assert.equal(poisonBlockNAiState.lastEnemyActions[0].skill.type, 64);
+assert.equal(poisonBlockNAiState.lastEnemyActions[0].skill.skillId, 9_012);
+assert.equal(selectedPoisonBlockNAiEngine.board.flat()
+  .filter((orb) => orb.type === 'mortalPoison').length, 5);
+assert.equal(selectedPoisonBlockNAiEngine.board.flat()
+  .filter((orb) => orb.type === 'heart').length, poisonBlockNHeartCount);
+let poisonBlockNExpectedState = 21_900;
+for (let index = 0; index < 11; index += 1) {
+  poisonBlockNExpectedState = padLcgStep(poisonBlockNExpectedState).state;
+}
+assert.equal(selectedPoisonBlockNAiEngine.rng.state, poisonBlockNExpectedState);
+assert.equal(poisonBlockNAiState.enemies[0].enemyAiBudget, 80);
+const rejectedPoisonBlockNAiEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: poisonBlockNAiMonsterDefinition,
+    skillDefinitions: [enemyAiPoisonBlockNDefinition],
+  }],
+});
+rejectedPoisonBlockNAiEngine.setBoardFromCodes([
+  'PMPMPM', 'MHMHMH', 'PMPMPM', 'MHMHMH', 'PMPMPM',
+]);
+rejectedPoisonBlockNAiEngine.setRngState(21_900);
+assert.equal(rejectedPoisonBlockNAiEngine.takeEnemySkill(0), null);
+assert.equal(rejectedPoisonBlockNAiEngine.rng.state, 21_900);
+assert.equal(rejectedPoisonBlockNAiEngine.snapshot().enemies[0].enemyAiBudget, 100);
 assert.equal(blackFallEngine.board[0][0].nail, false);
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);
