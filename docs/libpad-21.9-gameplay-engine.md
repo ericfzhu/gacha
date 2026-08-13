@@ -161,6 +161,11 @@ deals a separately rounded-up 20% of maximum HP and clears all non-bomb cells
 in its row and column. A blast deliberately skips other bombs, allowing each
 unmatched bomb to detonate and contribute its own HP hit. Blast-only cells do
 not become combos and therefore do not contribute attack, recovery, or poison.
+`_checkBomb` marks both ordinary-match and blast cells before returning the bomb
+count. `_gamePhaseWaitBombing` then waits for effect type `0x38` and advances the
+phase; it does not fall the board or scan for another match. The browser models
+that native visual wait as an explicit `bomb` phase, followed by one shared
+clear/fall epoch for the match and blast cells.
 
 The “Bur” name means the spiked/thorn-drop overlay. `_swapBlockMain` tests the
 orb being crossed for flag `0x80000`, reads the damage rate from

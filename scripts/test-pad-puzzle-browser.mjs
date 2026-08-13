@@ -86,11 +86,13 @@ try {
     engine.phaseTimer = 0;
     engine.advancePhase();
     const resolution = {
-      phase: engine.phase,
+      bombPhase: engine.phase,
       hp: engine.player.hp,
       damage: engine.lastBombDamage,
       clearedCells: engine.pendingBombCells.length,
     };
+    engine.advancePhase();
+    resolution.clearPhase = engine.phase;
     engine.applyPlayerHpResolution();
     resolution.resolvedHp = engine.player.hp;
     engine.reset();
@@ -98,7 +100,7 @@ try {
     return resolution;
   }) : null;
   if (bombResolution && (
-    bombResolution.phase !== 'clear' || bombResolution.hp !== 12_000 ||
+    bombResolution.bombPhase !== 'bomb' || bombResolution.clearPhase !== 'clear' || bombResolution.hp !== 12_000 ||
     bombResolution.resolvedHp !== 9_600 || bombResolution.damage !== 2_400 || bombResolution.clearedCells !== 10
   )) throw new Error(`Bomb resolution mismatch: ${JSON.stringify(bombResolution)}`);
 

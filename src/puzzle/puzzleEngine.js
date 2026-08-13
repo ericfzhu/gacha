@@ -286,8 +286,11 @@ export class PuzzleEngine {
         })));
         this.comboCount += matches.length;
         if (matches.length) this.cascadeDepth += 1;
-        this.phase = 'clear';
-        this.phaseTimer = 0.34;
+        // libpad marks ordinary matches and unmatched-bomb blast cells in one
+        // _checkBomb pass, then waits for effect 0x38 before erasing them. The
+        // wait is visual: it must not introduce a fall or another match scan.
+        this.phase = bombResolution.bombs.length ? 'bomb' : 'clear';
+        this.phaseTimer = bombResolution.bombs.length ? 0.28 : 0.34;
         this.message = matches.length
           ? `${this.comboCount} combo${this.comboCount === 1 ? '' : 's'}${this.cascadeDepth > 1 ? ` · cascade ${this.cascadeDepth}` : ''}${bombResolution.bombs.length ? ` · ${bombResolution.bombs.length} bomb${bombResolution.bombs.length === 1 ? '' : 's'}` : ''}`
           : `${bombResolution.bombs.length} bomb${bombResolution.bombs.length === 1 ? '' : 's'} detonated`;
@@ -307,6 +310,11 @@ export class PuzzleEngine {
         this.phaseTimer = 0.42;
         this.message = 'No match — the turn still advances.';
       }
+      return;
+    }
+    if (this.phase === 'bomb') {
+      this.phase = 'clear';
+      this.phaseTimer = 0.34;
       return;
     }
     if (this.phase === 'clear') {
