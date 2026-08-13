@@ -10,7 +10,7 @@ const CELL = 70;
 const SKILL_RECT = { x: 291, y: 353, width: 144, height: 64 };
 const RESET_RECT = { x: 15, y: 353, width: 48, height: 48 };
 const START_RECT = { x: 95, y: 541, width: 260, height: 58 };
-const PAD_ORB_SPRITES = Object.freeze({ fire: 2, water: 3, wood: 4, light: 5, dark: 6, heart: 7, jammer: 8, poison: 9, mortalPoison: 10 });
+const PAD_ORB_SPRITES = Object.freeze({ fire: 2, water: 3, wood: 4, light: 5, dark: 6, heart: 7, jammer: 8, poison: 9, mortalPoison: 10, bomb: 20 });
 let activePadOrbAtlas = null;
 let activePadMonsterArt = [];
 
@@ -51,6 +51,8 @@ function drawOrb(ctx, orb, x, y, radius, alpha = 1, selected = false) {
   const atlasSprite = activePadOrbAtlas?.sprites[PAD_ORB_SPRITES[orb.type]];
   if (atlasSprite) {
     const diameter = radius * (orb.type === 'heart' ? 2.16 : 2.28);
+    const drawWidth = orb.type === 'bomb' ? diameter * atlasSprite.width / atlasSprite.height : diameter;
+    const drawHeight = diameter;
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.shadowColor = 'rgba(9, 18, 29, .48)';
@@ -59,7 +61,7 @@ function drawOrb(ctx, orb, x, y, radius, alpha = 1, selected = false) {
     ctx.drawImage(
       activePadOrbAtlas.image,
       atlasSprite.x, atlasSprite.y, atlasSprite.width, atlasSprite.height,
-      x - diameter / 2, y - diameter / 2, diameter, diameter,
+      x - drawWidth / 2, y - drawHeight / 2, drawWidth, drawHeight,
     );
     if (selected) {
       ctx.shadowColor = 'transparent';
@@ -104,6 +106,12 @@ function drawOrb(ctx, orb, x, y, radius, alpha = 1, selected = false) {
     ctx.bezierCurveTo(17, 4, 4, 11, 0, 17);
     ctx.fill();
     ctx.restore();
+  } else if (orb.type === 'bomb') {
+    ctx.fillStyle = 'rgba(35, 40, 48, .86)';
+    ctx.font = `900 ${Math.round(radius * 1.08)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('✹', x, y + radius * 0.04);
   } else {
     ctx.fillStyle = 'rgba(255,255,255,.68)';
     ctx.beginPath();
@@ -388,12 +396,13 @@ function render(ctx, engine) {
 
   engine.floatingText.forEach((item, index) => {
     const t = item.age / 1.15;
-    const x = item.kind === 'heal' || item.kind === 'poison' ? 225 : item.enemy === 0 ? 132 : 318;
-    const y = item.kind === 'heal' || item.kind === 'poison' ? 322 - t * 30 : 122 - t * 44 - index * 2;
+    const isPlayerHp = item.kind === 'heal' || item.kind === 'poison' || item.kind === 'bomb';
+    const x = isPlayerHp ? 225 : item.enemy === 0 ? 132 : 318;
+    const y = isPlayerHp ? 322 - t * 30 : 122 - t * 44 - index * 2;
     ctx.globalAlpha = Math.max(0, 1 - t);
     ctx.textAlign = 'center';
     ctx.font = '900 22px "Barlow Condensed", sans-serif';
-    ctx.fillStyle = item.kind === 'heal' ? '#83ef9d' : item.kind === 'poison' ? '#d995ef' : item.kind === 'enemy' ? '#ff8b7f' : ORB_BY_ID[item.attribute]?.highlight || '#fff';
+    ctx.fillStyle = item.kind === 'heal' ? '#83ef9d' : item.kind === 'poison' ? '#d995ef' : item.kind === 'bomb' ? '#ffb45f' : item.kind === 'enemy' ? '#ff8b7f' : ORB_BY_ID[item.attribute]?.highlight || '#fff';
     ctx.fillText(`${item.kind === 'heal' ? '+' : '-'}${item.value.toLocaleString()}`, x, y);
     ctx.globalAlpha = 1;
   });

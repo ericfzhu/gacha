@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
   findPadMatches,
+  findPadBombDetonations,
   padApplyAttackMultipliers,
   padAttributeMultiplier,
+  padBombDamage,
   padComboMultiplier,
   padDamageAfterDefense,
   padEnhancedOrbMultiplier,
@@ -69,10 +71,44 @@ assert.equal(padEnhancedOrbMultiplier(3), 1.18);
 assert.equal(padNativeBaseAttackPower(100, [{ size: 3, enhancedCount: 3 }], 1), 118);
 assert.equal(padPoisonDamage(10_000, [3], []), 2_000);
 assert.equal(padPoisonDamage(10_000, [4], [3]), 7_500);
+assert.equal(padBombDamage(10_001, 2), 4_002);
 assert.equal(padAttributeMultiplier('fire', 'wood'), 2);
 assert.equal(padAttributeMultiplier('fire', 'water'), 0.5);
 assert.equal(padAttributeMultiplier('light', 'dark'), 2);
 assert.equal(padAttributeMultiplier('light', 'fire'), 1);
+
+const bombBoard = [
+  ['R', 'B', 'G', 'L', 'D', 'H'],
+  ['B', 'G', 'L', 'D', 'H', 'R'],
+  ['G', 'L', 'X', 'H', 'R', 'B'],
+  ['L', 'D', 'H', 'R', 'B', 'G'],
+  ['D', 'H', 'R', 'B', 'G', 'L'],
+];
+const bombResolution = findPadBombDetonations(
+  bombBoard,
+  findPadMatches(bombBoard, (cell) => cell),
+  (cell) => cell,
+  'X',
+);
+assert.deepEqual(bombResolution.bombs, [{ row: 2, column: 2 }]);
+assert.equal(bombResolution.cells.length, 10);
+assert(bombResolution.cells.some(({ row, column }) => row === 2 && column === 0));
+assert(bombResolution.cells.some(({ row, column }) => row === 4 && column === 2));
+
+const matchedBombBoard = bombBoard.map((row) => [...row]);
+matchedBombBoard[0] = ['X', 'X', 'X', 'L', 'D', 'H'];
+const matchedBombs = findPadMatches(matchedBombBoard, (cell) => cell);
+const matchedBombResolution = findPadBombDetonations(matchedBombBoard, matchedBombs, (cell) => cell, 'X');
+assert.equal(matchedBombs[0].type, 'X');
+assert.equal(matchedBombResolution.bombs.length, 1);
+assert.deepEqual(matchedBombResolution.bombs[0], { row: 2, column: 2 });
+
+const doubleBombBoard = bombBoard.map((row) => [...row]);
+doubleBombBoard[2][4] = 'X';
+const doubleBombResolution = findPadBombDetonations(doubleBombBoard, [], (cell) => cell, 'X');
+assert.equal(doubleBombResolution.bombs.length, 2);
+assert.equal(doubleBombResolution.cells.length, 14);
+assert.equal(padBombDamage(12_000, doubleBombResolution.bombs.length), 4_800);
 
 const engine = new PuzzleEngine({ seed: 1 });
 engine.setBoardFromCodes(['RBGHLD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD']);
@@ -100,4 +136,15 @@ stateEngine.useSkill();
 assert.equal(stateEngine.board[0][0].type, 'wood');
 assert.equal(stateEngine.board[0][0].enhanced, true);
 assert.equal(stateEngine.board[0][0].locked, true);
+
+const bombEngine = new PuzzleEngine({ seed: 4 });
+bombEngine.setBoardFromCodes(bombBoard.map((row) => row.join('')));
+bombEngine.start();
+bombEngine.phase = 'detect';
+bombEngine.phaseTimer = 0;
+bombEngine.advancePhase();
+assert.equal(bombEngine.phase, 'clear');
+assert.equal(bombEngine.lastBombDamage, 2_400);
+assert.equal(bombEngine.player.hp, 9_600);
+assert.equal(bombEngine.pendingBombCells.length, 10);
 console.log('PAD orthogonal drag, connected match, and classic multiplier checks passed.');

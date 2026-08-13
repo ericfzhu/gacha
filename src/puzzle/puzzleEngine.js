@@ -2,9 +2,11 @@ import {
   PAD_BOARD_COLUMNS,
   PAD_BOARD_ROWS,
   PAD_DEFAULT_MOVE_TIME_SECONDS,
+  findPadBombDetonations,
   findPadMatches,
   padApplyAttackMultipliers,
   padAttributeMultiplier,
+  padBombDamage,
   padComboMultiplier,
   padDamageAfterDefense,
   padEnhancedOrbMultiplier,
@@ -27,6 +29,7 @@ export const ORB_TYPES = Object.freeze([
   { id: 'jammer', code: 'J', label: 'Jammer', color: '#26354e', highlight: '#7092be' },
   { id: 'poison', code: 'P', label: 'Poison', color: '#6b2d88', highlight: '#d49be8' },
   { id: 'mortalPoison', code: 'M', label: 'Mortal Poison', color: '#32213f', highlight: '#f0e3f8' },
+  { id: 'bomb', code: 'X', label: 'Bomb', color: '#8f99a8', highlight: '#ffffff' },
 ]);
 
 const NATURAL_ORB_TYPES = ORB_TYPES.slice(0, 6);
@@ -94,6 +97,7 @@ export class PuzzleEngine {
     this.lastDamage = 0;
     this.lastHealing = 0;
     this.lastPoisonDamage = 0;
+    this.lastBombDamage = 0;
     this.lastLeaderMultiplier = 1;
     this.message = 'Drag one orb through the board to rearrange the whole path.';
     this.player = { hp: 12000, maxHp: 12000, recovery: 820 };
@@ -103,6 +107,7 @@ export class PuzzleEngine {
     this.skill = { name: 'Tide Shift', cooldown: 0, maxCooldown: 5 };
     this.drag = null;
     this.pendingMatches = [];
+    this.pendingBombCells = [];
     this.turnMatches = [];
     this.floatingText = [];
     this.board = this.createStableBoard();
@@ -180,9 +185,11 @@ export class PuzzleEngine {
     this.cascadeDepth = 0;
     this.turnMatches = [];
     this.pendingMatches = [];
+    this.pendingBombCells = [];
     this.lastDamage = 0;
     this.lastHealing = 0;
     this.lastPoisonDamage = 0;
+    this.lastBombDamage = 0;
     this.phase = 'detect';
     this.phaseTimer = 0.12;
     this.message = 'Checking matches…';
@@ -238,7 +245,15 @@ export class PuzzleEngine {
   advancePhase() {
     if (this.phase === 'detect') {
       const matches = this.findMatches();
-      if (matches.length) {
+      const bombResolution = findPadBombDetonations(this.board, matches);
+      if (bombResolution.bombs.length) {
+        const damage = padBombDamage(this.player.maxHp, bombResolution.bombs.length);
+        this.lastBombDamage += damage;
+        this.player.hp = Math.max(0, this.player.hp - damage);
+        this.pendingBombCells = bombResolution.cells;
+        this.floatingText.push({ kind: 'bomb', value: damage, enemy: -1, age: 0 });
+      }
+      if (matches.length || bombResolution.cells.length) {
         this.pendingMatches = matches;
         this.turnMatches.push(...matches.map((match) => ({
           type: match.type,
@@ -247,15 +262,23 @@ export class PuzzleEngine {
           isMassAttack: match.isMassAttack,
         })));
         this.comboCount += matches.length;
-        this.cascadeDepth += 1;
+        if (matches.length) this.cascadeDepth += 1;
         this.phase = 'clear';
         this.phaseTimer = 0.34;
-        this.message = `${this.comboCount} combo${this.comboCount === 1 ? '' : 's'}${this.cascadeDepth > 1 ? ` · cascade ${this.cascadeDepth}` : ''}`;
+        this.message = matches.length
+          ? `${this.comboCount} combo${this.comboCount === 1 ? '' : 's'}${this.cascadeDepth > 1 ? ` · cascade ${this.cascadeDepth}` : ''}${bombResolution.bombs.length ? ` · ${bombResolution.bombs.length} bomb${bombResolution.bombs.length === 1 ? '' : 's'}` : ''}`
+          : `${bombResolution.bombs.length} bomb${bombResolution.bombs.length === 1 ? '' : 's'} detonated`;
       } else if (this.turnMatches.length) {
         this.resolvePlayerTurn();
         this.phase = 'attack';
         this.phaseTimer = 0.72;
       } else {
+        if (this.player.hp <= 0) {
+          this.mode = 'defeat';
+          this.phase = 'complete';
+          this.message = 'Defeat — bomb damage reduced party HP to zero.';
+          return;
+        }
         this.phase = 'enemy';
         this.phaseTimer = 0.42;
         this.message = 'No match — the turn still advances.';
@@ -264,7 +287,9 @@ export class PuzzleEngine {
     }
     if (this.phase === 'clear') {
       this.pendingMatches.forEach((match) => match.cells.forEach(({ row, column }) => { this.board[row][column] = null; }));
+      this.pendingBombCells.forEach(({ row, column }) => { this.board[row][column] = null; });
       this.pendingMatches = [];
+      this.pendingBombCells = [];
       this.phase = 'fall';
       this.phaseTimer = 0.24;
       return;
@@ -363,7 +388,7 @@ export class PuzzleEngine {
       });
     });
     this.lastDamage = totalDamage;
-    this.message = `${this.comboCount} combo${this.comboCount === 1 ? '' : 's'} · ${totalDamage.toLocaleString()} total damage${this.lastHealing ? ` · +${this.lastHealing.toLocaleString()} HP` : ''}${this.lastPoisonDamage ? ` · -${this.lastPoisonDamage.toLocaleString()} poison` : ''}`;
+    this.message = `${this.comboCount} combo${this.comboCount === 1 ? '' : 's'} · ${totalDamage.toLocaleString()} total damage${this.lastHealing ? ` · +${this.lastHealing.toLocaleString()} HP` : ''}${this.lastPoisonDamage ? ` · -${this.lastPoisonDamage.toLocaleString()} poison` : ''}${this.lastBombDamage ? ` · -${this.lastBombDamage.toLocaleString()} bombs` : ''}`;
   }
 
   resolveEnemyTurn() {
@@ -416,6 +441,7 @@ export class PuzzleEngine {
       lastDamage: this.lastDamage,
       lastHealing: this.lastHealing,
       lastPoisonDamage: this.lastPoisonDamage,
+      lastBombDamage: this.lastBombDamage,
       leaderPairMultiplier: this.lastLeaderMultiplier,
       player: { ...this.player },
       targetEnemy: this.targetEnemy,

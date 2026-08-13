@@ -115,7 +115,9 @@ attack, row, column, cross, L, and 3x3 box metadata for each connected match.
 
 Native block types `0`–`5` are fire, water, wood, light, dark, and heart;
 `_doPoisonBlockN` explicitly treats types `7` and `8` as the two poison classes,
-leaving type `6` as jammer. These map directly to `block2.btex` sprites `2`–`10`.
+type `6` is jammer, and `_doMakeBombSub` passes type `9` to the block creation
+path. Types `0`–`8` map to `block2.btex` sprites `2`–`10`; bomb uses the
+non-sequential fuse-and-bomb sprite `20`.
 The browser rules layer clears and counts jammer/poison matches as combos, but
 only attribute/heart classes feed attacks or recovery. Poison costs 20% of
 maximum HP for a three-orb group and mortal poison 50%, with the same 25%
@@ -130,6 +132,16 @@ clears its enhancement value. The browser orb record therefore carries
 are skipped by conversion skills, while enhanced orbs retain their type and add
 the classic 6% per enhanced orb in that match. Original atlas overlays 22 and 25
 render the enhanced and locked states.
+
+Bombs and burst drops are distinct native mechanisms. `_doMakeBurDrop` writes a
+one-byte descriptor at `sBLOCK+0x0c` on an otherwise normally typed orb;
+`sGAMEWORK::setBurBlockFlag` uses flag `0x80000`. A true bomb is block type `9`.
+`_checkBomb` first performs ordinary match detection: bombs included in a
+three-or-more match clear harmlessly as that combo. Every unmatched bomb then
+deals a separately rounded-up 20% of maximum HP and clears all non-bomb cells
+in its row and column. A blast deliberately skips other bombs, allowing each
+unmatched bomb to detonate and contribute its own HP hit. Blast-only cells do
+not become combos and therefore do not contribute attack, recovery, or poison.
 
 Classic base multipliers recovered in the calculation path are:
 

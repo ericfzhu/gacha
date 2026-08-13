@@ -7,6 +7,7 @@ export const PAD_EXTRA_ORB_BONUS = 0.25;
 export const PAD_EXTRA_COMBO_BONUS = 0.25;
 export const PAD_POISON_MAX_HP_RATIO = 0.2;
 export const PAD_MORTAL_POISON_MAX_HP_RATIO = 0.5;
+export const PAD_BOMB_MAX_HP_RATIO = 0.2;
 export const PAD_ENHANCED_ORB_BONUS = 0.06;
 
 // Version 21.9.0's restored image exposes the corresponding native routines as
@@ -70,6 +71,15 @@ export function padPoisonDamage(maxHp, poisonMatchSizes = [], mortalPoisonMatchS
     mortalPoisonMatchSizes.reduce((total, size) =>
       total + PAD_MORTAL_POISON_MAX_HP_RATIO * padOrbMatchMultiplier(size), 0);
   return Math.floor(Math.max(0, maxHp) * ratio);
+}
+
+// cGAMEMAIN::_checkBomb (0x66a9f8) calculates and accumulates the HP hit once
+// per detonating bomb. Preserve that per-bomb ceiling instead of rounding the
+// combined ratio, which differs whenever max HP is not divisible by five.
+export function padBombDamage(maxHp, bombCount = 1) {
+  const hp = Math.max(0, Number(maxHp) || 0);
+  const count = Math.max(0, Math.trunc(Number(bombCount) || 0));
+  return Math.ceil(hp * PAD_BOMB_MAX_HP_RATIO) * count;
 }
 
 // Android may coalesce pointer motion. The native normal-board swap routine
@@ -246,4 +256,43 @@ export function findPadMatches(board, getType = (cell) => cell?.type, minimum = 
     }
   }
   return matches;
+}
+
+// A bomb already marked by normal match detection clears as part of that combo
+// and never explodes. Every remaining type-9 bomb detonates independently. Its
+// cross skips other bombs so they can each run their own damage/effect path.
+export function findPadBombDetonations(
+  board,
+  matches,
+  getType = (cell) => cell?.type,
+  bombType = 'bomb',
+) {
+  const rowCount = board.length;
+  const columnCount = board[0]?.length || 0;
+  if (!rowCount || !columnCount || board.some((row) => row.length !== columnCount)) {
+    throw new Error('PAD board must be a non-empty rectangle.');
+  }
+  const matched = new Set();
+  matches.forEach((match) => match.cells.forEach(({ row, column }) => matched.add(`${row}:${column}`)));
+  const bombs = [];
+  for (let row = 0; row < rowCount; row += 1) {
+    for (let column = 0; column < columnCount; column += 1) {
+      if (getType(board[row][column]) === bombType && !matched.has(`${row}:${column}`)) {
+        bombs.push({ row, column });
+      }
+    }
+  }
+
+  const cleared = new Map();
+  const add = (row, column) => cleared.set(`${row}:${column}`, { row, column });
+  bombs.forEach(({ row, column }) => {
+    add(row, column);
+    for (let nextColumn = 0; nextColumn < columnCount; nextColumn += 1) {
+      if (getType(board[row][nextColumn]) !== bombType) add(row, nextColumn);
+    }
+    for (let nextRow = 0; nextRow < rowCount; nextRow += 1) {
+      if (getType(board[nextRow][column]) !== bombType) add(nextRow, column);
+    }
+  });
+  return { bombs, cells: [...cleared.values()] };
 }
