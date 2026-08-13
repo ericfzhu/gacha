@@ -1,5 +1,6 @@
 const INDEX_MAGIC = 'MCD5';
 const IOSC_MAGIC = 'IOSC';
+const TEX1_MAGIC = 'TEX1';
 const TEX2_MAGIC = 'TEX2';
 const RECORD_SIZE = 16;
 const FIXED_NAME_SIZE = 16;
@@ -157,6 +158,7 @@ export class PadDataArchive {
 
   read(nameOrRecord, inflate = null) {
     const record = typeof nameOrRecord === 'string' ? this.find(nameOrRecord) : nameOrRecord;
+    if (!record) return null;
     const stored = this.readStored(record);
     if (!record.compressed) return stored;
     const output = decodeIosc(stored, inflate);
@@ -184,23 +186,52 @@ export class PadDataArchive {
   }
 }
 
-export function parseTex2(bytes) {
-  if (ascii(bytes, 0, 4) !== TEX2_MAGIC) throw new Error('Asset is not a TEX2 texture.');
+function parseTextureHeader(bytes, expectedMagic) {
+  if (ascii(bytes, 0, 4) !== expectedMagic) throw new Error(`Asset is not a ${expectedMagic} texture.`);
+  if (bytes.length < 48) throw new Error(`${expectedMagic} texture header is truncated.`);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const pixelEnd = view.getUint32(8, true);
-  const spriteCount = view.getUint32(12, true);
   const pixelOffset = view.getUint32(16, true);
   const widthAndFormat = view.getUint16(20, true);
-  const width = widthAndFormat & 0x3fff;
-  const formatFlags = widthAndFormat & 0xc000;
+  // libpad packs the texture width into the low 12 bits. The upper nibble is
+  // its GLES pixel-format selector (0x3000 is RGBA4444 in the shipped data).
+  const width = widthAndFormat & 0x0fff;
+  const formatFlags = widthAndFormat & 0xf000;
   const height = view.getUint16(22, true);
-  requireRange(bytes, pixelOffset, pixelEnd - pixelOffset, 'TEX2 pixels');
-  requireRange(bytes, pixelEnd, spriteCount * 16, 'TEX2 sprites');
+  if (!width || !height) throw new Error(`${expectedMagic} has invalid dimensions ${width}x${height}.`);
+  return { view, pixelOffset, width, height, formatFlags };
+}
+
+function textureResult(bytes, header, pixelEnd, sprites) {
+  const { view, pixelOffset, width, height, formatFlags } = header;
+  requireRange(bytes, pixelOffset, pixelEnd - pixelOffset, 'texture pixels');
   const pixelBytes = pixelEnd - pixelOffset;
   const bytesPerPixel = pixelBytes / (width * height);
   if (!Number.isInteger(bytesPerPixel) || bytesPerPixel <= 0) {
-    throw new Error(`TEX2 pixel plane ${pixelBytes} does not fit ${width}x${height}.`);
+    throw new Error(`Texture pixel plane ${pixelBytes} does not fit ${width}x${height}.`);
   }
+  return Object.freeze({
+    version: view.getUint32(4, true),
+    sourceName: ascii(bytes, 24, 24),
+    width,
+    height,
+    formatFlags,
+    bytesPerPixel,
+    pixels: bytes.subarray(pixelOffset, pixelEnd),
+    sprites,
+  });
+}
+
+export function parseTex1(bytes) {
+  const header = parseTextureHeader(bytes, TEX1_MAGIC);
+  return textureResult(bytes, header, bytes.length, []);
+}
+
+export function parseTex2(bytes) {
+  const header = parseTextureHeader(bytes, TEX2_MAGIC);
+  const { view } = header;
+  const pixelEnd = view.getUint32(8, true);
+  const spriteCount = view.getUint32(12, true);
+  requireRange(bytes, pixelEnd, spriteCount * 16, 'TEX2 sprites');
   const sprites = Array.from({ length: spriteCount }, (_, index) => {
     const offset = pixelEnd + index * 16;
     return Object.freeze({
@@ -215,14 +246,28 @@ export function parseTex2(bytes) {
       pivotY: view.getInt16(offset + 14, true),
     });
   });
-  return Object.freeze({
-    version: view.getUint32(4, true),
-    sourceName: ascii(bytes, 24, 24),
-    width,
-    height,
-    formatFlags,
-    bytesPerPixel,
-    pixels: bytes.subarray(pixelOffset, pixelEnd),
-    sprites,
-  });
+  return textureResult(bytes, header, pixelEnd, sprites);
+}
+
+export function parsePadTexture(bytes) {
+  const magic = ascii(bytes, 0, 4);
+  if (magic === TEX1_MAGIC) return parseTex1(bytes);
+  if (magic === TEX2_MAGIC) return parseTex2(bytes);
+  throw new Error(`Unsupported PAD texture magic ${JSON.stringify(magic)}.`);
+}
+
+export function decodePadTexturePixels(texture) {
+  if (texture.bytesPerPixel === 4 && texture.formatFlags === 0) return texture.pixels.slice();
+  if (texture.bytesPerPixel !== 2 || texture.formatFlags !== 0x3000) {
+    throw new Error(`Unsupported PAD texture pixel format 0x${texture.formatFlags.toString(16)} (${texture.bytesPerPixel} bytes per pixel).`);
+  }
+  const output = new Uint8Array(texture.width * texture.height * 4);
+  for (let source = 0, target = 0; source < texture.pixels.length; source += 2, target += 4) {
+    const packed = texture.pixels[source] | (texture.pixels[source + 1] << 8);
+    output[target] = ((packed >>> 12) & 0xf) * 17;
+    output[target + 1] = ((packed >>> 8) & 0xf) * 17;
+    output[target + 2] = ((packed >>> 4) & 0xf) * 17;
+    output[target + 3] = (packed & 0xf) * 17;
+  }
+  return output;
 }

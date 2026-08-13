@@ -185,8 +185,17 @@ records. `DATA000.NAM` contains matching fixed 16-byte names. Confirmed flags:
 `block2.btex` is the original orb atlas. It is a 512x512 `TEX2` image containing
 a 1 MiB RGBA plane followed by 26 16-byte sprite rectangles. Base orb records are
 2–7 in fire, water, wood, light, dark, heart order. The puzzle page can decode
-and use this atlas from a user-selected APK in a Web Worker; no extracted art is
-stored in the repository or transmitted.
+and use this atlas from a user-selected APK in a Web Worker. The texture width is
+stored in the low 12 bits of the packed dimension field; its upper nibble selects
+the GLES pixel format.
+
+Resident monster art uses both texture generations. `mons_001.btex` expands to
+a sprite-less 256x256 `TEX1`; `mons_147.btex` is a 256x256 `TEX2` with one sprite
+record. Both store little-endian `GL_UNSIGNED_SHORT_4_4_4_4` pixels, identified
+by format selector `0x3000`. The browser reproduces the RGBA4444 conversion,
+finds the non-transparent content bounds, and displays two original resident
+monsters beside the decoded orb atlas. All decoding remains local to the worker;
+no extracted art is stored in the repository or transmitted.
 
 The restored `CCardTexMana::UnZipCardBtex` call resolves through the recovered
 GOT to `cMINIZIP::getUnzipSize` (`0x348c60`) and

@@ -12,6 +12,7 @@ const RESET_RECT = { x: 15, y: 353, width: 48, height: 48 };
 const START_RECT = { x: 95, y: 541, width: 260, height: 58 };
 const PAD_ORB_SPRITES = Object.freeze({ fire: 2, water: 3, wood: 4, light: 5, dark: 6, heart: 7, jammer: 8, poison: 9, mortalPoison: 10 });
 let activePadOrbAtlas = null;
+let activePadMonsterArt = [];
 
 function roundedRect(ctx, x, y, width, height, radius) {
   const r = Math.min(radius, width / 2, height / 2);
@@ -142,30 +143,41 @@ function drawEnemy(ctx, enemy, index, target, time) {
   ctx.shadowColor = 'rgba(3, 9, 19, .46)';
   ctx.shadowBlur = 16;
   ctx.shadowOffsetY = 10;
-  const meta = ORB_BY_ID[enemy.attribute];
-  const gradient = ctx.createRadialGradient(-18, -24, 8, 0, 0, 66);
-  gradient.addColorStop(0, meta.highlight);
-  gradient.addColorStop(0.45, meta.color);
-  gradient.addColorStop(1, '#1a2435');
-  ctx.fillStyle = gradient;
-  ctx.beginPath();
-  ctx.moveTo(-55, 38);
-  ctx.quadraticCurveTo(-72, -8, -35, -50);
-  ctx.quadraticCurveTo(0, -74, 35, -50);
-  ctx.quadraticCurveTo(72, -8, 55, 38);
-  ctx.quadraticCurveTo(0, 67, -55, 38);
-  ctx.fill();
+  const monsterArt = activePadMonsterArt[index];
+  if (monsterArt) {
+    const { bounds } = monsterArt;
+    const scale = Math.min(146 / bounds.width, 140 / bounds.height);
+    const width = bounds.width * scale;
+    const height = bounds.height * scale;
+    ctx.drawImage(monsterArt.image, bounds.x, bounds.y, bounds.width, bounds.height,
+      -width / 2, -height / 2, width, height);
+  } else {
+    const meta = ORB_BY_ID[enemy.attribute];
+    const gradient = ctx.createRadialGradient(-18, -24, 8, 0, 0, 66);
+    gradient.addColorStop(0, meta.highlight);
+    gradient.addColorStop(0.45, meta.color);
+    gradient.addColorStop(1, '#1a2435');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.moveTo(-55, 38);
+    ctx.quadraticCurveTo(-72, -8, -35, -50);
+    ctx.quadraticCurveTo(0, -74, 35, -50);
+    ctx.quadraticCurveTo(72, -8, 55, 38);
+    ctx.quadraticCurveTo(0, 67, -55, 38);
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = '#f8f4df';
+    ctx.beginPath();
+    ctx.ellipse(-22, -6, 12, 16, -0.12, 0, Math.PI * 2);
+    ctx.ellipse(22, -6, 12, 16, 0.12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#192033';
+    ctx.beginPath();
+    ctx.arc(-19, -4, 5, 0, Math.PI * 2);
+    ctx.arc(19, -4, 5, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.shadowColor = 'transparent';
-  ctx.fillStyle = '#f8f4df';
-  ctx.beginPath();
-  ctx.ellipse(-22, -6, 12, 16, -0.12, 0, Math.PI * 2);
-  ctx.ellipse(22, -6, 12, 16, 0.12, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#192033';
-  ctx.beginPath();
-  ctx.arc(-19, -4, 5, 0, Math.PI * 2);
-  ctx.arc(19, -4, 5, 0, Math.PI * 2);
-  ctx.fill();
   ctx.strokeStyle = 'rgba(255,255,255,.7)';
   ctx.lineWidth = target === index && alive ? 4 : 1.5;
   ctx.beginPath();
@@ -427,7 +439,16 @@ export default function PuzzlePage() {
       const context = image.getContext('2d');
       context.putImageData(new ImageData(new Uint8ClampedArray(data.pixels), data.width, data.height), 0, 0);
       activePadOrbAtlas = { image, sprites: data.sprites };
-      setAtlasStatus(`Original ${data.sourceName} orb art active`);
+      activePadMonsterArt = data.monsters.map((monster) => {
+        const monsterImage = document.createElement('canvas');
+        monsterImage.width = monster.width;
+        monsterImage.height = monster.height;
+        monsterImage.getContext('2d').putImageData(
+          new ImageData(new Uint8ClampedArray(monster.pixels), monster.width, monster.height), 0, 0,
+        );
+        return { image: monsterImage, bounds: monster.bounds, sourceName: monster.sourceName };
+      });
+      setAtlasStatus(`Original ${data.sourceName} + ${activePadMonsterArt.length} monster textures active`);
       worker.terminate();
       if (assetWorkerRef.current === worker) assetWorkerRef.current = null;
     };
@@ -545,6 +566,7 @@ export default function PuzzlePage() {
       assetWorkerRef.current?.terminate();
       assetWorkerRef.current = null;
       activePadOrbAtlas = null;
+      activePadMonsterArt = [];
     };
   }, []);
 
