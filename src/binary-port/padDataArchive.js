@@ -6,7 +6,7 @@ const FIXED_NAME_SIZE = 16;
 export const PAD_DATA_RECORD_FLAGS = Object.freeze({
   RESIDENT_DATA001: 0x8000,
   EXTERNAL_DOWNLOAD: 0x8002,
-  COMPRESSED_DATA001: 0x18000,
+  RESIDENT_DATA002: 0x18000,
   COMPRESSED_DATA002: 0x18001,
   RESIDENT_DATA003: 0x28000,
 });
@@ -32,8 +32,8 @@ function classifyRecord(flags) {
       return { kind: 'resident', containerIndex: 0, compressed: false };
     case PAD_DATA_RECORD_FLAGS.EXTERNAL_DOWNLOAD:
       return { kind: 'external', containerIndex: null, compressed: false };
-    case PAD_DATA_RECORD_FLAGS.COMPRESSED_DATA001:
-      return { kind: 'resident', containerIndex: 0, compressed: true };
+    case PAD_DATA_RECORD_FLAGS.RESIDENT_DATA002:
+      return { kind: 'resident', containerIndex: 1, compressed: false };
     case PAD_DATA_RECORD_FLAGS.COMPRESSED_DATA002:
       return { kind: 'resident', containerIndex: 1, compressed: true };
     case PAD_DATA_RECORD_FLAGS.RESIDENT_DATA003:

@@ -147,7 +147,7 @@ records. `DATA000.NAM` contains matching fixed 16-byte names. Confirmed flags:
 | --- | ---: | --- |
 | `0x8000` | 97 | uncompressed resident data in `DATA001.BIN` |
 | `0x8002` | 1,520 | download-only asset; location points to full-name strings |
-| `0x18000` | 3 | compressed data in `DATA001.BIN` |
+| `0x18000` | 3 | uncompressed resident data in `DATA002.BIN` |
 | `0x18001` | 945 | `IOSChyQ` compressed textures in `DATA002.BIN` |
 | `0x28000` | 232 | resident WAV files in `DATA003.BIN` |
 | `0` | 1,531 | empty/reserved slot |

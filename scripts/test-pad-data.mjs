@@ -36,6 +36,9 @@ assert.deepEqual(texture.sprites[2], {
 const external = archive.records.find((record) => record.kind === 'external');
 assert.equal(external.name, 'dung249_mthigh.btex');
 assert.throws(() => archive.read(external), /download-only/);
+const cardPlaceholder = archive.find('cardph.btex');
+assert.equal(cardPlaceholder.containerIndex, 1);
+assert.equal(new TextDecoder('ascii').decode(archive.read(cardPlaceholder).subarray(0, 4)), 'TEX1');
 const compressed = archive.find('mons_001.btex');
 assert.equal(compressed.containerIndex, 1);
 assert.equal(compressed.compressed, true);
