@@ -489,6 +489,11 @@ export class PuzzleEngine {
         });
       });
     });
+    if (this.manualTarget && this.enemies[this.targetEnemy]?.hp <= 0) {
+      this.manualTarget = false;
+      const nextAlive = this.enemies.findIndex((enemy) => enemy.hp > 0);
+      if (nextAlive >= 0) this.targetEnemy = nextAlive;
+    }
     this.lastDamage = totalDamage;
     this.message = `${this.comboCount} combo${this.comboCount === 1 ? '' : 's'} · ${totalDamage.toLocaleString()} total damage${this.lastHealing ? ` · +${this.lastHealing.toLocaleString()} HP` : ''}${this.lastPoisonDamage ? ` · -${this.lastPoisonDamage.toLocaleString()} poison` : ''}${this.lastBombDamage ? ` · -${this.lastBombDamage.toLocaleString()} bombs` : ''}${this.lastThornDamage ? ` · -${this.lastThornDamage.toLocaleString()} thorns` : ''}`;
   }

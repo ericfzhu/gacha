@@ -335,6 +335,19 @@ autoTargetEngine.enemies[0] = { ...autoTargetEngine.enemies[0], hp: 1_000, attri
 autoTargetEngine.enemies[1] = { ...autoTargetEngine.enemies[1], hp: 100, attribute: 'light', defense: 0 };
 assert.equal(autoTargetEngine.chooseAttackTarget('fire', 30), 0);
 
+const massTargetEngine = new PuzzleEngine({ seed: 15 });
+massTargetEngine.party = [{ id: 'mass', name: 'Mass', attribute: 'fire', attack: 100, recovery: 0 }];
+massTargetEngine.enemies[0] = { ...massTargetEngine.enemies[0], hp: 10, attribute: 'light', defense: 0 };
+massTargetEngine.enemies[1] = { ...massTargetEngine.enemies[1], hp: 1_000, attribute: 'light', defense: 0 };
+massTargetEngine.selectEnemy(0);
+massTargetEngine.comboCount = 1;
+massTargetEngine.turnMatches = [{ type: 'fire', size: 5, enhancedCount: 0 }];
+massTargetEngine.resolvePlayerTurn();
+assert.equal(massTargetEngine.enemies[0].hp, 0);
+assert.equal(massTargetEngine.enemies[1].hp, 850);
+assert.equal(massTargetEngine.manualTarget, false);
+assert.equal(massTargetEngine.targetEnemy, 1);
+
 const stateEngine = new PuzzleEngine({ seed: 3 });
 stateEngine.setBoardFromCodes(['GGGHRD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD']);
 stateEngine.setOrbState(0, 0, { enhanced: true, locked: true });

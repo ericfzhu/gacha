@@ -271,6 +271,15 @@ try {
     engine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
     engine.resolvePlayerTurn();
     result.diagonalComboDamage = engine.lastDamage;
+    engine.reset();
+    engine.party = [{ id: 'mass', name: 'Mass', attribute: 'fire', attack: 100, recovery: 0 }];
+    engine.enemies[0] = { ...engine.enemies[0], hp: 10, attribute: 'light', defense: 0 };
+    engine.enemies[1] = { ...engine.enemies[1], hp: 1_000, attribute: 'light', defense: 0 };
+    engine.selectEnemy(0);
+    engine.comboCount = 1;
+    engine.turnMatches = [{ type: 'fire', size: 5, enhancedCount: 0 }];
+    engine.resolvePlayerTurn();
+    result.massTarget = { manual: engine.manualTarget, target: engine.targetEnemy };
     engine.allowDiagonalMoves = false;
     engine.reset();
     engine.start();
@@ -280,7 +289,8 @@ try {
     attackRounds.selectedTarget !== 0 || attackRounds.selectedManually !== true ||
     JSON.stringify(attackRounds.damageTargets) !== JSON.stringify([0, 1]) ||
     attackRounds.resolvedTarget !== 1 || attackRounds.resolvedManually !== false ||
-    attackRounds.diagonalComboDamage !== 200
+    attackRounds.diagonalComboDamage !== 200 || attackRounds.massTarget?.manual !== false ||
+    attackRounds.massTarget?.target !== 1
   )) throw new Error(`Attack round retarget mismatch: ${JSON.stringify(attackRounds)}`);
   const pointerIdentity = testPointerIdentity ? await (async () => {
     await page.evaluate(() => {

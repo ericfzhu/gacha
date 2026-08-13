@@ -288,7 +288,9 @@ pending hit can defeat. With no lethal candidate, elemental advantage takes
 priority and projected damage/current HP breaks the remaining tie. The browser
 uses that ordering and shows the target ring only for an explicit tap;
 automatic retargeting updates combat state without masquerading as a manual
-selection.
+selection. If a mass attack defeats the manually selected enemy without
+entering the single-target chooser, the selection is still cleared after the
+attack round and the fallback index advances to a surviving enemy.
 
 ## Shipped asset containers
 
