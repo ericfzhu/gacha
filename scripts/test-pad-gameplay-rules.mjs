@@ -13,6 +13,7 @@ import {
   padNativeBaseAttackPower,
   padOrbMatchMultiplier,
   padPoisonDamage,
+  padSecondaryAttributeAttack,
   padThornDamage,
   tracePadDragCells,
   tracePadPointerCells,
@@ -117,6 +118,9 @@ assert.equal(padDamageAfterDefense(10, 0.5, 999), 1);
 assert.equal(padEnhancedOrbMultiplier(3), 1.18);
 assert.equal(padNativeBaseAttackPower(100, [{ size: 3, enhancedCount: 3 }], 1), 118);
 assert.equal(padNativeBaseAttackPower(101, [{ size: 3, enhancedCount: 3 }], 1), 120);
+assert.equal(padSecondaryAttributeAttack(900, 'fire', 'fire'), 90);
+assert.equal(padSecondaryAttributeAttack(900, 'fire', 'water'), 300);
+assert.equal(padSecondaryAttributeAttack(900, 'fire', null), 0);
 assert.equal(padPoisonDamage(10_000, [3], []), 2_000);
 assert.equal(padPoisonDamage(10_000, [4], [3]), 7_500);
 assert.equal(padPoisonDamage(10_001, [3, 3], []), 4_002);
@@ -209,6 +213,8 @@ assert.equal(diagonalEngine.lastThornDamage, 480);
 assert.equal(diagonalEngine.snapshot().moveAdjacency, 'eight-way');
 
 const poisonEngine = new PuzzleEngine({ seed: 2 });
+assert.equal(poisonEngine.party.length, 6);
+assert.equal(poisonEngine.party.reduce((total, member) => total + member.recovery, 0), poisonEngine.player.recovery);
 poisonEngine.setBoardFromCodes(['PPPBGH', 'HHHLDB', 'BGHRDL', 'DLGRHB', 'HRBGLD']);
 poisonEngine.player.hp = poisonEngine.player.maxHp;
 poisonEngine.comboCount = 2;
@@ -217,6 +223,29 @@ poisonEngine.resolvePlayerTurn();
 assert.equal(poisonEngine.lastHealing, 1_025);
 assert.equal(poisonEngine.lastPoisonDamage, 2_400);
 assert.equal(poisonEngine.player.hp, 10_625);
+
+const secondaryAttackEngine = new PuzzleEngine({ seed: 6 });
+secondaryAttackEngine.party = [{
+  id: 'dual',
+  name: 'Dual',
+  attribute: 'fire',
+  secondaryAttribute: 'water',
+  attack: 90,
+  recovery: 0,
+}];
+secondaryAttackEngine.enemies[0] = { ...secondaryAttackEngine.enemies[0], attribute: 'light', defense: 0 };
+secondaryAttackEngine.enemies[1].hp = 0;
+secondaryAttackEngine.comboCount = 2;
+secondaryAttackEngine.turnMatches = [
+  { type: 'fire', size: 3, enhancedCount: 0 },
+  { type: 'water', size: 3, enhancedCount: 0 },
+];
+secondaryAttackEngine.resolvePlayerTurn();
+assert.equal(secondaryAttackEngine.lastDamage, 151);
+assert.deepEqual(
+  secondaryAttackEngine.floatingText.filter(({ kind }) => kind === 'damage').map(({ attribute, value }) => ({ attribute, value })),
+  [{ attribute: 'fire', value: 113 }, { attribute: 'water', value: 38 }],
+);
 
 const stateEngine = new PuzzleEngine({ seed: 3 });
 stateEngine.setBoardFromCodes(['GGGHRD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD']);

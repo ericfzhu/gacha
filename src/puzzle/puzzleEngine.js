@@ -13,6 +13,7 @@ import {
   padNativeBaseAttackPower,
   padOrbMatchMultiplier,
   padPoisonDamage,
+  padSecondaryAttributeAttack,
   padThornDamage,
   tracePadPointerCells,
 } from './padCoreRules.js';
@@ -39,11 +40,12 @@ export const ORB_BY_ID = Object.freeze(Object.fromEntries(ORB_TYPES.map((orb) =>
 export const ORB_BY_CODE = Object.freeze(Object.fromEntries(ORB_TYPES.map((orb) => [orb.code, orb])));
 
 const PARTY = Object.freeze([
-  { id: 'ember', name: 'Ember', attribute: 'fire', attack: 890 },
-  { id: 'marina', name: 'Marina', attribute: 'water', attack: 940 },
-  { id: 'briar', name: 'Briar', attribute: 'wood', attack: 850 },
-  { id: 'sol', name: 'Sol', attribute: 'light', attack: 910 },
-  { id: 'nyx', name: 'Nyx', attribute: 'dark', attack: 900 },
+  { id: 'ember', name: 'Ember', attribute: 'fire', secondaryAttribute: 'dark', attack: 890, recovery: 140 },
+  { id: 'marina', name: 'Marina', attribute: 'water', secondaryAttribute: 'light', attack: 940, recovery: 155 },
+  { id: 'briar', name: 'Briar', attribute: 'wood', secondaryAttribute: 'fire', attack: 850, recovery: 145 },
+  { id: 'sol', name: 'Sol', attribute: 'light', secondaryAttribute: 'light', attack: 910, recovery: 130 },
+  { id: 'nyx', name: 'Nyx', attribute: 'dark', secondaryAttribute: 'water', attack: 900, recovery: 120 },
+  { id: 'helper', name: 'Helper', attribute: 'fire', secondaryAttribute: 'wood', attack: 980, recovery: 130, helper: true },
 ]);
 
 const ENEMY_TEMPLATE = Object.freeze([
@@ -115,8 +117,12 @@ export class PuzzleEngine {
     this.hpResolutionApplied = false;
     this.lastLeaderMultiplier = 1;
     this.message = 'Drag one orb through the board to rearrange the whole path.';
-    this.player = { hp: 12000, maxHp: 12000, recovery: 820 };
     this.party = PARTY.map((member) => ({ ...member }));
+    this.player = {
+      hp: 12000,
+      maxHp: 12000,
+      recovery: this.party.reduce((total, member) => total + member.recovery, 0),
+    };
     this.enemies = copyEnemies();
     this.targetEnemy = 0;
     this.skill = { name: 'Tide Shift', cooldown: 0, maxCooldown: 5 };
@@ -412,17 +418,26 @@ export class PuzzleEngine {
     const target = this.enemies[this.targetEnemy]?.hp > 0 ? this.targetEnemy : this.enemies.findIndex((enemy) => enemy.hp > 0);
     this.targetEnemy = Math.max(0, target);
     this.party.forEach((member) => {
-      const matches = byType.get(member.attribute) || [];
-      if (!matches.length) return;
-      const matchAttack = padNativeBaseAttackPower(member.attack, matches, this.comboCount);
-      const raw = padApplyAttackMultipliers(matchAttack, [leader, leader]);
-      const isMassAttack = matches.some((match) => match.size >= 5);
-      this.enemies.forEach((enemy, enemyIndex) => {
-        if (enemy.hp <= 0 || (!isMassAttack && enemyIndex !== this.targetEnemy)) return;
-        const damage = padDamageAfterDefense(raw, padAttributeMultiplier(member.attribute, enemy.attribute), enemy.defense);
-        enemy.hp = Math.max(0, enemy.hp - damage);
-        totalDamage += damage;
-        this.floatingText.push({ kind: 'damage', value: damage, enemy: enemyIndex, attribute: member.attribute, age: 0 });
+      const attackLanes = [
+        { attribute: member.attribute, attack: member.attack },
+        {
+          attribute: member.secondaryAttribute,
+          attack: padSecondaryAttributeAttack(member.attack, member.attribute, member.secondaryAttribute),
+        },
+      ];
+      attackLanes.forEach((lane) => {
+        const matches = byType.get(lane.attribute) || [];
+        if (!lane.attack || !matches.length) return;
+        const matchAttack = padNativeBaseAttackPower(lane.attack, matches, this.comboCount);
+        const raw = padApplyAttackMultipliers(matchAttack, [leader, leader]);
+        const isMassAttack = matches.some((match) => match.size >= 5);
+        this.enemies.forEach((enemy, enemyIndex) => {
+          if (enemy.hp <= 0 || (!isMassAttack && enemyIndex !== this.targetEnemy)) return;
+          const damage = padDamageAfterDefense(raw, padAttributeMultiplier(lane.attribute, enemy.attribute), enemy.defense);
+          enemy.hp = Math.max(0, enemy.hp - damage);
+          totalDamage += damage;
+          this.floatingText.push({ kind: 'damage', value: damage, enemy: enemyIndex, attribute: lane.attribute, age: 0 });
+        });
       });
     });
     this.lastDamage = totalDamage;
@@ -517,6 +532,15 @@ export class PuzzleEngine {
       lastThornDamage: this.lastThornDamage,
       leaderPairMultiplier: this.lastLeaderMultiplier,
       player: { ...this.player },
+      party: this.party.map(({ id, name, attribute, secondaryAttribute, attack, recovery, helper = false }) => ({
+        id,
+        name,
+        attribute,
+        secondaryAttribute,
+        attack,
+        recovery,
+        helper,
+      })),
       targetEnemy: this.targetEnemy,
       enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter }) => ({ id, name, attribute, hp, maxHp, counter, maxCounter })),
       skill: { ...this.skill, ready: this.skill.cooldown === 0 },
