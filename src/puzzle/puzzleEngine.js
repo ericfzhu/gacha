@@ -36,6 +36,7 @@ import {
   PAD_ENEMY_SKILL_BLACK_FALL,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES,
   PAD_ENEMY_SKILL_VERTICAL_LINES,
+  PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
   PAD_ENEMY_SKILL_BLOCK_MINUS,
   PAD_ENEMY_SKILL_BUR_DROP,
   decodePadEnemySkillDefinition,
@@ -1035,6 +1036,11 @@ export class PuzzleEngine {
       this.message = `Enemy rewrote ${skill.kind === 'horizontalLines' ? 'horizontal' : 'vertical'} lines (effect ${effectFlags}).`;
       return true;
     }
+    if (skill.supported && skill.kind === 'poisonTypeListSwap') {
+      const effectFlags = this.doBlockSwap2(...skill.destinationTypes);
+      this.message = `Enemy converted poison orbs (effect ${effectFlags}).`;
+      return true;
+    }
     if (!skill.supported || skill.kind !== 'blackFall') return false;
     this.setBlackFallRule({
       chanceBasisPoints: skill.chanceBasisPoints,
@@ -1089,6 +1095,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_BLACK_FALL,
         PAD_ENEMY_SKILL_HORIZONTAL_LINES,
         PAD_ENEMY_SKILL_VERTICAL_LINES,
+        PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
         PAD_ENEMY_SKILL_BLOCK_MINUS,
         PAD_ENEMY_SKILL_BUR_DROP,
       ].includes(definition.effect.type) || !definition.effect.supported) {

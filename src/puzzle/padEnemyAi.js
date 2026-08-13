@@ -3,6 +3,7 @@ import {
   PAD_ENEMY_SKILL_BLACK_FALL,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES,
   PAD_ENEMY_SKILL_VERTICAL_LINES,
+  PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
   PAD_ENEMY_SKILL_BLOCK_MINUS,
   PAD_ENEMY_SKILL_BUR_DROP,
   decodePadEnemySkillDefinition,
@@ -103,6 +104,7 @@ function isStaticallyEligible(definition, state) {
     PAD_ENEMY_SKILL_BLACK_FALL,
     PAD_ENEMY_SKILL_HORIZONTAL_LINES,
     PAD_ENEMY_SKILL_VERTICAL_LINES,
+    PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
     PAD_ENEMY_SKILL_BLOCK_MINUS,
     PAD_ENEMY_SKILL_BUR_DROP,
   ].includes(definition.effect.type)) return false;
@@ -116,11 +118,12 @@ function evaluateCondition(definition, state, rngState) {
   if (definition.effect.type === PAD_ENEMY_SKILL_BLACK_FALL) {
     return { eligible: !state.blackFallActive, rngState };
   }
-  // chooseEnemyAiSub's type-79 table entry is the unconditional 1.0 handler
-  // at 0x61a630. Unlike candidate-based board effects, it performs no dry run.
+  // The decoded line and poison-list transformations all map to the
+  // unconditional 1.0 handler at 0x61a630, with no board dry run.
   if (
     definition.effect.type === PAD_ENEMY_SKILL_HORIZONTAL_LINES
     || definition.effect.type === PAD_ENEMY_SKILL_VERTICAL_LINES
+    || definition.effect.type === PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP
   ) {
     return { eligible: true, rngState };
   }

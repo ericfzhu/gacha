@@ -672,6 +672,26 @@ one ordinary saved-LCG step before lock rejection. Thus three ordinary
 five-cell columns selected immediately from new AI consume 16 advances: one
 probability roll followed by fifteen rewrite rolls.
 
+Enemy skill type `81` converts poison-family cells through an explicit
+destination list. Its early dispatch entry resolves to `0x628de0`, setup to
+`0x620100`, and AI condition to the unconditional `0x61a630` handler. Setup
+stores signed definition values `+0x14/+0x18/+0x1c/+0x20` at
+`sMONSTER+0x688/+0x68c/+0x690/+0x694`; definition `+0x10` participates in
+presentation setup but is not an argument to the board primitive. Execution
+passes those four runtime integers to `_doBlockSwap2` (`0x6af838`). The first
+destination is always admitted and each later negative value terminates the
+list; admitted entries are truncated to bytes before `_doBlockSwapNew`.
+
+Despite its name, `_doBlockSwap2` does not interpret the four values as two
+source/destination pairs. It calls `_doBlockSwapNew` with source mask zero,
+which natively expands to the shared poison-family bit and therefore selects
+types 7 and 8 (poison and mortal-poison) only. Each eligible cell consumes one
+saved-LCG destination roll before lock rejection, after which the existing
+minimum-three balancing rule applies if necessary. The type-81 AI condition
+does no dry run, so an immediately selected all-poison 6x5 fixture spends one
+selection roll and thirty cell rolls, yielding deterministic destination
+counts of 12 fire, 9 water, and 9 wood from seed 21900.
+
 Enemy skill type `151` connects that selector to the weakened-orb primitive.
 Its `_doEnemySkill` dispatch entry resolves to `0x62afd0`, which passes
 definition `+0x10` as the type mask, converts signed percentage `+0x14` through

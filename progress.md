@@ -2,6 +2,25 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 enemy poison type-list conversion
+
+- Mapped enemy skill type `81` to unconditional condition `0x61a630`, setup
+  `0x620100`, and early dispatch handler `0x628de0`.
+- Setup ignores definition `+0x10` for board semantics and copies the four
+  signed destination entries at `+0x14/+0x18/+0x1c/+0x20` into
+  `sMONSTER+0x688..+0x694`. Execution passes them to `_doBlockSwap2`.
+- Preserved `_doBlockSwap2`'s actual semantics: the values are a terminated
+  destination list, while source mask zero makes `_doBlockSwapNew` fold in
+  poison and mortal-poison. It is not a source/destination pair list and does
+  not rewrite ordinary colors.
+- Pure coverage selects skill ID 9006, converts an all-poison 6x5 board into
+  12 fire, 9 water, and 9 wood orbs, consumes one AI plus thirty per-cell LCG
+  advances, and updates budget 100 -> 80. Exact table checks and browser
+  coverage are in place. Rule tests, production build, exhaustive browser
+  suite, generic gameplay client, and both visual captures pass.
+- Next: commit this mechanic independently, then decode another distinct
+  board-affecting dispatch.
+
 ## 2026-08-14 enemy vertical-line skill dispatch
 
 - Mapped enemy skill type `77` to unconditional condition `0x61a630`, shared

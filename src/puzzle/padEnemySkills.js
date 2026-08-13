@@ -1,6 +1,7 @@
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_HORIZONTAL_LINES = 79;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES = 77;
+export const PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP = 81;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
 
@@ -81,6 +82,20 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       kind: type === PAD_ENEMY_SKILL_HORIZONTAL_LINES ? 'horizontalLines' : 'verticalLines',
       supported: true,
       lineSwaps: Object.freeze(lineSwaps),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP) {
+    requireLength(definitionBytes, 0x24, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'poisonTypeListSwap',
+      supported: true,
+      presentationValue: definition.getInt32(0x10, true),
+      destinationTypes: Object.freeze(Array.from(
+        { length: 4 },
+        (_, index) => definition.getInt32(0x14 + index * 4, true),
+      )),
       attackWithSkillValue,
     });
   }
@@ -204,6 +219,19 @@ export function normalizePadEnemySkillRecord(record) {
       kind: horizontal ? 'horizontalLines' : 'verticalLines',
       supported: true,
       lineSwaps: Object.freeze(lineSwaps),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP || record?.kind === 'poisonTypeListSwap') {
+    const authoredTypes = Array.isArray(record?.destinationTypes) ? record.destinationTypes : [];
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
+      kind: 'poisonTypeListSwap',
+      supported: true,
+      presentationValue: Math.trunc(Number(record?.presentationValue) || 0),
+      destinationTypes: Object.freeze(Array.from(
+        { length: 4 },
+        (_, index) => Math.trunc(Number(authoredTypes[index] ?? -1)),
+      )),
     });
   }
   if (type === PAD_ENEMY_SKILL_BLOCK_MINUS || record?.kind === 'blockMinus') {

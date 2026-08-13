@@ -4,6 +4,7 @@ import {
   PAD_ENEMY_SKILL_BLACK_FALL,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES,
   PAD_ENEMY_SKILL_VERTICAL_LINES,
+  PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
   PAD_ENEMY_SKILL_BLOCK_MINUS,
   PAD_ENEMY_SKILL_BUR_DROP,
   decodePadEnemySkillDefinition,
@@ -472,6 +473,23 @@ assert.deepEqual(decodePadEnemySkillDefinition(enemyAiVerticalLinesDefinition), 
     { lineMask: 0b000100, destinationTypeMask: 1 << 1 },
     { lineMask: 0b100000, destinationTypeMask: 1 << 2 },
   ],
+  attackWithSkillValue: 0,
+});
+const enemyAiPoisonTypeListDefinition = enemyAiHorizontalLinesDefinition.slice();
+const enemyAiPoisonTypeListView = new DataView(enemyAiPoisonTypeListDefinition.buffer);
+enemyAiPoisonTypeListView.setUint32(0x00, 9_006, true);
+enemyAiPoisonTypeListView.setInt16(0x04, PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP, true);
+enemyAiPoisonTypeListView.setInt32(0x10, 12, true);
+enemyAiPoisonTypeListView.setInt32(0x14, 0, true);
+enemyAiPoisonTypeListView.setInt32(0x18, 1, true);
+enemyAiPoisonTypeListView.setInt32(0x1c, 2, true);
+enemyAiPoisonTypeListView.setInt32(0x20, -1, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiPoisonTypeListDefinition), {
+  type: 81,
+  kind: 'poisonTypeListSwap',
+  supported: true,
+  presentationValue: 12,
+  destinationTypes: [0, 1, 2, -1],
   attackWithSkillValue: 0,
 });
 assert.deepEqual(padResolveEnhancementFall(21_900, 0, Array(6).fill(0)), {
@@ -1302,6 +1320,37 @@ for (let index = 0; index < 16; index += 1) {
 }
 assert.equal(selectedVerticalLinesAiEngine.rng.state, verticalLinesExpectedState);
 assert.equal(verticalLinesAiState.enemies[0].enemyAiBudget, 80);
+const poisonTypeListAiMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(poisonTypeListAiMonsterDefinition.buffer).setUint32(0xec, 9_006, true);
+const selectedPoisonTypeListAiEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: poisonTypeListAiMonsterDefinition,
+    skillDefinitions: [enemyAiPoisonTypeListDefinition],
+  }],
+});
+selectedPoisonTypeListAiEngine.setBoardFromCodes([
+  'PMPMPM', 'MPMPMP', 'PMPMPM', 'MPMPMP', 'PMPMPM',
+]);
+selectedPoisonTypeListAiEngine.setRngState(21_900);
+selectedPoisonTypeListAiEngine.enemies[0].counter = 1;
+selectedPoisonTypeListAiEngine.enemies[1].counter = 99;
+selectedPoisonTypeListAiEngine.resolveEnemyTurn();
+const poisonTypeListAiState = selectedPoisonTypeListAiEngine.snapshot();
+assert.equal(poisonTypeListAiState.lastEnemyActions[0].skill.type, 81);
+assert.equal(poisonTypeListAiState.lastEnemyActions[0].skill.skillId, 9_006);
+assert.deepEqual(['fire', 'water', 'wood'].map((type) => (
+  selectedPoisonTypeListAiEngine.board.flat().filter((orb) => orb.type === type).length
+)), [12, 9, 9]);
+assert.equal(selectedPoisonTypeListAiEngine.board.flat().some((orb) => (
+  orb.type === 'poison' || orb.type === 'mortalPoison'
+)), false);
+let poisonTypeListExpectedState = 21_900;
+for (let index = 0; index < 31; index += 1) {
+  poisonTypeListExpectedState = padLcgStep(poisonTypeListExpectedState).state;
+}
+assert.equal(selectedPoisonTypeListAiEngine.rng.state, poisonTypeListExpectedState);
+assert.equal(poisonTypeListAiState.enemies[0].enemyAiBudget, 80);
 assert.equal(blackFallEngine.board[0][0].nail, false);
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);
