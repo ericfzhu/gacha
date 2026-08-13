@@ -373,8 +373,14 @@ validates both expanded length and CRC. On the exact APK it expands
 
 The native client successfully opens packaged `assets/DATA001.BIN`, creates
 `files/boot.bin`, and then requests `files/data048.bin` and `cache/data030.bin`.
-Those downloaded datasets are not in this APK. Without them, the faithful binary
-client remains on its real Japanese startup warning. The browser UI accepts
+Those private runtime files are not in this APK. `data048.bin` is the
+server-issued account GUID/identity file rather than gameplay asset content;
+[PADDash's extraction documentation](https://mapaler.github.io/PADDashFormation/doc/export-player-data.html)
+independently identifies the same Android private path and account-specific
+role. `data030.bin` is cache/private state requested by this build. The port does
+not fabricate either file or claim that synthetic credentials make the online
+client playable. Without legitimate retained state, the faithful binary client
+remains on its real Japanese startup warning. The browser UI accepts
 optional `.bin` files so legitimately retained runtime data can be mounted. It
 canonicalizes selected names to Android's case-sensitive private paths:
 `data048.bin` under `files/`, `data030.bin` under `cache/`, and other retained
@@ -398,8 +404,8 @@ lifecycle exports, more than 100 million interpreted guest instructions, more
 than 100 frames and 10,000 translated draws, four delivered touch callbacks,
 and both missing-data requests with no console errors.
 
-This is a content boundary, not a CPU-port failure: protection, JNI, lifecycle,
-rendering, frames, and touch callbacks are all running. The remaining work for a
-fully populated offline client is downloaded data/schema recovery and coverage
-of modern active/leader/passive mechanics in the pure rules harness where server
-datasets are unavailable.
+This is an account/server boundary, not a CPU-port failure: protection, JNI,
+lifecycle, rendering, frames, touch callbacks, private-file loading, and payload
+reads are all running. The remaining offline work is coverage of modern
+active/leader/passive mechanics in the pure rules harness where server-issued
+account state and datasets are unavailable.

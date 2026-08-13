@@ -363,7 +363,7 @@ export default function BinaryPortPage() {
           <output id="binary-port-state" aria-live="polite">
             {state.phase}{state.elf ? ` · ${state.elf.deepInstructions.toLocaleString()} instructions · ${state.elf.executableStages} executable stages` : ''}
             {state.platform?.files?.some((event) => event.name === 'openat' && event.result === -2 && /\/(data048|data030)\.bin$/.test(event.path))
-              ? ' · downloaded data048/data030 not present; native client remains at its offline startup screen'
+              ? ' · private data048/data030 state not present; native client remains at its offline startup screen'
               : ''}
           </output>
         </div>
