@@ -43,6 +43,11 @@ self.onmessage = async ({ data }) => {
         jni: gameSession.jni.diagnostics(),
         platform: {
           hostCalls: Object.fromEntries([...gameSession.linux.hostCallCounts].sort((left, right) => right[1] - left[1]).slice(0, 50)),
+          compatibilityCalls: Object.fromEntries(
+            [...gameSession.linux.hostCallCounts]
+              .filter(([name]) => gameSession.linux.compatibilitySymbols.has(name))
+              .sort((left, right) => right[1] - left[1]),
+          ),
           assets: gameSession.linux.recentAssetEvents,
           openAssets: gameSession.linux.assets.size,
           systemCalls: Object.fromEntries([...gameSession.linux.systemCallCounts].sort((left, right) => right[1] - left[1]).slice(0, 30)),

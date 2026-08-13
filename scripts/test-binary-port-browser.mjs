@@ -80,6 +80,7 @@ try {
     drawCalls: state.drawCalls,
     deepInstructions: state.elf?.deepInstructions,
     mountedRuntimeFiles: state.elf?.mountedRuntimeFiles,
+    compatibilityCalls: state.platform?.compatibilityCalls,
     runtimeFileEvents: state.platform?.files?.filter(({ path }) => /data0(?:30|48)\.bin$/.test(path)),
     consoleMessages,
   } : { state, consoleMessages };

@@ -124,6 +124,7 @@ export class VirtualLinux {
     this.nextHostDataAddress = options.hostDataBase ?? HOST_DATA_BASE;
     this.hostStrings = new Map();
     this.compatibilityData = new Map();
+    this.compatibilitySymbols = new Set();
     this.openSlInterfaceNames = new Map();
     this.openSlInterfaces = new Map();
     this.nextGraphicsHandle = 1;
@@ -433,7 +434,10 @@ export class VirtualLinux {
     const isAudio = /^(al|alc)[A-Z]/.test(name) || name === 'slCreateEngine';
     const isAndroidAsset = /^(AAsset|AndroidBitmap)_?/.test(name);
     if (!name) return 0;
-    if (!this.hostImports.has(name)) this.registerHostImport(name, (snapshot) => this.hostCompatibilityCall(name, snapshot));
+    if (!this.hostImports.has(name)) {
+      this.compatibilitySymbols.add(name);
+      this.registerHostImport(name, (snapshot) => this.hostCompatibilityCall(name, snapshot));
+    }
     return this.bridgeAddress(name);
   }
 
@@ -1241,6 +1245,7 @@ export class VirtualLinux {
       result: -38n,
       pc: Number(snapshot.pc),
       svcAddress: Number(snapshot.svcAddress),
+      caller: Number(this.runtime.exports.arm64_get_register(30)),
     };
     let result = -38n; // ENOSYS
     let shouldResume = true;
@@ -1363,6 +1368,7 @@ export class VirtualLinux {
         event.fd = fd;
         event.path = descriptor?.path ?? null;
         event.fileOffset = descriptor?.offset ?? null;
+        event.whence = whence;
         if (!descriptor) result = -9n;
         else {
           const base = whence === SEEK_SET ? 0 : whence === SEEK_CUR ? descriptor.offset : whence === SEEK_END ? descriptor.data.length : null;
@@ -1519,7 +1525,16 @@ export class VirtualLinux {
         this.runtime.ensureCapacity(address + length);
         this.runtime.fillBytes(address, length, 0);
         const descriptor = this.descriptors.get(fd);
+        event.fd = fd;
+        event.path = descriptor?.path ?? null;
+        event.fileSize = descriptor?.data.length ?? null;
+        event.fileOffset = fileOffset;
+        event.count = length;
         if (descriptor && fileOffset < descriptor.data.length) {
+          event.firstBytes = Array.from(
+            descriptor.data.subarray(fileOffset, Math.min(fileOffset + length, descriptor.data.length, fileOffset + 32)),
+            (value) => value.toString(16).padStart(2, '0'),
+          ).join('');
           this.runtime.writeBytes(address, descriptor.data.subarray(fileOffset, Math.min(fileOffset + length, descriptor.data.length)));
         }
         this.mappings.push({ address, length, protection, fd, fileOffset });
@@ -1692,16 +1707,26 @@ export class VirtualLinux {
 
     event.result = result;
     this.systemCallCounts.set(event.name, (this.systemCallCounts.get(event.name) ?? 0) + 1);
-    if (['openat', 'read', 'write', 'close', 'unlinkat', 'mkdirat', 'fstat', 'newfstatat', 'lseek'].includes(event.name) && event.path) {
+    if (['openat', 'read', 'write', 'close', 'unlinkat', 'mkdirat', 'fstat', 'newfstatat', 'lseek', 'mmap'].includes(event.name) && event.path) {
+      const recentCalls = /\/data0(?:30|48)\.bin$/.test(event.path)
+        ? Array.from({ length: 16 }, (_, age) => ({
+          pc: Number(this.runtime.exports.arm64_get_recent_call_pc(age)),
+          target: Number(this.runtime.exports.arm64_get_recent_call_target(age)),
+        })).filter((call) => call.pc)
+        : null;
       this.recentFileEvents.push({
         name: event.name,
         path: event.path,
+        pc: event.pc,
+        caller: event.caller,
         flags: event.flags ?? null,
         count: event.count ?? null,
         fileSize: event.fileSize ?? null,
         fileOffset: event.fileOffset ?? null,
         nextFileOffset: event.nextFileOffset ?? null,
+        whence: event.whence ?? null,
         firstBytes: event.firstBytes ?? null,
+        recentCalls,
         result: Number(result),
       });
       if (this.recentFileEvents.length > 50) this.recentFileEvents.shift();
