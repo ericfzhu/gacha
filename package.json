@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "wasm:build": "bash scripts/build-arm64-wasm.sh",
     "wasm:test": "npm run wasm:build && node scripts/test-arm64-core.mjs",
+    "pad-data:test": "node scripts/test-pad-data.mjs",
     "android-stubs:build": "bash scripts/build-android-stubs.sh",
     "api:dev": "wrangler dev",
     "api:deploy": "wrangler deploy",
