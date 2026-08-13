@@ -192,18 +192,12 @@ export class PuzzleEngine {
   }
 
   createStableBoard() {
-    const board = Array.from({ length: this.rows }, () => Array(this.columns).fill(null));
-    for (let row = 0; row < this.rows; row += 1) {
-      for (let column = 0; column < this.columns; column += 1) {
-        const blocked = new Set();
-        if (column >= 2 && board[row][column - 1]?.type === board[row][column - 2]?.type) blocked.add(board[row][column - 1].type);
-        if (row >= 2 && board[row - 1][column]?.type === board[row - 2][column]?.type) blocked.add(board[row - 1][column].type);
-        const choices = NATURAL_ORB_TYPES.map((orb) => orb.id).filter((type) => !blocked.has(type));
-        const type = choices[Math.floor(this.rng.nextFloat() * choices.length)];
-        board[row][column] = this.createOrb(type);
-      }
-    }
-    return board;
+    return this.rng.createInitialBoard(
+      this.rows,
+      this.columns,
+      this.dropRates,
+      this.faceTypes,
+    ).map((row) => row.map((type) => this.createOrb(ORB_TYPES[type]?.id || NATURAL_ORB_TYPES[0].id)));
   }
 
   startDrag(row, column, pointerX = 0, pointerY = 0, gridColumn = column + 0.5, gridRow = row + 0.5) {

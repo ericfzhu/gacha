@@ -10,6 +10,7 @@ import {
   padBombDamage,
   padComboMultiplier,
   padComboLeaderMultiplier,
+  padCreateInitialBoard,
   padCountBlockBits,
   padCountNonPoisonBlocks,
   padDamageAfterDefense,
@@ -98,6 +99,28 @@ assert.deepEqual(padSpawnNewBlockInBits(21_900, 0, [0, 1, 2, 3, 4, 5]), {
   state: 3_803_934_822,
   type: 5,
   usedFaceFallback: true,
+});
+assert.deepEqual(padCreateInitialBoard(12, 1, 3, [], [0, 1, 2, 3, 4, 5]), {
+  state: 408_447_505,
+  board: [[0, 0, 1]],
+});
+assert.deepEqual(padCreateInitialBoard(12, 3, 1, [], [0, 1, 2, 3, 4, 5]), {
+  state: 408_447_505,
+  board: [[0], [0], [1]],
+});
+assert.deepEqual(padCreateInitialBoard(21_900, 5, 6, [], [0, 1, 2, 3, 4, 5]), {
+  state: 79_238_434,
+  board: [
+    [0, 5, 2, 1, 2, 2],
+    [1, 1, 2, 5, 0, 3],
+    [3, 4, 1, 0, 5, 0],
+    [1, 5, 3, 4, 1, 5],
+    [3, 0, 3, 4, 5, 0],
+  ],
+});
+assert.deepEqual(padCreateInitialBoard(21_900, 1, 1, [0.1], [0, 1, 2, 3, 4, 5]), {
+  state: 3_803_934_822,
+  board: [[0]],
 });
 assert.deepEqual(padShuffleBlockCandidates(21_900, [0, 1, 2, 3, 4, 5]), {
   state: 3_803_934_822,

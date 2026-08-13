@@ -178,6 +178,20 @@ returns natural bits `0..5` directly. Selecting any higher bit—or supplying an
 empty mask—spends a second roll and returns a uniform dungeon face type instead.
 `padSpawnNewBlockInBits` keeps that intentionally asymmetric fallback contract.
 
+Initial construction lives in `__initBlocks()` at `0x661f10`; `_initBlocks()`
+is only a four-byte branch wrapper. The gameplay part traverses rows top to
+bottom and columns left to right using the native `column + (row << 4)` backing
+index. Before every `_spawnNewBlock` call it detects whether the previous two
+horizontal cells are the same type and masks that type, then independently does
+the same for the previous two vertical cells. On the ordinary face fallback,
+the selected face rotates forward past either mask. This prevents an initial
+three-orb run without rerolling or rescaling the random value; each ordinary
+cell still consumes exactly one saved LCG step. `padCreateInitialBoard` and
+`PuzzleEngine.createStableBoard` now reproduce the row-major traversal,
+horizontal/vertical mask union, forward face rotation, and dynamic dimensions.
+The body's saturated active-rate correction remains a separate data-dependent
+branch to map before claiming every authored dungeon-opening distribution.
+
 The native combo list is a fixed list of 88-byte `sCOMBO` records with linked-list
 indices stored around game-work offset `0x57a8`. Version 21.9 also records modern
 shape metadata and passive-skill flags. The browser rules layer now returns mass

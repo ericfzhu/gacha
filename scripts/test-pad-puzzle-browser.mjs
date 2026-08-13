@@ -406,6 +406,8 @@ try {
     const excludedSkyfallState = engine.rng.state;
     engine.skyfallExclusionMask = 0;
     engine.reset();
+    const initialBoard = engine.snapshot().board;
+    const initialBoardState = engine.rng.state;
     engine.start();
     return {
       lockedStartState, lockedChanged, lockedEndState, startState, changed, endState,
@@ -424,6 +426,7 @@ try {
       passiveBlockFlagByte, passiveLineFlags, passiveLineState, passiveLineTypes, passiveLineFlagByte,
       skyfallType, skyfallState, weightedSkyfallType, weightedSkyfallState,
       excludedSkyfallType, excludedSkyfallState,
+      initialBoard, initialBoardState,
     };
   }) : null;
   const advanceLcg = (state, count) => {
@@ -482,7 +485,10 @@ try {
     poisonBlockSample.weightedSkyfallType !== 'fire' ||
     poisonBlockSample.weightedSkyfallState !== 3_803_934_822 ||
     poisonBlockSample.excludedSkyfallType !== 'water' ||
-    poisonBlockSample.excludedSkyfallState !== 394_448_415
+    poisonBlockSample.excludedSkyfallState !== 394_448_415 ||
+    JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
+      'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',
+    ]) || poisonBlockSample.initialBoardState !== 79_238_434
   )) throw new Error(`Poison-block mismatch: ${JSON.stringify(poisonBlockSample)}`);
   if (renderAtlasSheet) {
     const sheet = page.locator('#pad-atlas-sheet');

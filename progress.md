@@ -2,6 +2,19 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 native initial-board traversal
+
+- Recovered the gameplay loop in `__initBlocks` at `0x661f10`: top-down,
+  left-to-right traversal over `column + (row << 4)`, with separate masks for
+  same-type horizontal and vertical prefixes of the minimum match length.
+- Ported the initial board builder through `_spawnNewBlock`, preserving one
+  ordinary LCG step per cell and forward face-list rotation instead of random
+  rescaling over a filtered candidate list.
+- Added horizontal, vertical, exact 6×5 seed, weighted first-cell, engine, and
+  browser fixtures. The exact inspector now checks 57 anchors.
+- Next: decode the saturated active-rate correction in `__initBlocks` and map
+  the remaining dungeon drop-record inputs.
+
 ## 2026-08-14 native skyfall selection
 
 - Recovered `_spawnNewBlock` at `0x661978`: single-step ordinary face-list

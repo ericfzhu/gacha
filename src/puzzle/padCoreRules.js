@@ -180,6 +180,11 @@ export function createPadRng(seed = 0) {
       state = result.state;
       return result.type;
     },
+    createInitialBoard(rows, columns, dropRates, faceTypes, minimumMatch = PAD_MINIMUM_MATCH) {
+      const result = padCreateInitialBoard(state, rows, columns, dropRates, faceTypes, minimumMatch);
+      state = result.state;
+      return result.board;
+    },
     getRandomBlock(excludedType = -1, includeJammer = false, includeHeart = true) {
       const result = padGetRandomBlock(state, excludedType, includeJammer, includeHeart);
       state = result.state;
@@ -276,6 +281,51 @@ export function padSpawnNewBlockInBits(state, typeMask, faceTypes) {
     ? faces[Math.floor(second.value * faces.length / 0x10000)]
     : -1;
   return { state: second.state, type, usedFaceFallback: true };
+}
+
+// __initBlocks (0x661f10) visits the live board row-major. Before each
+// _spawnNewBlock call it masks the type of a same-color run occupying the
+// previous minimumMatch-1 horizontal cells and does the same vertically. The
+// spawn fallback rotates forward through the face list rather than rescaling
+// its random roll over a filtered candidate list.
+export function padCreateInitialBoard(
+  state,
+  rows,
+  columns,
+  dropRates,
+  faceTypes,
+  minimumMatch = PAD_MINIMUM_MATCH,
+) {
+  const height = Math.max(0, Math.trunc(Number(rows) || 0));
+  const width = Math.max(0, Math.trunc(Number(columns) || 0));
+  const runLength = Math.max(2, Math.trunc(Number(minimumMatch) || PAD_MINIMUM_MATCH));
+  const board = Array.from({ length: height }, () => Array(width).fill(-1));
+  let savedState = Number(state) >>> 0;
+  for (let row = 0; row < height; row += 1) {
+    for (let column = 0; column < width; column += 1) {
+      let excludedMask = 0;
+      if (column >= runLength - 1) {
+        const type = board[row][column - 1];
+        let same = true;
+        for (let offset = 2; offset < runLength; offset += 1) {
+          if (board[row][column - offset] !== type) same = false;
+        }
+        if (same && type >= 0) excludedMask |= 1 << type;
+      }
+      if (row >= runLength - 1) {
+        const type = board[row - 1][column];
+        let same = true;
+        for (let offset = 2; offset < runLength; offset += 1) {
+          if (board[row - offset][column] !== type) same = false;
+        }
+        if (same && type >= 0) excludedMask |= 1 << type;
+      }
+      const spawned = padSpawnNewBlock(savedState, dropRates, faceTypes, excludedMask);
+      savedState = spawned.state;
+      board[row][column] = spawned.type;
+    }
+  }
+  return { state: savedState, board };
 }
 
 // cGAMEMAIN::_getRandomBlock (0x617874) advances the saved game-work LCG
