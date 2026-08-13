@@ -2,6 +2,22 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 enemy weakened-orb skill dispatch
+
+- Mapped enemy skill type `151` through all three native tables: condition
+  `0x61bab4`, generic setup `0x6217c0`, and execution `0x62afd0`. It decodes
+  type mask `+0x10`, weakening percentage `+0x14`, count limit `+0x18`, and the
+  shared optional attack field `+0x44`.
+- Routed scheduled and raw-AI-selected records into the existing byte-faithful
+  `doBlockMinus` primitive. The AI condition performs the native dry run and
+  preserves its capped-shuffle RNG advance before the selection roll; actual
+  execution shuffles again before weakening the limited cells.
+- Added exact dispatch/setup/condition-table assertions, decoder fixtures, and
+  engine/browser coverage proving skill ID 9002 weakens exactly two orbs and
+  advances seed 21900 three times to 1929471377 with AI budget 100 -> 80.
+- Next: port type `153`, whose condition and execution both call the already
+  decoded thorn/burst-marking primitive, or another high-impact board skill.
+
 ## 2026-08-14 data-backed new enemy AI selection
 
 - Recovered `_doEnemyAi`'s mode switch and the supported portion of

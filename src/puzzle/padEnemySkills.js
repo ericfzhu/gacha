@@ -1,4 +1,5 @@
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
+export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 
 const PAD_INT32_MAX = 0x7fffffff;
 
@@ -59,6 +60,29 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
     definitionBytes.byteLength,
   );
   const type = definition.getInt16(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.typeOffset, true);
+  const attackWithSkillValue = definitionBytes.byteLength
+      >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+    ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+    : null;
+  if (type === PAD_ENEMY_SKILL_BLOCK_MINUS) {
+    requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    const typeMask = definition.getUint32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.parameter0Offset, true);
+    const powerPercent = definition.getInt32(
+      PAD_ENEMY_SKILL_DEFINITION_LAYOUT.parameter1Offset,
+      true,
+    );
+    const limit = definition.getInt32(0x18, true);
+    return Object.freeze({
+      type,
+      kind: 'blockMinus',
+      supported: true,
+      typeMask,
+      powerPercent,
+      power: Math.fround(Math.fround(powerPercent) / Math.fround(100)),
+      limit,
+      attackWithSkillValue,
+    });
+  }
   if (type !== PAD_ENEMY_SKILL_BLACK_FALL) {
     return Object.freeze({ type, kind: 'unsupported', supported: false });
   }
@@ -73,10 +97,6 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
   const rawChance = definitionChancePercent >= 1
     ? Math.imul(definitionChancePercent, 100) >>> 0
     : 10_000;
-  const attackWithSkillValue = definitionBytes.byteLength
-      >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
-    ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
-    : null;
   return Object.freeze({
     ...decodeBlackFallRuntime(type, definitionDuration & 0xffff, rawChance),
     definitionDuration,
@@ -134,6 +154,20 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
 
 export function normalizePadEnemySkillRecord(record) {
   const type = Math.trunc(Number(record?.type));
+  if (type === PAD_ENEMY_SKILL_BLOCK_MINUS || record?.kind === 'blockMinus') {
+    const powerPercent = Math.trunc(Number(record?.powerPercent) || 0);
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_BLOCK_MINUS,
+      kind: 'blockMinus',
+      supported: true,
+      typeMask: Number(record?.typeMask) >>> 0,
+      powerPercent,
+      power: record?.power === undefined
+        ? Math.fround(Math.fround(powerPercent) / Math.fround(100))
+        : Math.fround(Number(record.power) || 0),
+      limit: Math.trunc(Number(record?.limit) || 0),
+    });
+  }
   if (type !== PAD_ENEMY_SKILL_BLACK_FALL && record?.kind !== 'blackFall') {
     return Object.freeze({ type, kind: 'unsupported', supported: false });
   }

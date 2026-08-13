@@ -638,6 +638,24 @@ this raw record path into enemy turns and reports the chosen skill ID, budget,
 and RNG state. Other condition callbacks, flow-control records, and the legacy
 selector are rejected explicitly until decoded rather than approximated.
 
+Enemy skill type `151` connects that selector to the weakened-orb primitive.
+Its `_doEnemySkill` dispatch entry resolves to `0x62afd0`, which passes
+definition `+0x10` as the type mask, converts signed percentage `+0x14` through
+float32 division by 100, and passes `+0x18` as the maximum count to
+`_doBlockMinus(true, ...)`. Eligible orbs have a matching type bit and
+nonnegative enhancement power; the applied value is the negated float32 power.
+When the maximum is positive, one saved-LCG advance seeds the native forward
+shuffle before the first `min(eligible, maximum)` cells are changed.
+
+The corresponding `_chooseEnemyAiSub` entry at `0x61bab4` calls the identical
+primitive with `apply=false` and admits the definition only if its returned
+eligible count is at least one. Importantly, a positive maximum still executes
+the shuffle and consumes its LCG step during this dry run. The browser selector
+threads that changed RNG state into the immediate probability roll, and skill
+execution spends the later shuffle step again. This produces all three native
+advances for a capped, immediately selected type-151 action: condition dry run,
+selection roll, then actual application.
+
 The action boundary is recovered independently. `_setupEnemyAttack`
 (`0x622f64`) reads the counter object at `sMONSTER+0x120` and only admits a live
 enemy when its value is at or below zero; it then clears the prepared index at

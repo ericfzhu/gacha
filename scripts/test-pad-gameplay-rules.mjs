@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
+  PAD_ENEMY_SKILL_BLOCK_MINUS,
   decodePadEnemySkillDefinition,
   decodePadEnemySkillRuntime,
   padEnemySkillAttack,
@@ -390,6 +391,27 @@ const blockedWeightedEnemyAi = selectPadEnemyAiNew(
 );
 assert.equal(blockedWeightedEnemyAi.skillId, null);
 assert.equal(blockedWeightedEnemyAi.rngState, 394_448_415);
+const enemyAiBlockMinusDefinition = new Uint8Array(0x48);
+const enemyAiBlockMinusView = new DataView(enemyAiBlockMinusDefinition.buffer);
+enemyAiBlockMinusView.setUint32(0x00, 9_002, true);
+enemyAiBlockMinusView.setInt16(0x04, PAD_ENEMY_SKILL_BLOCK_MINUS, true);
+enemyAiBlockMinusView.setUint32(0x10, 0b11, true);
+enemyAiBlockMinusView.setInt32(0x14, 50, true);
+enemyAiBlockMinusView.setInt32(0x18, 2, true);
+enemyAiBlockMinusView.setInt32(0x30, 10_000, true);
+enemyAiBlockMinusView.setInt32(0x34, 1_000, true);
+enemyAiBlockMinusView.setInt32(0x38, 100, true);
+enemyAiBlockMinusView.setInt32(0x40, 20, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiBlockMinusDefinition), {
+  type: 151,
+  kind: 'blockMinus',
+  supported: true,
+  typeMask: 0b11,
+  powerPercent: 50,
+  power: 0.5,
+  limit: 2,
+  attackWithSkillValue: 0,
+});
 assert.deepEqual(padResolveEnhancementFall(21_900, 0, Array(6).fill(0)), {
   state: 394_448_415,
   enhancementPower: 0,
@@ -1108,6 +1130,33 @@ assert.equal(selectedAiEngine.snapshot().enemies[0].enemyAiSkillSlots, 1);
 assert.equal(selectedAiEngine.lastEnemyActions[0].skill.type, 128);
 assert.equal(selectedAiEngine.lastEnemyActions[0].skill.skillId, 9_001);
 assert.equal(selectedAiEngine.lastEnemyActions[0].damage, 925);
+
+const blockMinusAiMonsterDefinition = enemyAiMonsterDefinition.slice();
+const blockMinusAiMonsterView = new DataView(blockMinusAiMonsterDefinition.buffer);
+blockMinusAiMonsterView.setUint32(0xec, 9_002, true);
+const selectedBlockMinusAiEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: blockMinusAiMonsterDefinition,
+    skillDefinitions: [enemyAiBlockMinusDefinition],
+  }],
+});
+selectedBlockMinusAiEngine.setBoardFromCodes([
+  'RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD',
+]);
+selectedBlockMinusAiEngine.setRngState(21_900);
+selectedBlockMinusAiEngine.enemies[0].counter = 1;
+selectedBlockMinusAiEngine.enemies[1].counter = 99;
+selectedBlockMinusAiEngine.resolveEnemyTurn();
+const blockMinusAiState = selectedBlockMinusAiEngine.snapshot();
+assert.equal(blockMinusAiState.lastEnemyActions[0].skill.type, 151);
+assert.equal(blockMinusAiState.lastEnemyActions[0].skill.skillId, 9_002);
+assert.equal(blockMinusAiState.boardState.flat().filter((orb) => orb.enhancementPower === -0.5).length, 2);
+assert.equal(
+  selectedBlockMinusAiEngine.rng.state,
+  padLcgStep(padLcgStep(padLcgStep(21_900).state).state).state,
+);
+assert.equal(blockMinusAiState.enemies[0].enemyAiBudget, 80);
 assert.equal(blackFallEngine.board[0][0].nail, false);
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);

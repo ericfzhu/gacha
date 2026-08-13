@@ -560,6 +560,26 @@ try {
     const selectedEnemyAiHp = engine.player.hp;
     engine.resolveEnemyTurn();
     const selectedEnemyAi = engine.snapshot();
+    engine.setBlackFallRule(null);
+    const blockMinusAiMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(blockMinusAiMonsterDefinition.buffer).setUint32(0xec, 9_002, true);
+    const blockMinusAiDefinition = enemyAiBlackFallDefinition.slice();
+    const blockMinusAiView = new DataView(blockMinusAiDefinition.buffer);
+    blockMinusAiView.setUint32(0x00, 9_002, true);
+    blockMinusAiView.setInt16(0x04, 151, true);
+    blockMinusAiView.setUint32(0x10, 0b11, true);
+    blockMinusAiView.setInt32(0x14, 50, true);
+    blockMinusAiView.setInt32(0x18, 2, true);
+    blockMinusAiView.setInt32(0x44, 0, true);
+    engine.setEnemyAiDefinitionPool(0, blockMinusAiMonsterDefinition, [blockMinusAiDefinition]);
+    engine.setBoardFromCodes(['RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedBlockMinusAi = engine.snapshot();
+    const selectedBlockMinusCount = selectedBlockMinusAi.boardState.flat()
+      .filter((orb) => orb.enhancementPower === -0.5).length;
     engine.setEnemyAiDefinitionPool(0, null);
     engine.setBlackFallRule(null);
     engine.reset();
@@ -595,6 +615,7 @@ try {
       blackFallSkillApplied, blackFallOrb, blackFallRuleState, blackFallAfterFresh, blackFallTurnsAfterFresh,
       blackFallAfterExpiry, blackFallRuleAfterExpiry,
       scheduledBlackFallHp, scheduledBlackFall, selectedEnemyAiHp, selectedEnemyAi,
+      selectedBlockMinusAi, selectedBlockMinusCount,
       initialBoard, initialBoardState,
     };
   }) : null;
@@ -711,6 +732,11 @@ try {
     poisonBlockSample.selectedEnemyAi.lastEnemyActions?.[0]?.damage !== 925 ||
     poisonBlockSample.selectedEnemyAi.enemies?.[0]?.enemyAiBudget !== 80 ||
     poisonBlockSample.selectedEnemyAi.enemies?.[0]?.enemyAiSkillSlots !== 1 ||
+    poisonBlockSample.selectedBlockMinusAi.lastEnemyActions?.[0]?.skill?.type !== 151 ||
+    poisonBlockSample.selectedBlockMinusAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_002 ||
+    poisonBlockSample.selectedBlockMinusAi.rngState !== advanceLcg(21_900, 3) ||
+    poisonBlockSample.selectedBlockMinusAi.enemies?.[0]?.enemyAiBudget !== 80 ||
+    poisonBlockSample.selectedBlockMinusCount !== 2 ||
     JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
       'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',
     ]) || poisonBlockSample.initialBoardState !== 79_238_434

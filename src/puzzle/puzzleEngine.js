@@ -34,6 +34,7 @@ import {
 } from './padCoreRules.js';
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
+  PAD_ENEMY_SKILL_BLOCK_MINUS,
   decodePadEnemySkillDefinition,
   decodePadEnemySkillRuntime,
   normalizePadEnemySkillRecord,
@@ -844,6 +845,19 @@ export class PuzzleEngine {
       aiBudget: pool.aiBudget,
       blackFallActive: Boolean(this.blackFallRule?.active),
       rngState: this.rng.state,
+      evaluateCondition: (definition, rngState) => {
+        this.rng.setState(rngState);
+        if (definition.effect.kind === 'blockMinus') {
+          const eligible = this.doBlockMinus(
+            false,
+            definition.effect.typeMask,
+            definition.effect.power,
+            definition.effect.limit,
+          ) >= 1;
+          return { eligible, rngState: this.rng.state };
+        }
+        return { eligible: false, rngState: this.rng.state };
+      },
     });
     this.rng.setState(selection.rngState);
     pool.aiBudget = selection.aiBudget;
@@ -973,6 +987,16 @@ export class PuzzleEngine {
   applyEnemySkillRecord(record) {
     const skill = normalizePadEnemySkillRecord(record);
     this.lastEnemySkill = skill;
+    if (skill.supported && skill.kind === 'blockMinus') {
+      const changed = this.doBlockMinus(
+        true,
+        skill.typeMask,
+        skill.power,
+        skill.limit,
+      );
+      this.message = `${changed} orb${changed === 1 ? '' : 's'} weakened.`;
+      return true;
+    }
     if (!skill.supported || skill.kind !== 'blackFall') return false;
     this.setBlackFallRule({
       chanceBasisPoints: skill.chanceBasisPoints,
@@ -1023,7 +1047,10 @@ export class PuzzleEngine {
     for (const slot of monster.slots) {
       const definition = definitionsById.get(slot.skillId);
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
-      if (definition.effect.type !== PAD_ENEMY_SKILL_BLACK_FALL || !definition.effect.supported) {
+      if (![
+        PAD_ENEMY_SKILL_BLACK_FALL,
+        PAD_ENEMY_SKILL_BLOCK_MINUS,
+      ].includes(definition.effect.type) || !definition.effect.supported) {
         throw new Error(`PAD enemy AI skill ${slot.skillId} uses an unsupported condition/effect type.`);
       }
     }

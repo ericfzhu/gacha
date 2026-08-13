@@ -1,6 +1,7 @@
 import { padLcgStep } from './padCoreRules.js';
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
+  PAD_ENEMY_SKILL_BLOCK_MINUS,
   decodePadEnemySkillDefinition,
 } from './padEnemySkills.js';
 
@@ -94,15 +95,29 @@ function normalizeDefinitionMap(definitions) {
   }));
 }
 
-function isStaticallyEligibleBlackFall(definition, state) {
-  if (definition.effect.type !== PAD_ENEMY_SKILL_BLACK_FALL || !definition.effect.supported) return false;
+function isStaticallyEligible(definition, state) {
+  if (!definition.effect.supported || ![
+    PAD_ENEMY_SKILL_BLACK_FALL,
+    PAD_ENEMY_SKILL_BLOCK_MINUS,
+  ].includes(definition.effect.type)) return false;
   if (definition.budgetCost > state.aiBudget) return false;
   const hpPercent = state.maxHp > 0 ? state.currentHp / state.maxHp * 100 : 0;
   return hpPercent <= definition.hpThresholdPercent;
 }
 
-function isConditionEligibleBlackFall(definition, state) {
-  return isStaticallyEligibleBlackFall(definition, state) && !state.blackFallActive;
+function evaluateCondition(definition, state, rngState) {
+  if (!isStaticallyEligible(definition, state)) return { eligible: false, rngState };
+  if (definition.effect.type === PAD_ENEMY_SKILL_BLACK_FALL) {
+    return { eligible: !state.blackFallActive, rngState };
+  }
+  if (typeof state.evaluateCondition === 'function') {
+    const result = state.evaluateCondition(definition, rngState) || {};
+    return {
+      eligible: Boolean(result.eligible),
+      rngState: Number(result.rngState ?? rngState) >>> 0,
+    };
+  }
+  return { eligible: false, rngState };
 }
 
 function advanceRoll(state, scale) {
@@ -132,6 +147,7 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     maxHp: Math.max(0, Number(state.maxHp) || 0),
     aiBudget: Math.max(0, Math.trunc(Number(state.aiBudget ?? monster.budgetCap) || 0)),
     blackFallActive: Boolean(state.blackFallActive),
+    evaluateCondition: state.evaluateCondition,
   };
   let rngState = Number(state.rngState) >>> 0;
   let selected = null;
@@ -139,10 +155,12 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
 
   for (const slot of monster.slots) {
     const definition = definitionMap.get(slot.skillId);
-    if (!definition || !isStaticallyEligibleBlackFall(definition, current)) continue;
+    if (!definition || !isStaticallyEligible(definition, current)) continue;
     if (slot.fallbackWeight > 0) fallback.push({ slot, definition });
-    if (!isConditionEligibleBlackFall(definition, current)) continue;
     if (slot.immediateChance === 0) continue;
+    const condition = evaluateCondition(definition, current, rngState);
+    rngState = condition.rngState;
+    if (!condition.eligible) continue;
     const probability = immediateProbability(definition, slot);
     if (probability <= 0) continue;
     const roll = advanceRoll(rngState, 10_000);
@@ -154,9 +172,12 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
   }
 
   if (!selected && fallback.length > 0) {
-    const eligibleFallback = fallback.filter((candidate) => (
-      isConditionEligibleBlackFall(candidate.definition, current)
-    ));
+    const eligibleFallback = [];
+    for (const candidate of fallback) {
+      const condition = evaluateCondition(candidate.definition, current, rngState);
+      rngState = condition.rngState;
+      if (condition.eligible) eligibleFallback.push(candidate);
+    }
     const totalWeight = eligibleFallback.reduce((total, candidate) => (
       total + candidate.slot.fallbackWeight
     ), 0);
