@@ -196,13 +196,19 @@ try {
     await page.mouse.move(to.x, to.y, { steps: 1 });
     const duringDrag = JSON.parse(await page.evaluate(() => window.render_game_to_text()));
     await page.mouse.up();
-    return {
+    const result = {
       dimensions: ready.boardDimensions,
       rowCount: ready.board.length,
       columnCount: ready.board[0].length,
       dragColumn: duringDrag.drag?.column,
       pathLength: duringDrag.drag?.pathLength,
     };
+    // Changing the preset replaces window.__puzzleGame. Restore the normal
+    // engine so a combined all-flags run cannot leak 7x6 dimensions into the
+    // later fixed 6x5 fixtures.
+    await page.getByRole('button', { name: '6 by 5 board' }).click();
+    await page.waitForFunction(() => JSON.parse(window.render_game_to_text()).boardDimensions?.columns === 6);
+    return result;
   })() : null;
   if (largeBoard && (
     largeBoard.dimensions.rows !== 6 || largeBoard.dimensions.columns !== 7 ||
