@@ -145,6 +145,26 @@ export function createPadRng(seed = 0) {
       state = resolved.state;
       return resolved;
     },
+    resolveLineBlockSwaps(
+      lineMask,
+      destinationTypeMask,
+      boardTypes,
+      orientation,
+      lockedRows = null,
+      initialEffectFlags = 0,
+    ) {
+      const resolved = padResolveLineBlockSwaps(
+        state,
+        lineMask,
+        destinationTypeMask,
+        boardTypes,
+        orientation,
+        lockedRows,
+        initialEffectFlags,
+      );
+      state = resolved.state;
+      return resolved;
+    },
     getRandomBlock(excludedType = -1, includeJammer = false, includeHeart = true) {
       const result = padGetRandomBlock(state, excludedType, includeJammer, includeHeart);
       state = result.state;
@@ -531,6 +551,78 @@ export function padResolveBlockSwapNew(
     }
   }
   return { state: savedState, effectFlags, assignments, effectiveSourceMask };
+}
+
+// The native skill patterns are authored against the ordinary 6x5 board. The
+// V/H writers relocate their packed byte before testing larger or smaller live
+// boards, inserting a gap for 7x6 and compressing the canonical pattern below
+// 6x5 with these exact bit operations.
+export function padRelocateBoardXBits(mask, columns) {
+  const bits = Number(mask) & 0xff;
+  const width = Math.trunc(Number(columns) || 0);
+  if (width >= 7) return ((bits & 0x07) | ((bits >>> 3) << 4)) & 0xff;
+  if (width === 6) return bits;
+  return ((bits & 0x07) | ((bits >>> 1) & 0x7c)) & 0xff;
+}
+
+export function padRelocateBoardYBits(mask, rows) {
+  const bits = Number(mask) & 0xff;
+  const height = Math.trunc(Number(rows) || 0);
+  if (height >= 6) return ((bits & 0x03) | ((bits >>> 2) << 3)) & 0xff;
+  if (height === 5) return bits;
+  return ((bits & 0x07) | ((bits >>> 1) & 0x7c)) & 0xff;
+}
+
+// _doBlockSwapV/H (0x6ae64c/0x6ae8fc) choose one enabled destination type for
+// every cell in selected columns/rows. Horizontal pattern bits are bottom-up;
+// vertical bits are left-to-right. The saved LCG advances before lock rejection,
+// unlike _doBitReplace's negative-destination path.
+export function padResolveLineBlockSwaps(
+  state,
+  lineMask,
+  destinationTypeMask,
+  boardTypes,
+  orientation,
+  lockedRows = null,
+  initialEffectFlags = 0,
+) {
+  const rows = Array.isArray(boardTypes) ? boardTypes.length : 0;
+  const columns = rows > 0 && Array.isArray(boardTypes[0]) ? boardTypes[0].length : 0;
+  const validBoard = rows > 0 && columns > 0
+    && boardTypes.every((row) => Array.isArray(row) && row.length === columns);
+  const originalLineMask = Number(lineMask) & 0xff;
+  let savedState = Number(state) >>> 0;
+  if (originalLineMask === 0) return { state: savedState, effectFlags: 0, assignments: [], relocatedMask: 0 };
+  let effectFlags = Number(initialEffectFlags) | 0;
+  if (!validBoard) return { state: savedState, effectFlags, assignments: [], relocatedMask: originalLineMask };
+  const horizontal = orientation === 'horizontal' || orientation === 'h';
+  const relocatedMask = horizontal
+    ? padRelocateBoardYBits(originalLineMask, rows)
+    : padRelocateBoardXBits(originalLineMask, columns);
+  const destinationMask = Number(destinationTypeMask) & 0x3ff;
+  const destinationTypes = [];
+  for (let type = 0; type <= 9; type += 1) {
+    if ((destinationMask & (1 << type)) !== 0) destinationTypes.push(type);
+  }
+  const assignments = [];
+  for (let row = 0; row < rows; row += 1) {
+    const rowSelected = (relocatedMask & (1 << (rows - 1 - row))) !== 0;
+    const lockedBits = Number(lockedRows?.[row] ?? 0) & 0xffff;
+    for (let column = 0; column < columns; column += 1) {
+      const selected = horizontal ? rowSelected : (relocatedMask & (1 << column)) !== 0;
+      if (!selected) continue;
+      const roll = padLcgStep(savedState);
+      savedState = roll.state;
+      const destinationIndex = destinationTypes.length
+        ? Math.floor(roll.value * destinationTypes.length / 0x10000)
+        : 0;
+      const type = destinationTypes[destinationIndex] ?? 0;
+      if ((lockedBits & (1 << column)) !== 0) continue;
+      effectFlags |= type === 6 ? 4 : type === 7 || type === 8 ? 2 : 1;
+      assignments.push({ row, column, type });
+    }
+  }
+  return { state: savedState, effectFlags, assignments, relocatedMask };
 }
 
 // The same native routine builds its candidates from numeric block types

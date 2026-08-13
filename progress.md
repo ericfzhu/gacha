@@ -2,6 +2,22 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 line-pattern block swaps
+
+- Recovered `_doBlockSwapV`/`_doBlockSwapH` at `0x6ae64c`/`0x6ae8fc` plus exact
+  canonical-pattern relocation for larger and smaller boards.
+- Ported left-to-right vertical bits, bottom-to-top horizontal bits, uniform
+  Nth-enabled-type selection across destination bits 0..9, and one saved LCG
+  advance per selected active cell before locked-cell rejection.
+- Preserved the zero-pattern early return (including its zero effect result),
+  natural/special mutation state, and effect-category accumulation.
+- Added pure relocation, deterministic RNG, lock-order, engine, horizontal,
+  vertical, and browser fixtures. The exact inspector now checks 51 anchors.
+- Verification passed: rules, build, exact inspector, exhaustive mechanics,
+  generic tap-turn/text state, clean console, and screenshot inspection.
+- Next: recover non-null `sBLOCKFLAG` construction/resistance and the remaining
+  `_doBlockSwap2`/`_doBlockSwap3` skill-data wrappers.
+
 ## 2026-08-14 mask-to-mask block swaps
 
 - Recovered `_doBlockSwapNew` at `0x6aee90` and public `_doBlockSwap4`/

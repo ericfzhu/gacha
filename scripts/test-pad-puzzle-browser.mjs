@@ -342,6 +342,20 @@ try {
     const poisonSwapFlags = engine.doBlockSwap4((1 << 0) | (1 << 1), 4);
     const poisonSwapState = engine.rng.state;
     const poisonSwapTypes = engine.board[0].slice(0, 2).map((orb) => orb.type);
+    engine.setBoardFromCodes(['DDDDHD', 'GLDHRG', 'HBGDGL', 'DLGHHB', 'HBGGLD']);
+    engine.setRngState(21_900);
+    engine.setOrbState(2, 3, { locked: true });
+    const verticalSwapFlags = engine.doBlockSwapV(0b1001, (1 << 0) | (1 << 5), 8);
+    const verticalSwapState = engine.rng.state;
+    const verticalSwapTypes = [[0, 0], [0, 3], [2, 3]]
+      .map(([row, column]) => engine.board[row][column].type);
+    engine.setBoardFromCodes(['DDDDHD', 'GLDHRG', 'HBGDGL', 'DLGHHB', 'HBGGLD']);
+    engine.setRngState(21_900);
+    engine.setOrbState(0, 0, { locked: true });
+    const horizontalSwapFlags = engine.doBlockSwapH(0b10001, (1 << 6) | (1 << 7), 1);
+    const horizontalSwapState = engine.rng.state;
+    const horizontalSwapTypes = [[0, 0], [0, 1], [4, 0]]
+      .map(([row, column]) => engine.board[row][column].type);
     engine.reset();
     engine.start();
     return {
@@ -353,6 +367,8 @@ try {
       poisonReplaceFlags, poisonReplaceState, poisonReplaceOrb,
       maskSwapFlags, maskSwapState, maskSwapTypes,
       poisonSwapFlags, poisonSwapState, poisonSwapTypes,
+      verticalSwapFlags, verticalSwapState, verticalSwapTypes,
+      horizontalSwapFlags, horizontalSwapState, horizontalSwapTypes,
     };
   }) : null;
   const advanceLcg = (state, count) => {
@@ -388,7 +404,11 @@ try {
     poisonBlockSample.maskSwapFlags !== 1 || poisonBlockSample.maskSwapState !== 1_569_558_794 ||
     JSON.stringify(poisonBlockSample.maskSwapTypes) !== JSON.stringify(['wood', 'fire', 'wood', 'water']) ||
     poisonBlockSample.poisonSwapFlags !== 5 || poisonBlockSample.poisonSwapState !== 919_597_584 ||
-    JSON.stringify(poisonBlockSample.poisonSwapTypes) !== JSON.stringify(['fire', 'mortalPoison'])
+    JSON.stringify(poisonBlockSample.poisonSwapTypes) !== JSON.stringify(['fire', 'mortalPoison']) ||
+    poisonBlockSample.verticalSwapFlags !== 9 || poisonBlockSample.verticalSwapState !== 4_221_117_678 ||
+    JSON.stringify(poisonBlockSample.verticalSwapTypes) !== JSON.stringify(['fire', 'heart', 'dark']) ||
+    poisonBlockSample.horizontalSwapFlags !== 7 || poisonBlockSample.horizontalSwapState !== 2_782_038_744 ||
+    JSON.stringify(poisonBlockSample.horizontalSwapTypes) !== JSON.stringify(['dark', 'poison', 'jammer'])
   )) throw new Error(`Poison-block mismatch: ${JSON.stringify(poisonBlockSample)}`);
   if (renderAtlasSheet) {
     const sheet = page.locator('#pad-atlas-sheet');

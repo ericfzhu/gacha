@@ -349,6 +349,23 @@ them. `padResolveBlockSwapNew`, `PuzzleEngine.doBlockSwap4`, and
 poison aliasing, lock timing, effect flags, and special-orb mutation for the
 null-passive path.
 
+Line writers `_doBlockSwapV(uint8 pattern, uint32 destinationMask, int &flags,
+sBLOCKFLAG *)` at `0x6ae64c` and `_doBlockSwapH(...)` at `0x6ae8fc` use patterns
+authored for the canonical 6×5 board. `_relocateBoardXbits`/`Ybits` insert the
+native center gap for 7×6-or-larger boards and compress the packed byte below
+6×5. Vertical bits select columns left-to-right. Horizontal bits select rows in
+reverse order, so the low bit denotes the bottom row.
+
+For every active cell in a selected line, the routine consumes one saved LCG
+step and uniformly chooses the Nth enabled destination bit from types `0..9`.
+This happens before `_doBlockSwapMain` checks lock state, so locked cells consume
+RNG but remain unchanged. A zero line-pattern byte returns zero immediately,
+including discarding an incoming effect-mask value. `padRelocateBoardXBits`,
+`padRelocateBoardYBits`, `padResolveLineBlockSwaps`, and the engine's
+`doBlockSwapV/H` methods reproduce canonical/noncanonical pattern placement,
+bottom-up row semantics, per-cell RNG, lock timing, effect flags, and special
+destination clearing for the null-passive path.
+
 The enemy inverse is `_doBlockMinus(bool, uint32 mask, float, int)` at
 `0x61caa0`. Only cells whose type bit is in the mask and whose current power is
 non-negative are eligible; applying the effect stores the negated binary32

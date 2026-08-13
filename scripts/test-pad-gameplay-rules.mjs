@@ -24,6 +24,9 @@ import {
   padPoisonDamage,
   padResolveBitReplacements,
   padResolveBlockSwapNew,
+  padResolveLineBlockSwaps,
+  padRelocateBoardXBits,
+  padRelocateBoardYBits,
   padSecondaryAttributeAttack,
   padSelectPoisonBlockCandidates,
   padSelectPoisonBlockTypes,
@@ -251,6 +254,53 @@ assert.equal(balancedSwap.effectFlags, 7);
 assert.deepEqual(Array.from({ length: 10 }, (_, type) => (
   balancedSwap.assignments.filter((assignment) => assignment.type === type).length
 )), Array(10).fill(3));
+assert.equal(padRelocateBoardXBits(0b101000, 7), 0b1010000);
+assert.equal(padRelocateBoardXBits(0b101000, 6), 0b101000);
+assert.equal(padRelocateBoardXBits(0b101000, 5), 0b10100);
+assert.equal(padRelocateBoardYBits(0b10100, 6), 0b101000);
+assert.equal(padRelocateBoardYBits(0b10100, 5), 0b10100);
+assert.equal(padRelocateBoardYBits(0b10100, 4), 0b01100);
+const lineSwapBoard = Array.from({ length: 5 }, () => Array(6).fill(4));
+assert.deepEqual(padResolveLineBlockSwaps(
+  21_900,
+  0b1001,
+  (1 << 0) | (1 << 5),
+  lineSwapBoard,
+  'vertical',
+  [0, 0, 0b1000, 0, 0],
+  8,
+), {
+  state: 4_221_117_678,
+  effectFlags: 9,
+  assignments: [
+    { row: 0, column: 0, type: 0 },
+    { row: 0, column: 3, type: 5 },
+    { row: 1, column: 0, type: 0 },
+    { row: 1, column: 3, type: 0 },
+    { row: 2, column: 0, type: 0 },
+    { row: 3, column: 0, type: 0 },
+    { row: 3, column: 3, type: 0 },
+    { row: 4, column: 0, type: 0 },
+    { row: 4, column: 3, type: 5 },
+  ],
+  relocatedMask: 0b1001,
+});
+const horizontalLineSwap = padResolveLineBlockSwaps(
+  21_900,
+  0b10001,
+  (1 << 6) | (1 << 7),
+  lineSwapBoard,
+  'horizontal',
+  [0b1, 0, 0, 0, 0],
+  1,
+);
+assert.equal(horizontalLineSwap.state, 2_782_038_744);
+assert.equal(horizontalLineSwap.effectFlags, 7);
+assert.equal(horizontalLineSwap.assignments.length, 11);
+assert.ok(horizontalLineSwap.assignments.every(({ row }) => row === 0 || row === 4));
+assert.deepEqual(padResolveLineBlockSwaps(21_900, 0, 1, [[0]], 'vertical', null, 7), {
+  state: 21_900, effectFlags: 0, assignments: [], relocatedMask: 0,
+});
 assert.deepEqual(padGetRandomBlock(21_900), { state: 3_803_934_822, type: 1 });
 assert.deepEqual(padGetRandomBlock(21_900, 1), { state: 3_803_934_822, type: 2 });
 assert.deepEqual(padGetRandomBlock(21_900, -1, true, true), { state: 3_803_934_822, type: 1 });
@@ -849,6 +899,23 @@ assert.equal(poisonSwapEngine.doBlockSwap4((1 << 0) | (1 << 1), 4), 5);
 assert.equal(poisonSwapEngine.rng.state, 919_597_584);
 assert.equal(poisonSwapEngine.board[0][0].type, 'fire');
 assert.equal(poisonSwapEngine.board[0][1].type, 'mortalPoison');
+const lineSwapEngine = new PuzzleEngine({ seed: 21_900 });
+lineSwapEngine.setBoardFromCodes(['DDDDHD', 'GLDHRG', 'HBGDGL', 'DLGHHB', 'HBGGLD']);
+lineSwapEngine.setRngState(21_900);
+lineSwapEngine.setOrbState(2, 3, { locked: true });
+assert.equal(lineSwapEngine.doBlockSwapV(0b1001, (1 << 0) | (1 << 5), 8), 9);
+assert.equal(lineSwapEngine.rng.state, 4_221_117_678);
+assert.equal(lineSwapEngine.board[0][0].type, 'fire');
+assert.equal(lineSwapEngine.board[0][3].type, 'heart');
+assert.equal(lineSwapEngine.board[2][3].type, 'dark');
+lineSwapEngine.setBoardFromCodes(['DDDDHD', 'GLDHRG', 'HBGDGL', 'DLGHHB', 'HBGGLD']);
+lineSwapEngine.setRngState(21_900);
+lineSwapEngine.setOrbState(0, 0, { locked: true });
+assert.equal(lineSwapEngine.doBlockSwapH(0b10001, (1 << 6) | (1 << 7), 1), 7);
+assert.equal(lineSwapEngine.rng.state, 2_782_038_744);
+assert.equal(lineSwapEngine.board[0][0].type, 'dark');
+assert.equal(lineSwapEngine.board[0][1].type, 'poison');
+assert.equal(lineSwapEngine.board[4][0].type, 'jammer');
 assert.equal(specialLockEngine.doLockDropBits(0x3c0, 4, 0xbeef), true);
 for (let column = 0; column < 4; column += 1) {
   const orb = specialLockEngine.board[0][column];
