@@ -157,15 +157,19 @@ try {
     engine.setBoardFromCodes(['RRRBHD', 'GLDBHG', 'BHGDGL', 'DLGHHB', 'HBGGLD']);
     engine.setOrbState(0, 1, { enhancementPower: 0.25 });
     engine.setOrbState(0, 2, { enhancementPower: -0.5 });
+    const before = engine.hasBlockPowup('fire');
     const changed = engine.setBlockPowup('fire', 0.1);
+    const after = engine.hasBlockPowup(0);
+    const invalid = engine.hasBlockPowup(6);
     const rejected = engine.setBlockPowup('jammer', 0.1);
     const powers = engine.snapshot().boardState[0].slice(0, 3).map((orb) => orb.enhancementPower);
     engine.reset();
     engine.start();
-    return { changed, rejected, powers };
+    return { before, changed, after, invalid, rejected, powers };
   }) : null;
   if (blockPowupSample && (
-    blockPowupSample.changed !== 2 || blockPowupSample.rejected !== 0 ||
+    blockPowupSample.before !== true || blockPowupSample.changed !== 2 ||
+    blockPowupSample.after !== false || blockPowupSample.invalid !== true || blockPowupSample.rejected !== 0 ||
     blockPowupSample.powers[0] !== Math.fround(0.1) || blockPowupSample.powers[1] !== 0.25 ||
     blockPowupSample.powers[2] !== Math.fround(0.1)
   )) throw new Error(`Block-powup mismatch: ${JSON.stringify(blockPowupSample)}`);

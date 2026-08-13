@@ -222,6 +222,14 @@ board walk. `PuzzleEngine.setBlockPowup` exposes that same state transition and
 returns the native-style affected-cell count. The routine's optional sound and
 effect allocation remain presentation work rather than puzzle state.
 
+Its paired `_hasBlockPowup(int)` query has counterintuitive polarity: for a
+natural type `0..5` it returns true as soon as it finds a matching cell whose
+power is non-positive, meaning the board has a cell eligible for ordinary
+enhancement. It returns false when every matching cell is already positive or
+the type is absent. Any value outside `0..5`, including a negative integer
+after the native unsigned comparison, returns true immediately.
+`PuzzleEngine.hasBlockPowup` preserves those edge cases.
+
 Lock creation is similarly concrete. `_doLockDropBits(uint32 mask, int limit,
 uint16 seed)` at `0x62676c` gathers unlocked masked cells in row-major order.
 Unlike the enemy power and burst routines, it does not consume saved gameplay

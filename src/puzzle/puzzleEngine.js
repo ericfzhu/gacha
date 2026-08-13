@@ -673,6 +673,17 @@ export class PuzzleEngine {
     return changed;
   }
 
+  hasBlockPowup(type) {
+    const numericType = typeof type === 'number'
+      ? Number(type) >>> 0
+      : ORB_TYPES.findIndex((candidate) => candidate.id === type) >>> 0;
+    if (numericType > 5) return true;
+    const orbType = ORB_TYPES[numericType].id;
+    return this.board.some((row) => row.some((orb) => (
+      orb.type === orbType && normalizeEnhancementPower(orb.enhancementPower) <= 0
+    )));
+  }
+
   doBlockMinus(apply, typeMask, power, limit = 0) {
     const mask = Number(typeMask) >>> 0;
     const minusPower = Math.fround(-normalizeEnhancementPower(power));
