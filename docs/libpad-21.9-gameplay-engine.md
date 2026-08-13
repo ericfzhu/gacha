@@ -575,6 +575,21 @@ the erase-effect count before this step. The browser keeps the raw flag and
 renders a nail overlay, exposes `nailFallRule`, and reports the separately
 resolved `lastNailDamage` while including it in total outgoing damage.
 
+The first `_checkPassiveSkill4Block` branch is the native black/invisible
+skyfall effect. An active packed duration at game-work `+0x87804` permits types
+`0..10`; each eligible spawn consumes one shared `+0x66a14` LCG roll scaled to
+10,000 and compares it with the signed chance at `+0x87808`. Success sets block
+flag `0x1000` and stores countdown `1` with byte bit 7 at `sBLOCK+1`. When the
+spawn-context byte at `+0x66a41` is zero, it also sets transient flag `0x10000`.
+`_incEneTurn` at `0x677978` clears that transient bit without decrementing the
+countdown on the spawn cycle; later enemy turns decrement the low seven bits
+and clear `0x1000` at zero. `_doEntireBlack2` (`0x627118`),
+`_doMakeInvDropEfc` (`0x627e58`), and `_clearBlackFall` (`0x6b57a0`) confirm the
+state identity. On special types `6..9`, success also zeros enhancement and
+clears pre-existing combo-drop/Nail flags. The browser exposes this record as
+`blackFallRule`, renders the concealed orb and countdown, and advances both
+orb and effect lifetimes on the enemy-turn boundary.
+
 The last `_checkPassiveSkill4Block` branch handles enhanced and weakened
 skyfalls for natural types. `_countPassiveSkills` at `0x63fa28` is called with
 attribute-specific skill IDs `14, 15, 16, 17, 18, 29`; each matching awakening

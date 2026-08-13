@@ -96,6 +96,29 @@ function drawOrbState(ctx, orb, x, y, radius, alpha) {
     ctx.textAlign = 'center';
     ctx.fillText('▣', x, y + radius * 0.24);
   }
+  if (orb.blind) {
+    const shade = ctx.createRadialGradient(
+      x - radius * 0.25, y - radius * 0.28, radius * 0.08,
+      x, y, radius * 1.02,
+    );
+    shade.addColorStop(0, 'rgba(68, 74, 86, .98)');
+    shade.addColorStop(0.55, 'rgba(15, 18, 24, .99)');
+    shade.addColorStop(1, 'rgba(0, 0, 0, 1)');
+    ctx.fillStyle = shade;
+    ctx.strokeStyle = 'rgba(154, 164, 181, .72)';
+    ctx.lineWidth = Math.max(1, radius * 0.055);
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 0.94, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    if (orb.blindCountdown > 0) {
+      ctx.fillStyle = 'rgba(255, 255, 255, .94)';
+      ctx.font = `800 ${Math.round(radius * 0.78)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(orb.blindCountdown), x, y + radius * 0.03);
+    }
+  }
   ctx.restore();
 }
 

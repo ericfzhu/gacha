@@ -18,6 +18,7 @@ import {
   padNativeRecoveryPower,
   padNailDamage,
   padPoisonDamage,
+  padResolveBlackFall,
   padResolveBlockSwapPassive,
   padResolveComboDropAwakenings,
   padResolveComboDropSpawns,
@@ -50,7 +51,9 @@ export const ORB_TYPES = Object.freeze([
 
 const NATURAL_ORB_TYPES = ORB_TYPES.slice(0, 6);
 const PAD_BLOCK_LOCKED_FLAG = 0x800;
+const PAD_BLOCK_BLIND_FLAG = 0x1000;
 const PAD_BLOCK_COMBO_DROP_FLAG = 0x8000;
+const PAD_BLOCK_BLIND_FRESH_FLAG = 0x10000;
 const PAD_BLOCK_NAIL_FLAG = 0x20000;
 const PAD_BLOCK_SPECIAL_LOCK_CLEAR_FLAGS = 0x28000;
 const PAD_BLOCK_BURST_FLAG = 0x80000;
@@ -107,6 +110,7 @@ export class PuzzleEngine {
     comboDropCap = 12,
     comboDropAwakenings = Array(5).fill(0),
     topLineDropTypes = null,
+    blackFallRule = null,
     thornFallRule = null,
     nailFallRule = null,
     enhancedFallAwakenings = Array(6).fill(0),
@@ -130,6 +134,7 @@ export class PuzzleEngine {
     this.comboDropCap = Math.max(0, Math.trunc(Number(comboDropCap) || 0));
     this.setComboDropAwakenings(comboDropAwakenings);
     this.setTopLineDropTypes(topLineDropTypes);
+    this.setBlackFallRule(blackFallRule);
     this.setThornFallRule(thornFallRule);
     this.setNailFallRule(nailFallRule);
     this.setEnhancedFallAwakenings(enhancedFallAwakenings);
@@ -192,7 +197,7 @@ export class PuzzleEngine {
   }
 
   createOrb(type, state = {}) {
-    const enhancementPower = normalizeEnhancementPower(
+    let enhancementPower = normalizeEnhancementPower(
       state.enhancementPower === undefined ? (state.enhanced ? PAD_ENHANCED_ORB_BONUS : 0) : state.enhancementPower,
     );
     const descriptorInput = state.thornDescriptor === undefined
@@ -209,14 +214,33 @@ export class PuzzleEngine {
     const thornActive = state.thornActive === undefined
       ? thornDescriptor !== 0 || (requestedBlockFlags & PAD_BLOCK_BURST_FLAG) !== 0
       : Boolean(state.thornActive);
-    const nail = state.nail === undefined
+    let nail = state.nail === undefined
       ? (requestedBlockFlags & PAD_BLOCK_NAIL_FLAG) !== 0
       : Boolean(state.nail);
-    const blockFlags = (requestedBlockFlags
-      & ~(PAD_BLOCK_LOCKED_FLAG | PAD_BLOCK_NAIL_FLAG | PAD_BLOCK_BURST_FLAG))
+    const blind = state.blind === undefined
+      ? (requestedBlockFlags & PAD_BLOCK_BLIND_FLAG) !== 0
+      : Boolean(state.blind);
+    const blindFresh = blind && (state.blindFresh === undefined
+      ? (requestedBlockFlags & PAD_BLOCK_BLIND_FRESH_FLAG) !== 0
+      : Boolean(state.blindFresh));
+    const blindCountdown = blind
+      ? Math.max(0, Math.min(0x7f, Math.trunc(Number(state.blindCountdown) || 1)))
+      : 0;
+    let blockFlags = (requestedBlockFlags
+      & ~(PAD_BLOCK_LOCKED_FLAG | PAD_BLOCK_BLIND_FLAG | PAD_BLOCK_COMBO_DROP_FLAG
+        | PAD_BLOCK_BLIND_FRESH_FLAG | PAD_BLOCK_NAIL_FLAG | PAD_BLOCK_BURST_FLAG))
       | (locked ? PAD_BLOCK_LOCKED_FLAG : 0)
+      | (blind ? PAD_BLOCK_BLIND_FLAG : 0)
+      | ((requestedBlockFlags & PAD_BLOCK_COMBO_DROP_FLAG) !== 0 ? PAD_BLOCK_COMBO_DROP_FLAG : 0)
+      | (blindFresh ? PAD_BLOCK_BLIND_FRESH_FLAG : 0)
       | (nail ? PAD_BLOCK_NAIL_FLAG : 0)
       | (thornActive ? PAD_BLOCK_BURST_FLAG : 0);
+    const nativeType = ORB_TYPES.findIndex((candidate) => candidate.id === type);
+    if (blind && nativeType >= 6 && nativeType <= 9) {
+      blockFlags &= ~PAD_BLOCK_SPECIAL_LOCK_CLEAR_FLAGS;
+      enhancementPower = 0;
+      nail = false;
+    }
     return {
       id: ++this.orbSerial,
       type,
@@ -225,6 +249,9 @@ export class PuzzleEngine {
       enhancementPower,
       enhanced: enhancementPower > 0,
       locked,
+      blind,
+      blindFresh,
+      blindCountdown,
       nail,
       thornActive,
       thornDescriptor,
@@ -567,11 +594,18 @@ export class PuzzleEngine {
     this.rng.setState(comboDropResolution.state);
     this.pendingComboDrops = 0;
     generated.forEach((entry, index) => {
+      const blackFall = padResolveBlackFall(
+        this.lockFallRng.state,
+        entry.type,
+        this.blackFallRule,
+        comboDropResolution.marked[index] ? PAD_BLOCK_COMBO_DROP_FLAG : 0,
+      );
+      this.lockFallRng.setState(blackFall.state);
       const thornFall = padResolveThornFall(
         this.lockFallRng.state,
         entry.type,
         this.thornFallRule,
-        comboDropResolution.marked[index] ? PAD_BLOCK_COMBO_DROP_FLAG : 0,
+        blackFall.blockFlags,
       );
       this.lockFallRng.setState(thornFall.state);
       const nailFall = padResolveNailFall(
@@ -598,7 +632,11 @@ export class PuzzleEngine {
       this.lockFallRng.setState(lockFall.state);
       this.board[entry.row][entry.column] = this.createOrb(ORB_TYPES[entry.type]?.id || NATURAL_ORB_TYPES[0].id, {
         blockFlags: lockFall.blockFlags,
-        enhancementPower: thornFall.clearEnhancement ? 0 : enhancementFall.enhancementPower,
+        enhancementPower: blackFall.clearEnhancement || thornFall.clearEnhancement
+          ? 0
+          : enhancementFall.enhancementPower,
+        blindCountdown: blackFall.blindCountdown,
+        blindFresh: blackFall.blindFresh,
         thornDescriptor: thornFall.thornDescriptor,
       });
     });
@@ -722,6 +760,27 @@ export class PuzzleEngine {
       this.player.hp = Math.max(0, this.player.hp - total);
       this.message = `Enemies attacked for ${total.toLocaleString()} damage.`;
     }
+    this.advanceBlackOrbCountdowns();
+    if (this.blackFallRule?.active && this.blackFallRule.turnsRemaining !== null) {
+      this.blackFallRule.turnsRemaining = Math.max(0, this.blackFallRule.turnsRemaining - 1);
+      if (this.blackFallRule.turnsRemaining === 0) this.blackFallRule.active = false;
+    }
+  }
+
+  advanceBlackOrbCountdowns() {
+    this.board.forEach((row) => row.forEach((orb) => {
+      if (!orb.blind) return;
+      if (orb.blindFresh) {
+        orb.blindFresh = false;
+        orb.blockFlags = (Number(orb.blockFlags) >>> 0) & ~PAD_BLOCK_BLIND_FRESH_FLAG;
+        return;
+      }
+      orb.blindCountdown = Math.max(0, Math.trunc(Number(orb.blindCountdown) || 0) - 1);
+      if (orb.blindCountdown === 0) {
+        orb.blind = false;
+        orb.blockFlags = (Number(orb.blockFlags) >>> 0) & ~PAD_BLOCK_BLIND_FLAG;
+      }
+    }));
   }
 
   setBoardFromCodes(rows) {
@@ -806,6 +865,28 @@ export class PuzzleEngine {
     };
   }
 
+  setBlackFallRule(rule) {
+    if (rule === null || rule === undefined) {
+      this.blackFallRule = null;
+      return;
+    }
+    if (!Number.isInteger(Number(rule.chanceBasisPoints)) || (
+      rule.turnsRemaining !== undefined && rule.turnsRemaining !== null
+      && (!Number.isInteger(Number(rule.turnsRemaining)) || Number(rule.turnsRemaining) < 0)
+    )) throw new Error('PAD black-fall rule requires integer chanceBasisPoints and nonnegative turnsRemaining values.');
+    const turnsRemaining = rule.turnsRemaining === undefined || rule.turnsRemaining === null
+      ? null
+      : Number(rule.turnsRemaining);
+    this.blackFallRule = {
+      active: rule.active === undefined ? turnsRemaining === null || turnsRemaining > 0 : Boolean(rule.active),
+      chanceBasisPoints: (Number(rule.chanceBasisPoints) << 16) >> 16,
+      turnsRemaining,
+      skipInitialCountdown: rule.skipInitialCountdown === undefined
+        ? true
+        : Boolean(rule.skipInitialCountdown),
+    };
+  }
+
   setEnhancedFallAwakenings(counts) {
     if (!Array.isArray(counts) || counts.length !== 6 || counts.some((count) => (
       !Number.isInteger(Number(count)) || Number(count) < 0
@@ -854,11 +935,26 @@ export class PuzzleEngine {
     const sourceBlockFlags = state.blockFlags === undefined
       ? Number(orb.blockFlags) >>> 0
       : Number(state.blockFlags) >>> 0;
-    const nail = state.nail === undefined
+    let nail = state.nail === undefined
       ? state.blockFlags === undefined
         ? Boolean(orb.nail)
         : (sourceBlockFlags & PAD_BLOCK_NAIL_FLAG) !== 0
       : Boolean(state.nail);
+    const blind = state.blind === undefined
+      ? state.blockFlags === undefined
+        ? Boolean(orb.blind)
+        : (sourceBlockFlags & PAD_BLOCK_BLIND_FLAG) !== 0
+      : Boolean(state.blind);
+    const blindFresh = blind && (state.blindFresh === undefined
+      ? state.blockFlags === undefined
+        ? Boolean(orb.blindFresh)
+        : (sourceBlockFlags & PAD_BLOCK_BLIND_FRESH_FLAG) !== 0
+      : Boolean(state.blindFresh));
+    const blindCountdown = blind
+      ? Math.max(0, Math.min(0x7f, Math.trunc(Number(
+        state.blindCountdown === undefined ? orb.blindCountdown || 1 : state.blindCountdown,
+      ) || 0)))
+      : 0;
     const thornActive = state.thornActive === undefined
       ? thornStateChanged
         ? thornDescriptor !== 0
@@ -872,11 +968,18 @@ export class PuzzleEngine {
         ? orb.locked
         : (sourceBlockFlags & PAD_BLOCK_LOCKED_FLAG) !== 0
       : Boolean(state.locked);
-    const blockFlags = (sourceBlockFlags
-      & ~(PAD_BLOCK_LOCKED_FLAG | PAD_BLOCK_NAIL_FLAG | PAD_BLOCK_BURST_FLAG))
+    let blockFlags = (sourceBlockFlags
+      & ~(PAD_BLOCK_LOCKED_FLAG | PAD_BLOCK_BLIND_FLAG | PAD_BLOCK_BLIND_FRESH_FLAG
+        | PAD_BLOCK_NAIL_FLAG | PAD_BLOCK_BURST_FLAG))
       | (locked ? PAD_BLOCK_LOCKED_FLAG : 0)
+      | (blind ? PAD_BLOCK_BLIND_FLAG : 0)
+      | (blindFresh ? PAD_BLOCK_BLIND_FRESH_FLAG : 0)
       | (nail ? PAD_BLOCK_NAIL_FLAG : 0)
       | (thornActive ? PAD_BLOCK_BURST_FLAG : 0);
+    if (specialType && blind) {
+      blockFlags &= ~PAD_BLOCK_SPECIAL_LOCK_CLEAR_FLAGS;
+      nail = false;
+    }
     const currentEnhancementPower = normalizeEnhancementPower(
       orb.enhancementPower === undefined ? (orb.enhanced ? PAD_ENHANCED_ORB_BONUS : 0) : orb.enhancementPower,
     );
@@ -889,7 +992,7 @@ export class PuzzleEngine {
               ? currentEnhancementPower
               : normalizeEnhancementPower(PAD_ENHANCED_ORB_BONUS))
           : 0;
-    const enhancementPower = specialType && (thornPercent > 0 || locked)
+    const enhancementPower = specialType && (thornPercent > 0 || locked || blind)
       ? 0
       : requestedEnhancementPower;
     this.board[row][column] = {
@@ -898,6 +1001,9 @@ export class PuzzleEngine {
       enhanced: enhancementPower > 0,
       blockFlags,
       locked,
+      blind,
+      blindFresh,
+      blindCountdown,
       nail,
       thornActive,
       thornDescriptor,
@@ -1253,6 +1359,7 @@ export class PuzzleEngine {
       comboDropBonusCount: this.comboDropBonusCount,
       turnNailCount: this.turnNailCount,
       topLineDropTypes: this.topLineDropTypes ? [...this.topLineDropTypes] : null,
+      blackFallRule: this.blackFallRule ? { ...this.blackFallRule } : null,
       thornFallRule: this.thornFallRule ? { ...this.thornFallRule } : null,
       nailFallRule: this.nailFallRule ? { ...this.nailFallRule } : null,
       enhancedFallAwakenings: [...this.enhancedFallAwakenings],
@@ -1264,6 +1371,9 @@ export class PuzzleEngine {
         code: ORB_BY_ID[orb.type].code,
         blockFlags: orb.blockFlags,
         comboDrop: (orb.blockFlags & PAD_BLOCK_COMBO_DROP_FLAG) !== 0,
+        blind: (orb.blockFlags & PAD_BLOCK_BLIND_FLAG) !== 0,
+        blindFresh: (orb.blockFlags & PAD_BLOCK_BLIND_FRESH_FLAG) !== 0,
+        blindCountdown: orb.blindCountdown,
         nail: (orb.blockFlags & PAD_BLOCK_NAIL_FLAG) !== 0,
         enhancementPower: orb.enhancementPower,
         enhanced: orb.enhanced,

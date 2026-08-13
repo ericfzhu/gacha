@@ -16,6 +16,7 @@ const testAttackRounds = process.argv.includes('--attack-rounds');
 const testPointerIdentity = process.argv.includes('--pointer-identity');
 const testMoveDeadline = process.argv.includes('--move-deadline');
 const renderNailState = process.argv.includes('--nail-render');
+const renderBlackFallState = process.argv.includes('--black-fall-render');
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 980, height: 900 } });
 const consoleMessages = [];
@@ -500,6 +501,21 @@ try {
     const weakenedFallRuleState = engine.lockFallRng.state;
     engine.setEnhancedFallAwakenings(Array(6).fill(0));
     engine.setEnhancedFallModifier(null);
+    engine.setBlackFallRule({ chanceBasisPoints: 10_000, turnsRemaining: 2 });
+    engine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+    engine.setRngState(21_900);
+    engine.setLockFallRngState(21_900);
+    engine.board[0][0] = null;
+    engine.collapseAndRefill();
+    const blackFallOrb = engine.snapshot().boardState[0][0];
+    const blackFallRuleState = engine.lockFallRng.state;
+    engine.resolveEnemyTurn();
+    const blackFallAfterFresh = engine.snapshot().boardState[0][0];
+    const blackFallTurnsAfterFresh = engine.blackFallRule.turnsRemaining;
+    engine.resolveEnemyTurn();
+    const blackFallAfterExpiry = engine.snapshot().boardState[0][0];
+    const blackFallRuleAfterExpiry = { ...engine.blackFallRule };
+    engine.setBlackFallRule(null);
     engine.reset();
     const initialBoard = engine.snapshot().board;
     const initialBoardState = engine.rng.state;
@@ -530,6 +546,8 @@ try {
       thornFallOrb, thornFallMainState, thornFallRuleState,
       nailMatchCount, nailDamage, nailDamageTotal,
       enhancedFallPower, enhancedFallRuleState, weakenedFallPower, weakenedFallRuleState,
+      blackFallOrb, blackFallRuleState, blackFallAfterFresh, blackFallTurnsAfterFresh,
+      blackFallAfterExpiry, blackFallRuleAfterExpiry,
       initialBoard, initialBoardState,
     };
   }) : null;
@@ -616,6 +634,21 @@ try {
     poisonBlockSample.enhancedFallRuleState !== 394_448_415 ||
     poisonBlockSample.weakenedFallPower !== -0.5 ||
     poisonBlockSample.weakenedFallRuleState !== 394_448_415 ||
+    poisonBlockSample.blackFallOrb.blockFlags !== 0x11000 ||
+    poisonBlockSample.blackFallOrb.blind !== true ||
+    poisonBlockSample.blackFallOrb.blindFresh !== true ||
+    poisonBlockSample.blackFallOrb.blindCountdown !== 1 ||
+    poisonBlockSample.blackFallRuleState !== 3_803_934_822 ||
+    poisonBlockSample.blackFallAfterFresh.blockFlags !== 0x1000 ||
+    poisonBlockSample.blackFallAfterFresh.blind !== true ||
+    poisonBlockSample.blackFallAfterFresh.blindFresh !== false ||
+    poisonBlockSample.blackFallAfterFresh.blindCountdown !== 1 ||
+    poisonBlockSample.blackFallTurnsAfterFresh !== 1 ||
+    poisonBlockSample.blackFallAfterExpiry.blockFlags !== 0 ||
+    poisonBlockSample.blackFallAfterExpiry.blind !== false ||
+    poisonBlockSample.blackFallAfterExpiry.blindCountdown !== 0 ||
+    poisonBlockSample.blackFallRuleAfterExpiry.active !== false ||
+    poisonBlockSample.blackFallRuleAfterExpiry.turnsRemaining !== 0 ||
     JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
       'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',
     ]) || poisonBlockSample.initialBoardState !== 79_238_434
@@ -842,10 +875,24 @@ try {
     throw new Error(`Nail render-state mismatch: ${JSON.stringify(nailRenderState)}`);
   }
   if (nailRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
+  const blackFallRenderState = renderBlackFallState ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    engine.reset();
+    engine.setBoardFromCodes(['RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR']);
+    for (let column = 0; column < 3; column += 1) {
+      engine.setOrbState(0, column, { blind: true, blindFresh: true, blindCountdown: 1 });
+    }
+    engine.start();
+    return engine.snapshot().boardState[0];
+  }) : null;
+  if (blackFallRenderState && blackFallRenderState.slice(0, 3).some((orb) => (
+    !orb.blind || !orb.blindFresh || orb.blindCountdown !== 1 || (orb.blockFlags & 0x11000) !== 0x11000
+  ))) throw new Error(`Black-fall render-state mismatch: ${JSON.stringify(blackFallRenderState)}`);
+  if (blackFallRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

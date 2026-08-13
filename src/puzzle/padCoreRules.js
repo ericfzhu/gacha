@@ -334,6 +334,55 @@ export function padResolveComboDropAwakenings(matches, awakeningCounts) {
   return { pendingCount, bonusCombos };
 }
 
+// _checkPassiveSkill4Block's first branch applies the enemy black/invisible
+// skyfall record before thorn, Nail, enhancement, and lock assignment. Its
+// signed 16-bit chance is measured against a 10,000-unit roll. Successful
+// blocks receive a one-turn low-seven-bit countdown plus bit 7 in sBLOCK+1;
+// flag 0x10000 tells _incEneTurn to clear the marker without decrementing that
+// countdown on the spawn turn. Special types 6..9 lose enhancement and any
+// pre-existing combo-drop/Nail flags when the black state is applied.
+export function padResolveBlackFall(state, type, rule, initialBlockFlags = 0) {
+  let blockFlags = Number(initialBlockFlags) >>> 0;
+  const typeIndex = Math.trunc(Number(type));
+  if (!rule?.active || typeIndex < 0 || typeIndex > 10) {
+    return {
+      state: Number(state) >>> 0,
+      blockFlags,
+      blindCountdown: 0,
+      blindFresh: false,
+      clearEnhancement: false,
+      applied: false,
+      attempts: 0,
+    };
+  }
+
+  const roll = padLcgStep(state);
+  const scaled = Math.floor(roll.value * 10_000 / 0x10000);
+  const chanceBasisPoints = (Math.trunc(Number(rule.chanceBasisPoints) || 0) << 16) >> 16;
+  const applied = scaled < chanceBasisPoints;
+  let clearEnhancement = false;
+  const blindFresh = applied && rule.skipInitialCountdown !== false;
+  if (applied) {
+    const oldFlags = blockFlags;
+    blockFlags |= 0x1000;
+    if (blindFresh) blockFlags |= 0x10000;
+    if (typeIndex >= 6 && typeIndex <= 9) {
+      blockFlags &= ~0x20000;
+      if ((oldFlags & 0x8000) !== 0) blockFlags &= ~0x8000;
+      clearEnhancement = true;
+    }
+  }
+  return {
+    state: roll.state,
+    blockFlags: blockFlags >>> 0,
+    blindCountdown: applied ? 1 : 0,
+    blindFresh,
+    clearEnhancement,
+    applied,
+    attempts: 1,
+  };
+}
+
 // _checkPassiveSkill4Block (0x64131c) applies the active thorn-fall record
 // before _checkLockFall. Unlike lock-fall, an active record spends one roll for
 // every spawned block and only checks its optional type mask after the chance

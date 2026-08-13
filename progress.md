@@ -2,6 +2,21 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 native black/invisible skyfalls
+
+- Identified `_checkPassiveSkill4Block`'s `0x1000` branch as black/invisible
+  skyfall through `_doEntireBlack2`, `_doMakeInvDropEfc`, and
+  `_clearBlackFall`; it is not the roulette state.
+- Ported its signed basis-point chance, pre-thorn shared RNG position,
+  special-orb enhancement/combo-drop/Nail cleanup, fixed countdown `1`, and
+  transient `0x10000` spawn-cycle marker.
+- Recovered `_incEneTurn`'s lifecycle: fresh black orbs skip the first
+  decrement, then expire when the low-seven-bit countdown reaches zero. Added
+  browser rendering, pure/engine/browser lifecycle fixtures, and four exact
+  restored-image anchors (70 total).
+- Next: map the decoded fall controls from raw enemy/dungeon records and
+  continue into unresolved orb-state flags and enemy-skill dispatch.
+
 ## 2026-08-14 native enhanced/weakened fall resolution
 
 - Recovered `_checkPassiveSkill4Block`'s final natural-orb branch. Passive skill

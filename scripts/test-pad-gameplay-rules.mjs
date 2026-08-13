@@ -24,6 +24,7 @@ import {
   padNailDamage,
   padOrbMatchMultiplier,
   padPoisonDamage,
+  padResolveBlackFall,
   padResolveBitReplacements,
   padResolveBlockSwapPassive,
   padResolveComboDropAwakenings,
@@ -195,6 +196,52 @@ assert.deepEqual(padResolveNailFall(21_900, 6, {
   blockFlags: 0,
   applied: false,
   attempts: 0,
+});
+assert.deepEqual(padResolveBlackFall(21_900, 0, null, 0x8000), {
+  state: 21_900,
+  blockFlags: 0x8000,
+  blindCountdown: 0,
+  blindFresh: false,
+  clearEnhancement: false,
+  applied: false,
+  attempts: 0,
+});
+assert.deepEqual(padResolveBlackFall(21_900, 0, {
+  active: true,
+  chanceBasisPoints: 10_000,
+}), {
+  state: 394_448_415,
+  blockFlags: 0x11000,
+  blindCountdown: 1,
+  blindFresh: true,
+  clearEnhancement: false,
+  applied: true,
+  attempts: 1,
+});
+assert.deepEqual(padResolveBlackFall(21_900, 6, {
+  active: true,
+  chanceBasisPoints: 10_000,
+}, 0x28000), {
+  state: 394_448_415,
+  blockFlags: 0x11000,
+  blindCountdown: 1,
+  blindFresh: true,
+  clearEnhancement: true,
+  applied: true,
+  attempts: 1,
+});
+assert.deepEqual(padResolveBlackFall(21_900, 0, {
+  active: true,
+  chanceBasisPoints: 0,
+  skipInitialCountdown: false,
+}), {
+  state: 394_448_415,
+  blockFlags: 0,
+  blindCountdown: 0,
+  blindFresh: false,
+  clearEnhancement: false,
+  applied: false,
+  attempts: 1,
 });
 assert.deepEqual(padResolveEnhancementFall(21_900, 0, Array(6).fill(0)), {
   state: 394_448_415,
@@ -794,6 +841,46 @@ assert.deepEqual(enhancedFallEngine.snapshot().enhancedFallModifier, {
   chancePercent: 30,
   weakeningPowerPercent: 50,
 });
+const blackFallEngine = new PuzzleEngine({
+  seed: 21_900,
+  lockFallSeed: 21_900,
+  blackFallRule: { chanceBasisPoints: 10_000, turnsRemaining: 2 },
+  thornFallRule: {
+    typeMask: 1 << 0,
+    chancePercent: 100,
+    descriptor: 4,
+    descriptorHighBit: true,
+  },
+  nailFallRule: { chancePercent: 100 },
+  lockFallRules: [{ typeMask: 1 << 0, chancePercent: 100 }],
+});
+blackFallEngine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+blackFallEngine.setRngState(21_900);
+blackFallEngine.setLockFallRngState(21_900);
+blackFallEngine.board[0][0] = null;
+blackFallEngine.collapseAndRefill();
+assert.equal(blackFallEngine.board[0][0].blind, true);
+assert.equal(blackFallEngine.board[0][0].blindFresh, true);
+assert.equal(blackFallEngine.board[0][0].blindCountdown, 1);
+assert.equal(blackFallEngine.board[0][0].blockFlags, 0xb1800);
+assert.equal(blackFallEngine.lockFallRng.state, 1_848_838_291);
+blackFallEngine.resolveEnemyTurn();
+assert.equal(blackFallEngine.board[0][0].blind, true);
+assert.equal(blackFallEngine.board[0][0].blindFresh, false);
+assert.equal(blackFallEngine.blackFallRule.turnsRemaining, 1);
+blackFallEngine.resolveEnemyTurn();
+assert.equal(blackFallEngine.board[0][0].blind, false);
+assert.equal(blackFallEngine.board[0][0].blindCountdown, 0);
+assert.equal(blackFallEngine.blackFallRule.active, false);
+blackFallEngine.setBoardFromCodes(['JDDDDD', ...Array(4).fill('DDDDDD')]);
+blackFallEngine.setOrbState(0, 0, {
+  blockFlags: 0x28000,
+  blind: true,
+  enhancementPower: 0.5,
+});
+assert.equal(blackFallEngine.board[0][0].blockFlags, 0x1000);
+assert.equal(blackFallEngine.board[0][0].enhancementPower, 0);
+assert.equal(blackFallEngine.board[0][0].nail, false);
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);
 assert.deepEqual(tracePadDragCells(0, 0, 2, 2, true), [{ row: 1, column: 1 }, { row: 2, column: 2 }]);
