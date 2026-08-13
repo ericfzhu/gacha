@@ -195,6 +195,41 @@ try {
     blockMinusSample.cappedNegatives !== 3 ||
     blockMinusSample.allCount !== 1 || blockMinusSample.allNegatives !== 4
   )) throw new Error(`Block-minus mismatch: ${JSON.stringify(blockMinusSample)}`);
+  const burDropSample = showOrbStates ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    engine.reset();
+    engine.setBoardFromCodes(['RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
+    const startState = engine.rng.state;
+    const zeroCount = engine.doMakeBurDrop(true, 0b11, 0, 4);
+    const zeroState = engine.rng.state;
+    const dryCount = engine.doMakeBurDrop(false, 0b11, 2, 4);
+    const dryState = engine.rng.state;
+    const applyCount = engine.doMakeBurDrop(true, 0b11, 2, 4);
+    const applyState = engine.rng.state;
+    const firstDescriptors = engine.snapshot().boardState[0]
+      .filter((orb) => orb.thornActive)
+      .map((orb) => orb.thornDescriptor);
+    const remainingCount = engine.doMakeBurDrop(true, 0b11, 10, 5, true);
+    const finalState = engine.rng.state;
+    const finalStateOrbs = engine.snapshot().boardState[0].filter((orb) => orb.thornActive);
+    engine.reset();
+    engine.start();
+    return {
+      startState, zeroCount, zeroState, dryCount, dryState, applyCount, applyState,
+      firstDescriptors, remainingCount, finalState,
+      activeCount: finalStateOrbs.length,
+      clearHighBitCount: finalStateOrbs.filter((orb) => orb.thornDescriptor === 5).length,
+    };
+  }) : null;
+  const stepLcg = (state) => (Math.imul(state, 0x343fd) + 0x269ec3) >>> 0;
+  if (burDropSample && (
+    burDropSample.zeroCount !== 0 || burDropSample.zeroState !== burDropSample.startState ||
+    burDropSample.dryCount !== 2 || burDropSample.dryState !== stepLcg(burDropSample.startState) ||
+    burDropSample.applyCount !== 2 || burDropSample.applyState !== stepLcg(burDropSample.dryState) ||
+    burDropSample.firstDescriptors.some((descriptor) => descriptor !== 0x84) ||
+    burDropSample.remainingCount !== 2 || burDropSample.finalState !== stepLcg(burDropSample.applyState) ||
+    burDropSample.activeCount !== 4 || burDropSample.clearHighBitCount !== 2
+  )) throw new Error(`Burst-drop mismatch: ${JSON.stringify(burDropSample)}`);
   if (renderAtlasSheet) {
     const sheet = page.locator('#pad-atlas-sheet');
     await page.evaluate(() => {
@@ -406,9 +441,9 @@ try {
     moveDeadline.drag !== null || moveDeadline.turn !== 1 || moveDeadline.phase !== 'detect'
   )) throw new Error(`Move deadline mismatch: ${JSON.stringify(moveDeadline)}`);
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

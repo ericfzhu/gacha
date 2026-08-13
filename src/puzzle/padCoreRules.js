@@ -74,6 +74,11 @@ export function createPadRng(seed = 0) {
       state = shuffled.state;
       return shuffled.candidates;
     },
+    shuffleBurDropCandidates(candidates) {
+      const shuffled = padShuffleBurDropCandidates(state, candidates);
+      state = shuffled.state;
+      return shuffled.candidates;
+    },
     getRandomBlock(excludedType = -1, includeJammer = false, includeHeart = true) {
       const result = padGetRandomBlock(state, excludedType, includeJammer, includeHeart);
       state = result.state;
@@ -125,6 +130,13 @@ export function padShuffleBlockMinusCandidates(state, candidates) {
     [shuffled[index], shuffled[target]] = [shuffled[target], shuffled[index]];
   }
   return { state: persisted.state, candidates: shuffled };
+}
+
+// _doMakeBurDrop (0x61ce38) uses the same persisted/local LCG split as
+// _doBlockMinus. Keep a named entry point because the candidate rules and
+// zero-request behavior belong to the caller, not to this ordering primitive.
+export function padShuffleBurDropCandidates(state, candidates) {
+  return padShuffleBlockMinusCandidates(state, candidates);
 }
 
 // The same native routine builds its candidates from numeric block types

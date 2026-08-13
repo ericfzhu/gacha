@@ -146,14 +146,23 @@ export class PuzzleEngine {
     const enhancementPower = normalizeEnhancementPower(
       state.enhancementPower === undefined ? (state.enhanced ? PAD_ENHANCED_ORB_BONUS : 0) : state.enhancementPower,
     );
+    const descriptorInput = state.thornDescriptor === undefined
+      ? Math.max(0, Math.min(0x7f, Math.trunc(Number(state.thornPercent) || 0)))
+      : Math.max(0, Math.min(0xff, Math.trunc(Number(state.thornDescriptor) || 0)));
+    const thornPercent = state.thornPercent === undefined
+      ? descriptorInput & 0x7f
+      : Math.max(0, Math.min(0x7f, Math.trunc(Number(state.thornPercent) || 0)));
+    const thornDescriptor = (descriptorInput & 0x80) | thornPercent;
     return {
       id: ++this.orbSerial,
       type,
       locked: false,
-      thornPercent: 0,
       ...state,
       enhancementPower,
       enhanced: enhancementPower > 0,
+      thornActive: state.thornActive === undefined ? thornDescriptor !== 0 : Boolean(state.thornActive),
+      thornDescriptor,
+      thornPercent,
     };
   }
 
@@ -206,7 +215,7 @@ export class PuzzleEngine {
     if (!path.length) return false;
     for (const { row: nextRow, column: nextColumn } of path) {
       const crossedOrb = this.board[nextRow][nextColumn];
-      if (crossedOrb.thornPercent > 0) {
+      if (crossedOrb.thornActive && crossedOrb.thornPercent > 0) {
         const damage = padThornDamage(this.player.maxHp, crossedOrb.thornPercent);
         this.lastThornDamage = Math.min(PAD_INT32_MAX, this.lastThornDamage + damage);
       }
@@ -578,8 +587,18 @@ export class PuzzleEngine {
     if (!this.isCell(row, column)) throw new Error(`Orb state cell ${row},${column} is outside the board.`);
     const orb = this.board[row][column];
     const thornPercent = state.thornPercent === undefined
-      ? orb.thornPercent
+      ? state.thornDescriptor === undefined
+        ? orb.thornPercent
+        : Math.max(0, Math.min(0xff, Math.trunc(Number(state.thornDescriptor) || 0))) & 0x7f
       : Math.max(0, Math.min(0x7f, Math.trunc(Number(state.thornPercent) || 0)));
+    const descriptorHighBit = state.thornDescriptor === undefined
+      ? (orb.thornDescriptor || 0) & 0x80
+      : Math.max(0, Math.min(0xff, Math.trunc(Number(state.thornDescriptor) || 0))) & 0x80;
+    const thornDescriptor = descriptorHighBit | thornPercent;
+    const thornStateChanged = state.thornPercent !== undefined || state.thornDescriptor !== undefined;
+    const thornActive = state.thornActive === undefined
+      ? thornStateChanged ? thornDescriptor !== 0 : Boolean(orb.thornActive)
+      : Boolean(state.thornActive);
     const specialType = ['jammer', 'poison', 'mortalPoison', 'bomb'].includes(orb.type);
     const locked = state.locked === undefined ? orb.locked : Boolean(state.locked);
     const currentEnhancementPower = normalizeEnhancementPower(
@@ -602,6 +621,8 @@ export class PuzzleEngine {
       enhancementPower,
       enhanced: enhancementPower > 0,
       locked,
+      thornActive,
+      thornDescriptor,
       thornPercent,
     };
   }
@@ -640,6 +661,31 @@ export class PuzzleEngine {
     return candidates.length;
   }
 
+  doMakeBurDrop(apply, typeMask, count, descriptor, clearDescriptorHighBit = false) {
+    const requested = Number(count) >>> 0;
+    if (requested === 0) return 0;
+    const mask = Number(typeMask) >>> 0;
+    const candidates = [];
+    this.board.forEach((row, rowIndex) => row.forEach((orb, columnIndex) => {
+      const type = ORB_TYPES.findIndex((candidate) => candidate.id === orb.type);
+      if (type >= 0 && (mask & (1 << type)) !== 0 && !orb.thornActive) {
+        candidates.push({ row: rowIndex, column: columnIndex });
+      }
+    }));
+    const selected = this.rng.shuffleBurDropCandidates(candidates).slice(0, requested);
+    if (apply) {
+      const thornDescriptor = (Math.trunc(Number(descriptor) || 0) & 0x7f)
+        | (clearDescriptorHighBit ? 0 : 0x80);
+      selected.forEach(({ row, column }) => {
+        const orb = this.board[row][column];
+        orb.thornActive = true;
+        orb.thornDescriptor = thornDescriptor;
+        orb.thornPercent = thornDescriptor & 0x7f;
+      });
+    }
+    return selected.length;
+  }
+
   isCell(row, column) {
     return row >= 0 && row < this.rows && column >= 0 && column < this.columns;
   }
@@ -659,6 +705,8 @@ export class PuzzleEngine {
         enhancementPower: orb.enhancementPower,
         enhanced: orb.enhanced,
         locked: orb.locked,
+        thornActive: orb.thornActive,
+        thornDescriptor: orb.thornDescriptor,
         thornPercent: orb.thornPercent,
       }))),
       drag: this.drag ? { row: this.drag.row, column: this.drag.column, remainingSeconds: Number(this.drag.remaining.toFixed(2)), pathLength: this.drag.pathLength } : null,

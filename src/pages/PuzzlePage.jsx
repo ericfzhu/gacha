@@ -35,7 +35,7 @@ function roundedRect(ctx, x, y, width, height, radius) {
 function drawOrbState(ctx, orb, x, y, radius, alpha) {
   ctx.save();
   ctx.globalAlpha = alpha;
-  if (orb.thornPercent > 0) {
+  if (orb.thornActive && orb.thornPercent > 0) {
     ctx.save();
     ctx.translate(x, y);
     ctx.fillStyle = 'rgba(220, 230, 239, .92)';

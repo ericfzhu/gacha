@@ -235,9 +235,18 @@ persisted. `PuzzleEngine.doBlockMinus` and
 `padShuffleBlockMinusCandidates` reproduce both branches, including dry-run
 counting and the distinct RNG contract.
 
-Bombs and burst drops are distinct native mechanisms. `_doMakeBurDrop` writes a
-one-byte descriptor at `sBLOCK+0x0c` on an otherwise normally typed orb;
-`sGAMEWORK::setBurBlockFlag` uses flag `0x80000`. A true bomb is block type `9`.
+Bombs and burst drops are distinct native mechanisms. `_doMakeBurDrop(bool,
+uint32 mask, uint32 count, uint16 descriptor, bool)` at `0x61ce38` scans the
+board in row-major order for masked types and excludes cells already carrying
+the burst flag. A nonzero request consumes one saved LCG advance and uses the
+same high-16 temporary shuffle as `_doBlockMinus`, even for an empty candidate
+list or a dry run; a zero count returns without touching RNG. It selects at most
+`min(eligible, count)` cells. When applying, it writes `(descriptor & 0x7f) |
+((!finalBool) << 7)` at `sBLOCK+0x0c` and asks `sGAMEWORK::setBurBlockFlag` to
+set flag `0x80000`. The returned count is the selected-cell count. The browser
+keeps the active flag and raw descriptor separate from the low-seven-bit damage
+percentage and reproduces this through `PuzzleEngine.doMakeBurDrop`. A true
+bomb is block type `9`.
 `_checkBomb` first performs ordinary match detection: bombs included in a
 three-or-more match clear harmlessly as that combo. Every unmatched bomb then
 deals a separately rounded-up 20% of maximum HP and clears all non-bomb cells

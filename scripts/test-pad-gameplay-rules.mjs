@@ -23,6 +23,7 @@ import {
   padSecondaryAttributeAttack,
   padShuffleBlockCandidates,
   padShuffleBlockMinusCandidates,
+  padShuffleBurDropCandidates,
   padTertiaryAttributeAttack,
   padLcgStep,
   padThornDamage,
@@ -59,6 +60,14 @@ assert.deepEqual(padShuffleBlockMinusCandidates(21_900, [0, 1, 2, 3, 4]), {
   candidates: [3, 0, 4, 2, 1],
 });
 assert.deepEqual(padShuffleBlockMinusCandidates(21_900, []), {
+  state: 394_448_415,
+  candidates: [],
+});
+assert.deepEqual(padShuffleBurDropCandidates(21_900, [0, 1, 2, 3, 4]), {
+  state: 394_448_415,
+  candidates: [3, 0, 4, 2, 1],
+});
+assert.deepEqual(padShuffleBurDropCandidates(21_900, []), {
   state: 394_448_415,
   candidates: [],
 });
@@ -487,6 +496,31 @@ assert.equal(blockMinusEngine.board[0].filter((orb) => orb.enhancementPower < 0)
 assert.equal(blockMinusEngine.doBlockMinus(true, 0b11, 0.1), 1);
 assert.equal(blockMinusEngine.board[0].filter((orb) => orb.enhancementPower < 0).length, 4);
 
+const burDropEngine = new PuzzleEngine({ seed: 21_900 });
+burDropEngine.setBoardFromCodes(['RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
+const burDropStartState = burDropEngine.rng.state;
+assert.equal(burDropEngine.doMakeBurDrop(true, 0b11, 0, 4), 0);
+assert.equal(burDropEngine.rng.state, burDropStartState);
+assert.equal(burDropEngine.doMakeBurDrop(false, 0b11, 2, 4), 2);
+assert.equal(burDropEngine.rng.state, padLcgStep(burDropStartState).state);
+assert.equal(burDropEngine.board[0].filter((orb) => orb.thornActive).length, 0);
+assert.equal(burDropEngine.doMakeBurDrop(true, 0b11, 2, 4), 2);
+assert.equal(burDropEngine.rng.state, padLcgStep(padLcgStep(burDropStartState).state).state);
+assert.equal(burDropEngine.board[0].filter((orb) => orb.thornActive).length, 2);
+assert.deepEqual(
+  burDropEngine.board[0].filter((orb) => orb.thornActive).map((orb) => [orb.thornDescriptor, orb.thornPercent]),
+  [[0x84, 4], [0x84, 4]],
+);
+assert.equal(burDropEngine.doMakeBurDrop(true, 0b11, 10, 5, true), 2);
+assert.equal(burDropEngine.board[0].filter((orb) => orb.thornActive).length, 4);
+assert.deepEqual(
+  burDropEngine.board[0].filter((orb) => orb.thornDescriptor === 5).map((orb) => orb.thornPercent),
+  [5, 5],
+);
+const noBurDropCandidatesState = burDropEngine.rng.state;
+assert.equal(burDropEngine.doMakeBurDrop(true, 0b11, 1, 6), 0);
+assert.equal(burDropEngine.rng.state, padLcgStep(noBurDropCandidatesState).state);
+
 const thornEngine = new PuzzleEngine({ seed: 5 });
 thornEngine.setBoardFromCodes(['RBGHLD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD']);
 thornEngine.setOrbState(0, 1, { thornPercent: 4 });
@@ -496,6 +530,8 @@ thornEngine.moveDrag(0, 1, 120, 50, 1.5, 0.5);
 assert.equal(thornEngine.lastThornDamage, 480);
 assert.equal(thornEngine.player.hp, 12_000);
 assert.equal(thornEngine.board[0][0].thornPercent, 4);
+assert.equal(thornEngine.board[0][0].thornActive, true);
+assert.equal(thornEngine.board[0][0].thornDescriptor, 4);
 thornEngine.moveDrag(0, 0, 50, 50, 0.5, 0.5);
 assert.equal(thornEngine.lastThornDamage, 960);
 assert.equal(thornEngine.player.hp, 12_000);
