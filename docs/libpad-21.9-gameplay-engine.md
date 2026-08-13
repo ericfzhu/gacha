@@ -647,6 +647,24 @@ gate. An eligible fallback retains its authored `sENEAI+5` weight without
 scaling. The browser selector exposes this as `probabilityScale` while keeping
 the already decoded condition-owned RNG state transitions intact.
 
+Enemy skill type `4` is the general source-orb conversion. Dispatch targets
+`0x6292b4`, setup targets `0x61fee4`, and the AI condition targets `0x61b2d8`.
+Setup copies signed definition source/destination integers `+0x10/+0x14` to
+runtime `sMONSTER+0x678/+0x67c`. Execution passes them to `_doBlockSwap`
+(`0x6afa84`) with enemy-skill presentation enabled. Fixed nonnegative values
+convert every unlocked orb of the source type to the destination; source 7 or
+8 names the poison family as in the shared block-swap primitive.
+
+The condition calls `_checkNewBlockSwap` (`0x617cdc`). With fixed source and
+destination it returns the live source count divided by three as a binary32
+probability scale, without consuming RNG. A negative source instead chooses
+from natural colors present on the board via `_getRandomBlockOnFace`; a
+negative destination chooses a natural non-heart color other than the resolved
+source via `_getRandomBlock`. In either random mode, the condition is a binary
+availability gate and execution spends the two persisted LCG advances of each
+random-color shuffle. The browser preserves these fixed/random paths, lock
+rejection, poison-family matching, accompanying-hit ordering, and selector RNG.
+
 Enemy skill type `17` is the lone-enemy attack boost. Its late dispatch entry
 targets shared boost handler `0x629064`, setup targets `0x61ffdc`, and AI
 condition targets `0x61acdc`. Setup copies definition duration `+0x14` to

@@ -17,6 +17,10 @@ const ENEMY_SKILL_SETUP_TABLE = 0xd3c99c;
 const ENEMY_SKILL_SETUP_BASE = 0x61fee4;
 const ENEMY_SKILL_CONDITION_TABLE = 0xd3c6fc;
 const ENEMY_SKILL_CONDITION_BASE = 0x61a630;
+const SOURCE_ORB_CONVERSION_ENEMY_SKILL_TYPE = 4;
+const SOURCE_ORB_CONVERSION_HANDLER = 0x6292b4;
+const SOURCE_ORB_CONVERSION_SETUP_HANDLER = 0x61fee4;
+const SOURCE_ORB_CONVERSION_CONDITION_HANDLER = 0x61b2d8;
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -181,6 +185,7 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['orb-state', 'doBitReplace', '_ZN9cGAMEMAIN13_doBitReplaceEPKtiRiP10sBLOCKFLAG', 0x6adf2c],
   ['orb-state', 'doBlockSwapMain', '_ZN9cGAMEMAIN16_doBlockSwapMainEP6sBLOCKiRiP10sBLOCKFLAG', 0x6ae028],
   ['orb-state', 'doBlockSwap', '_ZN9cGAMEMAIN12_doBlockSwapEiibPb', 0x6afa84],
+  ['orb-state', 'checkNewBlockSwap', '_ZN9cGAMEMAIN18_checkNewBlockSwapERfii', 0x617cdc],
   ['orb-state', 'doBlockSwapNew', '_ZN9cGAMEMAIN15_doBlockSwapNewEPhiP10sBLOCKFLAGj', 0x6aee90],
   ['orb-state', 'doBlockSwap4', '_ZN9cGAMEMAIN13_doBlockSwap4EtP10sBLOCKFLAG', 0x6af6cc],
   ['orb-state', 'doBlockSwap5', '_ZN9cGAMEMAIN13_doBlockSwap5EttP10sBLOCKFLAG', 0x6af564],
@@ -300,6 +305,27 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     const entry = readUint16Virtual(restoredElf, restoredBytes, table + (type - 1) * 2);
     return base + entry * 4;
   };
+  const sourceOrbConversionDispatchTarget = resolveEnemySkillTarget(
+    SOURCE_ORB_CONVERSION_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const sourceOrbConversionSetupTarget = resolveEnemySkillTarget(
+    SOURCE_ORB_CONVERSION_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const sourceOrbConversionConditionTarget = resolveEnemySkillTarget(
+    SOURCE_ORB_CONVERSION_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const sourceOrbConversionDispatchMatches = sourceOrbConversionDispatchTarget === null
+    ? null : sourceOrbConversionDispatchTarget === SOURCE_ORB_CONVERSION_HANDLER;
+  const sourceOrbConversionSetupMatches = sourceOrbConversionSetupTarget === null
+    ? null : sourceOrbConversionSetupTarget === SOURCE_ORB_CONVERSION_SETUP_HANDLER;
+  const sourceOrbConversionConditionMatches = sourceOrbConversionConditionTarget === null
+    ? null : sourceOrbConversionConditionTarget === SOURCE_ORB_CONVERSION_CONDITION_HANDLER;
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1196,6 +1222,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       allAddressesMatch21_9: mismatches.length === 0,
       blackFallDispatchMatches21_9: blackFallDispatchMatches,
       blackFallSetupMatches21_9: blackFallSetupMatches,
+      sourceOrbConversionDispatchMatches21_9: sourceOrbConversionDispatchMatches,
+      sourceOrbConversionSetupMatches21_9: sourceOrbConversionSetupMatches,
+      sourceOrbConversionConditionMatches21_9: sourceOrbConversionConditionMatches,
       healPlayerDispatchMatches21_9: healPlayerDispatchMatches,
       healPlayerSetupMatches21_9: healPlayerSetupMatches,
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
@@ -1330,6 +1359,18 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       monsterChanceOffset: 'sMONSTER+0x67c (signed low 16 bits)',
       monsterReviveTargetOffset: 'sMONSTER+0x678 (type 52 signed enemy index)',
       monsterRevivePercentOffset: 'sMONSTER+0x67c (type 52 signed HP percent)',
+      sourceOrbConversionType: SOURCE_ORB_CONVERSION_ENEMY_SKILL_TYPE,
+      sourceOrbConversionDispatchTarget: sourceOrbConversionDispatchTarget === null
+        ? null : hex(sourceOrbConversionDispatchTarget),
+      sourceOrbConversionDispatchMatches21_9: sourceOrbConversionDispatchMatches,
+      sourceOrbConversionSetupTarget: sourceOrbConversionSetupTarget === null
+        ? null : hex(sourceOrbConversionSetupTarget),
+      sourceOrbConversionSetupMatches21_9: sourceOrbConversionSetupMatches,
+      sourceOrbConversionConditionTarget: sourceOrbConversionConditionTarget === null
+        ? null : hex(sourceOrbConversionConditionTarget),
+      sourceOrbConversionConditionMatches21_9: sourceOrbConversionConditionMatches,
+      sourceOrbConversionParameters:
+        'definition +0x10/+0x14 -> sMONSTER+0x678/+0x67c source/destination; negative selects native random mode',
       blackFallType: BLACK_FALL_ENEMY_SKILL_TYPE,
       dispatchEntry: blackFallDispatchEntry === null ? null : hex(blackFallDispatchEntry),
       dispatchTarget: blackFallDispatchTarget === null ? null : hex(blackFallDispatchTarget),
@@ -1710,6 +1751,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
 
   if (
     missing.length || mismatches.length
+    || sourceOrbConversionDispatchMatches === false
+    || sourceOrbConversionSetupMatches === false
+    || sourceOrbConversionConditionMatches === false
     || blackFallDispatchMatches === false || blackFallSetupMatches === false
     || healPlayerDispatchMatches === false || healPlayerSetupMatches === false
     || healPlayerConditionMatches === false

@@ -2,6 +2,23 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 source-orb conversion
+
+- Identified live enemy skill type `4` as the general source-to-destination orb
+  conversion: dispatch `0x6292b4`, setup `0x61fee4`, condition `0x61b2d8`.
+  Definition `+0x10/+0x14` becomes runtime `sMONSTER+0x678/+0x67c`.
+- Traced the condition through `_checkNewBlockSwap` (`0x617cdc`): fixed modes
+  scale probability by live source count divided by three; negative authored
+  source/destination values select binary availability checks and defer random
+  color resolution to execution.
+- Ported fixed conversion plus native random source selection from present
+  natural colors and random non-heart destination selection excluding source.
+  Each random shuffle preserves its exact two global LCG advances; locked cells
+  and poison-family source matching remain delegated to the shared block swap.
+- Added definition/runtime decoders, new-AI admission, scheduled/direct action
+  execution, pure and browser fixtures, exact address inspection, and helper
+  anchors. Next: inspect the next live early enemy action.
+
 ## 2026-08-14 conditional enemy attack boosts
 
 - Split enemy skill types `18` and `19` from the shared type-17 execution

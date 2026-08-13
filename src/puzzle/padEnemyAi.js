@@ -1,5 +1,6 @@
 import { padLcgStep } from './padCoreRules.js';
 import {
+  PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -128,6 +129,7 @@ function normalizeDefinitionMap(definitions) {
 
 function isStaticallyEligible(definition, state) {
   if (!definition.effect.supported || ![
+    PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
     PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
     PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
     PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -172,6 +174,19 @@ function evaluateCondition(definition, state, rngState) {
   if (definition.effect.type === PAD_ENEMY_SKILL_BLACK_FALL) {
     const eligible = !state.blackFallActive;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION) {
+    if (typeof state.evaluateCondition !== 'function') {
+      return { eligible: false, probabilityScale: 0, rngState };
+    }
+    const result = state.evaluateCondition(definition, rngState) || {};
+    return {
+      eligible: Boolean(result.eligible),
+      probabilityScale: Math.fround(Number(result.probabilityScale ?? (
+        result.eligible ? 1 : 0
+      )) || 0),
+      rngState: Number(result.rngState ?? rngState) >>> 0,
+    };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST) {
     const eligible = state.enemyAttackBoostTurns <= 0

@@ -1009,6 +1009,48 @@ try {
     engine.setRngState(21_900);
     const rejectedLoneAttackBoostSkill = engine.takeEnemySkill(0);
     const rejectedLoneAttackBoostState = engine.snapshot();
+    const sourceOrbConversionMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(sourceOrbConversionMonsterDefinition.buffer).setUint32(0xec, 9_033, true);
+    const sourceOrbConversionDefinition = sourceToPoisonDefinition.slice();
+    const sourceOrbConversionView = new DataView(sourceOrbConversionDefinition.buffer);
+    sourceOrbConversionView.setUint32(0x00, 9_033, true);
+    sourceOrbConversionView.setInt16(0x04, 4, true);
+    sourceOrbConversionView.setInt32(0x10, 1, true);
+    sourceOrbConversionView.setInt32(0x14, 4, true);
+    sourceOrbConversionView.setInt32(0x44, 25, true);
+    engine.reset();
+    engine.setBoardFromCodes(['BBBRHD', 'GLDRHG', 'RHRDGL', 'DLGRHB', 'HRRGLD']);
+    engine.setEnemyAiDefinitionPool(
+      0,
+      sourceOrbConversionMonsterDefinition,
+      [sourceOrbConversionDefinition],
+    );
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedSourceOrbConversionAi = engine.snapshot();
+    const selectedSourceOrbConversionWaterCount = engine.board.flat()
+      .filter((orb) => orb.type === 'water').length;
+    engine.reset();
+    engine.setBoardFromCodes(Array(5).fill('RRRRRR'));
+    engine.setEnemyAiDefinitionPool(
+      0,
+      sourceOrbConversionMonsterDefinition,
+      [sourceOrbConversionDefinition],
+    );
+    engine.setRngState(21_900);
+    const rejectedSourceOrbConversionSkill = engine.takeEnemySkill(0);
+    const rejectedSourceOrbConversionState = engine.snapshot();
+    const randomSourceOrbConversionDefinition = sourceOrbConversionDefinition.slice();
+    const randomSourceOrbConversionView = new DataView(randomSourceOrbConversionDefinition.buffer);
+    randomSourceOrbConversionView.setInt32(0x10, -1, true);
+    randomSourceOrbConversionView.setInt32(0x14, -1, true);
+    engine.setRngState(21_900);
+    const randomSourceOrbConversionApplied = engine.applyEnemySkillDefinition(
+      randomSourceOrbConversionDefinition,
+    );
+    const randomSourceOrbConversionState = engine.snapshot();
     const statusTriggeredAttackBoostMonsterDefinition = enemyAiMonsterDefinition.slice();
     new DataView(statusTriggeredAttackBoostMonsterDefinition.buffer).setUint32(0xec, 9_031, true);
     const statusTriggeredAttackBoostDefinition = sourceToPoisonDefinition.slice();
@@ -1358,6 +1400,9 @@ try {
       selectedStatusShieldAi, rejectedStatusShieldSkill, rejectedStatusShieldState,
       selectedLoneAttackBoostAi, boostedLoneEnemyAttack,
       rejectedLoneAttackBoostSkill, rejectedLoneAttackBoostState,
+      selectedSourceOrbConversionAi, selectedSourceOrbConversionWaterCount,
+      rejectedSourceOrbConversionSkill, rejectedSourceOrbConversionState,
+      randomSourceOrbConversionApplied, randomSourceOrbConversionState,
       selectedStatusTriggeredAttackBoostAi, selectedTransientAttackBoostAi,
       rejectedStatusTriggeredAttackBoostSkill, rejectedStatusTriggeredAttackBoostState,
       selectedDamagedTurnAttackBoostAi,
@@ -1623,6 +1668,16 @@ try {
     poisonBlockSample.boostedLoneEnemyAttack.lastEnemyActions?.[0]?.damage !== 3_700 ||
     poisonBlockSample.rejectedLoneAttackBoostSkill !== null ||
     poisonBlockSample.rejectedLoneAttackBoostState.rngState !== 21_900 ||
+    poisonBlockSample.selectedSourceOrbConversionAi.lastEnemyActions?.[0]?.skill?.type !== 4 ||
+    poisonBlockSample.selectedSourceOrbConversionAi.lastEnemyActions?.[0]?.damage !== 463 ||
+    poisonBlockSample.selectedSourceOrbConversionAi.rngState !== advanceLcg(21_900, 1) ||
+    poisonBlockSample.selectedSourceOrbConversionWaterCount !== 0 ||
+    poisonBlockSample.rejectedSourceOrbConversionSkill !== null ||
+    poisonBlockSample.rejectedSourceOrbConversionState.rngState !== 21_900 ||
+    poisonBlockSample.randomSourceOrbConversionApplied !== true ||
+    poisonBlockSample.randomSourceOrbConversionState.lastEnemySkill?.sourceType !== 0 ||
+    poisonBlockSample.randomSourceOrbConversionState.lastEnemySkill?.destinationType !== 3 ||
+    poisonBlockSample.randomSourceOrbConversionState.rngState !== advanceLcg(21_900, 4) ||
     poisonBlockSample.selectedStatusTriggeredAttackBoostAi.enemies?.[0]?.attackBoostTurns !== 2 ||
     poisonBlockSample.selectedStatusTriggeredAttackBoostAi.enemies?.[0]?.attackBoostPercent !== 250 ||
     poisonBlockSample.selectedStatusTriggeredAttackBoostAi.lastEnemyActions?.[0]?.skill?.type !== 18 ||

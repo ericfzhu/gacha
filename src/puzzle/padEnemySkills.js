@@ -1,3 +1,4 @@
+export const PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION = 4;
 export const PAD_ENEMY_SKILL_LONE_ATTACK_BOOST = 17;
 export const PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST = 18;
 export const PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST = 19;
@@ -94,6 +95,16 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
     ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
     : null;
+  if (type === PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION) {
+    return Object.freeze({
+      type,
+      kind: 'sourceOrbConversion',
+      supported: true,
+      sourceType: definition.getInt32(0x10, true),
+      destinationType: definition.getInt32(0x14, true),
+      attackWithSkillValue,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST) {
     requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
     return Object.freeze({
@@ -547,6 +558,20 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
   );
   const monster = new DataView(monsterBytes.buffer, monsterBytes.byteOffset, monsterBytes.byteLength);
   const type = definition.getInt16(PAD_ENEMY_SKILL_RUNTIME_LAYOUT.definitionTypeOffset, true);
+  if (type === PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION) {
+    return Object.freeze({
+      type,
+      kind: 'sourceOrbConversion',
+      supported: true,
+      sourceType: monster.getInt32(0x678, true),
+      destinationType: monster.getInt32(0x67c, true),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (
     type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST
     || type === PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST
@@ -734,6 +759,20 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
 
 export function normalizePadEnemySkillRecord(record) {
   const type = Math.trunc(Number(record?.type));
+  if (type === PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION || record?.kind === 'sourceOrbConversion') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
+      kind: 'sourceOrbConversion',
+      supported: true,
+      sourceType: Math.trunc(Number(record?.sourceType) || 0),
+      destinationType: Math.trunc(Number(record?.destinationType) || 0),
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      executionMaterialized: Boolean(record?.executionMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
   if (type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST || record?.kind === 'loneAttackBoost') {
     return Object.freeze({
       type: PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,

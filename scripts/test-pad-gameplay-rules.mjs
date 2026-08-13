@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
+  PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -784,6 +785,64 @@ assert.equal(statusShieldRuntimeEngine.applyEnemySkillRuntime(
   statusShieldMonsterRuntime,
 ), true);
 assert.equal(statusShieldRuntimeEngine.enemies[0].statusShieldTurns, 5);
+const enemyAiSourceOrbConversionDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiSourceOrbConversionView = new DataView(enemyAiSourceOrbConversionDefinition.buffer);
+enemyAiSourceOrbConversionView.setUint32(0x00, 9_033, true);
+enemyAiSourceOrbConversionView.setInt16(0x04, PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION, true);
+enemyAiSourceOrbConversionView.setInt32(0x10, 1, true);
+enemyAiSourceOrbConversionView.setInt32(0x14, 4, true);
+enemyAiSourceOrbConversionView.setInt32(0x44, 25, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiSourceOrbConversionDefinition), {
+  type: 4,
+  kind: 'sourceOrbConversion',
+  supported: true,
+  sourceType: 1,
+  destinationType: 4,
+  attackWithSkillValue: 25,
+});
+const sourceOrbConversionMonsterRuntime = new Uint8Array(0x680);
+const sourceOrbConversionMonsterRuntimeView = new DataView(sourceOrbConversionMonsterRuntime.buffer);
+sourceOrbConversionMonsterRuntimeView.setInt32(0x678, 2, true);
+sourceOrbConversionMonsterRuntimeView.setInt32(0x67c, 5, true);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(
+    enemyAiSourceOrbConversionDefinition,
+    sourceOrbConversionMonsterRuntime,
+  ),
+  {
+    type: 4,
+    kind: 'sourceOrbConversion',
+    supported: true,
+    sourceType: 2,
+    destinationType: 5,
+    setupMaterialized: true,
+    attackWithSkillValue: 25,
+  },
+);
+const sourceOrbConversionEngine = new PuzzleEngine({ seed: 21_900 });
+sourceOrbConversionEngine.setBoardFromCodes(['BBBRHD', 'GLDBHG', 'BHGDGL', 'DLGHHB', 'HBGGLD']);
+assert.equal(sourceOrbConversionEngine.applyEnemySkillDefinition(
+  enemyAiSourceOrbConversionDefinition,
+), true);
+assert.equal(sourceOrbConversionEngine.board.flat().filter((orb) => orb.type === 'water').length, 0);
+assert.equal(sourceOrbConversionEngine.board.flat().filter((orb) => orb.type === 'dark').length, 12);
+const randomSourceOrbConversionDefinition = enemyAiSourceOrbConversionDefinition.slice();
+const randomSourceOrbConversionView = new DataView(randomSourceOrbConversionDefinition.buffer);
+randomSourceOrbConversionView.setInt32(0x10, -1, true);
+randomSourceOrbConversionView.setInt32(0x14, -1, true);
+const randomSourceOrbConversionEngine = new PuzzleEngine({ seed: 21_900 });
+randomSourceOrbConversionEngine.setBoardFromCodes(Array(5).fill('RRRRRR'));
+randomSourceOrbConversionEngine.setRngState(21_900);
+assert.equal(randomSourceOrbConversionEngine.applyEnemySkillDefinition(
+  randomSourceOrbConversionDefinition,
+), true);
+assert.equal(randomSourceOrbConversionEngine.lastEnemySkill.sourceType, 0);
+assert.ok(randomSourceOrbConversionEngine.lastEnemySkill.destinationType >= 1);
+assert.ok(randomSourceOrbConversionEngine.lastEnemySkill.destinationType <= 4);
+assert.equal(randomSourceOrbConversionEngine.board.flat()
+  .every((orb) => orb.type !== 'fire'), true);
+assert.equal(randomSourceOrbConversionEngine.rng.state,
+  Array.from({ length: 4 }).reduce((state) => padLcgStep(state).state, 21_900));
 assert.equal(padEnemySkillBoostedAttack(1_850, 100, 200), 3_700);
 assert.equal(padEnemySkillBoostedAttack(1_850, 50, 200), 1_850);
 const enemyAiLoneAttackBoostDefinition = enemyAiPoisonBlocksDefinition.slice();
@@ -2616,6 +2675,39 @@ const rejectedLoneAttackBoostEngine = new PuzzleEngine({
 rejectedLoneAttackBoostEngine.setRngState(21_900);
 assert.equal(rejectedLoneAttackBoostEngine.takeEnemySkill(0), null);
 assert.equal(rejectedLoneAttackBoostEngine.rng.state, 21_900);
+const sourceOrbConversionMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(sourceOrbConversionMonsterDefinition.buffer).setUint32(0xec, 9_033, true);
+const selectedSourceOrbConversionEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: sourceOrbConversionMonsterDefinition,
+    skillDefinitions: [enemyAiSourceOrbConversionDefinition],
+  }],
+});
+selectedSourceOrbConversionEngine.setBoardFromCodes([
+  'BBBRHD', 'GLDRHG', 'RHRDGL', 'DLGRHB', 'HRRGLD',
+]);
+selectedSourceOrbConversionEngine.setRngState(21_900);
+selectedSourceOrbConversionEngine.enemies[0].counter = 1;
+selectedSourceOrbConversionEngine.enemies[1].counter = 99;
+selectedSourceOrbConversionEngine.resolveEnemyTurn();
+const selectedSourceOrbConversionState = selectedSourceOrbConversionEngine.snapshot();
+assert.equal(selectedSourceOrbConversionState.lastEnemyActions[0].skill.type, 4);
+assert.equal(selectedSourceOrbConversionState.lastEnemyActions[0].damage, 463);
+assert.equal(selectedSourceOrbConversionEngine.board.flat()
+  .some((orb) => orb.type === 'water'), false);
+assert.equal(selectedSourceOrbConversionEngine.rng.state, padLcgStep(21_900).state);
+const rejectedSourceOrbConversionEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: sourceOrbConversionMonsterDefinition,
+    skillDefinitions: [enemyAiSourceOrbConversionDefinition],
+  }],
+});
+rejectedSourceOrbConversionEngine.setBoardFromCodes(Array(5).fill('RRRRRR'));
+rejectedSourceOrbConversionEngine.setRngState(21_900);
+assert.equal(rejectedSourceOrbConversionEngine.takeEnemySkill(0), null);
+assert.equal(rejectedSourceOrbConversionEngine.rng.state, 21_900);
 const statusTriggeredAttackBoostMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(statusTriggeredAttackBoostMonsterDefinition.buffer).setUint32(0xec, 9_031, true);
 const selectedStatusTriggeredAttackBoostEngine = new PuzzleEngine({

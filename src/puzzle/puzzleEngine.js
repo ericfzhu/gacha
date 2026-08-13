@@ -33,6 +33,7 @@ import {
   tracePadPointerCells,
 } from './padCoreRules.js';
 import {
+  PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -976,6 +977,26 @@ export class PuzzleEngine {
       rngState: this.rng.state,
       evaluateCondition: (definition, rngState) => {
         this.rng.setState(rngState);
+        if (definition.effect.kind === 'sourceOrbConversion') {
+          const source = definition.effect.sourceType;
+          const destination = definition.effect.destinationType;
+          const sourceCount = source < 0
+            ? [0, 1, 2, 3, 4].reduce(
+              (count, type) => count + this.countBlockBits(1 << type),
+              0,
+            )
+            : source < 16 ? this.countBlockBits(1 << source) : 0;
+          const probabilityScale = sourceCount < 1
+            ? 0
+            : source < 0 || destination < 0
+              ? 1
+              : Math.fround(Math.fround(sourceCount) / Math.fround(3));
+          return {
+            eligible: probabilityScale > 0,
+            probabilityScale,
+            rngState: this.rng.state,
+          };
+        }
         if (definition.effect.kind === 'blockMinus') {
           const eligible = this.doBlockMinus(
             false,
@@ -1055,6 +1076,22 @@ export class PuzzleEngine {
 
   materializeEnemySkillRecord(record, enemyIndex = 0) {
     const skill = normalizePadEnemySkillRecord(record);
+    if (skill.supported && skill.kind === 'sourceOrbConversion' && !skill.executionMaterialized) {
+      const faceCounts = Array.from({ length: 6 }, (_, type) => this.countBlockBits(1 << type));
+      const sourceType = skill.sourceType < 0
+        ? this.rng.getRandomBlockOnFace(faceCounts, false).type
+        : skill.sourceType;
+      const destinationType = skill.destinationType < 0
+        ? this.rng.getRandomBlock(sourceType, false, false)
+        : skill.destinationType;
+      return Object.freeze({
+        ...record,
+        sourceType,
+        destinationType,
+        setupMaterialized: true,
+        executionMaterialized: true,
+      });
+    }
     if (skill.supported && skill.kind === 'changeEnemyAttribute' && !skill.setupMaterialized) {
       const index = Math.trunc(Number(enemyIndex));
       const enemy = this.enemies[index] || this.enemies[0];
@@ -1439,6 +1476,16 @@ export class PuzzleEngine {
       this.message = `Enemy converted one orb color to poison (effect ${effectFlags}).`;
       return true;
     }
+    if (skill.supported && skill.kind === 'sourceOrbConversion') {
+      const effectFlags = this.doBlockSwap(
+        skill.sourceType,
+        skill.destinationType,
+        0,
+        null,
+      );
+      this.message = `Enemy converted one orb color (effect ${effectFlags}).`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'blockMinus') {
       const changed = this.doBlockMinus(
         true,
@@ -1562,6 +1609,7 @@ export class PuzzleEngine {
       const definition = definitionsById.get(slot.skillId);
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
       if (![
+        PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
         PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
         PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
