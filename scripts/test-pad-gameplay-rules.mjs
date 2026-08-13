@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
+  PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
+  PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_SHIELD,
   PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
   PAD_ENEMY_SKILL_SELF_DESTRUCT,
@@ -814,6 +816,93 @@ assert.deepEqual(
     supported: true,
     durationTurns: 5,
     boostPercent: 175,
+    setupMaterialized: true,
+    attackWithSkillValue: 50,
+  },
+);
+const enemyAiStatusTriggeredAttackBoostDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiStatusTriggeredAttackBoostView = new DataView(
+  enemyAiStatusTriggeredAttackBoostDefinition.buffer,
+);
+enemyAiStatusTriggeredAttackBoostView.setUint32(0x00, 9_031, true);
+enemyAiStatusTriggeredAttackBoostView.setInt16(
+  0x04,
+  PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
+  true,
+);
+enemyAiStatusTriggeredAttackBoostView.setInt32(0x10, 2, true);
+enemyAiStatusTriggeredAttackBoostView.setInt32(0x14, 250, true);
+enemyAiStatusTriggeredAttackBoostView.setInt32(0x44, 50, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiStatusTriggeredAttackBoostDefinition), {
+  type: 18,
+  kind: 'statusTriggeredAttackBoost',
+  supported: true,
+  durationTurns: 2,
+  boostPercent: 250,
+  attackWithSkillValue: 50,
+});
+const statusTriggeredAttackBoostMonsterRuntime = new Uint8Array(0x680);
+const statusTriggeredAttackBoostMonsterRuntimeView = new DataView(
+  statusTriggeredAttackBoostMonsterRuntime.buffer,
+);
+statusTriggeredAttackBoostMonsterRuntimeView.setInt32(0x678, 4, true);
+statusTriggeredAttackBoostMonsterRuntimeView.setInt32(0x67c, 225, true);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(
+    enemyAiStatusTriggeredAttackBoostDefinition,
+    statusTriggeredAttackBoostMonsterRuntime,
+  ),
+  {
+    type: 18,
+    kind: 'statusTriggeredAttackBoost',
+    supported: true,
+    durationTurns: 4,
+    boostPercent: 225,
+    setupMaterialized: true,
+    attackWithSkillValue: 50,
+  },
+);
+const enemyAiDamagedTurnAttackBoostDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiDamagedTurnAttackBoostView = new DataView(
+  enemyAiDamagedTurnAttackBoostDefinition.buffer,
+);
+enemyAiDamagedTurnAttackBoostView.setUint32(0x00, 9_032, true);
+enemyAiDamagedTurnAttackBoostView.setInt16(
+  0x04,
+  PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
+  true,
+);
+enemyAiDamagedTurnAttackBoostView.setInt32(0x10, 2, true);
+enemyAiDamagedTurnAttackBoostView.setInt32(0x14, 4, true);
+enemyAiDamagedTurnAttackBoostView.setInt32(0x18, 300, true);
+enemyAiDamagedTurnAttackBoostView.setInt32(0x44, 50, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiDamagedTurnAttackBoostDefinition), {
+  type: 19,
+  kind: 'damagedTurnAttackBoost',
+  supported: true,
+  damagedTurnThreshold: 2,
+  durationTurns: 4,
+  boostPercent: 300,
+  attackWithSkillValue: 50,
+});
+const damagedTurnAttackBoostMonsterRuntime = new Uint8Array(0x680);
+const damagedTurnAttackBoostMonsterRuntimeView = new DataView(
+  damagedTurnAttackBoostMonsterRuntime.buffer,
+);
+damagedTurnAttackBoostMonsterRuntimeView.setInt32(0x678, 6, true);
+damagedTurnAttackBoostMonsterRuntimeView.setInt32(0x67c, 275, true);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(
+    enemyAiDamagedTurnAttackBoostDefinition,
+    damagedTurnAttackBoostMonsterRuntime,
+  ),
+  {
+    type: 19,
+    kind: 'damagedTurnAttackBoost',
+    supported: true,
+    durationTurns: 6,
+    boostPercent: 275,
+    damagedTurnThreshold: 2,
     setupMaterialized: true,
     attackWithSkillValue: 50,
   },
@@ -2527,6 +2616,90 @@ const rejectedLoneAttackBoostEngine = new PuzzleEngine({
 rejectedLoneAttackBoostEngine.setRngState(21_900);
 assert.equal(rejectedLoneAttackBoostEngine.takeEnemySkill(0), null);
 assert.equal(rejectedLoneAttackBoostEngine.rng.state, 21_900);
+const statusTriggeredAttackBoostMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(statusTriggeredAttackBoostMonsterDefinition.buffer).setUint32(0xec, 9_031, true);
+const selectedStatusTriggeredAttackBoostEngine = new PuzzleEngine({
+  seed: 21_900,
+  playerAttackBoostTurns: 2,
+  enemyAiPools: [{
+    monsterDefinition: statusTriggeredAttackBoostMonsterDefinition,
+    skillDefinitions: [enemyAiStatusTriggeredAttackBoostDefinition],
+  }],
+});
+selectedStatusTriggeredAttackBoostEngine.setRngState(21_900);
+selectedStatusTriggeredAttackBoostEngine.enemies[0].counter = 1;
+selectedStatusTriggeredAttackBoostEngine.enemies[1].counter = 99;
+selectedStatusTriggeredAttackBoostEngine.resolveEnemyTurn();
+const selectedStatusTriggeredAttackBoostState = selectedStatusTriggeredAttackBoostEngine.snapshot();
+assert.equal(selectedStatusTriggeredAttackBoostState.enemies[0].attackBoostTurns, 2);
+assert.equal(selectedStatusTriggeredAttackBoostState.enemies[0].attackBoostPercent, 250);
+assert.equal(selectedStatusTriggeredAttackBoostState.lastEnemyActions[0].skill.type, 18);
+assert.equal(selectedStatusTriggeredAttackBoostState.lastEnemyActions[0].damage, 925);
+assert.equal(selectedStatusTriggeredAttackBoostState.nativePlayerBuffStatus.attackBoostTurns, 2);
+assert.equal(selectedStatusTriggeredAttackBoostEngine.rng.state, padLcgStep(21_900).state);
+const transientStatusTriggeredAttackBoostEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: statusTriggeredAttackBoostMonsterDefinition,
+    skillDefinitions: [enemyAiStatusTriggeredAttackBoostDefinition],
+  }],
+});
+transientStatusTriggeredAttackBoostEngine.enemies[0].transientDebuffActive = true;
+transientStatusTriggeredAttackBoostEngine.enemies[0].counter = 1;
+transientStatusTriggeredAttackBoostEngine.enemies[1].counter = 99;
+transientStatusTriggeredAttackBoostEngine.resolveEnemyTurn();
+assert.equal(transientStatusTriggeredAttackBoostEngine.lastEnemySkill.type, 18);
+assert.equal(transientStatusTriggeredAttackBoostEngine.enemies[0].transientDebuffActive, false);
+const rejectedStatusTriggeredAttackBoostEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: statusTriggeredAttackBoostMonsterDefinition,
+    skillDefinitions: [enemyAiStatusTriggeredAttackBoostDefinition],
+  }],
+});
+rejectedStatusTriggeredAttackBoostEngine.setRngState(21_900);
+assert.equal(rejectedStatusTriggeredAttackBoostEngine.takeEnemySkill(0), null);
+assert.equal(rejectedStatusTriggeredAttackBoostEngine.rng.state, 21_900);
+const damagedTurnCounterEngine = new PuzzleEngine({ seed: 21_900 });
+damagedTurnCounterEngine.enemies[1].hp = 0;
+damagedTurnCounterEngine.comboCount = 1;
+damagedTurnCounterEngine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+damagedTurnCounterEngine.resolvePlayerTurn();
+assert.equal(damagedTurnCounterEngine.enemies[0].damagedTurnCount, 1);
+damagedTurnCounterEngine.resolvePlayerTurn();
+assert.equal(damagedTurnCounterEngine.enemies[0].damagedTurnCount, 2);
+const damagedTurnAttackBoostMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(damagedTurnAttackBoostMonsterDefinition.buffer).setUint32(0xec, 9_032, true);
+const selectedDamagedTurnAttackBoostEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: damagedTurnAttackBoostMonsterDefinition,
+    skillDefinitions: [enemyAiDamagedTurnAttackBoostDefinition],
+  }],
+});
+selectedDamagedTurnAttackBoostEngine.enemies[0].damagedTurnCount = 2;
+selectedDamagedTurnAttackBoostEngine.setRngState(21_900);
+selectedDamagedTurnAttackBoostEngine.enemies[0].counter = 1;
+selectedDamagedTurnAttackBoostEngine.enemies[1].counter = 99;
+selectedDamagedTurnAttackBoostEngine.resolveEnemyTurn();
+const selectedDamagedTurnAttackBoostState = selectedDamagedTurnAttackBoostEngine.snapshot();
+assert.equal(selectedDamagedTurnAttackBoostState.enemies[0].damagedTurnCount, 2);
+assert.equal(selectedDamagedTurnAttackBoostState.enemies[0].attackBoostTurns, 4);
+assert.equal(selectedDamagedTurnAttackBoostState.enemies[0].attackBoostPercent, 300);
+assert.equal(selectedDamagedTurnAttackBoostState.lastEnemyActions[0].skill.type, 19);
+assert.equal(selectedDamagedTurnAttackBoostState.lastEnemyActions[0].damage, 925);
+assert.equal(selectedDamagedTurnAttackBoostEngine.rng.state, padLcgStep(21_900).state);
+const rejectedDamagedTurnAttackBoostEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: damagedTurnAttackBoostMonsterDefinition,
+    skillDefinitions: [enemyAiDamagedTurnAttackBoostDefinition],
+  }],
+});
+rejectedDamagedTurnAttackBoostEngine.enemies[0].damagedTurnCount = 1;
+rejectedDamagedTurnAttackBoostEngine.setRngState(21_900);
+assert.equal(rejectedDamagedTurnAttackBoostEngine.takeEnemySkill(0), null);
+assert.equal(rejectedDamagedTurnAttackBoostEngine.rng.state, 21_900);
 const selfDestructMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(selfDestructMonsterDefinition.buffer).setUint32(0xec, 9_027, true);
 const selectedSelfDestructEngine = new PuzzleEngine({

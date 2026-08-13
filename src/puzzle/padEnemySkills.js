@@ -1,4 +1,6 @@
 export const PAD_ENEMY_SKILL_LONE_ATTACK_BOOST = 17;
+export const PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST = 18;
+export const PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST = 19;
 export const PAD_ENEMY_SKILL_STATUS_SHIELD = 20;
 export const PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION = 39;
 export const PAD_ENEMY_SKILL_SELF_DESTRUCT = 40;
@@ -98,6 +100,28 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       type,
       kind: 'loneAttackBoost',
       supported: true,
+      durationTurns: definition.getInt32(0x14, true),
+      boostPercent: definition.getInt32(0x18, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST) {
+    return Object.freeze({
+      type,
+      kind: 'statusTriggeredAttackBoost',
+      supported: true,
+      durationTurns: definition.getInt32(0x10, true),
+      boostPercent: definition.getInt32(0x14, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST) {
+    requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'damagedTurnAttackBoost',
+      supported: true,
+      damagedTurnThreshold: definition.getInt32(0x10, true),
       durationTurns: definition.getInt32(0x14, true),
       boostPercent: definition.getInt32(0x18, true),
       attackWithSkillValue,
@@ -523,13 +547,25 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
   );
   const monster = new DataView(monsterBytes.buffer, monsterBytes.byteOffset, monsterBytes.byteLength);
   const type = definition.getInt16(PAD_ENEMY_SKILL_RUNTIME_LAYOUT.definitionTypeOffset, true);
-  if (type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST) {
+  if (
+    type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST
+    || type === PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST
+    || type === PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST
+  ) {
+    const kind = type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST
+      ? 'loneAttackBoost'
+      : type === PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST
+        ? 'statusTriggeredAttackBoost'
+        : 'damagedTurnAttackBoost';
     return Object.freeze({
       type,
-      kind: 'loneAttackBoost',
+      kind,
       supported: true,
       durationTurns: monster.getInt32(0x678, true),
       boostPercent: monster.getInt32(0x67c, true),
+      ...(type === PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST
+        ? { damagedTurnThreshold: definition.getInt32(0x10, true) }
+        : {}),
       setupMaterialized: true,
       attackWithSkillValue: definitionBytes.byteLength
           >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
@@ -703,6 +739,39 @@ export function normalizePadEnemySkillRecord(record) {
       type: PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
       kind: 'loneAttackBoost',
       supported: true,
+      durationTurns: Math.trunc(Number(record?.durationTurns) || 0),
+      boostPercent: Math.trunc(Number(record?.boostPercent) || 0),
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (
+    type === PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST
+    || record?.kind === 'statusTriggeredAttackBoost'
+  ) {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
+      kind: 'statusTriggeredAttackBoost',
+      supported: true,
+      durationTurns: Math.trunc(Number(record?.durationTurns) || 0),
+      boostPercent: Math.trunc(Number(record?.boostPercent) || 0),
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (
+    type === PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST
+    || record?.kind === 'damagedTurnAttackBoost'
+  ) {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
+      kind: 'damagedTurnAttackBoost',
+      supported: true,
+      damagedTurnThreshold: Math.trunc(Number(record?.damagedTurnThreshold) || 0),
       durationTurns: Math.trunc(Number(record?.durationTurns) || 0),
       boostPercent: Math.trunc(Number(record?.boostPercent) || 0),
       setupMaterialized: Boolean(record?.setupMaterialized),

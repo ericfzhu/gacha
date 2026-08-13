@@ -1,6 +1,8 @@
 import { padLcgStep } from './padCoreRules.js';
 import {
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
+  PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
+  PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_SHIELD,
   PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
   PAD_ENEMY_SKILL_SELF_DESTRUCT,
@@ -127,6 +129,8 @@ function normalizeDefinitionMap(definitions) {
 function isStaticallyEligible(definition, state) {
   if (!definition.effect.supported || ![
     PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
+    PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
+    PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
     PAD_ENEMY_SKILL_STATUS_SHIELD,
     PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
     PAD_ENEMY_SKILL_SELF_DESTRUCT,
@@ -172,6 +176,25 @@ function evaluateCondition(definition, state, rngState) {
   if (definition.effect.type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST) {
     const eligible = state.enemyAttackBoostTurns <= 0
       && state.enemies.filter((enemy) => Number(enemy?.hp) > 0).length === 1;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST) {
+    // 0x61ad7c rejects an already-active sMONSTER+0x860 boost, then accepts
+    // when any of these native status lanes is active: sGAMEWORK+0x86bd4,
+    // sGAMEWORK+0x86c3c, or the per-monster byte at +0x07.
+    const eligible = state.enemyAttackBoostTurns <= 0 && (
+      state.playerAuxiliaryBuffTurns > 0
+      || state.playerAttackBoostTurns > 0
+      || state.enemyTransientDebuffActive
+    );
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST) {
+    // calcFinalDamage increments sMONSTER+0x7d0 only for the first positive
+    // damage event of a player turn. The type-19 callback compares +0x10 to
+    // that unsigned 16-bit counter and does not advance the RNG.
+    const eligible = state.enemyAttackBoostTurns <= 0
+      && definition.effect.damagedTurnThreshold <= state.enemyDamagedTurnCount;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_STATUS_SHIELD) {
@@ -293,6 +316,19 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     attributeAbsorbTurns: Math.max(0, Math.trunc(Number(state.attributeAbsorbTurns) || 0)),
     scaledAttackGate: Math.trunc(Number(state.scaledAttackGate) || 0),
     enemyAttackBoostTurns: Math.max(0, Math.trunc(Number(state.enemyAttackBoostTurns) || 0)),
+    enemyDamagedTurnCount: Math.max(
+      0,
+      Math.min(0xffff, Math.trunc(Number(state.enemyDamagedTurnCount) || 0)),
+    ),
+    playerAuxiliaryBuffTurns: Math.max(
+      0,
+      Math.trunc(Number(state.playerAuxiliaryBuffTurns) || 0),
+    ),
+    playerAttackBoostTurns: Math.max(
+      0,
+      Math.trunc(Number(state.playerAttackBoostTurns) || 0),
+    ),
+    enemyTransientDebuffActive: Boolean(state.enemyTransientDebuffActive),
     enemyStatusShieldTurns: Math.max(0, Math.trunc(Number(state.enemyStatusShieldTurns) || 0)),
     moveTimeReductionTurns: Math.max(0, Math.trunc(Number(state.moveTimeReductionTurns) || 0)),
     enemyAttribute: Math.trunc(Number(state.enemyAttribute)),

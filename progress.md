@@ -2,6 +2,27 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 conditional enemy attack boosts
+
+- Split enemy skill types `18` and `19` from the shared type-17 execution
+  handler `0x629064`, retaining their distinct setup and condition callbacks.
+  Type `18` uses setup `0x61fee4`, condition `0x61ad7c`, and definition
+  `+0x10/+0x14` for duration/percentage. Type `19` uses setup `0x61ffdc`,
+  condition `0x61ade8`, and `+0x10/+0x14/+0x18` for threshold/duration/percent.
+- Ported type `18`'s exact “boost inactive and any of three native status lanes
+  active” predicate. The raw lanes remain conservatively named because only
+  `sGAMEWORK+0x86c3c` is proven to be the player's attack-boost duration;
+  `monsterEndOfAttack` clears the per-monster `+0x07` lane after its action.
+- Traced type `19`'s unsigned-16 `sMONSTER+0x7d0` counter through
+  `_calcFinalDamage`: it increments once per player turn with positive
+  calculated damage, while `+0x7b8` suppresses later hits until `_initTurn`.
+  Ported the counter, threshold test, 16-bit wrap, snapshots, definition/runtime
+  decoders, and browser/pure-rule fixtures without adding condition-owned RNG.
+- Exact binary inspection now verifies both variants' dispatch, setup, and
+  condition table targets plus the damage/status lifecycle symbol anchors.
+- Next: continue the enemy-skill table beyond the completed live types while
+  preserving the raw state-lane boundary for semantics not yet proven.
+
 ## 2026-08-14 lone-enemy attack boost
 
 - Identified enemy skill type `17` as the lone-enemy attack boost: shared late

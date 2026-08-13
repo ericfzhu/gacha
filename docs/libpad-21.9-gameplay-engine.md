@@ -671,6 +671,35 @@ countdown, snapshot, and `ATK percent/turns` presentation. Neighboring types
 `18` and `19` share the execution handler but retain distinct setup layouts and
 conditions and are not conflated with type `17`.
 
+Type `18` is the status-triggered variant. Its dispatch also targets `0x629064`,
+while setup targets `0x61fee4` and its condition targets `0x61ad7c`. Setup copies
+definition duration `+0x10` and attack percentage `+0x14` to runtime
+`sMONSTER+0x678/+0x67c`. The condition rejects an already-active attack boost,
+then admits the skill when at least one of three raw native lanes is active:
+signed game-work counters `+0x86bd4` or `+0x86c3c`, or the per-monster byte at
+`+0x07`. The second game-work lane is the player's attack-boost duration; the
+first is another player timed-buff lane whose exact public label is not yet
+proven. The monster byte is a transient status bit rendered with those two
+lanes and cleared by `monsterEndOfAttack` after that monster acts. The port
+therefore exposes conservative `playerAuxiliaryBuffTurns`,
+`playerAttackBoostTurns`, and `transientDebuffActive` state names instead of
+assigning unsupported user-facing semantics.
+
+Type `19` is the damaged-turn variant. It dispatches to `0x629064`, uses setup
+`0x61ffdc`, and condition `0x61ade8`. Definition `+0x10` is the signed damage-
+turn threshold; `+0x14/+0x18` become runtime duration and attack percentage.
+The condition rejects an existing boost and otherwise admits the skill when
+the signed threshold is less than or equal to unsigned-16
+`sMONSTER+0x7d0`. `_calcFinalDamage` increments this counter only when it
+calculates positive damage while the current-turn accumulator at `+0x7b8` is
+still zero, then adds the damage to that accumulator. `_initTurn` clears the
+accumulator for the next player turn. Thus `+0x7d0` counts player turns in
+which that enemy received at least one positive calculated damage event—not
+individual hits—and naturally wraps at 16 bits. The browser mirrors this even
+when the later attribute-absorb step converts the calculated damage into
+healing. Neither type-18 nor type-19 condition advances RNG; an admitted
+immediate record spends only the selector's ordinary probability draw.
+
 Enemy skill type `20` applies the enemy's status-ailment immunity shield. Its
 late dispatch entry targets `0x629534`, setup targets `0x61ff08`, and AI
 condition targets `0x61b4d8`. Setup copies signed definition integer `+0x10`

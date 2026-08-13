@@ -34,6 +34,8 @@ import {
 } from './padCoreRules.js';
 import {
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
+  PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
+  PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_SHIELD,
   PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
   PAD_ENEMY_SKILL_SELF_DESTRUCT,
@@ -127,8 +129,8 @@ const PARTY = Object.freeze([
 ]);
 
 const ENEMY_TEMPLATE = Object.freeze([
-  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
-  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
+  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
+  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
 ]);
 
 function clamp(value, min, max) {
@@ -168,6 +170,8 @@ export class PuzzleEngine {
     lockFallSeed = seed,
     enemySkillQueues = [],
     enemyAiPools = [],
+    playerAuxiliaryBuffTurns = 0,
+    playerAttackBoostTurns = 0,
   } = {}) {
     if (![columns, rows].every(Number.isInteger) || columns < 1 || columns > 15 || rows < 1 || rows > 15) {
       throw new Error('PAD board dimensions must be integers from 1 through 15.');
@@ -207,6 +211,14 @@ export class PuzzleEngine {
         this.setEnemyAiDefinitionPool(enemyIndex, pool.monsterDefinition, pool.skillDefinitions);
       }
     });
+    this.initialPlayerAuxiliaryBuffTurns = Math.max(
+      0,
+      Math.trunc(Number(playerAuxiliaryBuffTurns) || 0),
+    );
+    this.initialPlayerAttackBoostTurns = Math.max(
+      0,
+      Math.trunc(Number(playerAttackBoostTurns) || 0),
+    );
     this.rng = createPadRng(seed);
     this.orbSerial = 0;
     this.visualTime = 0;
@@ -235,6 +247,8 @@ export class PuzzleEngine {
     this.lastEnemyActions = [];
     this.moveTime = this.baseMoveTime;
     this.moveTimeReduction = null;
+    this.playerAuxiliaryBuffTurns = this.initialPlayerAuxiliaryBuffTurns;
+    this.playerAttackBoostTurns = this.initialPlayerAttackBoostTurns;
     this.enemySkillQueues.forEach((queue) => { queue.position = 0; });
     this.enemyAiPools.forEach((pool) => {
       if (pool) pool.aiBudget = pool.monster.budgetCap;
@@ -754,6 +768,7 @@ export class PuzzleEngine {
 
     let totalDamage = 0;
     let absorbedDamage = 0;
+    const damagedThisTurn = new Set();
     const attackRounds = [
       (member) => ({ attribute: member.attribute, attack: member.attack }),
       (member) => ({
@@ -788,6 +803,7 @@ export class PuzzleEngine {
             enemy.defense,
             member.damageCap,
           );
+          if (damage > 0) damagedThisTurn.add(enemyIndex);
           const attributeIndex = PAD_ATTRIBUTE_INDEX[lane.attribute];
           if (
             Number(enemy.attributeAbsorbTurns || 0) > 0
@@ -823,6 +839,10 @@ export class PuzzleEngine {
     this.lastNailDamage = nailDamage;
     this.lastAbsorbedDamage = absorbedDamage;
     this.lastDamage = totalDamage + nailDamage;
+    damagedThisTurn.forEach((enemyIndex) => {
+      const enemy = this.enemies[enemyIndex];
+      if (enemy) enemy.damagedTurnCount = (Math.trunc(Number(enemy.damagedTurnCount) || 0) + 1) & 0xffff;
+    });
     this.advancePartyBindTurns();
     this.message = `${this.comboCount} combo${this.comboCount === 1 ? '' : 's'} · ${this.lastDamage.toLocaleString()} total damage${this.lastAbsorbedDamage ? ` · ${this.lastAbsorbedDamage.toLocaleString()} absorbed` : ''}${this.lastNailDamage ? ` · ${this.lastNailDamage.toLocaleString()} nails` : ''}${this.lastHealing ? ` · +${this.lastHealing.toLocaleString()} HP` : ''}${this.lastPoisonDamage ? ` · -${this.lastPoisonDamage.toLocaleString()} poison` : ''}${this.lastBombDamage ? ` · -${this.lastBombDamage.toLocaleString()} bombs` : ''}${this.lastThornDamage ? ` · -${this.lastThornDamage.toLocaleString()} thorns` : ''}`;
   }
@@ -895,6 +915,8 @@ export class PuzzleEngine {
           if (damage > 0) {
             this.floatingText.push({ kind: 'enemy', value: damage, enemy: index, age: 0 });
           }
+          // monsterEndOfAttack clears sMONSTER+0x07 after the monster acts.
+          enemy.transientDebuffActive = false;
           return;
         }
         const damage = padEnemySkillBoostedAttack(
@@ -905,6 +927,7 @@ export class PuzzleEngine {
         total += damage;
         this.lastEnemyActions.push({ enemy: index, kind: 'attack', damage });
         this.floatingText.push({ kind: 'enemy', value: damage, enemy: index, age: 0 });
+        enemy.transientDebuffActive = false;
       }
     });
     if (total) {
@@ -934,6 +957,10 @@ export class PuzzleEngine {
       attributeAbsorbTurns: enemy.attributeAbsorbTurns,
       scaledAttackGate: enemy.scaledAttackGate,
       enemyAttackBoostTurns: enemy.attackBoostTurns,
+      enemyDamagedTurnCount: enemy.damagedTurnCount,
+      enemyTransientDebuffActive: enemy.transientDebuffActive,
+      playerAuxiliaryBuffTurns: this.playerAuxiliaryBuffTurns,
+      playerAttackBoostTurns: this.playerAttackBoostTurns,
       enemyStatusShieldTurns: enemy.statusShieldTurns,
       moveTimeReductionTurns: this.moveTimeReduction?.turnsRemaining || 0,
       enemyAttribute: PAD_ATTRIBUTE_INDEX[enemy.attribute] ?? -1,
@@ -1298,7 +1325,11 @@ export class PuzzleEngine {
     const materialized = this.materializeEnemySkillRecord(record, enemyIndex);
     const skill = normalizePadEnemySkillRecord(materialized);
     this.lastEnemySkill = skill;
-    if (skill.supported && skill.kind === 'loneAttackBoost') {
+    if (skill.supported && [
+      'loneAttackBoost',
+      'statusTriggeredAttackBoost',
+      'damagedTurnAttackBoost',
+    ].includes(skill.kind)) {
       const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
       if (!enemy) return false;
       enemy.attackBoostTurns = Math.max(0, (skill.durationTurns << 16) >> 16);
@@ -1532,6 +1563,8 @@ export class PuzzleEngine {
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
       if (![
         PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
+        PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
+        PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_SHIELD,
         PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
         PAD_ENEMY_SKILL_SELF_DESTRUCT,
@@ -2107,6 +2140,10 @@ export class PuzzleEngine {
         skill: action.skill ? { ...action.skill } : undefined,
       })),
       leaderPairMultiplier: this.lastLeaderMultiplier,
+      nativePlayerBuffStatus: {
+        auxiliaryTurns: this.playerAuxiliaryBuffTurns,
+        attackBoostTurns: this.playerAttackBoostTurns,
+      },
       player: { ...this.player },
       party: this.party.map(({ id, name, attribute, secondaryAttribute, tertiaryAttribute, secondaryAttributeChanged = false, attack, recovery, damageCap, helper = false, leaderSkill = null, present = true, bindTurns = 0, bindResist = false, superBindResist = false }) => ({
         id,
@@ -2127,7 +2164,7 @@ export class PuzzleEngine {
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,
-      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0 }, index) => ({
+      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0 }, index) => ({
         id,
         name,
         attribute,
@@ -2138,6 +2175,8 @@ export class PuzzleEngine {
         scaledAttackGate,
         attackBoostTurns,
         attackBoostPercent,
+        damagedTurnCount,
+        transientDebuffActive,
         statusShieldTurns,
         attributeAbsorbTurns,
         attributeAbsorbMask,

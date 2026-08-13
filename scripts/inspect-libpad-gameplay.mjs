@@ -28,6 +28,14 @@ const LONE_ATTACK_BOOST_ENEMY_SKILL_TYPE = 17;
 const LONE_ATTACK_BOOST_HANDLER = 0x629064;
 const LONE_ATTACK_BOOST_SETUP_HANDLER = 0x61ffdc;
 const LONE_ATTACK_BOOST_CONDITION_HANDLER = 0x61acdc;
+const STATUS_TRIGGERED_ATTACK_BOOST_ENEMY_SKILL_TYPE = 18;
+const STATUS_TRIGGERED_ATTACK_BOOST_HANDLER = 0x629064;
+const STATUS_TRIGGERED_ATTACK_BOOST_SETUP_HANDLER = 0x61fee4;
+const STATUS_TRIGGERED_ATTACK_BOOST_CONDITION_HANDLER = 0x61ad7c;
+const DAMAGED_TURN_ATTACK_BOOST_ENEMY_SKILL_TYPE = 19;
+const DAMAGED_TURN_ATTACK_BOOST_HANDLER = 0x629064;
+const DAMAGED_TURN_ATTACK_BOOST_SETUP_HANDLER = 0x61ffdc;
+const DAMAGED_TURN_ATTACK_BOOST_CONDITION_HANDLER = 0x61ade8;
 const STATUS_SHIELD_ENEMY_SKILL_TYPE = 20;
 const STATUS_SHIELD_HANDLER = 0x629534;
 const STATUS_SHIELD_SETUP_HANDLER = 0x61ff08;
@@ -201,6 +209,9 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['enemy-ai', 'isValidCardNumber', '_ZN9cSAVEDATA17isValidCardNumberEib', 0x74393c],
   ['combat', 'checkMonsterAbsorb', '_ZN9cGAMEMAIN18_checkMonterAbsorbEv', 0x6239dc],
   ['combat', 'calcFinalDamage', '_ZN9cGAMEMAIN16_calcFinalDamageEbPK5sCARDPNS0_7sATKINFExRiP8sMONSTERiRbS8_S8_', 0x623b40],
+  ['combat', 'monsterEndOfAttack', '_ZN9cGAMEMAIN19_monsterEndOfAttackEP8sMONSTER', 0x622364],
+  ['combat', 'initTurn', '_ZN9cGAMEMAIN9_initTurnEv', 0x679a64],
+  ['combat', 'drawAndCountMonsIcons', '_ZN9cGAMEMAIN22_drawAndCountMonsIconsEPiP8sMONSTERR6IS_V2D8IS_RGBA8', 0x6a36fc],
   ['math', 'roundDouble', 'izMathRoundD', 0x36b2ec],
   ['math', 'roundFloat', 'izMathRound', 0x36a9bc],
   ['math', 'signedIntMultiplyAdd', 'izMathSint32MulAdd', 0x36b3fc],
@@ -325,6 +336,48 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : loneAttackBoostSetupTarget === LONE_ATTACK_BOOST_SETUP_HANDLER;
   const loneAttackBoostConditionMatches = loneAttackBoostConditionTarget === null
     ? null : loneAttackBoostConditionTarget === LONE_ATTACK_BOOST_CONDITION_HANDLER;
+  const statusTriggeredAttackBoostDispatchTarget = resolveEnemySkillTarget(
+    STATUS_TRIGGERED_ATTACK_BOOST_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const statusTriggeredAttackBoostSetupTarget = resolveEnemySkillTarget(
+    STATUS_TRIGGERED_ATTACK_BOOST_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const statusTriggeredAttackBoostConditionTarget = resolveEnemySkillTarget(
+    STATUS_TRIGGERED_ATTACK_BOOST_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const statusTriggeredAttackBoostDispatchMatches = statusTriggeredAttackBoostDispatchTarget === null
+    ? null : statusTriggeredAttackBoostDispatchTarget === STATUS_TRIGGERED_ATTACK_BOOST_HANDLER;
+  const statusTriggeredAttackBoostSetupMatches = statusTriggeredAttackBoostSetupTarget === null
+    ? null : statusTriggeredAttackBoostSetupTarget === STATUS_TRIGGERED_ATTACK_BOOST_SETUP_HANDLER;
+  const statusTriggeredAttackBoostConditionMatches = statusTriggeredAttackBoostConditionTarget === null
+    ? null : statusTriggeredAttackBoostConditionTarget === STATUS_TRIGGERED_ATTACK_BOOST_CONDITION_HANDLER;
+  const damagedTurnAttackBoostDispatchTarget = resolveEnemySkillTarget(
+    DAMAGED_TURN_ATTACK_BOOST_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const damagedTurnAttackBoostSetupTarget = resolveEnemySkillTarget(
+    DAMAGED_TURN_ATTACK_BOOST_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const damagedTurnAttackBoostConditionTarget = resolveEnemySkillTarget(
+    DAMAGED_TURN_ATTACK_BOOST_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const damagedTurnAttackBoostDispatchMatches = damagedTurnAttackBoostDispatchTarget === null
+    ? null : damagedTurnAttackBoostDispatchTarget === DAMAGED_TURN_ATTACK_BOOST_HANDLER;
+  const damagedTurnAttackBoostSetupMatches = damagedTurnAttackBoostSetupTarget === null
+    ? null : damagedTurnAttackBoostSetupTarget === DAMAGED_TURN_ATTACK_BOOST_SETUP_HANDLER;
+  const damagedTurnAttackBoostConditionMatches = damagedTurnAttackBoostConditionTarget === null
+    ? null : damagedTurnAttackBoostConditionTarget === DAMAGED_TURN_ATTACK_BOOST_CONDITION_HANDLER;
   const statusShieldDispatchTarget = resolveEnemySkillTarget(
     STATUS_SHIELD_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1149,6 +1202,12 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       loneAttackBoostDispatchMatches21_9: loneAttackBoostDispatchMatches,
       loneAttackBoostSetupMatches21_9: loneAttackBoostSetupMatches,
       loneAttackBoostConditionMatches21_9: loneAttackBoostConditionMatches,
+      statusTriggeredAttackBoostDispatchMatches21_9: statusTriggeredAttackBoostDispatchMatches,
+      statusTriggeredAttackBoostSetupMatches21_9: statusTriggeredAttackBoostSetupMatches,
+      statusTriggeredAttackBoostConditionMatches21_9: statusTriggeredAttackBoostConditionMatches,
+      damagedTurnAttackBoostDispatchMatches21_9: damagedTurnAttackBoostDispatchMatches,
+      damagedTurnAttackBoostSetupMatches21_9: damagedTurnAttackBoostSetupMatches,
+      damagedTurnAttackBoostConditionMatches21_9: damagedTurnAttackBoostConditionMatches,
       statusShieldDispatchMatches21_9: statusShieldDispatchMatches,
       statusShieldSetupMatches21_9: statusShieldSetupMatches,
       statusShieldConditionMatches21_9: statusShieldConditionMatches,
@@ -1297,6 +1356,30 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       loneAttackBoostConditionTarget: loneAttackBoostConditionTarget === null
         ? null : hex(loneAttackBoostConditionTarget),
       loneAttackBoostConditionMatches21_9: loneAttackBoostConditionMatches,
+      statusTriggeredAttackBoostType: STATUS_TRIGGERED_ATTACK_BOOST_ENEMY_SKILL_TYPE,
+      statusTriggeredAttackBoostDispatchTarget: statusTriggeredAttackBoostDispatchTarget === null
+        ? null : hex(statusTriggeredAttackBoostDispatchTarget),
+      statusTriggeredAttackBoostDispatchMatches21_9: statusTriggeredAttackBoostDispatchMatches,
+      statusTriggeredAttackBoostSetupTarget: statusTriggeredAttackBoostSetupTarget === null
+        ? null : hex(statusTriggeredAttackBoostSetupTarget),
+      statusTriggeredAttackBoostSetupMatches21_9: statusTriggeredAttackBoostSetupMatches,
+      statusTriggeredAttackBoostConditionTarget: statusTriggeredAttackBoostConditionTarget === null
+        ? null : hex(statusTriggeredAttackBoostConditionTarget),
+      statusTriggeredAttackBoostConditionMatches21_9: statusTriggeredAttackBoostConditionMatches,
+      statusTriggeredAttackBoostConditionLanes:
+        'sGAMEWORK+0x86bd4, sGAMEWORK+0x86c3c, or sMONSTER+0x07; requires sMONSTER+0x860 inactive',
+      damagedTurnAttackBoostType: DAMAGED_TURN_ATTACK_BOOST_ENEMY_SKILL_TYPE,
+      damagedTurnAttackBoostDispatchTarget: damagedTurnAttackBoostDispatchTarget === null
+        ? null : hex(damagedTurnAttackBoostDispatchTarget),
+      damagedTurnAttackBoostDispatchMatches21_9: damagedTurnAttackBoostDispatchMatches,
+      damagedTurnAttackBoostSetupTarget: damagedTurnAttackBoostSetupTarget === null
+        ? null : hex(damagedTurnAttackBoostSetupTarget),
+      damagedTurnAttackBoostSetupMatches21_9: damagedTurnAttackBoostSetupMatches,
+      damagedTurnAttackBoostConditionTarget: damagedTurnAttackBoostConditionTarget === null
+        ? null : hex(damagedTurnAttackBoostConditionTarget),
+      damagedTurnAttackBoostConditionMatches21_9: damagedTurnAttackBoostConditionMatches,
+      damagedTurnCounterOffset:
+        'sMONSTER+0x7d0 uint16; increments once per player turn with positive calculated damage',
       statusShieldType: STATUS_SHIELD_ENEMY_SKILL_TYPE,
       statusShieldDispatchTarget: statusShieldDispatchTarget === null
         ? null : hex(statusShieldDispatchTarget),
@@ -1632,6 +1715,12 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || healPlayerConditionMatches === false
     || loneAttackBoostDispatchMatches === false || loneAttackBoostSetupMatches === false
     || loneAttackBoostConditionMatches === false
+    || statusTriggeredAttackBoostDispatchMatches === false
+    || statusTriggeredAttackBoostSetupMatches === false
+    || statusTriggeredAttackBoostConditionMatches === false
+    || damagedTurnAttackBoostDispatchMatches === false
+    || damagedTurnAttackBoostSetupMatches === false
+    || damagedTurnAttackBoostConditionMatches === false
     || statusShieldDispatchMatches === false || statusShieldSetupMatches === false
     || statusShieldConditionMatches === false || inactiveEnemySkills21Through38Match === false
     || moveTimeReductionDispatchMatches === false || moveTimeReductionSetupMatches === false

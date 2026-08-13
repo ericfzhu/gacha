@@ -1009,6 +1009,85 @@ try {
     engine.setRngState(21_900);
     const rejectedLoneAttackBoostSkill = engine.takeEnemySkill(0);
     const rejectedLoneAttackBoostState = engine.snapshot();
+    const statusTriggeredAttackBoostMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(statusTriggeredAttackBoostMonsterDefinition.buffer).setUint32(0xec, 9_031, true);
+    const statusTriggeredAttackBoostDefinition = sourceToPoisonDefinition.slice();
+    const statusTriggeredAttackBoostView = new DataView(statusTriggeredAttackBoostDefinition.buffer);
+    statusTriggeredAttackBoostView.setUint32(0x00, 9_031, true);
+    statusTriggeredAttackBoostView.setInt16(0x04, 18, true);
+    statusTriggeredAttackBoostView.setInt32(0x10, 2, true);
+    statusTriggeredAttackBoostView.setInt32(0x14, 250, true);
+    statusTriggeredAttackBoostView.setInt32(0x44, 50, true);
+    engine.reset();
+    engine.playerAttackBoostTurns = 2;
+    engine.setEnemyAiDefinitionPool(
+      0,
+      statusTriggeredAttackBoostMonsterDefinition,
+      [statusTriggeredAttackBoostDefinition],
+    );
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedStatusTriggeredAttackBoostAi = engine.snapshot();
+    engine.reset();
+    engine.setEnemyAiDefinitionPool(
+      0,
+      statusTriggeredAttackBoostMonsterDefinition,
+      [statusTriggeredAttackBoostDefinition],
+    );
+    engine.enemies[0].transientDebuffActive = true;
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedTransientAttackBoostAi = engine.snapshot();
+    engine.reset();
+    engine.setEnemyAiDefinitionPool(
+      0,
+      statusTriggeredAttackBoostMonsterDefinition,
+      [statusTriggeredAttackBoostDefinition],
+    );
+    engine.setRngState(21_900);
+    const rejectedStatusTriggeredAttackBoostSkill = engine.takeEnemySkill(0);
+    const rejectedStatusTriggeredAttackBoostState = engine.snapshot();
+    const damagedTurnAttackBoostMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(damagedTurnAttackBoostMonsterDefinition.buffer).setUint32(0xec, 9_032, true);
+    const damagedTurnAttackBoostDefinition = sourceToPoisonDefinition.slice();
+    const damagedTurnAttackBoostView = new DataView(damagedTurnAttackBoostDefinition.buffer);
+    damagedTurnAttackBoostView.setUint32(0x00, 9_032, true);
+    damagedTurnAttackBoostView.setInt16(0x04, 19, true);
+    damagedTurnAttackBoostView.setInt32(0x10, 2, true);
+    damagedTurnAttackBoostView.setInt32(0x14, 4, true);
+    damagedTurnAttackBoostView.setInt32(0x18, 300, true);
+    damagedTurnAttackBoostView.setInt32(0x44, 50, true);
+    engine.reset();
+    engine.enemies[0].damagedTurnCount = 2;
+    engine.setEnemyAiDefinitionPool(
+      0,
+      damagedTurnAttackBoostMonsterDefinition,
+      [damagedTurnAttackBoostDefinition],
+    );
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedDamagedTurnAttackBoostAi = engine.snapshot();
+    engine.reset();
+    engine.enemies[0].damagedTurnCount = 1;
+    engine.setEnemyAiDefinitionPool(
+      0,
+      damagedTurnAttackBoostMonsterDefinition,
+      [damagedTurnAttackBoostDefinition],
+    );
+    engine.setRngState(21_900);
+    const rejectedDamagedTurnAttackBoostSkill = engine.takeEnemySkill(0);
+    const rejectedDamagedTurnAttackBoostState = engine.snapshot();
+    engine.reset();
+    engine.enemies[1].hp = 0;
+    engine.comboCount = 1;
+    engine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+    engine.resolvePlayerTurn();
+    const damagedTurnCounterState = engine.snapshot();
     const moveTimeReductionMonsterDefinition = enemyAiMonsterDefinition.slice();
     new DataView(moveTimeReductionMonsterDefinition.buffer).setUint32(0xec, 9_028, true);
     const moveTimeReductionDefinition = sourceToPoisonDefinition.slice();
@@ -1279,6 +1358,11 @@ try {
       selectedStatusShieldAi, rejectedStatusShieldSkill, rejectedStatusShieldState,
       selectedLoneAttackBoostAi, boostedLoneEnemyAttack,
       rejectedLoneAttackBoostSkill, rejectedLoneAttackBoostState,
+      selectedStatusTriggeredAttackBoostAi, selectedTransientAttackBoostAi,
+      rejectedStatusTriggeredAttackBoostSkill, rejectedStatusTriggeredAttackBoostState,
+      selectedDamagedTurnAttackBoostAi,
+      rejectedDamagedTurnAttackBoostSkill, rejectedDamagedTurnAttackBoostState,
+      damagedTurnCounterState,
       selectedMoveTimeReductionAi, moveTimeReductionDrag,
       rejectedMoveTimeReductionSkill, rejectedMoveTimeReductionState,
       selectedSelfDestructAi,
@@ -1539,6 +1623,25 @@ try {
     poisonBlockSample.boostedLoneEnemyAttack.lastEnemyActions?.[0]?.damage !== 3_700 ||
     poisonBlockSample.rejectedLoneAttackBoostSkill !== null ||
     poisonBlockSample.rejectedLoneAttackBoostState.rngState !== 21_900 ||
+    poisonBlockSample.selectedStatusTriggeredAttackBoostAi.enemies?.[0]?.attackBoostTurns !== 2 ||
+    poisonBlockSample.selectedStatusTriggeredAttackBoostAi.enemies?.[0]?.attackBoostPercent !== 250 ||
+    poisonBlockSample.selectedStatusTriggeredAttackBoostAi.lastEnemyActions?.[0]?.skill?.type !== 18 ||
+    poisonBlockSample.selectedStatusTriggeredAttackBoostAi.lastEnemyActions?.[0]?.damage !== 925 ||
+    poisonBlockSample.selectedStatusTriggeredAttackBoostAi.nativePlayerBuffStatus?.attackBoostTurns !== 2 ||
+    poisonBlockSample.selectedStatusTriggeredAttackBoostAi.rngState !== advanceLcg(21_900, 1) ||
+    poisonBlockSample.selectedTransientAttackBoostAi.lastEnemyActions?.[0]?.skill?.type !== 18 ||
+    poisonBlockSample.selectedTransientAttackBoostAi.enemies?.[0]?.transientDebuffActive !== false ||
+    poisonBlockSample.rejectedStatusTriggeredAttackBoostSkill !== null ||
+    poisonBlockSample.rejectedStatusTriggeredAttackBoostState.rngState !== 21_900 ||
+    poisonBlockSample.selectedDamagedTurnAttackBoostAi.enemies?.[0]?.damagedTurnCount !== 2 ||
+    poisonBlockSample.selectedDamagedTurnAttackBoostAi.enemies?.[0]?.attackBoostTurns !== 4 ||
+    poisonBlockSample.selectedDamagedTurnAttackBoostAi.enemies?.[0]?.attackBoostPercent !== 300 ||
+    poisonBlockSample.selectedDamagedTurnAttackBoostAi.lastEnemyActions?.[0]?.skill?.type !== 19 ||
+    poisonBlockSample.selectedDamagedTurnAttackBoostAi.lastEnemyActions?.[0]?.damage !== 925 ||
+    poisonBlockSample.selectedDamagedTurnAttackBoostAi.rngState !== advanceLcg(21_900, 1) ||
+    poisonBlockSample.rejectedDamagedTurnAttackBoostSkill !== null ||
+    poisonBlockSample.rejectedDamagedTurnAttackBoostState.rngState !== 21_900 ||
+    poisonBlockSample.damagedTurnCounterState.enemies?.[0]?.damagedTurnCount !== 1 ||
     poisonBlockSample.selectedMoveTimeReductionAi.moveTimeSeconds !== 3.75 ||
     poisonBlockSample.selectedMoveTimeReductionAi.moveTimeReduction?.turnsRemaining !== 2 ||
     poisonBlockSample.selectedMoveTimeReductionAi.lastEnemyActions?.[0]?.skill?.type !== 39 ||
