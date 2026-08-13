@@ -20,6 +20,10 @@ const ENEMY_SKILL_CONDITION_BASE = 0x61a630;
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
+const HEAL_PLAYER_ENEMY_SKILL_TYPE = 55;
+const HEAL_PLAYER_HANDLER = 0x629900;
+const HEAL_PLAYER_SETUP_HANDLER = 0x620040;
+const HEAL_PLAYER_CONDITION_HANDLER = 0x61aa74;
 const SOURCE_TO_POISON_ENEMY_SKILL_TYPE = 56;
 const SOURCE_TO_MORTAL_POISON_ENEMY_SKILL_TYPE = 58;
 const SOURCE_TO_POISON_HANDLER = 0x62917c;
@@ -139,6 +143,10 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['enemy-ai', 'doEnemyAi', '_ZN9cGAMEMAIN10_doEnemyAiEP8sMONSTER', 0x622544],
   ['enemy-ai', 'setupEnemyAttack', '_ZN9cGAMEMAIN17_setupEnemyAttackEv', 0x622f64],
   ['enemy-ai', 'resetEnemyAtkLeft', '_ZN9cGAMEMAIN18_resetEnemyAtkLeftEP8sMONSTER', 0x6408f0],
+  ['enemy-ai', 'playerMaxHp', '_ZNK7sPLAYER3mhpEv', 0x66b840],
+  ['enemy-ai', 'playerAddHp', '_ZN7sPLAYER5addHpEib', 0x678838],
+  ['math', 'roundDouble', 'izMathRoundD', 0x36b2ec],
+  ['math', 'signedIntMultiplyAdd', 'izMathSint32MulAdd', 0x36b3fc],
   ['combat', 'setEnemyAttackMain', '_ZN9cGAMEMAIN20__setEnemyAttackMainEP8sMONSTERbfi', 0x62c2cc],
   ['match', 'checkCombos', '_ZN9cGAMEMAIN12_checkCombosEii', 0x659d24],
   ['match', 'checkFlood', '_ZN9cGAMEMAIN11_checkFloodEiiiRi', 0x666724],
@@ -224,6 +232,21 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     const entry = readUint16Virtual(restoredElf, restoredBytes, table + (type - 1) * 2);
     return base + entry * 4;
   };
+  const healPlayerDispatchTarget = resolveEnemySkillTarget(
+    HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const healPlayerSetupTarget = resolveEnemySkillTarget(
+    HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const healPlayerConditionTarget = resolveEnemySkillTarget(
+    HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const healPlayerDispatchMatches = healPlayerDispatchTarget === null
+    ? null : healPlayerDispatchTarget === HEAL_PLAYER_HANDLER;
+  const healPlayerSetupMatches = healPlayerSetupTarget === null
+    ? null : healPlayerSetupTarget === HEAL_PLAYER_SETUP_HANDLER;
+  const healPlayerConditionMatches = healPlayerConditionTarget === null
+    ? null : healPlayerConditionTarget === HEAL_PLAYER_CONDITION_HANDLER;
   const sourceToPoisonDispatchTarget = resolveEnemySkillTarget(
     SOURCE_TO_POISON_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -831,6 +854,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       allAddressesMatch21_9: mismatches.length === 0,
       blackFallDispatchMatches21_9: blackFallDispatchMatches,
       blackFallSetupMatches21_9: blackFallSetupMatches,
+      healPlayerDispatchMatches21_9: healPlayerDispatchMatches,
+      healPlayerSetupMatches21_9: healPlayerSetupMatches,
+      healPlayerConditionMatches21_9: healPlayerConditionMatches,
       sourceToPoisonDispatchMatches21_9: sourceToPoisonDispatchMatches,
       sourceToPoisonSetupMatches21_9: sourceToPoisonSetupMatches,
       sourceToPoisonConditionMatches21_9: sourceToPoisonConditionMatches,
@@ -903,6 +929,7 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       definitionAttackWithSkillOffset: 'sENEMYSKILL+0x44 (positive signed int32 percent)',
       monsterAttackWithSkillOffset: 'sMONSTER+0x7e8 (uint32 converted to float32 / 100)',
       monsterDurationOffset: 'sMONSTER+0x678 (packed low 10 bits)',
+      monsterHealPercentOffset: 'sMONSTER+0x678 (type 55 signed int32 percent)',
       monsterChanceOffset: 'sMONSTER+0x67c (signed low 16 bits)',
       blackFallType: BLACK_FALL_ENEMY_SKILL_TYPE,
       dispatchEntry: blackFallDispatchEntry === null ? null : hex(blackFallDispatchEntry),
@@ -911,6 +938,15 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       setupEntry: blackFallSetupEntry === null ? null : hex(blackFallSetupEntry),
       setupTarget: blackFallSetupTarget === null ? null : hex(blackFallSetupTarget),
       setupMatches21_9: blackFallSetupMatches,
+      healPlayerType: HEAL_PLAYER_ENEMY_SKILL_TYPE,
+      healPlayerDispatchTarget: healPlayerDispatchTarget === null
+        ? null : hex(healPlayerDispatchTarget),
+      healPlayerDispatchMatches21_9: healPlayerDispatchMatches,
+      healPlayerSetupTarget: healPlayerSetupTarget === null ? null : hex(healPlayerSetupTarget),
+      healPlayerSetupMatches21_9: healPlayerSetupMatches,
+      healPlayerConditionTarget: healPlayerConditionTarget === null
+        ? null : hex(healPlayerConditionTarget),
+      healPlayerConditionMatches21_9: healPlayerConditionMatches,
       sourceToPoisonType: SOURCE_TO_POISON_ENEMY_SKILL_TYPE,
       sourceToPoisonDispatchTarget: sourceToPoisonDispatchTarget === null
         ? null : hex(sourceToPoisonDispatchTarget),
@@ -1138,6 +1174,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
   if (
     missing.length || mismatches.length
     || blackFallDispatchMatches === false || blackFallSetupMatches === false
+    || healPlayerDispatchMatches === false || healPlayerSetupMatches === false
+    || healPlayerConditionMatches === false
     || sourceToPoisonDispatchMatches === false || sourceToPoisonSetupMatches === false
     || sourceToPoisonConditionMatches === false
     || sourceToMortalPoisonDispatchMatches === false

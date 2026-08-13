@@ -1,5 +1,6 @@
 import { padLcgStep } from './padCoreRules.js';
 import {
+  PAD_ENEMY_SKILL_HEAL_PLAYER,
   PAD_ENEMY_SKILL_BLACK_FALL,
   PAD_ENEMY_SKILL_SOURCE_TO_POISON,
   PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON,
@@ -19,6 +20,7 @@ import {
   PAD_ENEMY_SKILL_BLOCK_MINUS,
   PAD_ENEMY_SKILL_BUR_DROP,
   decodePadEnemySkillDefinition,
+  padEnemySkillPlayerHpCondition,
 } from './padEnemySkills.js';
 
 export const PAD_ENEMY_AI_MONSTER_LAYOUT = Object.freeze({
@@ -113,6 +115,7 @@ function normalizeDefinitionMap(definitions) {
 
 function isStaticallyEligible(definition, state) {
   if (!definition.effect.supported || ![
+    PAD_ENEMY_SKILL_HEAL_PLAYER,
     PAD_ENEMY_SKILL_BLACK_FALL,
     PAD_ENEMY_SKILL_SOURCE_TO_POISON,
     PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON,
@@ -143,6 +146,14 @@ function evaluateCondition(definition, state, rngState) {
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_BLACK_FALL) {
     const eligible = !state.blackFallActive;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_HEAL_PLAYER) {
+    const eligible = padEnemySkillPlayerHpCondition(
+      state.playerCurrentHp,
+      state.playerMaxHp,
+      definition.effect.thresholdPercent,
+    );
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   // The decoded line and poison-list transformations all map to the
@@ -200,6 +211,8 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
   const current = {
     currentHp: Math.max(0, Number(state.currentHp) || 0),
     maxHp: Math.max(0, Number(state.maxHp) || 0),
+    playerCurrentHp: Math.max(0, Number(state.playerCurrentHp) || 0),
+    playerMaxHp: Math.max(0, Number(state.playerMaxHp) || 0),
     aiBudget: Math.max(0, Math.trunc(Number(state.aiBudget ?? monster.budgetCap) || 0)),
     blackFallActive: Boolean(state.blackFallActive),
     evaluateCondition: state.evaluateCondition,

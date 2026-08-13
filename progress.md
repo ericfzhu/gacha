@@ -2,6 +2,24 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 enemy player-heal skill
+
+- Mapped enemy skill type `55` to late handler `0x629900`, setup `0x620040`,
+  and condition `0x61aa74`. Definition `+0x10` is the player-HP activation
+  threshold and `+0x14` is the percentage of player max HP restored.
+- Ported the exact numeric paths: the condition uses double-precision
+  `izMathRoundD`, while execution divides the authored percentage in binary32
+  and calls `izMathSint32MulAdd` before `sPLAYER::addHp` performs its native
+  signed-32-bit addition and HP cap.
+- Added authored and materialized-runtime decoders, raw new-AI selection,
+  player-state plumbing, enemy-turn execution, threshold boundary tests, and
+  browser coverage for skill ID 9019. Selection consumes one ordinary AI roll;
+  a failed HP condition consumes none.
+- The exact inspector now asserts the type-55 dispatch/setup/condition entries,
+  both player HP methods, and both math helpers against the restored image.
+- Next: return to type `54` as a dedicated party-bind subsystem with per-card
+  eligibility and bind timers.
+
 ## 2026-08-14 source-color poison writers and scaled AI conditions
 
 - Mapped enemy skill types `56`/`58` to shared late handler `0x62917c`, setup

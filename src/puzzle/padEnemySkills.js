@@ -1,3 +1,4 @@
+export const PAD_ENEMY_SKILL_HEAL_PLAYER = 55;
 export const PAD_ENEMY_SKILL_SOURCE_TO_POISON = 56;
 export const PAD_ENEMY_SKILL_POISON_BLOCKS = 57;
 export const PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON = 58;
@@ -18,6 +19,7 @@ export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
 
 const PAD_INT32_MAX = 0x7fffffff;
+const PAD_INT32_MIN = -0x80000000;
 
 export const PAD_ENEMY_SKILL_RUNTIME_LAYOUT = Object.freeze({
   definitionTypeOffset: 0x04,
@@ -80,6 +82,16 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
     ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
     : null;
+  if (type === PAD_ENEMY_SKILL_HEAL_PLAYER) {
+    return Object.freeze({
+      type,
+      kind: 'healPlayer',
+      supported: true,
+      thresholdPercent: definition.getInt32(0x10, true),
+      healPercent: definition.getInt32(0x14, true),
+      attackWithSkillValue,
+    });
+  }
   if (
     type === PAD_ENEMY_SKILL_SOURCE_TO_POISON
     || type === PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON
@@ -270,6 +282,30 @@ export function padEnemySkillAttack(baseAttack, attackWithSkillPercent) {
   return Math.min(PAD_INT32_MAX, Math.max(0, Math.trunc(Math.fround(scaled + 0.5))));
 }
 
+// Type 55's 0x629900 handler divides its signed percentage in float32, then
+// calls izMathSint32MulAdd(0, playerMaxHp, ratio). That helper promotes the
+// float32 ratio to double, saturates to signed int32, and rounds halves away
+// from zero. Keeping the float32 division explicit reproduces native boundary
+// values that a direct binary64 percentage calculation can miss.
+export function padEnemySkillPlayerHeal(maxHp, healPercent) {
+  const hp = Math.trunc(Number(maxHp) || 0);
+  const percent = Math.trunc(Number(healPercent) || 0);
+  const ratio = Math.fround(Math.fround(percent) / Math.fround(100));
+  const scaled = Math.max(PAD_INT32_MIN, Math.min(PAD_INT32_MAX, hp * ratio));
+  return Math.trunc(scaled + (scaled < 0 ? -0.5 : 0.5));
+}
+
+// chooseEnemyAiSub's type-55 callback computes currentHp * 100 / maxHp in
+// binary64 and passes it through izMathRoundD before comparing it to +0x10.
+export function padEnemySkillPlayerHpCondition(currentHp, maxHp, thresholdPercent) {
+  const current = Math.trunc(Number(currentHp) || 0);
+  const maximum = Math.trunc(Number(maxHp) || 0);
+  if (maximum <= 0) return false;
+  const percentage = current * 100 / maximum;
+  const rounded = Math.trunc(percentage + (percentage < 0 ? -0.5 : 0.5));
+  return rounded <= Math.trunc(Number(thresholdPercent) || 0);
+}
+
 // _doEnemySkill's second jump table dispatches signed type 128 to 0x62a854.
 // That handler reads the selected definition type at +0x04, the active
 // monster's packed duration at +0x678, and its chance parameter at +0x67c.
@@ -295,6 +331,20 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
   );
   const monster = new DataView(monsterBytes.buffer, monsterBytes.byteOffset, monsterBytes.byteLength);
   const type = definition.getInt16(PAD_ENEMY_SKILL_RUNTIME_LAYOUT.definitionTypeOffset, true);
+  if (type === PAD_ENEMY_SKILL_HEAL_PLAYER) {
+    requireLength(definitionBytes, 0x14, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'healPlayer',
+      supported: true,
+      thresholdPercent: definition.getInt32(0x10, true),
+      healPercent: monster.getInt32(PAD_ENEMY_SKILL_RUNTIME_LAYOUT.monsterDurationOffset, true),
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type !== PAD_ENEMY_SKILL_BLACK_FALL) {
     return Object.freeze({ type, kind: 'unsupported', supported: false });
   }
@@ -305,6 +355,15 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
 
 export function normalizePadEnemySkillRecord(record) {
   const type = Math.trunc(Number(record?.type));
+  if (type === PAD_ENEMY_SKILL_HEAL_PLAYER || record?.kind === 'healPlayer') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_HEAL_PLAYER,
+      kind: 'healPlayer',
+      supported: true,
+      thresholdPercent: Math.trunc(Number(record?.thresholdPercent) || 0),
+      healPercent: Math.trunc(Number(record?.healPercent) || 0),
+    });
+  }
   if (
     type === PAD_ENEMY_SKILL_SOURCE_TO_POISON
     || type === PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON

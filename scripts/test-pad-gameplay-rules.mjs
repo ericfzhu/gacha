@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
+  PAD_ENEMY_SKILL_HEAL_PLAYER,
   PAD_ENEMY_SKILL_BLACK_FALL,
   PAD_ENEMY_SKILL_SOURCE_TO_POISON,
   PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON,
@@ -22,6 +23,8 @@ import {
   decodePadEnemySkillDefinition,
   decodePadEnemySkillRuntime,
   padEnemySkillAttack,
+  padEnemySkillPlayerHeal,
+  padEnemySkillPlayerHpCondition,
 } from '../src/puzzle/padEnemySkills.js';
 import {
   decodePadEnemyAiMonsterDefinition,
@@ -316,6 +319,11 @@ authoredBlackFallView.setInt32(0x14, 75, true);
 assert.equal(padEnemySkillAttack(1_850, 50), 925);
 assert.equal(padEnemySkillAttack(10_000_001, 33), 3_300_001);
 assert.equal(padEnemySkillAttack(1_850, 0), 0);
+assert.equal(padEnemySkillPlayerHeal(12_000, 50), 6_000);
+assert.equal(padEnemySkillPlayerHeal(12_000, -50), -6_000);
+assert.equal(padEnemySkillPlayerHeal(0x7fffffff, 200), 0x7fffffff);
+assert.equal(padEnemySkillPlayerHpCondition(3_059, 12_000, 25), true);
+assert.equal(padEnemySkillPlayerHpCondition(3_060, 12_000, 25), false);
 authoredBlackFallView.setInt32(0x44, 0, true);
 
 const enemyAiMonsterDefinition = new Uint8Array(0x2ec);
@@ -671,6 +679,33 @@ assert.deepEqual(decodePadEnemySkillDefinition(enemyAiSourceToMortalPoisonDefini
   destinationType: 8,
   attackWithSkillValue: 0,
 });
+const enemyAiHealPlayerDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiHealPlayerView = new DataView(enemyAiHealPlayerDefinition.buffer);
+enemyAiHealPlayerView.setUint32(0x00, 9_019, true);
+enemyAiHealPlayerView.setInt16(0x04, PAD_ENEMY_SKILL_HEAL_PLAYER, true);
+enemyAiHealPlayerView.setInt32(0x10, 25, true);
+enemyAiHealPlayerView.setInt32(0x14, 50, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiHealPlayerDefinition), {
+  type: 55,
+  kind: 'healPlayer',
+  supported: true,
+  thresholdPercent: 25,
+  healPercent: 50,
+  attackWithSkillValue: 0,
+});
+const healPlayerMonsterRuntime = new Uint8Array(0x680);
+new DataView(healPlayerMonsterRuntime.buffer).setInt32(0x678, 37, true);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiHealPlayerDefinition, healPlayerMonsterRuntime),
+  {
+    type: 55,
+    kind: 'healPlayer',
+    supported: true,
+    thresholdPercent: 25,
+    healPercent: 37,
+    attackWithSkillValue: 0,
+  },
+);
 const enemyAiPoisonBlockNCountedDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiPoisonBlockNCountedView = new DataView(enemyAiPoisonBlockNCountedDefinition.buffer);
 enemyAiPoisonBlockNCountedView.setUint32(0x00, 9_015, true);
@@ -1948,6 +1983,37 @@ assert.equal(sourceToMortalPoisonState.lastEnemyActions[0].skill.skillId, 9_018)
 assert.equal(selectedSourceToMortalPoisonEngine.board.flat()
   .filter((orb) => orb.type === 'mortalPoison').length, 3);
 assert.equal(selectedSourceToMortalPoisonEngine.rng.state, padLcgStep(21_900).state);
+const healPlayerMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(healPlayerMonsterDefinition.buffer).setUint32(0xec, 9_019, true);
+const selectedHealPlayerEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: healPlayerMonsterDefinition,
+    skillDefinitions: [enemyAiHealPlayerDefinition],
+  }],
+});
+selectedHealPlayerEngine.player.hp = 3_059;
+selectedHealPlayerEngine.setRngState(21_900);
+selectedHealPlayerEngine.enemies[0].counter = 1;
+selectedHealPlayerEngine.enemies[1].counter = 99;
+selectedHealPlayerEngine.resolveEnemyTurn();
+const selectedHealPlayerState = selectedHealPlayerEngine.snapshot();
+assert.equal(selectedHealPlayerState.player.hp, 9_059);
+assert.equal(selectedHealPlayerState.lastEnemyActions[0].skill.type, 55);
+assert.equal(selectedHealPlayerState.lastEnemyActions[0].skill.skillId, 9_019);
+assert.equal(selectedHealPlayerState.enemies[0].enemyAiBudget, 80);
+assert.equal(selectedHealPlayerEngine.rng.state, padLcgStep(21_900).state);
+const rejectedHealPlayerEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: healPlayerMonsterDefinition,
+    skillDefinitions: [enemyAiHealPlayerDefinition],
+  }],
+});
+rejectedHealPlayerEngine.player.hp = 3_060;
+rejectedHealPlayerEngine.setRngState(21_900);
+assert.equal(rejectedHealPlayerEngine.takeEnemySkill(0), null);
+assert.equal(rejectedHealPlayerEngine.rng.state, 21_900);
 const poisonFamilySwapEngine = new PuzzleEngine({ seed: 21_900 });
 poisonFamilySwapEngine.setBoardFromCodes([
   'PMBBBB', 'BBBBBB', 'BBBBBB', 'BBBBBB', 'BBBBBB',

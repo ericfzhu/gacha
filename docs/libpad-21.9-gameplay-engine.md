@@ -647,6 +647,27 @@ gate. An eligible fallback retains its authored `sENEAI+5` weight without
 scaling. The browser selector exposes this as `probabilityScale` while keeping
 the already decoded condition-owned RNG state transitions intact.
 
+Enemy skill type `55` heals the player. Its late dispatch entry targets
+`0x629900`, setup targets `0x620040`, and AI condition targets `0x61aa74`.
+Definition `+0x10` is a signed player-current-HP percentage threshold;
+definition `+0x14` is copied to `sMONSTER+0x678` as the signed percentage of
+player max HP to restore. This player threshold is additional to the generic
+enemy-HP threshold at definition `+0x38` used by `_chooseEnemyAiNew`.
+
+The condition computes `currentPlayerHp * 100 / maxPlayerHp` in binary64,
+passes it through `izMathRoundD` (`0x36b2ec`, halves away from zero), and admits
+the skill when that rounded value is at most `+0x10`. It consumes no condition
+RNG; an admitted immediate probability test still consumes the ordinary AI
+roll, while rejection consumes none.
+
+Execution converts the signed runtime percentage to binary32, divides by
+binary32 100, and calls `izMathSint32MulAdd(0, maxHp, ratio)` at `0x36b3fc`.
+That helper promotes the already-rounded binary32 ratio to double, clamps to
+signed-int32 bounds, and rounds halves away from zero. `sPLAYER::addHp`
+(`0x678838`) caps the delta to max HP, performs the native signed-32-bit add,
+then clamps current HP into `[0, maxHp]`. The browser preserves this sequence,
+including the float32 boundary and optional accompanying enemy attack.
+
 Enemy skill types `56` and `58` are deterministic source-color poison writers.
 Both resolve through late dispatch handler `0x62917c`, setup `0x61ff08`, and AI
 condition `0x61a63c`. Definition `+0x10` is the signed source orb type copied to

@@ -923,6 +923,26 @@ try {
     const selectedSourceToMortalPoisonAi = engine.snapshot();
     const selectedSourceToMortalPoisonCount = engine.board.flat()
       .filter((orb) => orb.type === 'mortalPoison').length;
+    const healPlayerMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(healPlayerMonsterDefinition.buffer).setUint32(0xec, 9_019, true);
+    const healPlayerDefinition = sourceToPoisonDefinition.slice();
+    const healPlayerView = new DataView(healPlayerDefinition.buffer);
+    healPlayerView.setUint32(0x00, 9_019, true);
+    healPlayerView.setInt16(0x04, 55, true);
+    healPlayerView.setInt32(0x10, 25, true);
+    healPlayerView.setInt32(0x14, 50, true);
+    engine.setEnemyAiDefinitionPool(0, healPlayerMonsterDefinition, [healPlayerDefinition]);
+    engine.player.hp = 3_059;
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedHealPlayerAi = engine.snapshot();
+    engine.setEnemyAiDefinitionPool(0, healPlayerMonsterDefinition, [healPlayerDefinition]);
+    engine.player.hp = 3_060;
+    engine.setRngState(21_900);
+    const rejectedHealPlayerSkill = engine.takeEnemySkill(0);
+    const rejectedHealPlayerState = engine.snapshot();
     engine.setEnemyAiDefinitionPool(0, null);
     engine.setBlackFallRule(null);
     engine.reset();
@@ -980,6 +1000,7 @@ try {
       selectedSourceToPoisonLockedType,
       rejectedScaledSourceToPoisonSkill, rejectedScaledSourceToPoisonState,
       selectedSourceToMortalPoisonAi, selectedSourceToMortalPoisonCount,
+      selectedHealPlayerAi, rejectedHealPlayerSkill, rejectedHealPlayerState,
       initialBoard, initialBoardState,
     };
   }) : null;
@@ -1206,6 +1227,13 @@ try {
     poisonBlockSample.selectedSourceToMortalPoisonAi.rngState !== advanceLcg(21_900, 1) ||
     poisonBlockSample.selectedSourceToMortalPoisonAi.enemies?.[0]?.enemyAiBudget !== 80 ||
     poisonBlockSample.selectedSourceToMortalPoisonCount !== 3 ||
+    poisonBlockSample.selectedHealPlayerAi.player.hp !== 9_059 ||
+    poisonBlockSample.selectedHealPlayerAi.lastEnemyActions?.[0]?.skill?.type !== 55 ||
+    poisonBlockSample.selectedHealPlayerAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_019 ||
+    poisonBlockSample.selectedHealPlayerAi.rngState !== advanceLcg(21_900, 1) ||
+    poisonBlockSample.selectedHealPlayerAi.enemies?.[0]?.enemyAiBudget !== 80 ||
+    poisonBlockSample.rejectedHealPlayerSkill !== null ||
+    poisonBlockSample.rejectedHealPlayerState.rngState !== 21_900 ||
     JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
       'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',
     ]) || poisonBlockSample.initialBoardState !== 79_238_434

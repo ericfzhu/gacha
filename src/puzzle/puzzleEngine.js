@@ -33,6 +33,7 @@ import {
   tracePadPointerCells,
 } from './padCoreRules.js';
 import {
+  PAD_ENEMY_SKILL_HEAL_PLAYER,
   PAD_ENEMY_SKILL_BLACK_FALL,
   PAD_ENEMY_SKILL_SOURCE_TO_POISON,
   PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON,
@@ -55,6 +56,7 @@ import {
   decodePadEnemySkillRuntime,
   normalizePadEnemySkillRecord,
   padEnemySkillAttack,
+  padEnemySkillPlayerHeal,
 } from './padEnemySkills.js';
 import {
   decodePadEnemyAiMonsterDefinition,
@@ -858,6 +860,8 @@ export class PuzzleEngine {
     const selection = selectPadEnemyAiNew(pool.monster, pool.definitions, {
       currentHp: enemy.hp,
       maxHp: enemy.maxHp,
+      playerCurrentHp: this.player.hp,
+      playerMaxHp: this.player.maxHp,
       aiBudget: pool.aiBudget,
       blackFallActive: Boolean(this.blackFallRule?.active),
       rngState: this.rng.state,
@@ -1050,6 +1054,20 @@ export class PuzzleEngine {
   applyEnemySkillRecord(record) {
     const skill = normalizePadEnemySkillRecord(record);
     this.lastEnemySkill = skill;
+    if (skill.supported && skill.kind === 'healPlayer') {
+      const requested = padEnemySkillPlayerHeal(this.player.maxHp, skill.healPercent);
+      const before = this.player.hp;
+      // sPLAYER::addHp first caps a positive delta to max HP, performs a
+      // wrapping 32-bit add, then clamps the resulting HP into [0, max HP].
+      const cappedDelta = Math.min(requested, this.player.maxHp);
+      this.player.hp = clamp((Math.trunc(this.player.hp) + cappedDelta) | 0, 0, this.player.maxHp);
+      const healed = this.player.hp - before;
+      if (healed > 0) {
+        this.floatingText.push({ kind: 'heal', value: healed, enemy: -1, age: 0 });
+      }
+      this.message = `Enemy restored ${Math.max(0, healed).toLocaleString()} player HP.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'sourceToPoison') {
       const effectFlags = this.doBlockSwap(
         skill.sourceType,
@@ -1183,6 +1201,7 @@ export class PuzzleEngine {
       const definition = definitionsById.get(slot.skillId);
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
       if (![
+        PAD_ENEMY_SKILL_HEAL_PLAYER,
         PAD_ENEMY_SKILL_BLACK_FALL,
         PAD_ENEMY_SKILL_SOURCE_TO_POISON,
         PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON,
