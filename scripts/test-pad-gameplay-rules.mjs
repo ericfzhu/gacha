@@ -3,6 +3,7 @@ import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES,
+  PAD_ENEMY_SKILL_VERTICAL_LINES,
   PAD_ENEMY_SKILL_BLOCK_MINUS,
   PAD_ENEMY_SKILL_BUR_DROP,
   decodePadEnemySkillDefinition,
@@ -449,6 +450,27 @@ assert.deepEqual(decodePadEnemySkillDefinition(enemyAiHorizontalLinesDefinition)
     { lineMask: 0b10000, destinationTypeMask: 1 << 0 },
     { lineMask: 0b00100, destinationTypeMask: 1 << 1 },
     { lineMask: 0b00001, destinationTypeMask: 1 << 2 },
+  ],
+  attackWithSkillValue: 0,
+});
+const enemyAiVerticalLinesDefinition = enemyAiHorizontalLinesDefinition.slice();
+const enemyAiVerticalLinesView = new DataView(enemyAiVerticalLinesDefinition.buffer);
+enemyAiVerticalLinesView.setUint32(0x00, 9_005, true);
+enemyAiVerticalLinesView.setInt16(0x04, PAD_ENEMY_SKILL_VERTICAL_LINES, true);
+enemyAiVerticalLinesView.setUint32(0x10, 0b000001, true);
+enemyAiVerticalLinesView.setUint32(0x14, 1 << 0, true);
+enemyAiVerticalLinesView.setUint32(0x18, 0b000100, true);
+enemyAiVerticalLinesView.setUint32(0x1c, 1 << 1, true);
+enemyAiVerticalLinesView.setUint32(0x20, 0b100000, true);
+enemyAiVerticalLinesView.setUint32(0x24, 1 << 2, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiVerticalLinesDefinition), {
+  type: 77,
+  kind: 'verticalLines',
+  supported: true,
+  lineSwaps: [
+    { lineMask: 0b000001, destinationTypeMask: 1 << 0 },
+    { lineMask: 0b000100, destinationTypeMask: 1 << 1 },
+    { lineMask: 0b100000, destinationTypeMask: 1 << 2 },
   ],
   attackWithSkillValue: 0,
 });
@@ -1252,6 +1274,34 @@ for (let index = 0; index < 19; index += 1) {
 }
 assert.equal(selectedHorizontalLinesAiEngine.rng.state, horizontalLinesExpectedState);
 assert.equal(horizontalLinesAiState.enemies[0].enemyAiBudget, 80);
+const verticalLinesAiMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(verticalLinesAiMonsterDefinition.buffer).setUint32(0xec, 9_005, true);
+const selectedVerticalLinesAiEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: verticalLinesAiMonsterDefinition,
+    skillDefinitions: [enemyAiVerticalLinesDefinition],
+  }],
+});
+selectedVerticalLinesAiEngine.setBoardFromCodes([
+  'DDDDDD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD',
+]);
+selectedVerticalLinesAiEngine.setRngState(21_900);
+selectedVerticalLinesAiEngine.enemies[0].counter = 1;
+selectedVerticalLinesAiEngine.enemies[1].counter = 99;
+selectedVerticalLinesAiEngine.resolveEnemyTurn();
+const verticalLinesAiState = selectedVerticalLinesAiEngine.snapshot();
+assert.equal(verticalLinesAiState.lastEnemyActions[0].skill.type, 77);
+assert.equal(verticalLinesAiState.lastEnemyActions[0].skill.skillId, 9_005);
+assert.deepEqual(verticalLinesAiState.board, [
+  'RDBDDG', 'RLBHJG', 'RMBDGG', 'RLBHHG', 'RJBGLG',
+]);
+let verticalLinesExpectedState = 21_900;
+for (let index = 0; index < 16; index += 1) {
+  verticalLinesExpectedState = padLcgStep(verticalLinesExpectedState).state;
+}
+assert.equal(selectedVerticalLinesAiEngine.rng.state, verticalLinesExpectedState);
+assert.equal(verticalLinesAiState.enemies[0].enemyAiBudget, 80);
 assert.equal(blackFallEngine.board[0][0].nail, false);
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);

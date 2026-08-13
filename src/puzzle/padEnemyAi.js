@@ -2,6 +2,7 @@ import { padLcgStep } from './padCoreRules.js';
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES,
+  PAD_ENEMY_SKILL_VERTICAL_LINES,
   PAD_ENEMY_SKILL_BLOCK_MINUS,
   PAD_ENEMY_SKILL_BUR_DROP,
   decodePadEnemySkillDefinition,
@@ -101,6 +102,7 @@ function isStaticallyEligible(definition, state) {
   if (!definition.effect.supported || ![
     PAD_ENEMY_SKILL_BLACK_FALL,
     PAD_ENEMY_SKILL_HORIZONTAL_LINES,
+    PAD_ENEMY_SKILL_VERTICAL_LINES,
     PAD_ENEMY_SKILL_BLOCK_MINUS,
     PAD_ENEMY_SKILL_BUR_DROP,
   ].includes(definition.effect.type)) return false;
@@ -116,7 +118,10 @@ function evaluateCondition(definition, state, rngState) {
   }
   // chooseEnemyAiSub's type-79 table entry is the unconditional 1.0 handler
   // at 0x61a630. Unlike candidate-based board effects, it performs no dry run.
-  if (definition.effect.type === PAD_ENEMY_SKILL_HORIZONTAL_LINES) {
+  if (
+    definition.effect.type === PAD_ENEMY_SKILL_HORIZONTAL_LINES
+    || definition.effect.type === PAD_ENEMY_SKILL_VERTICAL_LINES
+  ) {
     return { eligible: true, rngState };
   }
   if (typeof state.evaluateCondition === 'function') {

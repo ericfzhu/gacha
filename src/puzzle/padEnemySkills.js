@@ -1,5 +1,6 @@
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_HORIZONTAL_LINES = 79;
+export const PAD_ENEMY_SKILL_VERTICAL_LINES = 77;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
 
@@ -66,7 +67,7 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
     ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
     : null;
-  if (type === PAD_ENEMY_SKILL_HORIZONTAL_LINES) {
+  if (type === PAD_ENEMY_SKILL_HORIZONTAL_LINES || type === PAD_ENEMY_SKILL_VERTICAL_LINES) {
     requireLength(definitionBytes, 0x28, 'PAD enemy-skill definition');
     const lineSwaps = [];
     for (let offset = 0x10; offset < 0x28; offset += 8) {
@@ -77,7 +78,7 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
     }
     return Object.freeze({
       type,
-      kind: 'horizontalLines',
+      kind: type === PAD_ENEMY_SKILL_HORIZONTAL_LINES ? 'horizontalLines' : 'verticalLines',
       supported: true,
       lineSwaps: Object.freeze(lineSwaps),
       attackWithSkillValue,
@@ -186,15 +187,21 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
 
 export function normalizePadEnemySkillRecord(record) {
   const type = Math.trunc(Number(record?.type));
-  if (type === PAD_ENEMY_SKILL_HORIZONTAL_LINES || record?.kind === 'horizontalLines') {
+  if (
+    type === PAD_ENEMY_SKILL_HORIZONTAL_LINES
+    || type === PAD_ENEMY_SKILL_VERTICAL_LINES
+    || record?.kind === 'horizontalLines'
+    || record?.kind === 'verticalLines'
+  ) {
+    const horizontal = type === PAD_ENEMY_SKILL_HORIZONTAL_LINES || record?.kind === 'horizontalLines';
     const authoredSwaps = Array.isArray(record?.lineSwaps) ? record.lineSwaps : [];
     const lineSwaps = Array.from({ length: 3 }, (_, index) => Object.freeze({
       lineMask: Number(authoredSwaps[index]?.lineMask) & 0xff,
       destinationTypeMask: Number(authoredSwaps[index]?.destinationTypeMask) & 0xffff,
     }));
     return Object.freeze({
-      type: PAD_ENEMY_SKILL_HORIZONTAL_LINES,
-      kind: 'horizontalLines',
+      type: horizontal ? PAD_ENEMY_SKILL_HORIZONTAL_LINES : PAD_ENEMY_SKILL_VERTICAL_LINES,
+      kind: horizontal ? 'horizontalLines' : 'verticalLines',
       supported: true,
       lineSwaps: Object.freeze(lineSwaps),
     });

@@ -2,6 +2,23 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 enemy vertical-line skill dispatch
+
+- Mapped enemy skill type `77` to unconditional condition `0x61a630`, shared
+  packed-pair setup `0x61ff14`, and early execution handler `0x628d3c`.
+- Confirmed that its three runtime words at
+  `sMONSTER+0x688/+0x68c/+0x690` feed `_doBlockSwapV` rather than the type-79
+  `_doBlockSwapH` path, while retaining the shared effect accumulator and
+  ordinary saved-LCG stream.
+- The raw decoder and new-AI engine now support both orientations without
+  conflating their native type IDs. Pure coverage rewrites columns 0, 2, and 5
+  to fire, water, and wood and proves one selection plus fifteen cell advances.
+- Exact table assertions and the browser scenario cover skill ID 9005 and AI
+  budget 100 -> 80. Rule tests, production build, exhaustive browser suite,
+  generic gameplay client, and both visual captures pass.
+- Next: commit this paired native handler independently, then move to a
+  different enemy-skill family.
+
 ## 2026-08-14 enemy horizontal-line skill dispatch
 
 - Mapped enemy skill type `79` across the native condition, setup, and early

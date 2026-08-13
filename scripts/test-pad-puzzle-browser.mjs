@@ -620,6 +620,25 @@ try {
     engine.enemies[1].counter = 99;
     engine.resolveEnemyTurn();
     const selectedHorizontalLinesAi = engine.snapshot();
+    const verticalLinesAiMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(verticalLinesAiMonsterDefinition.buffer).setUint32(0xec, 9_005, true);
+    const verticalLinesAiDefinition = horizontalLinesAiDefinition.slice();
+    const verticalLinesAiView = new DataView(verticalLinesAiDefinition.buffer);
+    verticalLinesAiView.setUint32(0x00, 9_005, true);
+    verticalLinesAiView.setInt16(0x04, 77, true);
+    verticalLinesAiView.setUint32(0x10, 0b000001, true);
+    verticalLinesAiView.setUint32(0x14, 1 << 0, true);
+    verticalLinesAiView.setUint32(0x18, 0b000100, true);
+    verticalLinesAiView.setUint32(0x1c, 1 << 1, true);
+    verticalLinesAiView.setUint32(0x20, 0b100000, true);
+    verticalLinesAiView.setUint32(0x24, 1 << 2, true);
+    engine.setEnemyAiDefinitionPool(0, verticalLinesAiMonsterDefinition, [verticalLinesAiDefinition]);
+    engine.setBoardFromCodes(['DDDDDD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedVerticalLinesAi = engine.snapshot();
     engine.setEnemyAiDefinitionPool(0, null);
     engine.setBlackFallRule(null);
     engine.reset();
@@ -658,6 +677,7 @@ try {
       selectedBlockMinusAi, selectedBlockMinusCount,
       selectedBurDropAi, selectedBurDropCount,
       selectedHorizontalLinesAi,
+      selectedVerticalLinesAi,
       initialBoard, initialBoardState,
     };
   }) : null;
@@ -790,6 +810,13 @@ try {
     poisonBlockSample.selectedHorizontalLinesAi.enemies?.[0]?.enemyAiBudget !== 80 ||
     JSON.stringify(poisonBlockSample.selectedHorizontalLinesAi.board) !== JSON.stringify([
       'RRRRRR', 'GLDHJG', 'BBBBBB', 'DLGHHJ', 'GGGGGG',
+    ]) ||
+    poisonBlockSample.selectedVerticalLinesAi.lastEnemyActions?.[0]?.skill?.type !== 77 ||
+    poisonBlockSample.selectedVerticalLinesAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_005 ||
+    poisonBlockSample.selectedVerticalLinesAi.rngState !== advanceLcg(21_900, 16) ||
+    poisonBlockSample.selectedVerticalLinesAi.enemies?.[0]?.enemyAiBudget !== 80 ||
+    JSON.stringify(poisonBlockSample.selectedVerticalLinesAi.board) !== JSON.stringify([
+      'RDBDDG', 'RLBHJG', 'RMBDGG', 'RLBHHG', 'RJBGLG',
     ]) ||
     JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
       'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',

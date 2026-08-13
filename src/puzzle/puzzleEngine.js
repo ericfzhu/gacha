@@ -35,6 +35,7 @@ import {
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
   PAD_ENEMY_SKILL_HORIZONTAL_LINES,
+  PAD_ENEMY_SKILL_VERTICAL_LINES,
   PAD_ENEMY_SKILL_BLOCK_MINUS,
   PAD_ENEMY_SKILL_BUR_DROP,
   decodePadEnemySkillDefinition,
@@ -1020,21 +1021,18 @@ export class PuzzleEngine {
       this.message = `${changed} orb${changed === 1 ? '' : 's'} became thorns.`;
       return true;
     }
-    if (skill.supported && skill.kind === 'horizontalLines') {
+    if (skill.supported && (skill.kind === 'horizontalLines' || skill.kind === 'verticalLines')) {
       let effectFlags = 0;
       for (const swap of skill.lineSwaps) {
-        // _doEnemySkill type 79 shares one `int &flags` across all three
-        // _doBlockSwapH calls. A zero authored line mask is a no-op and leaves
-        // that accumulator untouched.
+        // _doEnemySkill types 77/79 share one `int &flags` across all three
+        // line-writer calls. A zero authored mask leaves it untouched.
         if (swap.lineMask !== 0) {
-          effectFlags = this.doBlockSwapH(
-            swap.lineMask,
-            swap.destinationTypeMask,
-            effectFlags,
-          );
+          effectFlags = skill.kind === 'horizontalLines'
+            ? this.doBlockSwapH(swap.lineMask, swap.destinationTypeMask, effectFlags)
+            : this.doBlockSwapV(swap.lineMask, swap.destinationTypeMask, effectFlags);
         }
       }
-      this.message = `Enemy rewrote horizontal lines (effect ${effectFlags}).`;
+      this.message = `Enemy rewrote ${skill.kind === 'horizontalLines' ? 'horizontal' : 'vertical'} lines (effect ${effectFlags}).`;
       return true;
     }
     if (!skill.supported || skill.kind !== 'blackFall') return false;
@@ -1090,6 +1088,7 @@ export class PuzzleEngine {
       if (![
         PAD_ENEMY_SKILL_BLACK_FALL,
         PAD_ENEMY_SKILL_HORIZONTAL_LINES,
+        PAD_ENEMY_SKILL_VERTICAL_LINES,
         PAD_ENEMY_SKILL_BLOCK_MINUS,
         PAD_ENEMY_SKILL_BUR_DROP,
       ].includes(definition.effect.type) || !definition.effect.supported) {

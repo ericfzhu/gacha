@@ -661,6 +661,17 @@ pairs from raw definitions, applies them through the existing exact
 board. A fixture selecting three six-cell rows from seed 21900 consequently
 advances the ordinary LCG exactly 19 times.
 
+Enemy skill type `77` is the paired vertical-line rewrite. Its early dispatch
+entry resolves to `0x628d3c`, while its setup and AI condition deliberately
+share type 79's `0x61ff14` and unconditional `0x61a630` targets. The handler
+unpacks the same three runtime words but calls `_doBlockSwapV` (`0x6ae64c`).
+Vertical mask bits run left-to-right on a canonical 6x5 board and use the
+native X-axis relocation rule at other widths. As in the horizontal handler,
+the three calls share one effect accumulator; every selected board cell spends
+one ordinary saved-LCG step before lock rejection. Thus three ordinary
+five-cell columns selected immediately from new AI consume 16 advances: one
+probability roll followed by fifteen rewrite rolls.
+
 Enemy skill type `151` connects that selector to the weakened-orb primitive.
 Its `_doEnemySkill` dispatch entry resolves to `0x62afd0`, which passes
 definition `+0x10` as the type mask, converts signed percentage `+0x14` through

@@ -24,6 +24,10 @@ const HORIZONTAL_LINES_ENEMY_SKILL_TYPE = 79;
 const HORIZONTAL_LINES_HANDLER = 0x6287f8;
 const HORIZONTAL_LINES_SETUP_HANDLER = 0x61ff14;
 const HORIZONTAL_LINES_CONDITION_HANDLER = 0x61a630;
+const VERTICAL_LINES_ENEMY_SKILL_TYPE = 77;
+const VERTICAL_LINES_HANDLER = 0x628d3c;
+const VERTICAL_LINES_SETUP_HANDLER = 0x61ff14;
+const VERTICAL_LINES_CONDITION_HANDLER = 0x61a630;
 const BLOCK_MINUS_ENEMY_SKILL_TYPE = 151;
 const BLOCK_MINUS_HANDLER = 0x62afd0;
 const BLOCK_MINUS_SETUP_HANDLER = 0x6217c0;
@@ -235,6 +239,45 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
   const horizontalLinesConditionMatches = horizontalLinesConditionTarget === null
     ? null
     : horizontalLinesConditionTarget === HORIZONTAL_LINES_CONDITION_HANDLER;
+  const verticalLinesDispatchEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      EARLY_ENEMY_SKILL_DISPATCH_TABLE + (VERTICAL_LINES_ENEMY_SKILL_TYPE - 5) * 2,
+    )
+    : null;
+  const verticalLinesSetupEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      ENEMY_SKILL_SETUP_TABLE + (VERTICAL_LINES_ENEMY_SKILL_TYPE - 1) * 2,
+    )
+    : null;
+  const verticalLinesConditionEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      ENEMY_SKILL_CONDITION_TABLE + (VERTICAL_LINES_ENEMY_SKILL_TYPE - 1) * 2,
+    )
+    : null;
+  const verticalLinesDispatchTarget = verticalLinesDispatchEntry === null
+    ? null
+    : EARLY_ENEMY_SKILL_DISPATCH_BASE + verticalLinesDispatchEntry * 4;
+  const verticalLinesSetupTarget = verticalLinesSetupEntry === null
+    ? null
+    : ENEMY_SKILL_SETUP_BASE + verticalLinesSetupEntry * 4;
+  const verticalLinesConditionTarget = verticalLinesConditionEntry === null
+    ? null
+    : ENEMY_SKILL_CONDITION_BASE + verticalLinesConditionEntry * 4;
+  const verticalLinesDispatchMatches = verticalLinesDispatchTarget === null
+    ? null
+    : verticalLinesDispatchTarget === VERTICAL_LINES_HANDLER;
+  const verticalLinesSetupMatches = verticalLinesSetupTarget === null
+    ? null
+    : verticalLinesSetupTarget === VERTICAL_LINES_SETUP_HANDLER;
+  const verticalLinesConditionMatches = verticalLinesConditionTarget === null
+    ? null
+    : verticalLinesConditionTarget === VERTICAL_LINES_CONDITION_HANDLER;
   const blockMinusDispatchEntry = restoredElf
     ? readUint16Virtual(
       restoredElf,
@@ -349,6 +392,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       horizontalLinesDispatchMatches21_9: horizontalLinesDispatchMatches,
       horizontalLinesSetupMatches21_9: horizontalLinesSetupMatches,
       horizontalLinesConditionMatches21_9: horizontalLinesConditionMatches,
+      verticalLinesDispatchMatches21_9: verticalLinesDispatchMatches,
+      verticalLinesSetupMatches21_9: verticalLinesSetupMatches,
+      verticalLinesConditionMatches21_9: verticalLinesConditionMatches,
       blockMinusDispatchMatches21_9: blockMinusDispatchMatches,
       blockMinusSetupMatches21_9: blockMinusSetupMatches,
       blockMinusConditionMatches21_9: blockMinusConditionMatches,
@@ -394,6 +440,16 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       horizontalLinesConditionTarget: horizontalLinesConditionTarget === null
         ? null : hex(horizontalLinesConditionTarget),
       horizontalLinesConditionMatches21_9: horizontalLinesConditionMatches,
+      verticalLinesType: VERTICAL_LINES_ENEMY_SKILL_TYPE,
+      verticalLinesDispatchTarget: verticalLinesDispatchTarget === null
+        ? null : hex(verticalLinesDispatchTarget),
+      verticalLinesDispatchMatches21_9: verticalLinesDispatchMatches,
+      verticalLinesSetupTarget: verticalLinesSetupTarget === null
+        ? null : hex(verticalLinesSetupTarget),
+      verticalLinesSetupMatches21_9: verticalLinesSetupMatches,
+      verticalLinesConditionTarget: verticalLinesConditionTarget === null
+        ? null : hex(verticalLinesConditionTarget),
+      verticalLinesConditionMatches21_9: verticalLinesConditionMatches,
       blockMinusType: BLOCK_MINUS_ENEMY_SKILL_TYPE,
       blockMinusDispatchTarget: blockMinusDispatchTarget === null ? null : hex(blockMinusDispatchTarget),
       blockMinusDispatchMatches21_9: blockMinusDispatchMatches,
@@ -474,6 +530,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || blackFallDispatchMatches === false || blackFallSetupMatches === false
     || horizontalLinesDispatchMatches === false || horizontalLinesSetupMatches === false
     || horizontalLinesConditionMatches === false
+    || verticalLinesDispatchMatches === false || verticalLinesSetupMatches === false
+    || verticalLinesConditionMatches === false
     || blockMinusDispatchMatches === false || blockMinusSetupMatches === false
     || blockMinusConditionMatches === false
     || burDropDispatchMatches === false || burDropSetupMatches === false
