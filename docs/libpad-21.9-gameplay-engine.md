@@ -665,6 +665,15 @@ availability gate and execution spends the two persisted LCG advances of each
 random-color shuffle. The browser preserves these fixed/random paths, lock
 rejection, poison-family matching, accompanying-hit ordering, and selector RNG.
 
+Type `12` is the dedicated source-color-to-jammer variant. Its dispatch target
+is `0x6293f8`, setup is `0x61ff08`, and condition is `0x61a63c`. Setup copies
+definition source type `+0x10` to runtime `sMONSTER+0x678`; execution calls the
+same `_doBlockSwap` with fixed destination type 6. The condition returns zero
+when no source orb exists and otherwise returns binary32
+`min(sourceCount / 3, 1)`, without condition-owned RNG. The port reuses the
+native numeric board and lock semantics rather than implementing jammer as a
+separate visual-only effect.
+
 Enemy skill type `17` is the lone-enemy attack boost. Its late dispatch entry
 targets shared boost handler `0x629064`, setup targets `0x61ffdc`, and AI
 condition targets `0x61acdc`. Setup copies definition duration `+0x14` to

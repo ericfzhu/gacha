@@ -1051,6 +1051,30 @@ try {
       randomSourceOrbConversionDefinition,
     );
     const randomSourceOrbConversionState = engine.snapshot();
+    const sourceToJammerMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(sourceToJammerMonsterDefinition.buffer).setUint32(0xec, 9_034, true);
+    const sourceToJammerDefinition = sourceToPoisonDefinition.slice();
+    const sourceToJammerView = new DataView(sourceToJammerDefinition.buffer);
+    sourceToJammerView.setUint32(0x00, 9_034, true);
+    sourceToJammerView.setInt16(0x04, 12, true);
+    sourceToJammerView.setInt32(0x10, 5, true);
+    sourceToJammerView.setInt32(0x44, 0, true);
+    engine.reset();
+    engine.setBoardFromCodes(['HHHRBD', 'GLDRBG', 'RBRDGL', 'DLGRHB', 'HRRGLD']);
+    engine.setEnemyAiDefinitionPool(0, sourceToJammerMonsterDefinition, [sourceToJammerDefinition]);
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedSourceToJammerAi = engine.snapshot();
+    const selectedSourceToJammerCount = engine.board.flat()
+      .filter((orb) => orb.type === 'jammer').length;
+    engine.reset();
+    engine.setBoardFromCodes(Array(5).fill('RRRRRR'));
+    engine.setEnemyAiDefinitionPool(0, sourceToJammerMonsterDefinition, [sourceToJammerDefinition]);
+    engine.setRngState(21_900);
+    const rejectedSourceToJammerSkill = engine.takeEnemySkill(0);
+    const rejectedSourceToJammerState = engine.snapshot();
     const statusTriggeredAttackBoostMonsterDefinition = enemyAiMonsterDefinition.slice();
     new DataView(statusTriggeredAttackBoostMonsterDefinition.buffer).setUint32(0xec, 9_031, true);
     const statusTriggeredAttackBoostDefinition = sourceToPoisonDefinition.slice();
@@ -1403,6 +1427,8 @@ try {
       selectedSourceOrbConversionAi, selectedSourceOrbConversionWaterCount,
       rejectedSourceOrbConversionSkill, rejectedSourceOrbConversionState,
       randomSourceOrbConversionApplied, randomSourceOrbConversionState,
+      selectedSourceToJammerAi, selectedSourceToJammerCount,
+      rejectedSourceToJammerSkill, rejectedSourceToJammerState,
       selectedStatusTriggeredAttackBoostAi, selectedTransientAttackBoostAi,
       rejectedStatusTriggeredAttackBoostSkill, rejectedStatusTriggeredAttackBoostState,
       selectedDamagedTurnAttackBoostAi,
@@ -1678,6 +1704,11 @@ try {
     poisonBlockSample.randomSourceOrbConversionState.lastEnemySkill?.sourceType !== 0 ||
     poisonBlockSample.randomSourceOrbConversionState.lastEnemySkill?.destinationType !== 3 ||
     poisonBlockSample.randomSourceOrbConversionState.rngState !== advanceLcg(21_900, 4) ||
+    poisonBlockSample.selectedSourceToJammerAi.lastEnemyActions?.[0]?.skill?.type !== 12 ||
+    poisonBlockSample.selectedSourceToJammerAi.rngState !== advanceLcg(21_900, 1) ||
+    poisonBlockSample.selectedSourceToJammerCount !== 5 ||
+    poisonBlockSample.rejectedSourceToJammerSkill !== null ||
+    poisonBlockSample.rejectedSourceToJammerState.rngState !== 21_900 ||
     poisonBlockSample.selectedStatusTriggeredAttackBoostAi.enemies?.[0]?.attackBoostTurns !== 2 ||
     poisonBlockSample.selectedStatusTriggeredAttackBoostAi.enemies?.[0]?.attackBoostPercent !== 250 ||
     poisonBlockSample.selectedStatusTriggeredAttackBoostAi.lastEnemyActions?.[0]?.skill?.type !== 18 ||

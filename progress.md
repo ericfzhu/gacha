@@ -2,6 +2,16 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 source-to-jammer conversion
+
+- Identified enemy skill type `12`: dispatch `0x6293f8`, setup `0x61ff08`,
+  condition `0x61a63c`. Definition source type `+0x10` materializes at
+  `sMONSTER+0x678`; execution converts it to fixed jammer type 6.
+- Ported definition/runtime decoding, capped live-source `count / 3` AI scale,
+  dry-board rejection without RNG, shared lock-aware block conversion, direct
+  and scheduled execution, exact inspection, and pure/browser fixtures.
+- Next: continue the remaining live early enemy-action table.
+
 ## 2026-08-14 source-orb conversion
 
 - Identified live enemy skill type `4` as the general source-to-destination orb

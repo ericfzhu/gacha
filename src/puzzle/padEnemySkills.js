@@ -1,4 +1,5 @@
 export const PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION = 4;
+export const PAD_ENEMY_SKILL_SOURCE_TO_JAMMER = 12;
 export const PAD_ENEMY_SKILL_LONE_ATTACK_BOOST = 17;
 export const PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST = 18;
 export const PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST = 19;
@@ -102,6 +103,16 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       supported: true,
       sourceType: definition.getInt32(0x10, true),
       destinationType: definition.getInt32(0x14, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_SOURCE_TO_JAMMER) {
+    return Object.freeze({
+      type,
+      kind: 'sourceToJammer',
+      supported: true,
+      sourceType: definition.getInt32(0x10, true),
+      destinationType: 6,
       attackWithSkillValue,
     });
   }
@@ -572,6 +583,20 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_SOURCE_TO_JAMMER) {
+    return Object.freeze({
+      type,
+      kind: 'sourceToJammer',
+      supported: true,
+      sourceType: monster.getInt32(0x678, true),
+      destinationType: 6,
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (
     type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST
     || type === PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST
@@ -768,6 +793,19 @@ export function normalizePadEnemySkillRecord(record) {
       destinationType: Math.trunc(Number(record?.destinationType) || 0),
       setupMaterialized: Boolean(record?.setupMaterialized),
       executionMaterialized: Boolean(record?.executionMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_SOURCE_TO_JAMMER || record?.kind === 'sourceToJammer') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
+      kind: 'sourceToJammer',
+      supported: true,
+      sourceType: Math.trunc(Number(record?.sourceType) || 0),
+      destinationType: 6,
+      setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

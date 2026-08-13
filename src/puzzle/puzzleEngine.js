@@ -34,6 +34,7 @@ import {
 } from './padCoreRules.js';
 import {
   PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
+  PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -997,6 +998,17 @@ export class PuzzleEngine {
             rngState: this.rng.state,
           };
         }
+        if (definition.effect.kind === 'sourceToJammer') {
+          const sourceType = definition.effect.sourceType;
+          const sourceMask = sourceType === 7 || sourceType === 8
+            ? 1 << 7
+            : sourceType >= 0 && sourceType < 16 ? 1 << sourceType : 0;
+          const count = sourceMask === 0 ? 0 : this.countBlockBits(sourceMask);
+          const probabilityScale = count < 1
+            ? 0
+            : Math.fround(Math.min(1, Math.fround(Math.fround(count) / Math.fround(3))));
+          return { eligible: probabilityScale > 0, probabilityScale, rngState: this.rng.state };
+        }
         if (definition.effect.kind === 'blockMinus') {
           const eligible = this.doBlockMinus(
             false,
@@ -1486,6 +1498,11 @@ export class PuzzleEngine {
       this.message = `Enemy converted one orb color (effect ${effectFlags}).`;
       return true;
     }
+    if (skill.supported && skill.kind === 'sourceToJammer') {
+      const effectFlags = this.doBlockSwap(skill.sourceType, 6, 0, null);
+      this.message = `Enemy converted one orb color to jammer (effect ${effectFlags}).`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'blockMinus') {
       const changed = this.doBlockMinus(
         true,
@@ -1610,6 +1627,7 @@ export class PuzzleEngine {
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
       if (![
         PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
+        PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
         PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
         PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,

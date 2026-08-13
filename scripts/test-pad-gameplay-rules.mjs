@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
   PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
+  PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -843,6 +844,39 @@ assert.equal(randomSourceOrbConversionEngine.board.flat()
   .every((orb) => orb.type !== 'fire'), true);
 assert.equal(randomSourceOrbConversionEngine.rng.state,
   Array.from({ length: 4 }).reduce((state) => padLcgStep(state).state, 21_900));
+const enemyAiSourceToJammerDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiSourceToJammerView = new DataView(enemyAiSourceToJammerDefinition.buffer);
+enemyAiSourceToJammerView.setUint32(0x00, 9_034, true);
+enemyAiSourceToJammerView.setInt16(0x04, PAD_ENEMY_SKILL_SOURCE_TO_JAMMER, true);
+enemyAiSourceToJammerView.setInt32(0x10, 5, true);
+enemyAiSourceToJammerView.setInt32(0x44, 0, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiSourceToJammerDefinition), {
+  type: 12,
+  kind: 'sourceToJammer',
+  supported: true,
+  sourceType: 5,
+  destinationType: 6,
+  attackWithSkillValue: 0,
+});
+const sourceToJammerMonsterRuntime = new Uint8Array(0x680);
+new DataView(sourceToJammerMonsterRuntime.buffer).setInt32(0x678, 4, true);
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiSourceToJammerDefinition,
+  sourceToJammerMonsterRuntime,
+), {
+  type: 12,
+  kind: 'sourceToJammer',
+  supported: true,
+  sourceType: 4,
+  destinationType: 6,
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
+const sourceToJammerEngine = new PuzzleEngine({ seed: 21_900 });
+sourceToJammerEngine.setBoardFromCodes(['HHHRBD', 'GLDRBG', 'RBRDGL', 'DLGRHB', 'HRRGLD']);
+assert.equal(sourceToJammerEngine.applyEnemySkillDefinition(enemyAiSourceToJammerDefinition), true);
+assert.equal(sourceToJammerEngine.board.flat().filter((orb) => orb.type === 'heart').length, 0);
+assert.equal(sourceToJammerEngine.board.flat().filter((orb) => orb.type === 'jammer').length, 5);
 assert.equal(padEnemySkillBoostedAttack(1_850, 100, 200), 3_700);
 assert.equal(padEnemySkillBoostedAttack(1_850, 50, 200), 1_850);
 const enemyAiLoneAttackBoostDefinition = enemyAiPoisonBlocksDefinition.slice();
@@ -2708,6 +2742,37 @@ rejectedSourceOrbConversionEngine.setBoardFromCodes(Array(5).fill('RRRRRR'));
 rejectedSourceOrbConversionEngine.setRngState(21_900);
 assert.equal(rejectedSourceOrbConversionEngine.takeEnemySkill(0), null);
 assert.equal(rejectedSourceOrbConversionEngine.rng.state, 21_900);
+const sourceToJammerMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(sourceToJammerMonsterDefinition.buffer).setUint32(0xec, 9_034, true);
+const selectedSourceToJammerEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: sourceToJammerMonsterDefinition,
+    skillDefinitions: [enemyAiSourceToJammerDefinition],
+  }],
+});
+selectedSourceToJammerEngine.setBoardFromCodes([
+  'HHHRBD', 'GLDRBG', 'RBRDGL', 'DLGRHB', 'HRRGLD',
+]);
+selectedSourceToJammerEngine.setRngState(21_900);
+selectedSourceToJammerEngine.enemies[0].counter = 1;
+selectedSourceToJammerEngine.enemies[1].counter = 99;
+selectedSourceToJammerEngine.resolveEnemyTurn();
+assert.equal(selectedSourceToJammerEngine.lastEnemySkill.type, 12);
+assert.equal(selectedSourceToJammerEngine.board.flat()
+  .filter((orb) => orb.type === 'jammer').length, 5);
+assert.equal(selectedSourceToJammerEngine.rng.state, padLcgStep(21_900).state);
+const rejectedSourceToJammerEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: sourceToJammerMonsterDefinition,
+    skillDefinitions: [enemyAiSourceToJammerDefinition],
+  }],
+});
+rejectedSourceToJammerEngine.setBoardFromCodes(Array(5).fill('RRRRRR'));
+rejectedSourceToJammerEngine.setRngState(21_900);
+assert.equal(rejectedSourceToJammerEngine.takeEnemySkill(0), null);
+assert.equal(rejectedSourceToJammerEngine.rng.state, 21_900);
 const statusTriggeredAttackBoostMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(statusTriggeredAttackBoostMonsterDefinition.buffer).setUint32(0xec, 9_031, true);
 const selectedStatusTriggeredAttackBoostEngine = new PuzzleEngine({

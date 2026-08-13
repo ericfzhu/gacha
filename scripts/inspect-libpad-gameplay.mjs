@@ -21,6 +21,10 @@ const SOURCE_ORB_CONVERSION_ENEMY_SKILL_TYPE = 4;
 const SOURCE_ORB_CONVERSION_HANDLER = 0x6292b4;
 const SOURCE_ORB_CONVERSION_SETUP_HANDLER = 0x61fee4;
 const SOURCE_ORB_CONVERSION_CONDITION_HANDLER = 0x61b2d8;
+const SOURCE_TO_JAMMER_ENEMY_SKILL_TYPE = 12;
+const SOURCE_TO_JAMMER_HANDLER = 0x6293f8;
+const SOURCE_TO_JAMMER_SETUP_HANDLER = 0x61ff08;
+const SOURCE_TO_JAMMER_CONDITION_HANDLER = 0x61a63c;
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -326,6 +330,21 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : sourceOrbConversionSetupTarget === SOURCE_ORB_CONVERSION_SETUP_HANDLER;
   const sourceOrbConversionConditionMatches = sourceOrbConversionConditionTarget === null
     ? null : sourceOrbConversionConditionTarget === SOURCE_ORB_CONVERSION_CONDITION_HANDLER;
+  const sourceToJammerDispatchTarget = resolveEnemySkillTarget(
+    SOURCE_TO_JAMMER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const sourceToJammerSetupTarget = resolveEnemySkillTarget(
+    SOURCE_TO_JAMMER_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const sourceToJammerConditionTarget = resolveEnemySkillTarget(
+    SOURCE_TO_JAMMER_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const sourceToJammerDispatchMatches = sourceToJammerDispatchTarget === null
+    ? null : sourceToJammerDispatchTarget === SOURCE_TO_JAMMER_HANDLER;
+  const sourceToJammerSetupMatches = sourceToJammerSetupTarget === null
+    ? null : sourceToJammerSetupTarget === SOURCE_TO_JAMMER_SETUP_HANDLER;
+  const sourceToJammerConditionMatches = sourceToJammerConditionTarget === null
+    ? null : sourceToJammerConditionTarget === SOURCE_TO_JAMMER_CONDITION_HANDLER;
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1225,6 +1244,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       sourceOrbConversionDispatchMatches21_9: sourceOrbConversionDispatchMatches,
       sourceOrbConversionSetupMatches21_9: sourceOrbConversionSetupMatches,
       sourceOrbConversionConditionMatches21_9: sourceOrbConversionConditionMatches,
+      sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
+      sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
+      sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
       healPlayerDispatchMatches21_9: healPlayerDispatchMatches,
       healPlayerSetupMatches21_9: healPlayerSetupMatches,
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
@@ -1371,6 +1393,16 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       sourceOrbConversionConditionMatches21_9: sourceOrbConversionConditionMatches,
       sourceOrbConversionParameters:
         'definition +0x10/+0x14 -> sMONSTER+0x678/+0x67c source/destination; negative selects native random mode',
+      sourceToJammerType: SOURCE_TO_JAMMER_ENEMY_SKILL_TYPE,
+      sourceToJammerDispatchTarget: sourceToJammerDispatchTarget === null
+        ? null : hex(sourceToJammerDispatchTarget),
+      sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
+      sourceToJammerSetupTarget: sourceToJammerSetupTarget === null
+        ? null : hex(sourceToJammerSetupTarget),
+      sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
+      sourceToJammerConditionTarget: sourceToJammerConditionTarget === null
+        ? null : hex(sourceToJammerConditionTarget),
+      sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
       blackFallType: BLACK_FALL_ENEMY_SKILL_TYPE,
       dispatchEntry: blackFallDispatchEntry === null ? null : hex(blackFallDispatchEntry),
       dispatchTarget: blackFallDispatchTarget === null ? null : hex(blackFallDispatchTarget),
@@ -1754,6 +1786,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || sourceOrbConversionDispatchMatches === false
     || sourceOrbConversionSetupMatches === false
     || sourceOrbConversionConditionMatches === false
+    || sourceToJammerDispatchMatches === false
+    || sourceToJammerSetupMatches === false
+    || sourceToJammerConditionMatches === false
     || blackFallDispatchMatches === false || blackFallSetupMatches === false
     || healPlayerDispatchMatches === false || healPlayerSetupMatches === false
     || healPlayerConditionMatches === false
