@@ -2,6 +2,38 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 gameplay fidelity checkpoint
+
+- Added a reproducible `libpad:inspect` command that validates the exact
+  protected `libpad.so` hash, distinguishes it from the restored image, and
+  verifies 31 recovered input, board, match, hazard, combat, targeting, and
+  recovery routine addresses and sizes.
+- Ported the exact `izRndLcGet` primitive and `_getRandomBlock` selection:
+  two persisted global LCG advances, high-half temporary seed construction,
+  forward Fisher-Yates candidate ordering, type exclusion, and jammer/heart
+  eligibility. The data-driven initial-board and skyfall tables remain on the
+  native binary path rather than being mislabeled as a uniform exact port.
+- Matched native movement edge cases: fractional coalesced-pointer crossings,
+  special diagonal adjacency and combo scaling, primary-pointer ownership,
+  zero-distance turn use, and an elapsed-time move deadline that cannot be
+  extended by a stalled browser frame.
+- Matched more block/hazard state: poison operation order, bomb wait ordering,
+  thorn crossings, special-orb lock/enhancement interaction, shared pending-HP
+  saturation, and simultaneous recovery/damage application.
+- Matched more combat staging: six-card main/tertiary/secondary rounds,
+  binary32 multiplier boundaries, card-driven leader scaling, automatic and
+  manual retargeting, mass-target cleanup, and per-card damage-cap-before-defense
+  ordering.
+- Fixed the puzzle canvas HP label so it no longer sits behind the reset hit
+  target, and made every browser scenario safe to run together after switching
+  between the native 6x5 and 7x6 layouts.
+- Verification passed: pure rules, production build, the combined Chromium
+  gameplay suite, and the exact-APK ARM64/Wasm smoke test. The latter executed
+  151,900,698 guest instructions, reached all six lifecycle exports, rendered
+  161 frames / 17,732 draw calls, accepted four native touch callbacks, requested
+  the expected absent `data048.bin` and `data030.bin`, and emitted no browser
+  errors.
+
 ## 2026-08-13 gameplay data and rules fidelity pass
 
 - Decoded the `MCD5` shipped-asset index: 4,328 records spanning resident `DATA001.BIN`, compressed `DATA002.BIN`, WAV `DATA003.BIN`, download-only names, and reserved slots. Added a dependency-free parser, inspector, and exact-APK regression.
