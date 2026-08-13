@@ -113,6 +113,15 @@ indices stored around game-work offset `0x57a8`. Version 21.9 also records moder
 shape metadata and passive-skill flags. The browser rules layer now returns mass
 attack, row, column, cross, L, and 3x3 box metadata for each connected match.
 
+Native block types `0`–`5` are fire, water, wood, light, dark, and heart;
+`_doPoisonBlockN` explicitly treats types `7` and `8` as the two poison classes,
+leaving type `6` as jammer. These map directly to `block2.btex` sprites `2`–`10`.
+The browser rules layer clears and counts jammer/poison matches as combos, but
+only attribute/heart classes feed attacks or recovery. Poison costs 20% of
+maximum HP for a three-orb group and mortal poison 50%, with the same 25%
+per-extra-orb group scaling. Recovery and poison are netted before the HP clamp,
+matching `_applyHpRecAndPoisonDamage` rather than healing to the cap first.
+
 Classic base multipliers recovered in the calculation path are:
 
 - three connected orbs: `1.0`

@@ -5,6 +5,8 @@ export const PAD_MASS_ATTACK_ORBS = 5;
 export const PAD_DEFAULT_MOVE_TIME_SECONDS = 5;
 export const PAD_EXTRA_ORB_BONUS = 0.25;
 export const PAD_EXTRA_COMBO_BONUS = 0.25;
+export const PAD_POISON_MAX_HP_RATIO = 0.2;
+export const PAD_MORTAL_POISON_MAX_HP_RATIO = 0.5;
 
 // Version 21.9.0's restored image exposes the corresponding native routines as
 // cGAMEMAIN::_isNeighborBlock (0x673e24), _swapBlock (0x67ab14),
@@ -50,6 +52,14 @@ export function padApplyAttackMultipliers(attack, multipliers) {
 
 export function padDamageAfterDefense(attack, attributeMultiplier, defense) {
   return Math.max(1, Math.ceil(attack * attributeMultiplier) - Math.max(0, defense));
+}
+
+export function padPoisonDamage(maxHp, poisonMatchSizes = [], mortalPoisonMatchSizes = []) {
+  const ratio = poisonMatchSizes.reduce((total, size) =>
+    total + PAD_POISON_MAX_HP_RATIO * padOrbMatchMultiplier(size), 0) +
+    mortalPoisonMatchSizes.reduce((total, size) =>
+      total + PAD_MORTAL_POISON_MAX_HP_RATIO * padOrbMatchMultiplier(size), 0);
+  return Math.floor(Math.max(0, maxHp) * ratio);
 }
 
 // Android may coalesce pointer motion. The native normal-board swap routine

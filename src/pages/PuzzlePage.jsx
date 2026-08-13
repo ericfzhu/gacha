@@ -10,7 +10,7 @@ const CELL = 70;
 const SKILL_RECT = { x: 291, y: 353, width: 144, height: 64 };
 const RESET_RECT = { x: 15, y: 353, width: 48, height: 48 };
 const START_RECT = { x: 95, y: 541, width: 260, height: 58 };
-const PAD_ORB_SPRITES = Object.freeze({ fire: 2, water: 3, wood: 4, light: 5, dark: 6, heart: 7 });
+const PAD_ORB_SPRITES = Object.freeze({ fire: 2, water: 3, wood: 4, light: 5, dark: 6, heart: 7, jammer: 8, poison: 9, mortalPoison: 10 });
 let activePadOrbAtlas = null;
 
 function roundedRect(ctx, x, y, width, height, radius) {
@@ -348,12 +348,12 @@ function render(ctx, engine) {
 
   engine.floatingText.forEach((item, index) => {
     const t = item.age / 1.15;
-    const x = item.kind === 'heal' ? 225 : item.enemy === 0 ? 132 : 318;
-    const y = item.kind === 'heal' ? 322 : 122 - t * 44 - index * 2;
+    const x = item.kind === 'heal' || item.kind === 'poison' ? 225 : item.enemy === 0 ? 132 : 318;
+    const y = item.kind === 'heal' || item.kind === 'poison' ? 322 - t * 30 : 122 - t * 44 - index * 2;
     ctx.globalAlpha = Math.max(0, 1 - t);
     ctx.textAlign = 'center';
     ctx.font = '900 22px "Barlow Condensed", sans-serif';
-    ctx.fillStyle = item.kind === 'heal' ? '#83ef9d' : item.kind === 'enemy' ? '#ff8b7f' : ORB_BY_ID[item.attribute]?.highlight || '#fff';
+    ctx.fillStyle = item.kind === 'heal' ? '#83ef9d' : item.kind === 'poison' ? '#d995ef' : item.kind === 'enemy' ? '#ff8b7f' : ORB_BY_ID[item.attribute]?.highlight || '#fff';
     ctx.fillText(`${item.kind === 'heal' ? '+' : '-'}${item.value.toLocaleString()}`, x, y);
     ctx.globalAlpha = 1;
   });

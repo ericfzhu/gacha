@@ -9,6 +9,7 @@ import {
   padMatchPower,
   padNativeBaseAttackPower,
   padOrbMatchMultiplier,
+  padPoisonDamage,
   tracePadDragCells,
   tracePadPointerCells,
 } from '../src/puzzle/padCoreRules.js';
@@ -63,6 +64,8 @@ assert.equal(padNativeBaseAttackPower(101, [3, 4], 2), 285);
 assert.equal(padApplyAttackMultipliers(285, [1.5, 1.5]), 642);
 assert.equal(padDamageAfterDefense(101, 0.5, 40), 11);
 assert.equal(padDamageAfterDefense(10, 0.5, 999), 1);
+assert.equal(padPoisonDamage(10_000, [3], []), 2_000);
+assert.equal(padPoisonDamage(10_000, [4], [3]), 7_500);
 assert.equal(padAttributeMultiplier('fire', 'wood'), 2);
 assert.equal(padAttributeMultiplier('fire', 'water'), 0.5);
 assert.equal(padAttributeMultiplier('light', 'dark'), 2);
@@ -75,4 +78,14 @@ assert.equal(engine.startDrag(0, 0, 50, 50), true);
 assert.equal(engine.moveDrag(1, 1, 120, 120), true);
 assert.equal(engine.drag.pathLength, 2);
 assert.deepEqual(engine.snapshot().board.slice(0, 2), ['BLGHLD', 'GRDBHR']);
+
+const poisonEngine = new PuzzleEngine({ seed: 2 });
+poisonEngine.setBoardFromCodes(['PPPBGH', 'HHHLDB', 'BGHRDL', 'DLGRHB', 'HRBGLD']);
+poisonEngine.player.hp = poisonEngine.player.maxHp;
+poisonEngine.comboCount = 2;
+poisonEngine.turnMatches = poisonEngine.findMatches();
+poisonEngine.resolvePlayerTurn();
+assert.equal(poisonEngine.lastHealing, 1_025);
+assert.equal(poisonEngine.lastPoisonDamage, 2_400);
+assert.equal(poisonEngine.player.hp, 10_625);
 console.log('PAD orthogonal drag, connected match, and classic multiplier checks passed.');

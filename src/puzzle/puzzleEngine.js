@@ -9,6 +9,7 @@ import {
   padDamageAfterDefense,
   padMatchPower,
   padNativeBaseAttackPower,
+  padPoisonDamage,
   tracePadPointerCells,
 } from './padCoreRules.js';
 
@@ -22,7 +23,12 @@ export const ORB_TYPES = Object.freeze([
   { id: 'light', code: 'L', label: 'Light', color: '#f2c94c', highlight: '#fff4b0' },
   { id: 'dark', code: 'D', label: 'Dark', color: '#8d65cf', highlight: '#dac8ff' },
   { id: 'heart', code: 'H', label: 'Heart', color: '#ed72a7', highlight: '#ffd0e2' },
+  { id: 'jammer', code: 'J', label: 'Jammer', color: '#26354e', highlight: '#7092be' },
+  { id: 'poison', code: 'P', label: 'Poison', color: '#6b2d88', highlight: '#d49be8' },
+  { id: 'mortalPoison', code: 'M', label: 'Mortal Poison', color: '#32213f', highlight: '#f0e3f8' },
 ]);
+
+const NATURAL_ORB_TYPES = ORB_TYPES.slice(0, 6);
 
 export const ORB_BY_ID = Object.freeze(Object.fromEntries(ORB_TYPES.map((orb) => [orb.id, orb])));
 export const ORB_BY_CODE = Object.freeze(Object.fromEntries(ORB_TYPES.map((orb) => [orb.code, orb])));
@@ -86,6 +92,7 @@ export class PuzzleEngine {
     this.lastComboCount = 0;
     this.lastDamage = 0;
     this.lastHealing = 0;
+    this.lastPoisonDamage = 0;
     this.lastLeaderMultiplier = 1;
     this.message = 'Drag one orb through the board to rearrange the whole path.';
     this.player = { hp: 12000, maxHp: 12000, recovery: 820 };
@@ -118,7 +125,7 @@ export class PuzzleEngine {
         const blocked = new Set();
         if (column >= 2 && board[row][column - 1]?.type === board[row][column - 2]?.type) blocked.add(board[row][column - 1].type);
         if (row >= 2 && board[row - 1][column]?.type === board[row - 2][column]?.type) blocked.add(board[row - 1][column].type);
-        const choices = ORB_TYPES.map((orb) => orb.id).filter((type) => !blocked.has(type));
+        const choices = NATURAL_ORB_TYPES.map((orb) => orb.id).filter((type) => !blocked.has(type));
         const type = choices[Math.floor(this.rng() * choices.length)];
         board[row][column] = this.createOrb(type);
       }
@@ -174,6 +181,7 @@ export class PuzzleEngine {
     this.pendingMatches = [];
     this.lastDamage = 0;
     this.lastHealing = 0;
+    this.lastPoisonDamage = 0;
     this.phase = 'detect';
     this.phaseTimer = 0.12;
     this.message = 'Checking matches…';
@@ -294,7 +302,7 @@ export class PuzzleEngine {
       const survivors = [];
       for (let row = BOARD_ROWS - 1; row >= 0; row -= 1) if (this.board[row][column]) survivors.push(this.board[row][column]);
       for (let row = BOARD_ROWS - 1, index = 0; row >= 0; row -= 1, index += 1) {
-        this.board[row][column] = survivors[index] || this.createOrb(ORB_TYPES[Math.floor(this.rng() * ORB_TYPES.length)].id);
+        this.board[row][column] = survivors[index] || this.createOrb(NATURAL_ORB_TYPES[Math.floor(this.rng() * NATURAL_ORB_TYPES.length)].id);
       }
     }
   }
@@ -313,14 +321,20 @@ export class PuzzleEngine {
     });
 
     const heartMatches = byType.get('heart') || [];
-    if (heartMatches.length) {
-      const heartBase = padMatchPower(this.player.recovery, heartMatches);
-      const healing = Math.floor(heartBase * comboMultiplier);
-      const actual = Math.min(healing, this.player.maxHp - this.player.hp);
-      this.player.hp += actual;
-      this.lastHealing = actual;
-      if (actual > 0) this.floatingText.push({ kind: 'heal', value: actual, enemy: -1, age: 0 });
-    }
+    const healing = heartMatches.length
+      ? Math.floor(padMatchPower(this.player.recovery, heartMatches) * comboMultiplier)
+      : 0;
+    const poisonDamage = padPoisonDamage(
+      this.player.maxHp,
+      byType.get('poison') || [],
+      byType.get('mortalPoison') || [],
+    );
+    const previousHp = this.player.hp;
+    this.player.hp = clamp(previousHp + healing - poisonDamage, 0, this.player.maxHp);
+    this.lastHealing = healing;
+    this.lastPoisonDamage = poisonDamage;
+    if (healing > 0) this.floatingText.push({ kind: 'heal', value: healing, enemy: -1, age: 0 });
+    if (poisonDamage > 0) this.floatingText.push({ kind: 'poison', value: poisonDamage, enemy: -1, age: 0 });
 
     let totalDamage = 0;
     const target = this.enemies[this.targetEnemy]?.hp > 0 ? this.targetEnemy : this.enemies.findIndex((enemy) => enemy.hp > 0);
@@ -340,7 +354,7 @@ export class PuzzleEngine {
       });
     });
     this.lastDamage = totalDamage;
-    this.message = `${this.comboCount} combo${this.comboCount === 1 ? '' : 's'} · ${totalDamage.toLocaleString()} total damage${this.lastHealing ? ` · +${this.lastHealing.toLocaleString()} HP` : ''}`;
+    this.message = `${this.comboCount} combo${this.comboCount === 1 ? '' : 's'} · ${totalDamage.toLocaleString()} total damage${this.lastHealing ? ` · +${this.lastHealing.toLocaleString()} HP` : ''}${this.lastPoisonDamage ? ` · -${this.lastPoisonDamage.toLocaleString()} poison` : ''}`;
   }
 
   resolveEnemyTurn() {
@@ -385,6 +399,7 @@ export class PuzzleEngine {
       lastComboCount: this.lastComboCount,
       lastDamage: this.lastDamage,
       lastHealing: this.lastHealing,
+      lastPoisonDamage: this.lastPoisonDamage,
       leaderPairMultiplier: this.lastLeaderMultiplier,
       player: { ...this.player },
       targetEnemy: this.targetEnemy,
