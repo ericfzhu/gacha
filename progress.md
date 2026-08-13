@@ -2,6 +2,19 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 explicit-list poison swaps
+
+- Recovered `_doBlockSwap2` at `0x6af838`: one mandatory destination followed
+  by up to three values, truncated at the first negative sentinel and preserving
+  duplicates, forwarded to the default poison/mortal source path.
+- Added engine and browser fixtures for sentinel truncation, duplicate weighting,
+  locked mortal-poison rejection, RNG state, and accumulated effect flags.
+- Expanded the exact restored-binary inspector to 52 gameplay anchors.
+- Verification passed: rules, build, exact inspector, exhaustive browser suite,
+  generic tap-turn/text state, clean console, and screenshot inspection.
+- Next: `_doBlockSwap3` skill-record decoding and non-null `sBLOCKFLAG` passive
+  resistance, followed by data-backed board generation/skyfall constraints.
+
 ## 2026-08-14 line-pattern block swaps
 
 - Recovered `_doBlockSwapV`/`_doBlockSwapH` at `0x6ae64c`/`0x6ae8fc` plus exact

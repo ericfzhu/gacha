@@ -342,6 +342,12 @@ try {
     const poisonSwapFlags = engine.doBlockSwap4((1 << 0) | (1 << 1), 4);
     const poisonSwapState = engine.rng.state;
     const poisonSwapTypes = engine.board[0].slice(0, 2).map((orb) => orb.type);
+    engine.setBoardFromCodes(['PMJGHD', 'GLDHRG', 'HBGDGL', 'DLGHHB', 'HBGGLD']);
+    engine.setRngState(21_900);
+    engine.setOrbState(0, 1, { locked: true });
+    const explicitSwapFlags = engine.doBlockSwap2(2, 3, -1, 9, 4);
+    const explicitSwapState = engine.rng.state;
+    const explicitSwapTypes = engine.board[0].slice(0, 2).map((orb) => orb.type);
     engine.setBoardFromCodes(['DDDDHD', 'GLDHRG', 'HBGDGL', 'DLGHHB', 'HBGGLD']);
     engine.setRngState(21_900);
     engine.setOrbState(2, 3, { locked: true });
@@ -367,6 +373,7 @@ try {
       poisonReplaceFlags, poisonReplaceState, poisonReplaceOrb,
       maskSwapFlags, maskSwapState, maskSwapTypes,
       poisonSwapFlags, poisonSwapState, poisonSwapTypes,
+      explicitSwapFlags, explicitSwapState, explicitSwapTypes,
       verticalSwapFlags, verticalSwapState, verticalSwapTypes,
       horizontalSwapFlags, horizontalSwapState, horizontalSwapTypes,
     };
@@ -405,6 +412,8 @@ try {
     JSON.stringify(poisonBlockSample.maskSwapTypes) !== JSON.stringify(['wood', 'fire', 'wood', 'water']) ||
     poisonBlockSample.poisonSwapFlags !== 5 || poisonBlockSample.poisonSwapState !== 919_597_584 ||
     JSON.stringify(poisonBlockSample.poisonSwapTypes) !== JSON.stringify(['fire', 'mortalPoison']) ||
+    poisonBlockSample.explicitSwapFlags !== 5 || poisonBlockSample.explicitSwapState !== 919_597_584 ||
+    JSON.stringify(poisonBlockSample.explicitSwapTypes) !== JSON.stringify(['wood', 'mortalPoison']) ||
     poisonBlockSample.verticalSwapFlags !== 9 || poisonBlockSample.verticalSwapState !== 4_221_117_678 ||
     JSON.stringify(poisonBlockSample.verticalSwapTypes) !== JSON.stringify(['fire', 'heart', 'dark']) ||
     poisonBlockSample.horizontalSwapFlags !== 7 || poisonBlockSample.horizontalSwapState !== 2_782_038_744 ||

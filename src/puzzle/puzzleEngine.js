@@ -899,6 +899,26 @@ export class PuzzleEngine {
     for (let type = 0; type <= 9; type += 1) {
       if ((destinationMask & (1 << type)) !== 0) destinationTypes.push(type);
     }
+    return this.doBlockSwapTypes(destinationTypes, sourceTypeMask, initialEffectFlags);
+  }
+
+  doBlockSwap2(
+    firstType,
+    secondType = -1,
+    thirdType = -1,
+    fourthType = -1,
+    initialEffectFlags = 0,
+  ) {
+    const destinationTypes = [];
+    for (const value of [firstType, secondType, thirdType, fourthType]) {
+      const type = Math.trunc(Number(value));
+      if (type < 0) break;
+      if (type <= 9) destinationTypes.push(type);
+    }
+    return this.doBlockSwapTypes(destinationTypes, 0, initialEffectFlags);
+  }
+
+  doBlockSwapTypes(destinationTypes, sourceTypeMask, initialEffectFlags = 0) {
     if (destinationTypes.length === 0) return Number(initialEffectFlags) | 0;
     const boardTypes = this.board.map((row) => row.map((orb) => (
       ORB_TYPES.findIndex((candidate) => candidate.id === orb.type)

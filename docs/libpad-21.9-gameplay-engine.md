@@ -366,6 +366,14 @@ including discarding an incoming effect-mask value. `padRelocateBoardXBits`,
 bottom-up row semantics, per-cell RNG, lock timing, effect flags, and special
 destination clearing for the null-passive path.
 
+`_doBlockSwap2(int, int, int, int, sBLOCKFLAG *)` at `0x6af838` is the
+explicit-list sibling. Its first type is mandatory; it appends later arguments
+until the first negative sentinel, so a value after that sentinel is ignored.
+It preserves repeated destination types and calls `_doBlockSwapNew` with source
+mask zero, selecting poison/mortal-poison through the default-source rule.
+`PuzzleEngine.doBlockSwap2` keeps that ordered/sentinel contract and therefore
+does not collapse repeated types into a bit mask.
+
 The enemy inverse is `_doBlockMinus(bool, uint32 mask, float, int)` at
 `0x61caa0`. Only cells whose type bit is in the mask and whose current power is
 non-negative are eligible; applying the effect stores the negated binary32
