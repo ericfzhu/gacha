@@ -262,6 +262,14 @@ mid-round retargeting, and damage display. Its party also uses the native
 six-card shape (five player cards plus the helper), and team recovery is the
 sum of those six card records.
 
+The ordinary automatic-target branch in `_calcChoiceAtkTarget` does not merely
+pick the lowest-HP enemy. It first retains the largest-current-HP target the
+pending hit can defeat. With no lethal candidate, elemental advantage takes
+priority and projected damage/current HP breaks the remaining tie. The browser
+uses that ordering and shows the target ring only for an explicit tap;
+automatic retargeting updates combat state without masquerading as a manual
+selection.
+
 ## Shipped asset containers
 
 `DATA000.BIN` is an `MCD5` index with a 0x50-byte header and 4,328 16-byte

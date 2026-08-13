@@ -239,15 +239,28 @@ export class PuzzleEngine {
     this.manualTarget = false;
     const candidates = this.enemies.map((enemy, index) => {
       if (enemy.hp <= 0) return null;
+      const attributeMultiplier = padAttributeMultiplier(attribute, enemy.attribute);
       const damage = padDamageAfterDefense(
         attack,
-        padAttributeMultiplier(attribute, enemy.attribute),
+        attributeMultiplier,
         enemy.defense,
       );
-      return { index, damage, lethal: damage >= enemy.hp, ratio: damage / enemy.hp };
+      return {
+        index,
+        hp: enemy.hp,
+        damage,
+        lethal: damage >= enemy.hp,
+        advantageous: attributeMultiplier > 1,
+        ratio: damage / enemy.hp,
+      };
     }).filter(Boolean);
+    // The ordinary branch of _calcChoiceAtkTarget first keeps the largest-HP
+    // enemy this hit can defeat. If none is killable, it prefers elemental
+    // advantage and only then compares projected-damage/current-HP ratios.
     candidates.sort((left, right) =>
       Number(right.lethal) - Number(left.lethal) ||
+      (left.lethal && right.lethal ? right.hp - left.hp : 0) ||
+      Number(right.advantageous) - Number(left.advantageous) ||
       right.ratio - left.ratio ||
       left.index - right.index);
     this.targetEnemy = candidates[0]?.index ?? 0;

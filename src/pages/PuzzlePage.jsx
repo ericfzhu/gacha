@@ -366,7 +366,8 @@ function render(ctx, engine) {
   ctx.font = '600 9px "Noto Sans", sans-serif';
   ctx.fillText(engine.phase.toUpperCase(), 434, 43);
 
-  engine.enemies.forEach((enemy, index) => drawEnemy(ctx, enemy, index, engine.targetEnemy, engine.visualTime));
+  const visibleTarget = engine.manualTarget ? engine.targetEnemy : -1;
+  engine.enemies.forEach((enemy, index) => drawEnemy(ctx, enemy, index, visibleTarget, engine.visualTime));
   drawParty(ctx, engine);
 
   drawBar(ctx, 16, 344, 259, 12, engine.player.hp / engine.player.maxHp, ['#67d283', '#b5e35b']);

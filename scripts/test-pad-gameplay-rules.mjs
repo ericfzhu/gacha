@@ -313,6 +313,14 @@ assert.deepEqual(
 );
 assert.equal(retargetEngine.manualTarget, false);
 
+const autoTargetEngine = new PuzzleEngine({ seed: 13 });
+autoTargetEngine.enemies[0] = { ...autoTargetEngine.enemies[0], hp: 10, attribute: 'light', defense: 0 };
+autoTargetEngine.enemies[1] = { ...autoTargetEngine.enemies[1], hp: 20, attribute: 'light', defense: 0 };
+assert.equal(autoTargetEngine.chooseAttackTarget('fire', 30), 1);
+autoTargetEngine.enemies[0] = { ...autoTargetEngine.enemies[0], hp: 1_000, attribute: 'wood', defense: 0 };
+autoTargetEngine.enemies[1] = { ...autoTargetEngine.enemies[1], hp: 100, attribute: 'light', defense: 0 };
+assert.equal(autoTargetEngine.chooseAttackTarget('fire', 30), 0);
+
 const stateEngine = new PuzzleEngine({ seed: 3 });
 stateEngine.setBoardFromCodes(['GGGHRD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD']);
 stateEngine.setOrbState(0, 0, { enhanced: true, locked: true });
