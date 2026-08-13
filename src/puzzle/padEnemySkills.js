@@ -1,4 +1,5 @@
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
+export const PAD_ENEMY_SKILL_HORIZONTAL_LINES = 79;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
 
@@ -65,6 +66,23 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
     ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
     : null;
+  if (type === PAD_ENEMY_SKILL_HORIZONTAL_LINES) {
+    requireLength(definitionBytes, 0x28, 'PAD enemy-skill definition');
+    const lineSwaps = [];
+    for (let offset = 0x10; offset < 0x28; offset += 8) {
+      lineSwaps.push(Object.freeze({
+        lineMask: definition.getUint32(offset, true) & 0xff,
+        destinationTypeMask: definition.getUint32(offset + 4, true) & 0xffff,
+      }));
+    }
+    return Object.freeze({
+      type,
+      kind: 'horizontalLines',
+      supported: true,
+      lineSwaps: Object.freeze(lineSwaps),
+      attackWithSkillValue,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_BLOCK_MINUS) {
     requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
     const typeMask = definition.getUint32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.parameter0Offset, true);
@@ -168,6 +186,19 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
 
 export function normalizePadEnemySkillRecord(record) {
   const type = Math.trunc(Number(record?.type));
+  if (type === PAD_ENEMY_SKILL_HORIZONTAL_LINES || record?.kind === 'horizontalLines') {
+    const authoredSwaps = Array.isArray(record?.lineSwaps) ? record.lineSwaps : [];
+    const lineSwaps = Array.from({ length: 3 }, (_, index) => Object.freeze({
+      lineMask: Number(authoredSwaps[index]?.lineMask) & 0xff,
+      destinationTypeMask: Number(authoredSwaps[index]?.destinationTypeMask) & 0xffff,
+    }));
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_HORIZONTAL_LINES,
+      kind: 'horizontalLines',
+      supported: true,
+      lineSwaps: Object.freeze(lineSwaps),
+    });
+  }
   if (type === PAD_ENEMY_SKILL_BLOCK_MINUS || record?.kind === 'blockMinus') {
     const powerPercent = Math.trunc(Number(record?.powerPercent) || 0);
     return Object.freeze({

@@ -597,6 +597,29 @@ try {
     const selectedBurDropAi = engine.snapshot();
     const selectedBurDropCount = selectedBurDropAi.boardState.flat()
       .filter((orb) => orb.thornActive && orb.thornDescriptor === 4).length;
+    const horizontalLinesAiMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(horizontalLinesAiMonsterDefinition.buffer).setUint32(0xec, 9_004, true);
+    const horizontalLinesAiDefinition = blockMinusAiDefinition.slice();
+    const horizontalLinesAiView = new DataView(horizontalLinesAiDefinition.buffer);
+    horizontalLinesAiView.setUint32(0x00, 9_004, true);
+    horizontalLinesAiView.setInt16(0x04, 79, true);
+    horizontalLinesAiView.setUint32(0x10, 0b10000, true);
+    horizontalLinesAiView.setUint32(0x14, 1 << 0, true);
+    horizontalLinesAiView.setUint32(0x18, 0b00100, true);
+    horizontalLinesAiView.setUint32(0x1c, 1 << 1, true);
+    horizontalLinesAiView.setUint32(0x20, 0b00001, true);
+    horizontalLinesAiView.setUint32(0x24, 1 << 2, true);
+    engine.setEnemyAiDefinitionPool(
+      0,
+      horizontalLinesAiMonsterDefinition,
+      [horizontalLinesAiDefinition],
+    );
+    engine.setBoardFromCodes(['DDDDDD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedHorizontalLinesAi = engine.snapshot();
     engine.setEnemyAiDefinitionPool(0, null);
     engine.setBlackFallRule(null);
     engine.reset();
@@ -634,6 +657,7 @@ try {
       scheduledBlackFallHp, scheduledBlackFall, selectedEnemyAiHp, selectedEnemyAi,
       selectedBlockMinusAi, selectedBlockMinusCount,
       selectedBurDropAi, selectedBurDropCount,
+      selectedHorizontalLinesAi,
       initialBoard, initialBoardState,
     };
   }) : null;
@@ -760,6 +784,13 @@ try {
     poisonBlockSample.selectedBurDropAi.rngState !== advanceLcg(21_900, 3) ||
     poisonBlockSample.selectedBurDropAi.enemies?.[0]?.enemyAiBudget !== 80 ||
     poisonBlockSample.selectedBurDropCount !== 2 ||
+    poisonBlockSample.selectedHorizontalLinesAi.lastEnemyActions?.[0]?.skill?.type !== 79 ||
+    poisonBlockSample.selectedHorizontalLinesAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_004 ||
+    poisonBlockSample.selectedHorizontalLinesAi.rngState !== advanceLcg(21_900, 19) ||
+    poisonBlockSample.selectedHorizontalLinesAi.enemies?.[0]?.enemyAiBudget !== 80 ||
+    JSON.stringify(poisonBlockSample.selectedHorizontalLinesAi.board) !== JSON.stringify([
+      'RRRRRR', 'GLDHJG', 'BBBBBB', 'DLGHHJ', 'GGGGGG',
+    ]) ||
     JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
       'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',
     ]) || poisonBlockSample.initialBoardState !== 79_238_434

@@ -2,6 +2,25 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 enemy horizontal-line skill dispatch
+
+- Mapped enemy skill type `79` across the native condition, setup, and early
+  execution tables: unconditional condition `0x61a630`, setup `0x61ff14`, and
+  `_doEnemySkill` handler `0x6287f8`.
+- Decoded three authored `(line mask, destination type mask)` pairs at
+  `+0x10/+0x14`, `+0x18/+0x1c`, and `+0x20/+0x24`. Setup packs their low
+  halfwords into `sMONSTER+0x688/+0x68c/+0x690`; execution calls
+  `_doBlockSwapH` three times with one shared effect accumulator.
+- Raw new-AI definitions now select and apply the three-stage board rewrite.
+  Pure and browser fixtures turn the top, middle, and bottom rows into fire,
+  water, and wood, preserving the exact one selection plus eighteen per-cell
+  LCG advances and AI budget 100 -> 80.
+- The exact inspector checks the type-79 early dispatch table separately from
+  the later type-128+ table. Rule tests, production build, exhaustive browser
+  suite, generic gameplay client, and both visual captures pass.
+- Next: decode the paired type `77` vertical-line handler, then factor the
+  shared raw setup layout without weakening the explicit binary provenance.
+
 ## 2026-08-14 enemy thorn-marker skill dispatch
 
 - Mapped enemy skill type `153` to condition `0x61ba04`, generic setup

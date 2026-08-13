@@ -11,6 +11,8 @@ const PAD_21_9_LIBPAD_SHA256 = '785ffa641837c528864cfbeb9716e340c9d948ba3a37bca3
 const PAD_21_9_RESTORED_SHA256 = '91223570f42247f155e50fba03e529f2a21b936021bd1525928237a5c87cd99a';
 const ENEMY_SKILL_DISPATCH_TABLE = 0xd3cbe0;
 const ENEMY_SKILL_DISPATCH_BASE = 0x628fe0;
+const EARLY_ENEMY_SKILL_DISPATCH_TABLE = 0xd3caea;
+const EARLY_ENEMY_SKILL_DISPATCH_BASE = 0x6286b4;
 const ENEMY_SKILL_SETUP_TABLE = 0xd3c99c;
 const ENEMY_SKILL_SETUP_BASE = 0x61fee4;
 const ENEMY_SKILL_CONDITION_TABLE = 0xd3c6fc;
@@ -18,6 +20,10 @@ const ENEMY_SKILL_CONDITION_BASE = 0x61a630;
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
+const HORIZONTAL_LINES_ENEMY_SKILL_TYPE = 79;
+const HORIZONTAL_LINES_HANDLER = 0x6287f8;
+const HORIZONTAL_LINES_SETUP_HANDLER = 0x61ff14;
+const HORIZONTAL_LINES_CONDITION_HANDLER = 0x61a630;
 const BLOCK_MINUS_ENEMY_SKILL_TYPE = 151;
 const BLOCK_MINUS_HANDLER = 0x62afd0;
 const BLOCK_MINUS_SETUP_HANDLER = 0x6217c0;
@@ -190,6 +196,45 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
   const blackFallSetupMatches = blackFallSetupTarget === null
     ? null
     : blackFallSetupTarget === BLACK_FALL_SETUP_HANDLER;
+  const horizontalLinesDispatchEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      EARLY_ENEMY_SKILL_DISPATCH_TABLE + (HORIZONTAL_LINES_ENEMY_SKILL_TYPE - 5) * 2,
+    )
+    : null;
+  const horizontalLinesSetupEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      ENEMY_SKILL_SETUP_TABLE + (HORIZONTAL_LINES_ENEMY_SKILL_TYPE - 1) * 2,
+    )
+    : null;
+  const horizontalLinesConditionEntry = restoredElf
+    ? readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      ENEMY_SKILL_CONDITION_TABLE + (HORIZONTAL_LINES_ENEMY_SKILL_TYPE - 1) * 2,
+    )
+    : null;
+  const horizontalLinesDispatchTarget = horizontalLinesDispatchEntry === null
+    ? null
+    : EARLY_ENEMY_SKILL_DISPATCH_BASE + horizontalLinesDispatchEntry * 4;
+  const horizontalLinesSetupTarget = horizontalLinesSetupEntry === null
+    ? null
+    : ENEMY_SKILL_SETUP_BASE + horizontalLinesSetupEntry * 4;
+  const horizontalLinesConditionTarget = horizontalLinesConditionEntry === null
+    ? null
+    : ENEMY_SKILL_CONDITION_BASE + horizontalLinesConditionEntry * 4;
+  const horizontalLinesDispatchMatches = horizontalLinesDispatchTarget === null
+    ? null
+    : horizontalLinesDispatchTarget === HORIZONTAL_LINES_HANDLER;
+  const horizontalLinesSetupMatches = horizontalLinesSetupTarget === null
+    ? null
+    : horizontalLinesSetupTarget === HORIZONTAL_LINES_SETUP_HANDLER;
+  const horizontalLinesConditionMatches = horizontalLinesConditionTarget === null
+    ? null
+    : horizontalLinesConditionTarget === HORIZONTAL_LINES_CONDITION_HANDLER;
   const blockMinusDispatchEntry = restoredElf
     ? readUint16Virtual(
       restoredElf,
@@ -301,6 +346,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       allAddressesMatch21_9: mismatches.length === 0,
       blackFallDispatchMatches21_9: blackFallDispatchMatches,
       blackFallSetupMatches21_9: blackFallSetupMatches,
+      horizontalLinesDispatchMatches21_9: horizontalLinesDispatchMatches,
+      horizontalLinesSetupMatches21_9: horizontalLinesSetupMatches,
+      horizontalLinesConditionMatches21_9: horizontalLinesConditionMatches,
       blockMinusDispatchMatches21_9: blockMinusDispatchMatches,
       blockMinusSetupMatches21_9: blockMinusSetupMatches,
       blockMinusConditionMatches21_9: blockMinusConditionMatches,
@@ -336,6 +384,16 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       setupEntry: blackFallSetupEntry === null ? null : hex(blackFallSetupEntry),
       setupTarget: blackFallSetupTarget === null ? null : hex(blackFallSetupTarget),
       setupMatches21_9: blackFallSetupMatches,
+      horizontalLinesType: HORIZONTAL_LINES_ENEMY_SKILL_TYPE,
+      horizontalLinesDispatchTarget: horizontalLinesDispatchTarget === null
+        ? null : hex(horizontalLinesDispatchTarget),
+      horizontalLinesDispatchMatches21_9: horizontalLinesDispatchMatches,
+      horizontalLinesSetupTarget: horizontalLinesSetupTarget === null
+        ? null : hex(horizontalLinesSetupTarget),
+      horizontalLinesSetupMatches21_9: horizontalLinesSetupMatches,
+      horizontalLinesConditionTarget: horizontalLinesConditionTarget === null
+        ? null : hex(horizontalLinesConditionTarget),
+      horizontalLinesConditionMatches21_9: horizontalLinesConditionMatches,
       blockMinusType: BLOCK_MINUS_ENEMY_SKILL_TYPE,
       blockMinusDispatchTarget: blockMinusDispatchTarget === null ? null : hex(blockMinusDispatchTarget),
       blockMinusDispatchMatches21_9: blockMinusDispatchMatches,
@@ -414,6 +472,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
   if (
     missing.length || mismatches.length
     || blackFallDispatchMatches === false || blackFallSetupMatches === false
+    || horizontalLinesDispatchMatches === false || horizontalLinesSetupMatches === false
+    || horizontalLinesConditionMatches === false
     || blockMinusDispatchMatches === false || blockMinusSetupMatches === false
     || blockMinusConditionMatches === false
     || burDropDispatchMatches === false || burDropSetupMatches === false

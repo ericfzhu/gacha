@@ -638,6 +638,29 @@ this raw record path into enemy turns and reports the chosen skill ID, budget,
 and RNG state. Other condition callbacks, flow-control records, and the legacy
 selector are rejected explicitly until decoded rather than approximated.
 
+Enemy skill type `79` is the horizontal-line board rewrite. It uses the early
+`_doEnemySkill` table at `0xd3caea`, indexed from type 5; its entry resolves
+from base `0x6286b4` to handler `0x6287f8`. The setup entry at `0x61ff14`
+combines the low halfwords of definition pairs `+0x10/+0x14`, `+0x18/+0x1c`,
+and `+0x20/+0x24` into runtime words at
+`sMONSTER+0x688/+0x68c/+0x690`. Each runtime word supplies an unsigned-byte
+row mask in its high half and a destination-orb type mask in its low half.
+The handler initializes one effect accumulator and calls `_doBlockSwapH`
+(`0x6ae8fc`) for all three pairs. Horizontal mask bits are bottom-up on the
+canonical 6x5 board and are relocated by the already decoded large/small-board
+rules. Every selected cell spends one saved-LCG step before lock rejection and
+chooses one enabled destination type; the three calls share the continuing RNG
+stream and effect accumulator.
+
+The type-79 `_chooseEnemyAiSub` entry is the unconditional `1.0` handler at
+`0x61a630`, so it does not dry-run the board and consumes no condition RNG.
+An immediately selected action therefore spends one probability roll followed
+by the per-cell line-rewrite rolls. The browser accepts all three authored
+pairs from raw definitions, applies them through the existing exact
+`doBlockSwapH` primitive, and snapshots the selected skill ID and rewritten
+board. A fixture selecting three six-cell rows from seed 21900 consequently
+advances the ordinary LCG exactly 19 times.
+
 Enemy skill type `151` connects that selector to the weakened-orb primitive.
 Its `_doEnemySkill` dispatch entry resolves to `0x62afd0`, which passes
 definition `+0x10` as the type mask, converts signed percentage `+0x14` through

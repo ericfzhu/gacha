@@ -34,6 +34,7 @@ import {
 } from './padCoreRules.js';
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
+  PAD_ENEMY_SKILL_HORIZONTAL_LINES,
   PAD_ENEMY_SKILL_BLOCK_MINUS,
   PAD_ENEMY_SKILL_BUR_DROP,
   decodePadEnemySkillDefinition,
@@ -1019,6 +1020,23 @@ export class PuzzleEngine {
       this.message = `${changed} orb${changed === 1 ? '' : 's'} became thorns.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'horizontalLines') {
+      let effectFlags = 0;
+      for (const swap of skill.lineSwaps) {
+        // _doEnemySkill type 79 shares one `int &flags` across all three
+        // _doBlockSwapH calls. A zero authored line mask is a no-op and leaves
+        // that accumulator untouched.
+        if (swap.lineMask !== 0) {
+          effectFlags = this.doBlockSwapH(
+            swap.lineMask,
+            swap.destinationTypeMask,
+            effectFlags,
+          );
+        }
+      }
+      this.message = `Enemy rewrote horizontal lines (effect ${effectFlags}).`;
+      return true;
+    }
     if (!skill.supported || skill.kind !== 'blackFall') return false;
     this.setBlackFallRule({
       chanceBasisPoints: skill.chanceBasisPoints,
@@ -1071,6 +1089,7 @@ export class PuzzleEngine {
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
       if (![
         PAD_ENEMY_SKILL_BLACK_FALL,
+        PAD_ENEMY_SKILL_HORIZONTAL_LINES,
         PAD_ENEMY_SKILL_BLOCK_MINUS,
         PAD_ENEMY_SKILL_BUR_DROP,
       ].includes(definition.effect.type) || !definition.effect.supported) {
