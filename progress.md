@@ -2,6 +2,16 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-13 playable native-frame milestone
+
+- Completed the protected PAD module chain and restored enough of the original image to call `JNI_OnLoad` (`JNI_VERSION_1_6`) and the exported Android lifecycle directly from the browser worker.
+- Extended the exact AArch64/Wasm interpreter through the scalar floating-point and NEON instruction families encountered by live startup. Consecutive `onDrawFrame` and `onTouchEvent(FFIIIIJI)` callbacks now return without skipped guest instructions.
+- Added a guest-resident Android/JNI compatibility layer including critical primitive arrays, AAPCS64 `va_list` decoding, Java strings and paths, deterministic clocks, writable files/cache directories, and a Canvas-backed reproduction of Android `Paint`/`Bitmap.copyPixelsToBuffer` system-font rendering.
+- Added a fixed-function GLES 1.x to WebGL renderer with matrices, client arrays, textures, blending/depth state, frame/render buffers, and `glDrawTex*OES`. The exact binary rendered 170 frames / 18,740 draw calls in the final Chromium run with no WebGL or page errors; two browser clicks produced four acknowledged native touch callbacks.
+- Confirmed the real APK asset path works: `libpad.so` opens and reads `assets/DATA001.BIN`, creates `files/boot.bin`, and then requests downloaded `files/data048.bin` and `cache/data030.bin`. Those server-delivered datasets are not present in the APK, which is why the authentic offline client remains on its Japanese startup warning.
+- `/binary-port` now accepts the APK plus optional `.bin` runtime data. When the unavailable downloaded data is not supplied, it reports the exact boundary and links to the browser-playable TypeScript puzzle reconstruction at `/puzzle`.
+- Final verification: `npm run wasm:test`, `npm run build`, and the Playwright exact-APK smoke run all pass.
+
 ## 2026-08-13 libpad binary-port runtime
 
 - Chose a hybrid architecture: freestanding C AArch64 interpreter compiled to WebAssembly, with JavaScript handling ELF loading, browser integration, and diagnostics.
@@ -21,6 +31,74 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
 - Add the remaining ARM64 scalar, floating-point, NEON, atomic, and memory-ordering instructions as they are encountered.
 - Map companion `lib__6dba__.so`, `libopenal.so`, and protection asset `assets/6dba/data1.dat` into the virtual filesystem.
 - Reach and capture the first decrypted anonymous mmap module, then implement synthetic ELF/libc/JNI imports and intercept `RegisterNatives`.
+
+## 2026-08-13 libpad binary port
+
+- Added a freestanding AArch64 interpreter compiled to WebAssembly and a browser runtime that maps the exact `libpad.so` ELF64 PT_LOAD segments into biased guest virtual memory.
+- Verified the exact APK payload by SHA-256 (`785ffa641837c528864cfbeb9716e340c9d948ba3a37bca3193b5cd32dda89d8`) and executed the resident `mov w0, #225; ret` probe from the mapped image.
+- Implemented the instruction families encountered by live constructor execution, including arithmetic/logical forms, bitfields, conditional selects, multiply-add, variable shifts, register-offset and scaled loads/stores, pairs, branches, system register reads, and cache/barrier no-ops.
+- Added a browser-side virtual Linux layer for `openat`, `read`, `lseek`, `close`, `mmap`, `mprotect`, `munmap`, stat calls, clocks, process IDs, writes, and exits, plus virtual `/proc/self/maps` and `/proc/self/environ`.
+- Corrected the ELF execution model to use a nonzero shared-object load bias and apply `R_AARCH64_RELATIVE` relocations. This fixed the unpacked loader's first null-base validation.
+- The real protected constructor now executes 4,691,980 AArch64 instructions and 71 syscalls, reads and decrypts the full 11,000,352-byte protected payload, maps its 155,648-byte unpacked module executable, re-enters `/proc`, and reaches the Android dependency namespace scan.
+- Added shared-object mapping support so APK/system dependency ELF images can be registered at stable load bases and represented accurately in `/proc/self/maps`. Mapping the real APK `libopenal.so` and provisional system images advances execution to 8,537,583 guest instructions; the next correctness boundary is a malformed dependency metadata pointer caused by using `libopenal.so` as a stand-in for Android system libraries.
+- Expanded `npm run wasm:test` into an exact-binary integration check covering the nonzero load bias, helper semantics, first constructor syscall, decrypt/executable-map milestone, proc environment, and Android dependency scan.
+- Updated `/binary-port` so loading the extracted `libpad.so` runs the deeper virtual-Linux constructor path and reports its instruction/syscall counts and current missing Android namespace boundary.
+
+## 2026-08-13 libpad protected constructor deep dive
+
+- Replaced provisional dependency images with 11 distinct freestanding AArch64 Android ABI ELFs, a host-backed `dlopen`/`dlsym`/`dladdr` bridge, dynamic relocation linking, system-property service, and a coherent Android 7 virtual process/filesystem.
+- Implemented the loader-observed libc surface: environment/time/stdio/directory APIs, formatted printing/scanning, mutexes, deterministic pthread workers, process/socket/stat helpers, logging, and guest syscall wrappers. All symbols requested by the 12 decrypted stages now resolve.
+- Added the observed SIMD and arithmetic families (including exact high multiply, MOVI, 2D/4S add, XTN/XTN2, USHLL/USHLL2, AND, SSHL, MUL, MLA, ADDV, and UMOV) with regression probes in `npm run wasm:test`.
+- Added one-shot instruction and memory watchpoints plus call/return tracing to the Wasm CPU. These identified protection record `60` as an 80-byte detector event, then traced it to two inconsistent Android surfaces: missing `ro.debuggable=0` and a `getenv("PATH")` result that disagreed with `/proc/self/environ`.
+- Corrected the property and environment ABI. The exact helper now executes 169,690,779 original AArch64 instructions, services 1,463 Linux calls plus 984 host ABI calls, reports protection state `1` (success), and terminates its helper lifecycle through `_exit(0)`. There are no unresolved imports or unknown syscalls.
+- Added a dependency-free DEX native-method inspector. It inventories 61 `AppDelegate` native methods and their Java callers, including the lifecycle/render surface and exact touch bridge `onTouchEvent(FFIIIIJI)V`.
+- Reconstructed the Java input transform from Dalvik bytecode: only pointer slot 0 is sampled; native receives adjusted `(x, y)`, pointer index 0, a reserved zero, pointer count, raw action, event time, and masked action. The Y coordinate is `MotionEvent.getY(0) - (2 * viewScale + statusBarHeight)`.
+- Added `padInputModel.js`, a tested browser PointerEvent adapter that reproduces the recovered Android action/index encoding and JNI argument order without translating the gameplay rules into a separate clone engine.
+- `/binary-port` now accepts the APK directly, extracts `libpad.so`, `libopenal.so`, `lib__6dba__.so`, and `assets/6dba/data1.dat` locally with a dependency-free ZIP reader, loads packaged generated Android ABI images, and runs the constructor in yielding chunks with visible progress. No proprietary APK payloads are copied into the project.
+- Production build and exact Wasm regression suite pass. The complete harness now runs inside a Vite module Web Worker and reports progress without occupying the page's canvas/control thread. In-app browser verification completed the exact APK path at 160,434,835 instructions / 12 executable stages with the probe control still enabled and zero console errors. Uploading the large APK through the isolated automation sandbox is slow; selecting the four extracted runtime files is the faster development path.
+
+### Binary-port next steps (current)
+
+- Reach the protected JNI binder, synthesize `JNIEnv`/`JavaVM` function tables, and capture the hidden native address table for the inventoried `AppDelegate` methods.
+- Invoke `onSurfaceCreated`, `onSurfaceChanged`, `onDrawFrame`, and the exact touch bridge from browser input, then trace the native board/state transitions into a deterministic WebGL/canvas presentation.
+
+## 2026-08-13 protected Android load sequence and cooperative threads
+
+- Corrected Linux thread semantics: syscall `exit(93)` now halts only the current native context, while `exit_group(94)` remains process-wide. The Wasm CPU now supports 64 suspended callback contexts with full scalar/vector/register/flag/stack state.
+- Replaced eager `pthread_create` execution with queue-only creation and join-driven scheduling. This fixed the protector race in which a detached enforcement worker ran before its creator completed the shared-state protocol. A Wasm regression test now verifies suspend/resume/result/parent restoration.
+- With the scheduler corrected, a controlled platform-capability diagnostic makes the exact `libpad.so` constructor return normally after 181,724,313 original AArch64 instructions; its 17th helper remains suspended at the correct guest PC instead of terminating the virtual process.
+- Extended the DEX inspector to enumerate native methods and inspect arbitrary class initializers. Recovered the actual Java load order: `EntryApplication.attachBaseContext` loads `lib__6dba__.so`; `AppDelegate.<clinit>` then loads `libopenal.so` followed by `libpad.so`.
+- Added `padNativeContract.js` with the exact lifecycle/render/input JNI descriptors, including `onSurfaceCreated(Landroid/content/res/AssetManager;)V`, `onSurfaceChanged(IIIIFFFF)V`, `onDrawFrame()V`, and `onTouchEvent(FFIIIIJI)V`.
+- Added an `--entry-wrapper` and `--load-pad-after-entry` mode to the protected-loader inspector. It now reproduces the real Android sequence in one virtual address space: wrapper constructor, OpenAL initializer, and relocated pad constructor.
+- Verified both protected constructors return in that exact sequence under the controlled capability diagnostic. The wrapper decrypts from the signed `base.apk`; pad creates its own second 16-worker pool, joins it, and leaves its detached enforcement context suspended. The JNI registration names are not plaintext after construction, confirming registration is deferred/hidden behind the protection binder.
+
+### Binary-port next steps (current)
+
+- Replace the temporary capability-address diagnostic with the correct Android/kernel capability source expected by the decrypted enforcement module.
+- Implement minimal `JavaVM`/`JNIEnv` tables and the Android linker lookup for the hidden JNI binder, then capture `RegisterNatives` names, descriptors, and AArch64 addresses.
+- Drive the recovered surface/frame/touch entrypoints from the browser worker and connect the guest renderer to WebGL/canvas.
+
+## 2026-08-13 exact browser bootstrap and JNI ABI
+
+- Moved guest pthread stacks below the ELF load base so the 16-worker protection pools can no longer overwrite the mapped `libpad.so` image.
+- Widened nested AArch64 callback setup from `x0` only to the complete integer/pointer argument bank `x0`–`x7`. A regression probe now performs a real guest indirect call through JNI table slot 215 and captures `AppDelegate.onDrawFrame()V` at its supplied native address.
+- Added a minimal guest-resident `JNIEnv`/`JavaVM` with class/string/reference handling, attach/get-env support, and `RegisterNatives` capture. Constructors do not call it yet, confirming the binding is hidden behind a later protection phase rather than the ordinary ELF constructors.
+- Reproduced the exact Android Java load sequence in the browser worker: `lib__6dba__.so`, then `libopenal.so`, then `libpad.so`. The verified APK completes this bootstrap in Chromium in about 22 seconds: 332,646,281 original AArch64 instructions, 3,167 syscalls, and 28 executable mappings, with zero page errors.
+- Deep inspection recovered the protector's descriptor-driven module chain. The decrypted chain includes environment/security modules `0x60`, `0x40`, and `0x20`; the `e4` dispatcher reports module `0x20` success, then explicitly invokes module `0x97`.
+- Module `0x97` reads a success/configuration flag at its relative address `0x1b1c0`. Leaving it zero synchronously calls `exit_group(134)`; setting it to one allows both protected constructors to return. This controlled bypass does not mutate PAD `.text`, so it is not the original-code restoration step and is not treated as completion.
+- The 16 worker threads decode transient protection-module code into anonymous executable mappings; they are not yet game-code workers. The remaining binary boundary is to recover the module that restores the original RX image / real initializer and thereby reaches the hidden JNI binder.
+- Added a repeatable Playwright APK-upload smoke test and visually verified the completed browser diagnostic screen. Production build and `npm run wasm:test` pass.
+- Corrected virtual mounts so a mounted file always materializes all ancestor directories. This fixed an impossible state in which `libpad.so` existed while `/data/user/0/jp.gungho.pad/lib` returned `ENOENT`; the protector now advances through additional parent/path checks.
+- Replaced the single guest-callback parent with an eight-frame callback stack, supporting native callbacks and pthread work launched from inside constructors. The regression suite now verifies an inner callback returns to its callback parent and the outer callback then returns to the root CPU context.
+- Removed PAD's brittle fixed anonymous-map addresses from the browser worker. It now identifies PAD's own transient module `0x97` by its decoded AArch64 signature, excludes the wrapper's earlier identical module, and applies the controlled capability value during the inner pthread scheduler. The exact APK browser regression succeeds after the mmap layout changes at 336,596,979 guest instructions and 3,223 syscalls.
+- Parsed `PT_DYNAMIC` and confirmed `DT_INIT_ARRAYSZ=416`: Android's linker sees 52 PAD initializer slots. Slots 1–51 still point into zero-filled protected `.text`, so calling them before the original-image restoration correctly faults; this is direct evidence that constructor return alone is not a playable engine.
+- Disassembly shows module `0x97` is primarily the special post-dispatch cleanup/anti-debug path. Its main walks and clears transient module records, and the `0x1b1c0` value gates its anti-debug capability checks; it is not itself the missing original-code restorer.
+
+### Binary-port next steps (current)
+
+- Trace the `e4` dispatcher immediately before its indirect module call and capture the complete `0x97` record, including init/main offsets and input pointers.
+- Determine why the `0x97` flag is not set naturally, then execute the subsequent original-image restoration and real initializer rather than relying on the return-only bypass.
+- Once `RegisterNatives` fires, persist the 61 recovered method addresses and drive surface creation, resize, frame, key, and touch calls from the browser with floating-point argument support.
 
 ## 2026-08-13 Orb Battle Lab
 
