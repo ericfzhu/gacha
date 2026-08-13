@@ -3,9 +3,12 @@ import {
   PAD_BOARD_ROWS,
   PAD_DEFAULT_MOVE_TIME_SECONDS,
   findPadMatches,
+  padApplyAttackMultipliers,
   padAttributeMultiplier,
   padComboMultiplier,
+  padDamageAfterDefense,
   padMatchPower,
+  padNativeBaseAttackPower,
   tracePadDragCells,
 } from './padCoreRules.js';
 
@@ -314,12 +317,12 @@ export class PuzzleEngine {
     this.party.forEach((member) => {
       const sizes = byType.get(member.attribute) || [];
       if (!sizes.length) return;
-      const matchAttack = padMatchPower(member.attack, sizes);
-      const raw = matchAttack * comboMultiplier * leaderPair;
+      const matchAttack = padNativeBaseAttackPower(member.attack, sizes, this.comboCount);
+      const raw = padApplyAttackMultipliers(matchAttack, [leader, leader]);
       const isMassAttack = sizes.some((size) => size >= 5);
       this.enemies.forEach((enemy, enemyIndex) => {
         if (enemy.hp <= 0 || (!isMassAttack && enemyIndex !== this.targetEnemy)) return;
-        const damage = Math.max(1, Math.floor(raw * padAttributeMultiplier(member.attribute, enemy.attribute)) - enemy.defense);
+        const damage = padDamageAfterDefense(raw, padAttributeMultiplier(member.attribute, enemy.attribute), enemy.defense);
         enemy.hp = Math.max(0, enemy.hp - damage);
         totalDamage += damage;
         this.floatingText.push({ kind: 'damage', value: damage, enemy: enemyIndex, attribute: member.attribute, age: 0 });

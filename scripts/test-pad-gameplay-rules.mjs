@@ -2,9 +2,12 @@ import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
   findPadMatches,
+  padApplyAttackMultipliers,
   padAttributeMultiplier,
   padComboMultiplier,
+  padDamageAfterDefense,
   padMatchPower,
+  padNativeBaseAttackPower,
   padOrbMatchMultiplier,
   tracePadDragCells,
 } from '../src/puzzle/padCoreRules.js';
@@ -44,6 +47,10 @@ assert.equal(padOrbMatchMultiplier(5), 1.5);
 assert.equal(padComboMultiplier(1), 1);
 assert.equal(padComboMultiplier(7), 2.5);
 assert.equal(padMatchPower(1000, [3, 5]), 2500);
+assert.equal(padNativeBaseAttackPower(101, [3, 4], 2), 285);
+assert.equal(padApplyAttackMultipliers(285, [1.5, 1.5]), 642);
+assert.equal(padDamageAfterDefense(101, 0.5, 40), 11);
+assert.equal(padDamageAfterDefense(10, 0.5, 999), 1);
 assert.equal(padAttributeMultiplier('fire', 'wood'), 2);
 assert.equal(padAttributeMultiplier('fire', 'water'), 0.5);
 assert.equal(padAttributeMultiplier('light', 'dark'), 2);

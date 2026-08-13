@@ -10,6 +10,7 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
 - Regenerated the post-protection `libpad.so` image and anchored the native movement, adjacency, swap, match flood-fill, erase, fall, combo, damage, recovery, and game-phase routines by restored symbol and address.
 - Corrected coalesced pointer movement in the JS engine. Normal `libpad` rejects diagonal neighbours, so sparse motion is now expanded into orthogonally adjacent boundary crossings instead of a direct diagonal swap.
 - Extracted classic match/combo/attribute constants into a pure rules layer and added connected-group shape metadata for row, column, cross, L, box, and mass attacks.
+- Matched native combat rounding boundaries: combo/base attack lanes use `izMathCeiling`, later attack multipliers round positive values with `+0.5`, elemental scaling uses `izMathCeilingSint64`, and recovery truncates with `fcvtzs`.
 - Added an optional local-only APK worker to decode and render the original orb atlas in the playable puzzle harness without committing or uploading proprietary pixels.
 - Verification passes: rules tests, data-container tests, ARM64/Wasm integration, production build, custom-art Chromium input regression, and exact-APK-atlas Chromium input regression with zero console errors.
 - Detailed evidence and current data boundary: `docs/libpad-21.9-gameplay-engine.md`.

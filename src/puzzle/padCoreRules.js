@@ -34,6 +34,24 @@ export function padMatchPower(attack, matchSizes) {
   return matchSizes.reduce((total, size) => total + attack * padOrbMatchMultiplier(size), 0);
 }
 
+// libpad keeps attack lanes as integers. _applyComboMul routes each matched
+// lane through sCARD::dmgUpBase, which uses izMathCeiling, while later attack
+// multipliers route through sCARD::dmgUp and round positive values with +0.5.
+// _calcAttackPow then applies elemental advantage with izMathCeilingSint64.
+export function padNativeBaseAttackPower(attack, matchSizes, combos) {
+  const comboMultiplier = padComboMultiplier(combos);
+  return matchSizes.reduce((total, size) =>
+    total + Math.ceil(attack * padOrbMatchMultiplier(size) * comboMultiplier), 0);
+}
+
+export function padApplyAttackMultipliers(attack, multipliers) {
+  return multipliers.reduce((value, multiplier) => Math.floor(value * multiplier + 0.5), attack);
+}
+
+export function padDamageAfterDefense(attack, attributeMultiplier, defense) {
+  return Math.max(1, Math.ceil(attack * attributeMultiplier) - Math.max(0, defense));
+}
+
 // Android may coalesce pointer motion. The native normal-board swap routine
 // rejects diagonal neighbours, so a sparse event must be expanded into the
 // orthogonal grid boundaries crossed by its line segment. Exact corner ties are
