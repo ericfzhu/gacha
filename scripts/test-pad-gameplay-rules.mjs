@@ -28,6 +28,7 @@ import {
   padResolveComboDropAwakenings,
   padResolveComboDropSpawns,
   padResolveLockFall,
+  padResolveThornFall,
   padResolveBlockSwapNew,
   padResolveLineBlockSwaps,
   padResolveSkillBoardSwap,
@@ -124,6 +125,46 @@ assert.deepEqual(padResolveComboDropAwakenings([
 ], [3, 3, 9, 9, 9]), {
   pendingCount: 6,
   bonusCombos: 4,
+});
+assert.deepEqual(padResolveThornFall(21_900, 0, {
+  active: true,
+  typeMask: 1 << 0,
+  chancePercent: 100,
+  descriptor: 4,
+  descriptorHighBit: true,
+}, 0x8000), {
+  state: 394_448_415,
+  blockFlags: 0x88000,
+  thornDescriptor: 0x84,
+  clearEnhancement: false,
+  applied: true,
+  attempts: 1,
+});
+assert.deepEqual(padResolveThornFall(21_900, 1, {
+  active: true,
+  typeMask: 1 << 0,
+  chancePercent: 100,
+  descriptor: 4,
+}), {
+  state: 394_448_415,
+  blockFlags: 0,
+  thornDescriptor: 0,
+  clearEnhancement: false,
+  applied: false,
+  attempts: 1,
+});
+assert.deepEqual(padResolveThornFall(21_900, 6, {
+  active: true,
+  typeMask: 0,
+  chancePercent: 100,
+  descriptor: 5,
+}, 0x28000), {
+  state: 394_448_415,
+  blockFlags: 0x80000,
+  thornDescriptor: 5,
+  clearEnhancement: true,
+  applied: true,
+  attempts: 1,
 });
 assert.deepEqual(padResolveLockFall(21_900, 0, [
   { typeMask: 1 << 0, chancePercent: 0 },
@@ -605,6 +646,35 @@ assert.equal(lockFallEngine.board[0][0].type, 'fire');
 assert.equal(lockFallEngine.board[0][0].locked, true);
 assert.equal(lockFallEngine.rng.state, 394_448_415);
 assert.equal(lockFallEngine.lockFallRng.state, 394_448_415);
+const thornFallEngine = new PuzzleEngine({
+  seed: 21_900,
+  lockFallSeed: 21_900,
+  thornFallRule: {
+    typeMask: 1 << 0,
+    chancePercent: 100,
+    descriptor: 4,
+    descriptorHighBit: true,
+  },
+  lockFallRules: [{ typeMask: 1 << 0, chancePercent: 100 }],
+});
+thornFallEngine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+thornFallEngine.setRngState(21_900);
+thornFallEngine.setLockFallRngState(21_900);
+thornFallEngine.board[0][0] = null;
+thornFallEngine.collapseAndRefill();
+assert.equal(thornFallEngine.board[0][0].type, 'fire');
+assert.equal(thornFallEngine.board[0][0].locked, true);
+assert.equal(thornFallEngine.board[0][0].thornActive, true);
+assert.equal(thornFallEngine.board[0][0].thornDescriptor, 0x84);
+assert.equal(thornFallEngine.rng.state, 394_448_415);
+assert.equal(thornFallEngine.lockFallRng.state, 3_803_934_822);
+assert.deepEqual(thornFallEngine.snapshot().thornFallRule, {
+  active: true,
+  typeMask: 1,
+  chancePercent: 100,
+  descriptor: 4,
+  descriptorHighBit: true,
+});
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);
 assert.deepEqual(tracePadDragCells(0, 0, 2, 2, true), [{ row: 1, column: 1 }, { row: 2, column: 2 }]);

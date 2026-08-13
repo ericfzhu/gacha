@@ -2,6 +2,20 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 native thorn-fall post-spawn rule
+
+- Recovered `_checkPassiveSkill4Block`'s thorn/burst branch: an active record
+  consumes one shared post-spawn LCG roll for every new block before checking
+  its optional type mask, then applies flag `0x80000` and the packed damage
+  descriptor when `roll10000 >= (100 - percent) * 100`.
+- Ported `thornFallRule`, including its separate descriptor high bit and its
+  exact ordering ahead of `_checkLockFall` on game-work stream `+0x66a14`.
+- Added pure, engine, and browser fixtures for matching, masked, special-type,
+  and combined thorn-plus-lock cases. The restored-image inspector now checks
+  63 exact gameplay anchors.
+- Next: recover the adjacent passive blind/minus/enhanced fall branches and map
+  their packed dungeon/passive records into the decoded browser configuration.
+
 ## 2026-08-14 native lock-fall rule stream
 
 - Recovered `_checkLockFall` at `0x626200`: up to ten active records provide a

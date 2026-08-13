@@ -552,6 +552,16 @@ overlay moves backward with that stationary orb during the swap, reversing over
 it triggers the damage again. The browser input path preserves that behavior,
 including multiple crossed cells from one coalesced pointer-motion event.
 
+New thorn skyfalls are assigned by `_checkPassiveSkill4Block` at `0x64131c`,
+after `sBLOCK::init` and before `_checkLockFall`. When its single packed rule is
+active, every new block spends one advance from game-work LCG `+0x66a14`; the
+optional type mask is deliberately checked only after a successful percentage
+roll. The percentage comparison is `roll10000 >= (100 - percent) * 100`. A
+selected block receives flag `0x80000`, the rule's low-seven-bit damage
+descriptor, and its independently packed descriptor high bit. Thorn and lock
+skyfall therefore consume the same LCG in that order. The browser exposes the
+decoded record as `thornFallRule` and preserves this shared-stream ordering.
+
 Bomb and thorn hits accumulate in the same native pending-damage integer at
 game-work offset `0x8aacc`; neither is clamped against current HP at the moment
 of contact. `_applyHpRecAndPoisonDamage` later subtracts that aggregate from

@@ -21,6 +21,7 @@ import {
   padResolveComboDropAwakenings,
   padResolveComboDropSpawns,
   padResolveLockFall,
+  padResolveThornFall,
   padSecondaryAttributeAttack,
   padShuffleLockDropCandidates,
   padTertiaryAttributeAttack,
@@ -102,6 +103,7 @@ export class PuzzleEngine {
     comboDropCap = 12,
     comboDropAwakenings = Array(5).fill(0),
     topLineDropTypes = null,
+    thornFallRule = null,
     lockFallRules = [],
     lockFallSeed = seed,
   } = {}) {
@@ -120,6 +122,7 @@ export class PuzzleEngine {
     this.comboDropCap = Math.max(0, Math.trunc(Number(comboDropCap) || 0));
     this.setComboDropAwakenings(comboDropAwakenings);
     this.setTopLineDropTypes(topLineDropTypes);
+    this.setThornFallRule(thornFallRule);
     this.setLockFallRules(lockFallRules);
     this.lockFallSeed = Number(lockFallSeed) >>> 0;
     this.rng = createPadRng(seed);
@@ -540,15 +543,24 @@ export class PuzzleEngine {
     this.rng.setState(comboDropResolution.state);
     this.pendingComboDrops = 0;
     generated.forEach((entry, index) => {
+      const thornFall = padResolveThornFall(
+        this.lockFallRng.state,
+        entry.type,
+        this.thornFallRule,
+        comboDropResolution.marked[index] ? PAD_BLOCK_COMBO_DROP_FLAG : 0,
+      );
+      this.lockFallRng.setState(thornFall.state);
       const lockFall = padResolveLockFall(
         this.lockFallRng.state,
         entry.type,
         this.lockFallRules,
-        comboDropResolution.marked[index] ? PAD_BLOCK_COMBO_DROP_FLAG : 0,
+        thornFall.blockFlags,
       );
       this.lockFallRng.setState(lockFall.state);
       this.board[entry.row][entry.column] = this.createOrb(ORB_TYPES[entry.type]?.id || NATURAL_ORB_TYPES[0].id, {
         blockFlags: lockFall.blockFlags,
+        enhancementPower: thornFall.clearEnhancement ? 0 : undefined,
+        thornDescriptor: thornFall.thornDescriptor,
       });
     });
   }
@@ -711,6 +723,23 @@ export class PuzzleEngine {
       !Number.isInteger(Number(type)) || Number(type) < 0 || Number(type) >= ORB_TYPES.length
     ))) throw new Error(`PAD top-line drop types must contain exactly ${this.columns} native orb type indices.`);
     this.topLineDropTypes = types.map((type) => Number(type));
+  }
+
+  setThornFallRule(rule) {
+    if (rule === null || rule === undefined) {
+      this.thornFallRule = null;
+      return;
+    }
+    if (![rule.typeMask, rule.chancePercent, rule.descriptor].every((value) => Number.isInteger(Number(value)))) {
+      throw new Error('PAD thorn-fall rule requires integer typeMask, chancePercent, and descriptor values.');
+    }
+    this.thornFallRule = {
+      active: rule.active === undefined ? true : Boolean(rule.active),
+      typeMask: Number(rule.typeMask) >>> 0,
+      chancePercent: Number(rule.chancePercent) & 0xffff,
+      descriptor: Number(rule.descriptor) & 0x7f,
+      descriptorHighBit: Boolean(rule.descriptorHighBit),
+    };
   }
 
   setLockFallRules(rules) {
@@ -1130,6 +1159,7 @@ export class PuzzleEngine {
       pendingComboDrops: this.pendingComboDrops,
       comboDropBonusCount: this.comboDropBonusCount,
       topLineDropTypes: this.topLineDropTypes ? [...this.topLineDropTypes] : null,
+      thornFallRule: this.thornFallRule ? { ...this.thornFallRule } : null,
       lockFallRules: this.lockFallRules.map((rule) => ({ ...rule })),
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({

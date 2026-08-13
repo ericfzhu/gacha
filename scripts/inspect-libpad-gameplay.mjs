@@ -30,6 +30,7 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['orb-state', 'makeBlockFlagByPassiveSkill', '_ZN9cGAMEMAIN27makeBlockFlagByPassiveSkillEP10sBLOCKFLAGi', 0x6add50],
   ['orb-state', 'doLockDropBits', '_ZN9cGAMEMAIN15_doLockDropBitsEjit', 0x62676c],
   ['orb-state', 'checkLockFall', '_ZNK9cGAMEMAIN14_checkLockFallEP6sBLOCK', 0x626200],
+  ['orb-state', 'checkPassiveSkill4Block', '_ZN9cGAMEMAIN24_checkPassiveSkill4BlockEP6sBLOCKb', 0x64131c],
   ['orb-state', 'hasBlockPowup', '_ZN9cGAMEMAIN14_hasBlockPowupEi', 0x6b0cc8],
   ['orb-state', 'setBlockPowup', '_ZN9cGAMEMAIN14_setBlockPowupEifb', 0x6b0db4],
   ['orb-state', 'doBlockMinus', '_ZN9cGAMEMAIN13_doBlockMinusEbjfi', 0x61caa0],

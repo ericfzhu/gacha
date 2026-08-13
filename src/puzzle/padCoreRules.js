@@ -333,6 +333,57 @@ export function padResolveComboDropAwakenings(matches, awakeningCounts) {
   return { pendingCount, bonusCombos };
 }
 
+// _checkPassiveSkill4Block (0x64131c) applies the active thorn-fall record
+// before _checkLockFall. Unlike lock-fall, an active record spends one roll for
+// every spawned block and only checks its optional type mask after the chance
+// succeeds. The descriptor's high bit is supplied by a separate packed control
+// bit while the low seven bits are the per-crossing max-HP damage percentage.
+export function padResolveThornFall(state, type, rule, initialBlockFlags = 0) {
+  let blockFlags = Number(initialBlockFlags) >>> 0;
+  if (!rule?.active) {
+    return {
+      state: Number(state) >>> 0,
+      blockFlags,
+      thornDescriptor: 0,
+      clearEnhancement: false,
+      applied: false,
+      attempts: 0,
+    };
+  }
+
+  const roll = padLcgStep(state);
+  const chancePercent = Math.trunc(Number(rule.chancePercent) || 0) & 0xffff;
+  const threshold = (100 - chancePercent) * 100;
+  const scaled = Math.floor(roll.value * 10_000 / 0x10000);
+  const typeIndex = Math.trunc(Number(type));
+  const typeMask = Number(rule.typeMask) >>> 0;
+  const typeMatches = typeMask === 0 || (
+    typeIndex >= 0 && typeIndex <= 31 && (typeMask & (1 << typeIndex)) !== 0
+  );
+  const applied = scaled >= threshold && typeMatches;
+  let clearEnhancement = false;
+  if (applied) {
+    const oldFlags = blockFlags;
+    blockFlags |= 0x80000;
+    if (typeIndex >= 6 && typeIndex <= 9 && (oldFlags & 0x28000) !== 0) {
+      blockFlags &= ~0x20000;
+      if ((oldFlags & 0x8000) !== 0) blockFlags &= ~0x8000;
+      clearEnhancement = true;
+    }
+  }
+  const thornDescriptor = applied
+    ? (Math.trunc(Number(rule.descriptor) || 0) & 0x7f) | (rule.descriptorHighBit ? 0x80 : 0)
+    : 0;
+  return {
+    state: roll.state,
+    blockFlags: blockFlags >>> 0,
+    thornDescriptor,
+    clearEnhancement,
+    applied,
+    attempts: 1,
+  };
+}
+
 // _checkLockFall (0x626200) walks ten active rules. A matching type mask spends
 // one advance from the dedicated lock-fall LCG at game-work+0x66a14 (separate
 // from _spawnNewBlock's stream) and locks when roll >= (100 - percent) * 100.

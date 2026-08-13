@@ -452,6 +452,21 @@ try {
     const lockFallLocked = engine.board[0][0].locked;
     const lockFallMainState = engine.rng.state;
     const lockFallRuleState = engine.lockFallRng.state;
+    engine.setThornFallRule({
+      typeMask: 1 << 0,
+      chancePercent: 100,
+      descriptor: 4,
+      descriptorHighBit: true,
+    });
+    engine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+    engine.setRngState(21_900);
+    engine.setLockFallRngState(21_900);
+    engine.board[0][0] = null;
+    engine.collapseAndRefill();
+    const thornFallOrb = engine.snapshot().boardState[0][0];
+    const thornFallMainState = engine.rng.state;
+    const thornFallRuleState = engine.lockFallRng.state;
+    engine.setThornFallRule(null);
     engine.setLockFallRules([]);
     engine.reset();
     const initialBoard = engine.snapshot().board;
@@ -480,6 +495,7 @@ try {
       comboDropAwakeningMatchSize, comboDropAwakeningCombos,
       comboDropAwakeningBonus, comboDropAwakeningPending,
       lockFallType, lockFallLocked, lockFallMainState, lockFallRuleState,
+      thornFallOrb, thornFallMainState, thornFallRuleState,
       initialBoard, initialBoardState,
     };
   }) : null;
@@ -555,6 +571,11 @@ try {
     poisonBlockSample.lockFallType !== 'fire' || !poisonBlockSample.lockFallLocked ||
     poisonBlockSample.lockFallMainState !== 394_448_415 ||
     poisonBlockSample.lockFallRuleState !== 394_448_415 ||
+    poisonBlockSample.thornFallOrb.code !== 'R' || !poisonBlockSample.thornFallOrb.locked ||
+    !poisonBlockSample.thornFallOrb.thornActive ||
+    poisonBlockSample.thornFallOrb.thornDescriptor !== 0x84 ||
+    poisonBlockSample.thornFallMainState !== 394_448_415 ||
+    poisonBlockSample.thornFallRuleState !== 3_803_934_822 ||
     JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
       'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',
     ]) || poisonBlockSample.initialBoardState !== 79_238_434
