@@ -326,6 +326,29 @@ special-orb state clearing. Passive-skill resistance carried by a non-null
 `sBLOCKFLAG` remains part of the surrounding swap-family recovery rather than
 being guessed into this primitive.
 
+The public mask wrappers `_doBlockSwap4(uint16 destinationMask, sBLOCKFLAG *)`
+at `0x6af6cc` and `_doBlockSwap5(uint16 sourceMask, uint16 destinationMask,
+sBLOCKFLAG *)` at `0x6af564` expand destination bits `0..9` in ascending type
+order and enter `_doBlockSwapNew` at `0x6aee90`. Swap4 supplies a zero source
+mask. The executor augments any source mask naming neither poison type with
+bits `7|8`; poison bit 7 matches both poison variants, while a mask containing
+only mortal-poison bit 8 stays mortal-only.
+
+Every eligible cell—including locked cells—consumes one saved LCG step to pick
+an index from the ordered destination list. Locked cells reject only during the
+final `_doBlockSwapMain` application. If fewer than `3 * destinationCount`
+initial assignments would change type, native collects up to 64 eligible packed
+coordinates, consumes two more saved RNG steps, applies its usual combined-seed
+forward shuffle, and assigns destination types cyclically across the shuffled
+coordinates. Otherwise it uses two saved steps per correction attempt to
+rebalance underrepresented destinations toward three assignments, scanning
+cyclically from a random column/row for a donor assignment. Cells initially
+rolled to their current type remain untouched unless the fallback overwrites
+them. `padResolveBlockSwapNew`, `PuzzleEngine.doBlockSwap4`, and
+`PuzzleEngine.doBlockSwap5` reproduce both correction branches, mask expansion,
+poison aliasing, lock timing, effect flags, and special-orb mutation for the
+null-passive path.
+
 The enemy inverse is `_doBlockMinus(bool, uint32 mask, float, int)` at
 `0x61caa0`. Only cells whose type bit is in the mask and whose current power is
 non-negative are eligible; applying the effect stores the negated binary32

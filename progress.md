@@ -2,6 +2,26 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 mask-to-mask block swaps
+
+- Recovered `_doBlockSwapNew` at `0x6aee90` and public `_doBlockSwap4`/
+  `_doBlockSwap5` wrappers at `0x6af6cc`/`0x6af564`.
+- Ported ordered destination-mask expansion, automatic poison-source inclusion,
+  poison-bit aliasing, per-eligible-cell saved RNG, and final locked-cell
+  rejection. Locked cells participate in selection before rejecting mutation.
+- Ported both correction branches: combined-seed coordinate shuffle plus cyclic
+  destination assignment below the three-per-destination threshold, and the
+  random-start donor-balancing loop above it.
+- Added deterministic fallback, balancing, poison-default, typed-mask, lock,
+  effect-flag, engine, and browser fixtures. The exact inspector now checks 49
+  recovered gameplay anchors.
+- Verification passed: gameplay rules, production build, exact APK/restored
+  symbol checks, exhaustive browser mechanics, generic tap-turn/text-state
+  loop, clean console, and canvas/full-page screenshot inspection.
+- Next high-value swap gaps: `_doBlockSwapV`, `_doBlockSwapH`, and passive
+  `sBLOCKFLAG` construction/resistance behavior; then data-driven initial-board
+  and skyfall constraints.
+
 ## 2026-08-14 bit-replacement executor
 
 - Recovered `_doBitReplace` at `0x6adf2c` and `_doBlockSwapMain` at `0x6ae028`.

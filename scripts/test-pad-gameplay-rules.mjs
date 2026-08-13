@@ -23,6 +23,7 @@ import {
   padOrbMatchMultiplier,
   padPoisonDamage,
   padResolveBitReplacements,
+  padResolveBlockSwapNew,
   padSecondaryAttributeAttack,
   padSelectPoisonBlockCandidates,
   padSelectPoisonBlockTypes,
@@ -209,6 +210,47 @@ assert.deepEqual(padResolveBitReplacements(21_900, [0b1], [[0]], 6), {
   effectFlags: 4,
   assignments: [{ row: 0, column: 0, type: 6 }],
 });
+assert.deepEqual(padResolveBlockSwapNew(
+  21_900,
+  [1, 2],
+  [[0, 0, 0, 0]],
+  1,
+  [0b0010],
+  8,
+), {
+  state: 1_569_558_794,
+  effectFlags: 9,
+  assignments: [
+    { row: 0, column: 0, type: 2 },
+    { row: 0, column: 2, type: 2 },
+    { row: 0, column: 3, type: 1 },
+  ],
+  effectiveSourceMask: 0x181,
+});
+assert.deepEqual(padResolveBlockSwapNew(
+  21_900,
+  [0, 1],
+  [[7, 8, 6, 0]],
+  0,
+  [0b0010],
+  4,
+), {
+  state: 919_597_584,
+  effectFlags: 5,
+  assignments: [{ row: 0, column: 0, type: 0 }],
+  effectiveSourceMask: 0x180,
+});
+const balancedSwap = padResolveBlockSwapNew(
+  21_900,
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  Array.from({ length: 5 }, () => Array(6).fill(0)),
+  1,
+);
+assert.equal(balancedSwap.state, 3_099_008_172);
+assert.equal(balancedSwap.effectFlags, 7);
+assert.deepEqual(Array.from({ length: 10 }, (_, type) => (
+  balancedSwap.assignments.filter((assignment) => assignment.type === type).length
+)), Array(10).fill(3));
 assert.deepEqual(padGetRandomBlock(21_900), { state: 3_803_934_822, type: 1 });
 assert.deepEqual(padGetRandomBlock(21_900, 1), { state: 3_803_934_822, type: 2 });
 assert.deepEqual(padGetRandomBlock(21_900, -1, true, true), { state: 3_803_934_822, type: 1 });
@@ -790,6 +832,23 @@ assert.equal(bitReplaceEngine.board[0][0].type, 'poison');
 assert.equal(bitReplaceEngine.board[0][0].blockFlags, 0x80000);
 assert.equal(bitReplaceEngine.board[0][0].enhancementPower, 0);
 assert.equal(bitReplaceEngine.board[0][1].type, 'dark');
+const blockSwapEngine = new PuzzleEngine({ seed: 21_900 });
+blockSwapEngine.setBoardFromCodes(['RRRRHD', 'GLDHJG', 'HBGDGL', 'DLGHHB', 'HBGGLD']);
+blockSwapEngine.setRngState(21_900);
+blockSwapEngine.setOrbState(0, 1, { locked: true });
+assert.equal(blockSwapEngine.doBlockSwap5(1, (1 << 1) | (1 << 2)), 1);
+assert.equal(blockSwapEngine.rng.state, 1_569_558_794);
+assert.deepEqual(blockSwapEngine.board[0].slice(0, 4).map((orb) => orb.type), [
+  'wood', 'fire', 'wood', 'water',
+]);
+const poisonSwapEngine = new PuzzleEngine({ seed: 21_900 });
+poisonSwapEngine.setBoardFromCodes(['PMJGHD', 'GLDHRG', 'HBGDGL', 'DLGHHB', 'HBGGLD']);
+poisonSwapEngine.setRngState(21_900);
+poisonSwapEngine.setOrbState(0, 1, { locked: true });
+assert.equal(poisonSwapEngine.doBlockSwap4((1 << 0) | (1 << 1), 4), 5);
+assert.equal(poisonSwapEngine.rng.state, 919_597_584);
+assert.equal(poisonSwapEngine.board[0][0].type, 'fire');
+assert.equal(poisonSwapEngine.board[0][1].type, 'mortalPoison');
 assert.equal(specialLockEngine.doLockDropBits(0x3c0, 4, 0xbeef), true);
 for (let column = 0; column < 4; column += 1) {
   const orb = specialLockEngine.board[0][column];

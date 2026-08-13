@@ -127,6 +127,24 @@ export function createPadRng(seed = 0) {
       state = resolved.state;
       return resolved;
     },
+    resolveBlockSwapNew(
+      destinationTypes,
+      boardTypes,
+      sourceTypeMask,
+      lockedRows = null,
+      initialEffectFlags = 0,
+    ) {
+      const resolved = padResolveBlockSwapNew(
+        state,
+        destinationTypes,
+        boardTypes,
+        sourceTypeMask,
+        lockedRows,
+        initialEffectFlags,
+      );
+      state = resolved.state;
+      return resolved;
+    },
     getRandomBlock(excludedType = -1, includeJammer = false, includeHeart = true) {
       const result = padGetRandomBlock(state, excludedType, includeJammer, includeHeart);
       state = result.state;
@@ -403,6 +421,116 @@ export function padResolveBitReplacements(
     }
   }
   return { state: savedState, effectFlags, assignments };
+}
+
+function padBlockSwapSourceEligible(type, effectiveSourceMask) {
+  if ((effectiveSourceMask & (1 << 7)) !== 0 && (type === 7 || type === 8)) return true;
+  return type >= 0 && type < 32 && (effectiveSourceMask & (1 << type)) !== 0;
+}
+
+// _doBlockSwapNew (0x6aee90) powers the public type-mask replacement wrappers.
+// It always folds poison/mortal-poison into a source mask that names neither,
+// uses per-cell saved LCG rolls for its first assignment, and then either
+// balances viable assignments to three of every destination or falls back to a
+// two-step shuffled cyclic distribution when fewer changes are available.
+export function padResolveBlockSwapNew(
+  state,
+  destinationTypes,
+  boardTypes,
+  sourceTypeMask,
+  lockedRows = null,
+  initialEffectFlags = 0,
+) {
+  const rows = Array.isArray(boardTypes) ? boardTypes.length : 0;
+  const columns = rows > 0 && Array.isArray(boardTypes[0]) ? boardTypes[0].length : 0;
+  const validBoard = rows > 0 && columns > 0
+    && boardTypes.every((row) => Array.isArray(row) && row.length === columns);
+  const destinations = (Array.isArray(destinationTypes) ? destinationTypes : [])
+    .map((value) => Math.trunc(Number(value)))
+    .filter((type) => type >= 0 && type <= 9);
+  let savedState = Number(state) >>> 0;
+  let effectFlags = Number(initialEffectFlags) | 0;
+  if (!validBoard || destinations.length === 0) {
+    return { state: savedState, effectFlags, assignments: [], effectiveSourceMask: 0 };
+  }
+  let effectiveSourceMask = Number(sourceTypeMask) >>> 0;
+  if ((effectiveSourceMask & 0x180) === 0) effectiveSourceMask |= 0x180;
+  const randomMap = Array.from({ length: rows }, () => Array(columns).fill(-1));
+  const destinationCounts = Array(destinations.length).fill(0);
+  let changedCount = 0;
+  const eligible = [];
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const currentType = Math.trunc(Number(boardTypes[row][column]));
+      if (!padBlockSwapSourceEligible(currentType, effectiveSourceMask)) continue;
+      const roll = padLcgStep(savedState);
+      savedState = roll.state;
+      const destinationIndex = Math.floor(roll.value * destinations.length / 0x10000);
+      const destinationType = destinations[destinationIndex];
+      destinationCounts[destinationIndex] += 1;
+      eligible.push({ row, column });
+      if (currentType !== destinationType) {
+        randomMap[row][column] = destinationType;
+        changedCount += 1;
+      }
+    }
+  }
+
+  if (changedCount < destinations.length * 3) {
+    const fallbackCandidates = eligible.slice(0, 64);
+    const shuffled = padShuffleBlockCandidates(savedState, fallbackCandidates);
+    savedState = shuffled.state;
+    shuffled.candidates.forEach(({ row, column }, index) => {
+      randomMap[row][column] = destinations[index % destinations.length];
+    });
+  } else {
+    for (let destinationIndex = 0; destinationIndex < destinations.length; destinationIndex += 1) {
+      let localCount = destinationCounts[destinationIndex];
+      while (localCount <= 2) {
+        let sourceIndex = 0;
+        let sourceCount = 0;
+        for (let index = 0; index < destinations.length; index += 1) {
+          if (index !== destinationIndex && destinationCounts[index] > sourceCount) {
+            sourceCount = destinationCounts[index];
+            sourceIndex = index;
+          }
+        }
+        const columnRoll = padLcgStep(savedState);
+        const rowRoll = padLcgStep(columnRoll.state);
+        savedState = rowRoll.state;
+        let column = Math.floor(columnRoll.value * columns / 0x10000);
+        let row = Math.floor(rowRoll.value * rows / 0x10000);
+        for (let scanned = 0; scanned < rows * columns; scanned += 1) {
+          if (randomMap[row][column] === destinations[sourceIndex]) {
+            randomMap[row][column] = destinations[destinationIndex];
+            destinationCounts[sourceIndex] -= 1;
+            destinationCounts[destinationIndex] += 1;
+            break;
+          }
+          column += 1;
+          if (column >= columns) {
+            column = 0;
+            row = (row + 1) % rows;
+          }
+        }
+        localCount += 1;
+      }
+    }
+  }
+
+  const assignments = [];
+  for (let row = 0; row < rows; row += 1) {
+    const lockedBits = Number(lockedRows?.[row] ?? 0) & 0xffff;
+    for (let column = 0; column < columns; column += 1) {
+      const type = randomMap[row][column];
+      if (type < 0 || (lockedBits & (1 << column)) !== 0) continue;
+      const currentType = Math.trunc(Number(boardTypes[row][column]));
+      if (!padBlockSwapSourceEligible(currentType, effectiveSourceMask)) continue;
+      effectFlags |= type === 6 ? 4 : type === 7 || type === 8 ? 2 : 1;
+      assignments.push({ row, column, type });
+    }
+  }
+  return { state: savedState, effectFlags, assignments, effectiveSourceMask };
 }
 
 // The same native routine builds its candidates from numeric block types

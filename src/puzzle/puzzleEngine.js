@@ -893,6 +893,42 @@ export class PuzzleEngine {
     return resolved.effectFlags;
   }
 
+  doBlockSwap5(sourceTypeMask, destinationTypeMask, initialEffectFlags = 0) {
+    const destinationMask = Number(destinationTypeMask) & 0xffff;
+    const destinationTypes = [];
+    for (let type = 0; type <= 9; type += 1) {
+      if ((destinationMask & (1 << type)) !== 0) destinationTypes.push(type);
+    }
+    if (destinationTypes.length === 0) return Number(initialEffectFlags) | 0;
+    const boardTypes = this.board.map((row) => row.map((orb) => (
+      ORB_TYPES.findIndex((candidate) => candidate.id === orb.type)
+    )));
+    const lockedRows = this.board.map((row) => row.reduce((bits, orb, column) => (
+      orb.locked ? bits | (1 << column) : bits
+    ), 0));
+    const resolved = this.rng.resolveBlockSwapNew(
+      destinationTypes,
+      boardTypes,
+      sourceTypeMask,
+      lockedRows,
+      initialEffectFlags,
+    );
+    resolved.assignments.forEach(({ row, column, type }) => {
+      const orb = this.board[row][column];
+      orb.type = ORB_TYPES[type].id;
+      if (type >= 6) {
+        orb.blockFlags = (Number(orb.blockFlags) >>> 0) & ~PAD_BLOCK_SPECIAL_LOCK_CLEAR_FLAGS;
+        orb.enhancementPower = 0;
+        orb.enhanced = false;
+      }
+    });
+    return resolved.effectFlags;
+  }
+
+  doBlockSwap4(destinationTypeMask, initialEffectFlags = 0) {
+    return this.doBlockSwap5(0, destinationTypeMask, initialEffectFlags);
+  }
+
   isCell(row, column) {
     return row >= 0 && row < this.rows && column >= 0 && column < this.columns;
   }
