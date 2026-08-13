@@ -333,6 +333,28 @@ export function padResolveComboDropAwakenings(matches, awakeningCounts) {
   return { pendingCount, bonusCombos };
 }
 
+// _checkLockFall (0x626200) walks ten active rules. A matching type mask spends
+// one advance from the dedicated lock-fall LCG at game-work+0x66a14 (separate
+// from _spawnNewBlock's stream) and locks when roll >= (100 - percent) * 100.
+export function padResolveLockFall(state, type, rules, initialBlockFlags = 0) {
+  let nextState = Number(state) >>> 0;
+  let blockFlags = Number(initialBlockFlags) >>> 0;
+  let attempts = 0;
+  const typeIndex = Math.trunc(Number(type));
+  for (const rule of (Array.isArray(rules) ? rules : []).slice(0, 10)) {
+    const typeMask = Number(rule?.typeMask) & 0xffff;
+    if (typeIndex < 0 || typeIndex > 15 || (typeMask & (1 << typeIndex)) === 0) continue;
+    const roll = padLcgStep(nextState);
+    nextState = roll.state;
+    attempts += 1;
+    const chancePercent = Math.trunc(Number(rule?.chancePercent) || 0);
+    const threshold = (100 - chancePercent) * 100;
+    const scaled = Math.floor(roll.value * 10_000 / 0x10000);
+    if (scaled >= threshold) blockFlags |= 0x800;
+  }
+  return { state: nextState, blockFlags: blockFlags >>> 0, attempts };
+}
+
 // _buildBlockList (0x6615e8) emits ten float32 lanes, adds them sequentially,
 // multiplies the final binary32 total by 100000.0f, and returns
 // izMathCeiling(result). The raw dungeon/passive records are upstream inputs;

@@ -27,6 +27,7 @@ import {
   padResolveBlockSwapPassive,
   padResolveComboDropAwakenings,
   padResolveComboDropSpawns,
+  padResolveLockFall,
   padResolveBlockSwapNew,
   padResolveLineBlockSwaps,
   padResolveSkillBoardSwap,
@@ -123,6 +124,21 @@ assert.deepEqual(padResolveComboDropAwakenings([
 ], [3, 3, 9, 9, 9]), {
   pendingCount: 6,
   bonusCombos: 4,
+});
+assert.deepEqual(padResolveLockFall(21_900, 0, [
+  { typeMask: 1 << 0, chancePercent: 0 },
+  { typeMask: 1 << 0, chancePercent: 100 },
+]), {
+  state: 3_803_934_822,
+  blockFlags: 0x800,
+  attempts: 2,
+});
+assert.deepEqual(padResolveLockFall(21_900, 1, [
+  { typeMask: 1 << 0, chancePercent: 100 },
+]), {
+  state: 21_900,
+  blockFlags: 0,
+  attempts: 0,
 });
 assert.deepEqual(padSpawnNewBlockInBits(394_448_415, (1 << 0) | (1 << 6), [0, 1, 2, 3, 4, 5]), {
   state: 1_929_471_377,
@@ -575,6 +591,20 @@ assert.equal(comboDropAwakeningEngine.pendingMatches[0].size, 10);
 assert.equal(comboDropAwakeningEngine.comboCount, 3);
 assert.equal(comboDropAwakeningEngine.comboDropBonusCount, 2);
 assert.equal(comboDropAwakeningEngine.pendingComboDrops, 2);
+const lockFallEngine = new PuzzleEngine({
+  seed: 21_900,
+  lockFallSeed: 21_900,
+  lockFallRules: [{ typeMask: 1 << 0, chancePercent: 100 }],
+});
+lockFallEngine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+lockFallEngine.setRngState(21_900);
+lockFallEngine.setLockFallRngState(21_900);
+lockFallEngine.board[0][0] = null;
+lockFallEngine.collapseAndRefill();
+assert.equal(lockFallEngine.board[0][0].type, 'fire');
+assert.equal(lockFallEngine.board[0][0].locked, true);
+assert.equal(lockFallEngine.rng.state, 394_448_415);
+assert.equal(lockFallEngine.lockFallRng.state, 394_448_415);
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);
 assert.deepEqual(tracePadDragCells(0, 0, 2, 2, true), [{ row: 1, column: 1 }, { row: 2, column: 2 }]);

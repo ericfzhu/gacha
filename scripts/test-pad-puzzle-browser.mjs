@@ -440,6 +440,19 @@ try {
     const comboDropAwakeningBonus = engine.comboDropBonusCount;
     const comboDropAwakeningPending = engine.pendingComboDrops;
     engine.setComboDropAwakenings([0, 0, 0, 0, 0]);
+    engine.pendingComboDrops = 0;
+    engine.comboDropBonusCount = 0;
+    engine.setLockFallRules([{ typeMask: 1 << 0, chancePercent: 100 }]);
+    engine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+    engine.setRngState(21_900);
+    engine.setLockFallRngState(21_900);
+    engine.board[0][0] = null;
+    engine.collapseAndRefill();
+    const lockFallType = engine.board[0][0].type;
+    const lockFallLocked = engine.board[0][0].locked;
+    const lockFallMainState = engine.rng.state;
+    const lockFallRuleState = engine.lockFallRng.state;
+    engine.setLockFallRules([]);
     engine.reset();
     const initialBoard = engine.snapshot().board;
     const initialBoardState = engine.rng.state;
@@ -466,6 +479,7 @@ try {
       topLineSkyfallTypes, topLineSkyfallState,
       comboDropAwakeningMatchSize, comboDropAwakeningCombos,
       comboDropAwakeningBonus, comboDropAwakeningPending,
+      lockFallType, lockFallLocked, lockFallMainState, lockFallRuleState,
       initialBoard, initialBoardState,
     };
   }) : null;
@@ -538,6 +552,9 @@ try {
     poisonBlockSample.comboDropAwakeningCombos !== 3 ||
     poisonBlockSample.comboDropAwakeningBonus !== 2 ||
     poisonBlockSample.comboDropAwakeningPending !== 2 ||
+    poisonBlockSample.lockFallType !== 'fire' || !poisonBlockSample.lockFallLocked ||
+    poisonBlockSample.lockFallMainState !== 394_448_415 ||
+    poisonBlockSample.lockFallRuleState !== 394_448_415 ||
     JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
       'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',
     ]) || poisonBlockSample.initialBoardState !== 79_238_434

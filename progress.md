@@ -2,6 +2,21 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 native lock-fall rule stream
+
+- Recovered `_checkLockFall` at `0x626200`: up to ten active records provide a
+  16-bit type mask and signed percentage; each matching record consumes one
+  roll and locks when `roll10000 >= (100 - percent) * 100`.
+- Preserved the dedicated game-work LCG stream at `+0x66a14`, separate from
+  `_spawnNewBlock`'s `+0x66a10` stream, and applied resulting flag `0x800` after
+  combo-drop marker selection during every refill.
+- Added pure, engine, and browser fixtures for matching/nonmatching and 0%/100%
+  rules. The exact restored-image inspector now checks 62 anchors.
+- Rules, production build, exhaustive browser mechanics, and the independent
+  gameplay-client render check pass with no console errors.
+- Next: recover `_checkPassiveSkill4Block`'s post-spawn state and the remaining
+  non-drop/fall-status branches, then map raw dungeon rule records.
+
 ## 2026-08-14 native combo-drop awakening accounting
 
 - Recovered `_checkErases`' passive-skill `62` path: it builds five elemental

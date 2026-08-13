@@ -20,6 +20,7 @@ import {
   padResolveBlockSwapPassive,
   padResolveComboDropAwakenings,
   padResolveComboDropSpawns,
+  padResolveLockFall,
   padSecondaryAttributeAttack,
   padShuffleLockDropCandidates,
   padTertiaryAttributeAttack,
@@ -101,6 +102,8 @@ export class PuzzleEngine {
     comboDropCap = 12,
     comboDropAwakenings = Array(5).fill(0),
     topLineDropTypes = null,
+    lockFallRules = [],
+    lockFallSeed = seed,
   } = {}) {
     if (![columns, rows].every(Number.isInteger) || columns < 1 || columns > 15 || rows < 1 || rows > 15) {
       throw new Error('PAD board dimensions must be integers from 1 through 15.');
@@ -117,6 +120,8 @@ export class PuzzleEngine {
     this.comboDropCap = Math.max(0, Math.trunc(Number(comboDropCap) || 0));
     this.setComboDropAwakenings(comboDropAwakenings);
     this.setTopLineDropTypes(topLineDropTypes);
+    this.setLockFallRules(lockFallRules);
+    this.lockFallSeed = Number(lockFallSeed) >>> 0;
     this.rng = createPadRng(seed);
     this.orbSerial = 0;
     this.visualTime = 0;
@@ -125,6 +130,7 @@ export class PuzzleEngine {
 
   reset() {
     this.rng = createPadRng(this.seed);
+    this.lockFallRng = createPadRng(this.lockFallSeed);
     this.orbSerial = 0;
     this.mode = 'ready';
     this.phase = 'input';
@@ -534,8 +540,15 @@ export class PuzzleEngine {
     this.rng.setState(comboDropResolution.state);
     this.pendingComboDrops = 0;
     generated.forEach((entry, index) => {
+      const lockFall = padResolveLockFall(
+        this.lockFallRng.state,
+        entry.type,
+        this.lockFallRules,
+        comboDropResolution.marked[index] ? PAD_BLOCK_COMBO_DROP_FLAG : 0,
+      );
+      this.lockFallRng.setState(lockFall.state);
       this.board[entry.row][entry.column] = this.createOrb(ORB_TYPES[entry.type]?.id || NATURAL_ORB_TYPES[0].id, {
-        blockFlags: comboDropResolution.marked[index] ? PAD_BLOCK_COMBO_DROP_FLAG : 0,
+        blockFlags: lockFall.blockFlags,
       });
     });
   }
@@ -664,6 +677,10 @@ export class PuzzleEngine {
     this.rng = createPadRng(Number(state) >>> 0);
   }
 
+  setLockFallRngState(state) {
+    this.lockFallRng = createPadRng(Number(state) >>> 0);
+  }
+
   setFaceTypes(types) {
     if (!Array.isArray(types) || types.length > 16 || types.some((type) => (
       !Number.isInteger(Number(type)) || Number(type) < 0 || Number(type) >= ORB_TYPES.length
@@ -694,6 +711,16 @@ export class PuzzleEngine {
       !Number.isInteger(Number(type)) || Number(type) < 0 || Number(type) >= ORB_TYPES.length
     ))) throw new Error(`PAD top-line drop types must contain exactly ${this.columns} native orb type indices.`);
     this.topLineDropTypes = types.map((type) => Number(type));
+  }
+
+  setLockFallRules(rules) {
+    if (!Array.isArray(rules) || rules.length > 10 || rules.some((rule) => (
+      !Number.isInteger(Number(rule?.typeMask)) || !Number.isInteger(Number(rule?.chancePercent))
+    ))) throw new Error('PAD lock-fall rules must contain at most ten integer mask/percentage records.');
+    this.lockFallRules = rules.map((rule) => ({
+      typeMask: Number(rule.typeMask) & 0xffff,
+      chancePercent: Number(rule.chancePercent),
+    }));
   }
 
   setOrbState(row, column, state) {
@@ -1093,6 +1120,7 @@ export class PuzzleEngine {
       phase: this.phase,
       turn: this.turn,
       rngState: this.rng.state,
+      lockFallRngState: this.lockFallRng.state,
       faceTypes: [...this.faceTypes],
       dropRates: [...this.dropRates],
       skyfallExclusionMask: this.skyfallExclusionMask,
@@ -1102,6 +1130,7 @@ export class PuzzleEngine {
       pendingComboDrops: this.pendingComboDrops,
       comboDropBonusCount: this.comboDropBonusCount,
       topLineDropTypes: this.topLineDropTypes ? [...this.topLineDropTypes] : null,
+      lockFallRules: this.lockFallRules.map((rule) => ({ ...rule })),
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({
         code: ORB_BY_ID[orb.type].code,

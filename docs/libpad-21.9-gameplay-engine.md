@@ -334,6 +334,17 @@ retain `sBLOCK+8`; special types 6 through 9 clear that float and flags
 `0x28000` while retaining the new lock. `PuzzleEngine.doLockDropBits` mirrors
 that behavior and retains the relevant raw `sBLOCK.flags` bits as `blockFlags`.
 
+Automatic lock skyfalls use a different routine and random stream.
+`_checkLockFall(sBLOCK *)` at `0x626200` walks up to ten active dungeon records;
+each supplies a 16-bit type mask and a signed percentage. A matching record
+advances the dedicated LCG at game-work `+0x66a14`, scales its high half to
+`0..9999`, and sets flag `0x800` when the result is at least
+`(100 - percentage) * 100`. Multiple matching records each consume a roll even
+after an earlier record locks the block. This stream is separate from
+`_spawnNewBlock`'s state at `+0x66a10`, so automatic lock checks cannot change
+future orb types. `padResolveLockFall` and `lockFallRules` preserve the ten-rule
+limit, mask/threshold boundary, independent state, and post-spawn lock flag.
+
 `_doPoisonBlockN(int destinationType, int count, bool excludeHeart)` at
 `0x626bf0` is the random individual poison writer. It clears a temporary visited
 byte on every board cell, then spends two saved LCG advances for every positive
