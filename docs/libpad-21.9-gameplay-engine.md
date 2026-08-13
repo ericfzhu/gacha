@@ -272,6 +272,29 @@ The browser exposes dungeon face order through `setFaceTypes`, and
 `padSelectPoisonBlockTypes` plus `PuzzleEngine.doPoisonBlocks` reproduce this
 bulk path without pretending every dungeon has the default six-color list.
 
+The generalized writer `_doPoisonBlockN2(int perTypeCount, uint32
+destinationMask, uint32 excludedSourceMask, bool dryRun, bool presentation,
+uint16_t *selectedRows)` at `0x61c344` has a separate contract. It scans the
+board row-major and stores coordinates as `(row << 4) | column`. With no row
+bitmap, a cell is eligible when its current type bit is absent from the source
+exclusion mask. When a bitmap is supplied, the bitmap replaces that test: a
+cell is eligible when bit `column` in `selectedRows[row]` is clear, even if its
+source type is excluded. A dry run returns the raw candidate count without RNG,
+mutation, or bitmap writes. An applying call always consumes exactly two saved
+LCG advances, including empty boards, non-positive counts, and empty destination
+masks, then uses the standard combined-seed forward shuffle.
+
+Destination bits are visited in numeric type order `0..9`, taking up to
+`perTypeCount` consecutive shuffled cells for each enabled destination. Every
+attempt contributes to the return count and sets its row bit before the next
+caller use. A locked cell still consumes that assignment and bitmap bit even
+though the common block-change helper rejects its mutation. Natural destination
+types `0..5` retain the cell's enhancement power; special types `6..9` clear it,
+while independent block flags remain intact. The fifth argument only selects
+native sound/effect presentation and does not alter board selection. The port's
+`padSelectMaskedBlockChanges` and `PuzzleEngine.doPoisonBlockN2` expose these
+candidate, RNG, bitmap, and mutation rules directly.
+
 The enemy inverse is `_doBlockMinus(bool, uint32 mask, float, int)` at
 `0x61caa0`. Only cells whose type bit is in the mask and whose current power is
 non-negative are eligible; applying the effect stores the negated binary32

@@ -813,6 +813,46 @@ export class PuzzleEngine {
     return changed;
   }
 
+  doPoisonBlockN2(
+    perTypeCount,
+    destinationTypeMask,
+    excludedSourceTypeMask,
+    dryRun = false,
+    presentation = true,
+    selectedRows = null,
+  ) {
+    const boardTypes = this.board.map((row) => row.map((orb) => (
+      ORB_TYPES.findIndex((candidate) => candidate.id === orb.type)
+    )));
+    const selected = this.rng.selectMaskedBlockChanges(
+      boardTypes,
+      perTypeCount,
+      destinationTypeMask,
+      excludedSourceTypeMask,
+      dryRun,
+      selectedRows,
+    );
+    if (selectedRows !== null && selectedRows !== undefined && selected.selectedRows) {
+      selected.selectedRows.forEach((rowBits, row) => {
+        selectedRows[row] = rowBits;
+      });
+    }
+    if (dryRun) return selected.candidateCount;
+    selected.assignments.forEach(({ row, column, type }) => {
+      const orb = this.board[row][column];
+      if (orb.locked) return;
+      orb.type = ORB_TYPES[type].id;
+      if (type >= 6) {
+        orb.enhancementPower = 0;
+        orb.enhanced = false;
+      }
+    });
+    // Native w5 only selects presentation/sound behavior. Keeping the argument
+    // preserves the call shape while the deterministic browser model omits it.
+    void presentation;
+    return selected.assignments.length;
+  }
+
   isCell(row, column) {
     return row >= 0 && row < this.rows && column >= 0 && column < this.columns;
   }

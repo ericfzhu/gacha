@@ -295,11 +295,28 @@ try {
     const bulkEndState = engine.rng.state;
     const bulkPoison = engine.board.flat().filter((orb) => orb.type === 'poison').length;
     const bulkLockedType = engine.board[0][1].type;
+    engine.setBoardFromCodes(['RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
+    engine.setRngState(21_900);
+    engine.setOrbState(0, 3, { locked: true });
+    const maskedDryCount = engine.doPoisonBlockN2(2, 0xc0, 0x1a0, true);
+    const maskedDryState = engine.rng.state;
+    const maskedAttempted = engine.doPoisonBlockN2(2, 0xc0, 0x1a0);
+    const maskedEndState = engine.rng.state;
+    const maskedTypes = [[3, 5], [0, 3], [2, 4], [0, 5]]
+      .map(([row, column]) => engine.board[row][column].type);
+    engine.setBoardFromCodes(['RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
+    engine.setRngState(21_900);
+    const selectedRows = new Uint16Array(5);
+    const mappedAttempted = engine.doPoisonBlockN2(2, 0xc0, 0xffff_ffff, false, false, selectedRows);
+    const mappedTypes = [[2, 5], [0, 3], [2, 0], [4, 3]]
+      .map(([row, column]) => engine.board[row][column].type);
     engine.reset();
     engine.start();
     return {
       lockedStartState, lockedChanged, lockedEndState, startState, changed, endState,
       beforeMortal, afterMortal, bulkStartState, bulkChanged, bulkEndState, bulkPoison, bulkLockedType,
+      maskedDryCount, maskedDryState, maskedAttempted, maskedEndState, maskedTypes,
+      mappedAttempted, selectedRows: [...selectedRows], mappedTypes,
     };
   }) : null;
   const advanceLcg = (state, count) => {
@@ -315,7 +332,13 @@ try {
     poisonBlockSample.afterMortal - poisonBlockSample.beforeMortal !== 5 ||
     poisonBlockSample.bulkChanged !== 5 ||
     poisonBlockSample.bulkEndState !== advanceLcg(poisonBlockSample.bulkStartState, 2) ||
-    poisonBlockSample.bulkPoison !== 5 || poisonBlockSample.bulkLockedType !== 'water'
+    poisonBlockSample.bulkPoison !== 5 || poisonBlockSample.bulkLockedType !== 'water' ||
+    poisonBlockSample.maskedDryCount !== 23 || poisonBlockSample.maskedDryState !== 21_900 ||
+    poisonBlockSample.maskedAttempted !== 4 || poisonBlockSample.maskedEndState !== 3_803_934_822 ||
+    JSON.stringify(poisonBlockSample.maskedTypes) !== JSON.stringify(['jammer', 'water', 'poison', 'poison']) ||
+    poisonBlockSample.mappedAttempted !== 4 ||
+    JSON.stringify(poisonBlockSample.selectedRows) !== JSON.stringify([0x08, 0, 0x21, 0, 0x08]) ||
+    JSON.stringify(poisonBlockSample.mappedTypes) !== JSON.stringify(['jammer', 'jammer', 'poison', 'poison'])
   )) throw new Error(`Poison-block mismatch: ${JSON.stringify(poisonBlockSample)}`);
   if (renderAtlasSheet) {
     const sheet = page.locator('#pad-atlas-sheet');

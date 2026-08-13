@@ -2,6 +2,27 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 masked block-change fidelity
+
+- Recovered `_doPoisonBlockN2` at `0x61c344`, including both candidate modes:
+  source-type exclusion without a row bitmap, and bitmap exclusion that replaces
+  the source mask when a caller supplies `uint16_t selectedRows[]`.
+- Ported dry-run counting, unconditional two-step applying RNG use, ascending
+  destination-mask traversal, per-destination limits, row-bit writes, and the
+  native attempted-write return value. Locked cells consume an attempt without
+  changing; special destinations clear enhancement power while natural ones
+  retain it and independent block flags survive.
+- Expanded the exact restored-binary inspector to 43 gameplay anchors and added
+  pure, stateful-engine, typed-bitmap, locked-cell, enhancement, and browser
+  fixtures for the generalized conversion path.
+- Verification passed: pure gameplay rules, production build, exact protected
+  APK/restored-image hashes and anchors, exhaustive browser mechanics, console
+  checks, generic start/tap-turn/text-state progression, and canvas/full-page
+  screenshot inspection.
+- Next high-value board gaps: the bit-mask block-swap family and data-driven
+  skyfall/opening-board constraints. Keep private `data048.bin`/`data030.bin`
+  account/server inputs outside claims of APK-only fidelity.
+
 ## 2026-08-14 whole-color poison fidelity
 
 - Recovered `_doPoisonBlocks` at `0x626e78` and the ordered dungeon face-color

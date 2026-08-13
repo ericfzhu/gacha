@@ -89,6 +89,26 @@ export function createPadRng(seed = 0) {
       state = selected.state;
       return selected.types;
     },
+    selectMaskedBlockChanges(
+      boardTypes,
+      perTypeCount,
+      destinationTypeMask,
+      excludedSourceTypeMask,
+      dryRun = false,
+      selectedRows = null,
+    ) {
+      const selected = padSelectMaskedBlockChanges(
+        state,
+        boardTypes,
+        perTypeCount,
+        destinationTypeMask,
+        excludedSourceTypeMask,
+        dryRun,
+        selectedRows,
+      );
+      state = selected.state;
+      return selected;
+    },
     getRandomBlock(excludedType = -1, includeJammer = false, includeHeart = true) {
       const result = padGetRandomBlock(state, excludedType, includeJammer, includeHeart);
       state = result.state;
@@ -219,6 +239,74 @@ export function padSelectPoisonBlockTypes(state, faceTypes, boardTypes, count, e
   const shuffled = padShuffleBlockCandidates(state, eligible);
   const requested = Math.max(0, Math.trunc(Number(count) || 0));
   return { state: shuffled.state, types: shuffled.candidates.slice(0, requested) };
+}
+
+// _doPoisonBlockN2 (0x61c344) is the general masked block-change writer used
+// by several skills. Without a caller bitmap it excludes source types by mask;
+// with one it instead excludes cells whose row bit is already set. Applying
+// always spends the ordinary two saved LCG steps, even if no assignment can be
+// made. Its return value and bitmap count attempted writes, including writes a
+// locked block will later reject.
+export function padSelectMaskedBlockChanges(
+  state,
+  boardTypes,
+  perTypeCount,
+  destinationTypeMask,
+  excludedSourceTypeMask,
+  dryRun = false,
+  selectedRows = null,
+) {
+  const rows = Array.isArray(boardTypes) ? boardTypes.length : 0;
+  const columns = rows > 0 && Array.isArray(boardTypes[0]) ? boardTypes[0].length : 0;
+  const validBoard = rows > 0 && columns > 0
+    && boardTypes.every((row) => Array.isArray(row) && row.length === columns);
+  const hasSelectionMap = selectedRows !== null && selectedRows !== undefined;
+  const outputRows = hasSelectionMap
+    ? Array.from({ length: rows }, (_, row) => Number(selectedRows[row] ?? 0) & 0xffff)
+    : null;
+
+  const excludedMask = Number(excludedSourceTypeMask) >>> 0;
+  const candidates = [];
+  if (validBoard) {
+    boardTypes.forEach((row, rowIndex) => row.forEach((value, columnIndex) => {
+      const type = Math.trunc(Number(value));
+      const excluded = hasSelectionMap
+        ? (outputRows[rowIndex] & (1 << columnIndex)) !== 0
+        : type >= 0 && type < 32 && (excludedMask & (1 << type)) !== 0;
+      if (!excluded) candidates.push({ row: rowIndex, column: columnIndex, type });
+    }));
+  }
+  if (dryRun) {
+    return {
+      state: Number(state) >>> 0,
+      candidateCount: candidates.length,
+      assignments: [],
+      selectedRows: outputRows,
+    };
+  }
+
+  const shuffled = padShuffleBlockCandidates(state, candidates);
+  const destinationMask = Number(destinationTypeMask) >>> 0;
+  const requested = Math.trunc(Number(perTypeCount) || 0);
+  const assignments = [];
+  let candidateIndex = 0;
+  if (requested >= 1) {
+    for (let type = 0; type <= 9 && candidateIndex < shuffled.candidates.length; type += 1) {
+      if ((destinationMask & (1 << type)) === 0) continue;
+      for (let count = 0; count < requested && candidateIndex < shuffled.candidates.length; count += 1) {
+        const candidate = shuffled.candidates[candidateIndex];
+        candidateIndex += 1;
+        assignments.push({ row: candidate.row, column: candidate.column, type });
+        if (outputRows) outputRows[candidate.row] |= 1 << candidate.column;
+      }
+    }
+  }
+  return {
+    state: shuffled.state,
+    candidateCount: candidates.length,
+    assignments,
+    selectedRows: outputRows,
+  };
 }
 
 // The same native routine builds its candidates from numeric block types

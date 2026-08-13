@@ -23,6 +23,7 @@ import {
   padSecondaryAttributeAttack,
   padSelectPoisonBlockCandidates,
   padSelectPoisonBlockTypes,
+  padSelectMaskedBlockChanges,
   padShuffleBlockCandidates,
   padShuffleBlockMinusCandidates,
   padShuffleBurDropCandidates,
@@ -106,6 +107,66 @@ assert.deepEqual(padSelectPoisonBlockTypes(21_900, [5], [[5]], 1, true), {
   state: 21_900,
   types: [],
 });
+const maskedChangeBoard = [
+  [0, 1, 0, 1, 5, 4],
+  [2, 3, 4, 5, 6, 2],
+  [5, 8, 2, 4, 2, 3],
+  [4, 3, 2, 5, 5, 6],
+  [5, 6, 2, 2, 3, 4],
+];
+assert.deepEqual(padSelectMaskedBlockChanges(
+  21_900,
+  maskedChangeBoard,
+  2,
+  (1 << 6) | (1 << 7),
+  (1 << 5) | (1 << 7) | (1 << 8),
+), {
+  state: 3_803_934_822,
+  candidateCount: 23,
+  assignments: [
+    { row: 3, column: 5, type: 6 },
+    { row: 0, column: 3, type: 6 },
+    { row: 2, column: 4, type: 7 },
+    { row: 0, column: 5, type: 7 },
+  ],
+  selectedRows: null,
+});
+assert.deepEqual(padSelectMaskedBlockChanges(
+  21_900,
+  maskedChangeBoard,
+  2,
+  (1 << 6) | (1 << 7),
+  (1 << 5) | (1 << 7) | (1 << 8),
+  true,
+), {
+  state: 21_900,
+  candidateCount: 23,
+  assignments: [],
+  selectedRows: null,
+});
+assert.deepEqual(padSelectMaskedBlockChanges(
+  21_900,
+  maskedChangeBoard,
+  2,
+  (1 << 6) | (1 << 7),
+  0xffff_ffff,
+  false,
+  [0, 0, 0, 0x20, 0],
+), {
+  state: 3_803_934_822,
+  candidateCount: 29,
+  assignments: [
+    { row: 2, column: 5, type: 6 },
+    { row: 0, column: 3, type: 6 },
+    { row: 2, column: 0, type: 7 },
+    { row: 4, column: 4, type: 7 },
+  ],
+  selectedRows: [0x08, 0, 0x21, 0x20, 0x10],
+});
+assert.equal(padSelectMaskedBlockChanges(21_900, [[0]], 0, 0, 0).state, 3_803_934_822);
+assert.equal(padSelectMaskedBlockChanges(21_900, [[0]], -1, 0, 0).state, 3_803_934_822);
+assert.equal(padSelectMaskedBlockChanges(21_900, [[0]], 1, 1, 1).state, 3_803_934_822);
+assert.equal(padSelectMaskedBlockChanges(21_900, [], 1, 1, 0).state, 3_803_934_822);
 assert.deepEqual(padGetRandomBlock(21_900), { state: 3_803_934_822, type: 1 });
 assert.deepEqual(padGetRandomBlock(21_900, 1), { state: 3_803_934_822, type: 2 });
 assert.deepEqual(padGetRandomBlock(21_900, -1, true, true), { state: 3_803_934_822, type: 1 });
@@ -614,6 +675,53 @@ poisonBlocksEngine.setFaceTypes([5]);
 const poisonBlocksNoCandidateState = poisonBlocksEngine.rng.state;
 assert.equal(poisonBlocksEngine.doPoisonBlocks(8, 1, true), 0);
 assert.equal(poisonBlocksEngine.rng.state, poisonBlocksNoCandidateState);
+
+const maskedChangeEngine = new PuzzleEngine({ seed: 21_900 });
+maskedChangeEngine.setBoardFromCodes(['RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
+maskedChangeEngine.setRngState(21_900);
+maskedChangeEngine.setOrbState(0, 3, { locked: true });
+maskedChangeEngine.setOrbState(3, 5, { enhancementPower: 0.5, blockFlags: 0x80000 });
+const maskedDryState = maskedChangeEngine.rng.state;
+assert.equal(maskedChangeEngine.doPoisonBlockN2(
+  2,
+  (1 << 6) | (1 << 7),
+  (1 << 5) | (1 << 7) | (1 << 8),
+  true,
+), 23);
+assert.equal(maskedChangeEngine.rng.state, maskedDryState);
+assert.equal(maskedChangeEngine.doPoisonBlockN2(
+  2,
+  (1 << 6) | (1 << 7),
+  (1 << 5) | (1 << 7) | (1 << 8),
+  false,
+  false,
+), 4);
+assert.equal(maskedChangeEngine.rng.state, 3_803_934_822);
+assert.equal(maskedChangeEngine.board[3][5].type, 'jammer');
+assert.equal(maskedChangeEngine.board[3][5].enhancementPower, 0);
+assert.equal(maskedChangeEngine.board[3][5].blockFlags & 0x80000, 0x80000);
+assert.equal(maskedChangeEngine.board[0][3].type, 'water');
+assert.equal(maskedChangeEngine.board[2][4].type, 'poison');
+assert.equal(maskedChangeEngine.board[0][5].type, 'poison');
+
+const mappedChangeEngine = new PuzzleEngine({ seed: 21_900 });
+mappedChangeEngine.setBoardFromCodes(['RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
+mappedChangeEngine.setRngState(21_900);
+const selectedRows = new Uint16Array(5);
+assert.equal(mappedChangeEngine.doPoisonBlockN2(2, 0xc0, 0xffff_ffff, false, true, selectedRows), 4);
+assert.deepEqual([...selectedRows], [0x08, 0, 0x21, 0, 0x08]);
+assert.equal(mappedChangeEngine.board[2][5].type, 'jammer');
+assert.equal(mappedChangeEngine.board[0][3].type, 'jammer');
+assert.equal(mappedChangeEngine.board[2][0].type, 'poison');
+assert.equal(mappedChangeEngine.board[4][3].type, 'poison');
+
+const naturalMaskedChangeEngine = new PuzzleEngine({ seed: 21_900 });
+naturalMaskedChangeEngine.setBoardFromCodes(['RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD']);
+naturalMaskedChangeEngine.setRngState(21_900);
+naturalMaskedChangeEngine.setOrbState(2, 5, { enhancementPower: 0.5 });
+assert.equal(naturalMaskedChangeEngine.doPoisonBlockN2(1, 1, 0), 1);
+assert.equal(naturalMaskedChangeEngine.board[2][5].type, 'fire');
+assert.equal(naturalMaskedChangeEngine.board[2][5].enhancementPower, 0.5);
 assert.equal(specialLockEngine.doLockDropBits(0x3c0, 4, 0xbeef), true);
 for (let column = 0; column < 4; column += 1) {
   const orb = specialLockEngine.board[0][column];
