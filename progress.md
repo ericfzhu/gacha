@@ -2,6 +2,25 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 current-HP gravity
+
+- Identified enemy skill type `50` as fixed current-HP gravity: late handler
+  `0x62974c`, setup `0x621530`, and unconditional condition `0x61a630`.
+  Definition `+0x10` is copied to runtime `sMONSTER+0x678` as a signed damage
+  percentage; setup consumes no RNG.
+- Execution reads protected player current HP. Exactly 100% uses that value
+  directly; other positive values multiply and divide in binary32 before
+  `izMathRound` applies half-away-from-zero rounding. The positive result is
+  passed as `_setEnemyAttackMain`'s fixed-damage override.
+- Added authored/runtime decoders, binary32 boundary fixtures, unconditional
+  new-AI selection, pending-damage-aware enemy-turn execution, state reporting,
+  browser coverage, and exact dispatch/setup/condition plus `izMathRound`
+  anchors. An admitted immediate AI skill consumes one probability draw only.
+- Confirmed neighboring type `51` is a rejected control/sentinel boundary: its
+  condition returns zero, setup clears the selected skill, and its dispatch is
+  the common no-effect finalizer.
+- Next: inspect the remaining neighboring attack and status types.
+
 ## 2026-08-14 enemy resurrection
 
 - Identified enemy skill type `52` as resurrection: late handler `0x6297ac`,

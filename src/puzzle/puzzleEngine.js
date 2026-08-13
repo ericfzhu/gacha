@@ -33,6 +33,7 @@ import {
   tracePadPointerCells,
 } from './padCoreRules.js';
 import {
+  PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
   PAD_ENEMY_SKILL_REVIVE_ENEMY,
   PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
   PAD_ENEMY_SKILL_BIND_LEADER_HELPER,
@@ -59,6 +60,7 @@ import {
   decodePadEnemySkillRuntime,
   normalizePadEnemySkillRecord,
   padEnemySkillAttack,
+  padEnemySkillCurrentHpGravity,
   padEnemySkillPlayerHeal,
   padEnemySkillReviveHp,
 } from './padEnemySkills.js';
@@ -846,7 +848,9 @@ export class PuzzleEngine {
         const skill = this.takeEnemySkill(index);
         if (skill) {
           this.applyEnemySkillRecord(skill, index);
-          const damage = padEnemySkillAttack(enemy.attack, skill.attackWithSkillValue);
+          const damage = skill.kind === 'currentHpGravity'
+            ? padEnemySkillCurrentHpGravity(this.player.hp - total, skill.damagePercent)
+            : padEnemySkillAttack(enemy.attack, skill.attackWithSkillValue);
           total += damage;
           this.lastEnemyActions.push({
             enemy: index,
@@ -1199,6 +1203,10 @@ export class PuzzleEngine {
     const materialized = this.materializeEnemySkillRecord(record);
     const skill = normalizePadEnemySkillRecord(materialized);
     this.lastEnemySkill = skill;
+    if (skill.supported && skill.kind === 'currentHpGravity') {
+      this.message = `Enemy gravity deals ${skill.damagePercent}% of current HP.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'reviveEnemy') {
       const target = this.enemies[skill.targetEnemyIndex];
       if (!target || target.hp > 0) return false;
@@ -1377,6 +1385,7 @@ export class PuzzleEngine {
       const definition = definitionsById.get(slot.skillId);
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
       if (![
+        PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
         PAD_ENEMY_SKILL_REVIVE_ENEMY,
         PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
         PAD_ENEMY_SKILL_BIND_LEADER_HELPER,

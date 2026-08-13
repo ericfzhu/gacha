@@ -1,3 +1,4 @@
+export const PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY = 50;
 export const PAD_ENEMY_SKILL_REVIVE_ENEMY = 52;
 export const PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB = 53;
 export const PAD_ENEMY_SKILL_BIND_LEADER_HELPER = 54;
@@ -85,6 +86,15 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
     ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
     : null;
+  if (type === PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY) {
+    return Object.freeze({
+      type,
+      kind: 'currentHpGravity',
+      supported: true,
+      damagePercent: definition.getInt32(0x10, true),
+      attackWithSkillValue,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_REVIVE_ENEMY) {
     return Object.freeze({
       type,
@@ -358,6 +368,19 @@ export function padEnemySkillReviveHp(maxHp, revivePercent) {
   return Math.trunc(scaled + (scaled < 0 ? -0.5 : 0.5));
 }
 
+// Type 50 reads current player HP, scales it by runtime +0x678 in binary32,
+// and calls izMathRound. Its 100% fast path returns current HP directly.
+export function padEnemySkillCurrentHpGravity(currentHp, damagePercent) {
+  const current = Math.max(0, Math.trunc(Number(currentHp) || 0));
+  const percent = Math.trunc(Number(damagePercent) || 0);
+  if (percent <= 0 || current <= 0) return 0;
+  if (percent === 100) return current;
+  const scaled = Math.fround(
+    Math.fround(Math.fround(current) * Math.fround(percent)) / Math.fround(100),
+  );
+  return Math.max(0, Math.trunc(Math.fround(scaled + 0.5)));
+}
+
 // _doEnemySkill's second jump table dispatches signed type 128 to 0x62a854.
 // That handler reads the selected definition type at +0x04, the active
 // monster's packed duration at +0x678, and its chance parameter at +0x67c.
@@ -383,6 +406,18 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
   );
   const monster = new DataView(monsterBytes.buffer, monsterBytes.byteOffset, monsterBytes.byteLength);
   const type = definition.getInt16(PAD_ENEMY_SKILL_RUNTIME_LAYOUT.definitionTypeOffset, true);
+  if (type === PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY) {
+    return Object.freeze({
+      type,
+      kind: 'currentHpGravity',
+      supported: true,
+      damagePercent: monster.getInt32(0x678, true),
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_REVIVE_ENEMY) {
     requireLength(definitionBytes, 0x14, 'PAD enemy-skill definition');
     return Object.freeze({
@@ -463,6 +498,14 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
 
 export function normalizePadEnemySkillRecord(record) {
   const type = Math.trunc(Number(record?.type));
+  if (type === PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY || record?.kind === 'currentHpGravity') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
+      kind: 'currentHpGravity',
+      supported: true,
+      damagePercent: Math.trunc(Number(record?.damagePercent) || 0),
+    });
+  }
   if (type === PAD_ENEMY_SKILL_REVIVE_ENEMY || record?.kind === 'reviveEnemy') {
     const targetPresent = record?.targetEnemyIndex !== undefined
       && record?.targetEnemyIndex !== null;

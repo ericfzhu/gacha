@@ -24,6 +24,10 @@ const HEAL_PLAYER_ENEMY_SKILL_TYPE = 55;
 const HEAL_PLAYER_HANDLER = 0x629900;
 const HEAL_PLAYER_SETUP_HANDLER = 0x620040;
 const HEAL_PLAYER_CONDITION_HANDLER = 0x61aa74;
+const CURRENT_HP_GRAVITY_ENEMY_SKILL_TYPE = 50;
+const CURRENT_HP_GRAVITY_HANDLER = 0x62974c;
+const CURRENT_HP_GRAVITY_SETUP_HANDLER = 0x621530;
+const CURRENT_HP_GRAVITY_CONDITION_HANDLER = 0x61a630;
 const REVIVE_ENEMY_SKILL_TYPE = 52;
 const REVIVE_ENEMY_HANDLER = 0x6297ac;
 const REVIVE_ENEMY_SETUP_HANDLER = 0x620350;
@@ -163,6 +167,7 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['combat', 'checkMonsterAbsorb', '_ZN9cGAMEMAIN18_checkMonterAbsorbEv', 0x6239dc],
   ['combat', 'calcFinalDamage', '_ZN9cGAMEMAIN16_calcFinalDamageEbPK5sCARDPNS0_7sATKINFExRiP8sMONSTERiRbS8_S8_', 0x623b40],
   ['math', 'roundDouble', 'izMathRoundD', 0x36b2ec],
+  ['math', 'roundFloat', 'izMathRound', 0x36a9bc],
   ['math', 'signedIntMultiplyAdd', 'izMathSint32MulAdd', 0x36b3fc],
   ['combat', 'setEnemyAttackMain', '_ZN9cGAMEMAIN20__setEnemyAttackMainEP8sMONSTERbfi', 0x62c2cc],
   ['match', 'checkCombos', '_ZN9cGAMEMAIN12_checkCombosEii', 0x659d24],
@@ -264,6 +269,27 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : healPlayerSetupTarget === HEAL_PLAYER_SETUP_HANDLER;
   const healPlayerConditionMatches = healPlayerConditionTarget === null
     ? null : healPlayerConditionTarget === HEAL_PLAYER_CONDITION_HANDLER;
+  const currentHpGravityDispatchTarget = resolveEnemySkillTarget(
+    CURRENT_HP_GRAVITY_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const currentHpGravitySetupTarget = resolveEnemySkillTarget(
+    CURRENT_HP_GRAVITY_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const currentHpGravityConditionTarget = resolveEnemySkillTarget(
+    CURRENT_HP_GRAVITY_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const currentHpGravityDispatchMatches = currentHpGravityDispatchTarget === null
+    ? null : currentHpGravityDispatchTarget === CURRENT_HP_GRAVITY_HANDLER;
+  const currentHpGravitySetupMatches = currentHpGravitySetupTarget === null
+    ? null : currentHpGravitySetupTarget === CURRENT_HP_GRAVITY_SETUP_HANDLER;
+  const currentHpGravityConditionMatches = currentHpGravityConditionTarget === null
+    ? null : currentHpGravityConditionTarget === CURRENT_HP_GRAVITY_CONDITION_HANDLER;
   const reviveEnemyDispatchTarget = resolveEnemySkillTarget(
     REVIVE_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -931,6 +957,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       healPlayerDispatchMatches21_9: healPlayerDispatchMatches,
       healPlayerSetupMatches21_9: healPlayerSetupMatches,
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
+      currentHpGravityDispatchMatches21_9: currentHpGravityDispatchMatches,
+      currentHpGravitySetupMatches21_9: currentHpGravitySetupMatches,
+      currentHpGravityConditionMatches21_9: currentHpGravityConditionMatches,
       reviveEnemyDispatchMatches21_9: reviveEnemyDispatchMatches,
       reviveEnemySetupMatches21_9: reviveEnemySetupMatches,
       reviveEnemyConditionMatches21_9: reviveEnemyConditionMatches,
@@ -1013,6 +1042,7 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       monsterAttackWithSkillOffset: 'sMONSTER+0x7e8 (uint32 converted to float32 / 100)',
       monsterDurationOffset: 'sMONSTER+0x678 (packed low 10 bits)',
       monsterHealPercentOffset: 'sMONSTER+0x678 (type 55 signed int32 percent)',
+      monsterCurrentHpGravityPercentOffset: 'sMONSTER+0x678 (type 50 signed int32 percent)',
       monsterAttributeAbsorbDurationOffset: 'sMONSTER+0x890 (type 53 TCHKVAL<int16>)',
       monsterAttributeAbsorbMaskOffset: 'sMONSTER+0x880 (type 53 TCHKVAL<int16>)',
       monsterBindTargetMaskOffset: 'sMONSTER+0x674 (type 54 uint16 party mask)',
@@ -1036,6 +1066,16 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       healPlayerConditionTarget: healPlayerConditionTarget === null
         ? null : hex(healPlayerConditionTarget),
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
+      currentHpGravityType: CURRENT_HP_GRAVITY_ENEMY_SKILL_TYPE,
+      currentHpGravityDispatchTarget: currentHpGravityDispatchTarget === null
+        ? null : hex(currentHpGravityDispatchTarget),
+      currentHpGravityDispatchMatches21_9: currentHpGravityDispatchMatches,
+      currentHpGravitySetupTarget: currentHpGravitySetupTarget === null
+        ? null : hex(currentHpGravitySetupTarget),
+      currentHpGravitySetupMatches21_9: currentHpGravitySetupMatches,
+      currentHpGravityConditionTarget: currentHpGravityConditionTarget === null
+        ? null : hex(currentHpGravityConditionTarget),
+      currentHpGravityConditionMatches21_9: currentHpGravityConditionMatches,
       reviveEnemyType: REVIVE_ENEMY_SKILL_TYPE,
       reviveEnemyDispatchTarget: reviveEnemyDispatchTarget === null
         ? null : hex(reviveEnemyDispatchTarget),
@@ -1295,6 +1335,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || blackFallDispatchMatches === false || blackFallSetupMatches === false
     || healPlayerDispatchMatches === false || healPlayerSetupMatches === false
     || healPlayerConditionMatches === false
+    || currentHpGravityDispatchMatches === false || currentHpGravitySetupMatches === false
+    || currentHpGravityConditionMatches === false
     || reviveEnemyDispatchMatches === false || reviveEnemySetupMatches === false
     || reviveEnemyConditionMatches === false
     || attributeAbsorbDispatchMatches === false || attributeAbsorbSetupMatches === false

@@ -1,5 +1,6 @@
 import { padLcgStep } from './padCoreRules.js';
 import {
+  PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
   PAD_ENEMY_SKILL_REVIVE_ENEMY,
   PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
   PAD_ENEMY_SKILL_BIND_LEADER_HELPER,
@@ -118,6 +119,7 @@ function normalizeDefinitionMap(definitions) {
 
 function isStaticallyEligible(definition, state) {
   if (!definition.effect.supported || ![
+    PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
     PAD_ENEMY_SKILL_REVIVE_ENEMY,
     PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
     PAD_ENEMY_SKILL_BIND_LEADER_HELPER,
@@ -153,6 +155,9 @@ function evaluateCondition(definition, state, rngState) {
   if (definition.effect.type === PAD_ENEMY_SKILL_BLACK_FALL) {
     const eligible = !state.blackFallActive;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY) {
+    return { eligible: true, probabilityScale: 1, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_REVIVE_ENEMY) {
     const eligible = state.enemies.some((enemy) => Number(enemy?.hp) <= 0);

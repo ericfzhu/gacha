@@ -946,6 +946,24 @@ try {
     engine.setRngState(21_900);
     const rejectedHealPlayerSkill = engine.takeEnemySkill(0);
     const rejectedHealPlayerState = engine.snapshot();
+    const currentHpGravityMonsterDefinition = enemyAiMonsterDefinition.slice();
+    new DataView(currentHpGravityMonsterDefinition.buffer).setUint32(0xec, 9_023, true);
+    const currentHpGravityDefinition = sourceToPoisonDefinition.slice();
+    const currentHpGravityView = new DataView(currentHpGravityDefinition.buffer);
+    currentHpGravityView.setUint32(0x00, 9_023, true);
+    currentHpGravityView.setInt16(0x04, 50, true);
+    currentHpGravityView.setInt32(0x10, 25, true);
+    engine.setEnemyAiDefinitionPool(
+      0,
+      currentHpGravityMonsterDefinition,
+      [currentHpGravityDefinition],
+    );
+    engine.player.hp = 12_000;
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const selectedCurrentHpGravityAi = engine.snapshot();
     const reviveEnemyMonsterDefinition = enemyAiMonsterDefinition.slice();
     new DataView(reviveEnemyMonsterDefinition.buffer).setUint32(0xec, 9_022, true);
     const reviveEnemyDefinition = sourceToPoisonDefinition.slice();
@@ -1087,6 +1105,7 @@ try {
       rejectedScaledSourceToPoisonSkill, rejectedScaledSourceToPoisonState,
       selectedSourceToMortalPoisonAi, selectedSourceToMortalPoisonCount,
       selectedHealPlayerAi, rejectedHealPlayerSkill, rejectedHealPlayerState,
+      selectedCurrentHpGravityAi,
       selectedReviveEnemyAi, rejectedReviveEnemySkill, rejectedReviveEnemyState,
       selectedBindLeaderHelperAi,
       rejectedBindLeaderHelperSkill, rejectedBindLeaderHelperState,
@@ -1325,6 +1344,12 @@ try {
     poisonBlockSample.selectedHealPlayerAi.enemies?.[0]?.enemyAiBudget !== 80 ||
     poisonBlockSample.rejectedHealPlayerSkill !== null ||
     poisonBlockSample.rejectedHealPlayerState.rngState !== 21_900 ||
+    poisonBlockSample.selectedCurrentHpGravityAi.player.hp !== 9_000 ||
+    poisonBlockSample.selectedCurrentHpGravityAi.lastEnemyActions?.[0]?.skill?.type !== 50 ||
+    poisonBlockSample.selectedCurrentHpGravityAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_023 ||
+    poisonBlockSample.selectedCurrentHpGravityAi.lastEnemyActions?.[0]?.damage !== 3_000 ||
+    poisonBlockSample.selectedCurrentHpGravityAi.rngState !== advanceLcg(21_900, 1) ||
+    poisonBlockSample.selectedCurrentHpGravityAi.enemies?.[0]?.enemyAiBudget !== 80 ||
     poisonBlockSample.selectedReviveEnemyAi.lastEnemyActions?.[0]?.skill?.type !== 52 ||
     poisonBlockSample.selectedReviveEnemyAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_022 ||
     poisonBlockSample.selectedReviveEnemyAi.lastEnemyActions?.[0]?.skill?.targetEnemyIndex !== 1 ||

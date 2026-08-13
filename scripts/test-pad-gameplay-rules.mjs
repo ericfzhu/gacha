@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
+  PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
   PAD_ENEMY_SKILL_REVIVE_ENEMY,
   PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
   PAD_ENEMY_SKILL_BIND_LEADER_HELPER,
@@ -26,6 +27,7 @@ import {
   decodePadEnemySkillDefinition,
   decodePadEnemySkillRuntime,
   padEnemySkillAttack,
+  padEnemySkillCurrentHpGravity,
   padEnemySkillPlayerHeal,
   padEnemySkillPlayerHpCondition,
   padEnemySkillReviveHp,
@@ -330,6 +332,10 @@ assert.equal(padEnemySkillPlayerHpCondition(3_059, 12_000, 25), true);
 assert.equal(padEnemySkillPlayerHpCondition(3_060, 12_000, 25), false);
 assert.equal(padEnemySkillReviveHp(76_001, 50), 38_001);
 assert.equal(padEnemySkillReviveHp(76_000, 37), 28_120);
+assert.equal(padEnemySkillCurrentHpGravity(12_000, 25), 3_000);
+assert.equal(padEnemySkillCurrentHpGravity(12_000, 100), 12_000);
+assert.equal(padEnemySkillCurrentHpGravity(16_777_219, 33), 5_536_483);
+assert.equal(padEnemySkillCurrentHpGravity(12_000, -25), 0);
 authoredBlackFallView.setInt32(0x44, 0, true);
 
 const enemyAiMonsterDefinition = new Uint8Array(0x2ec);
@@ -709,6 +715,33 @@ assert.deepEqual(
     supported: true,
     thresholdPercent: 25,
     healPercent: 37,
+    attackWithSkillValue: 0,
+  },
+);
+const enemyAiCurrentHpGravityDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiCurrentHpGravityView = new DataView(enemyAiCurrentHpGravityDefinition.buffer);
+enemyAiCurrentHpGravityView.setUint32(0x00, 9_023, true);
+enemyAiCurrentHpGravityView.setInt16(0x04, PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY, true);
+enemyAiCurrentHpGravityView.setInt32(0x10, 25, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiCurrentHpGravityDefinition), {
+  type: 50,
+  kind: 'currentHpGravity',
+  supported: true,
+  damagePercent: 25,
+  attackWithSkillValue: 0,
+});
+const currentHpGravityMonsterRuntime = new Uint8Array(0x680);
+new DataView(currentHpGravityMonsterRuntime.buffer).setInt32(0x678, 37, true);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(
+    enemyAiCurrentHpGravityDefinition,
+    currentHpGravityMonsterRuntime,
+  ),
+  {
+    type: 50,
+    kind: 'currentHpGravity',
+    supported: true,
+    damagePercent: 37,
     attackWithSkillValue: 0,
   },
 );
@@ -2152,6 +2185,37 @@ rejectedHealPlayerEngine.player.hp = 3_060;
 rejectedHealPlayerEngine.setRngState(21_900);
 assert.equal(rejectedHealPlayerEngine.takeEnemySkill(0), null);
 assert.equal(rejectedHealPlayerEngine.rng.state, 21_900);
+const currentHpGravityMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(currentHpGravityMonsterDefinition.buffer).setUint32(0xec, 9_023, true);
+const selectedCurrentHpGravityEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: currentHpGravityMonsterDefinition,
+    skillDefinitions: [enemyAiCurrentHpGravityDefinition],
+  }],
+});
+selectedCurrentHpGravityEngine.setRngState(21_900);
+selectedCurrentHpGravityEngine.enemies[0].counter = 1;
+selectedCurrentHpGravityEngine.enemies[1].counter = 99;
+selectedCurrentHpGravityEngine.resolveEnemyTurn();
+const selectedCurrentHpGravityState = selectedCurrentHpGravityEngine.snapshot();
+assert.equal(selectedCurrentHpGravityState.player.hp, 9_000);
+assert.equal(selectedCurrentHpGravityState.lastEnemyActions[0].skill.type, 50);
+assert.equal(selectedCurrentHpGravityState.lastEnemyActions[0].skill.skillId, 9_023);
+assert.equal(selectedCurrentHpGravityState.lastEnemyActions[0].damage, 3_000);
+assert.equal(selectedCurrentHpGravityState.enemies[0].enemyAiBudget, 80);
+assert.equal(selectedCurrentHpGravityEngine.rng.state, padLcgStep(21_900).state);
+const sequentialCurrentHpGravityEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemySkillQueues: [[enemyAiCurrentHpGravityDefinition], [enemyAiCurrentHpGravityDefinition]],
+});
+sequentialCurrentHpGravityEngine.player.hp = 12_000;
+sequentialCurrentHpGravityEngine.enemies[0].counter = 1;
+sequentialCurrentHpGravityEngine.enemies[1].counter = 1;
+sequentialCurrentHpGravityEngine.resolveEnemyTurn();
+assert.equal(sequentialCurrentHpGravityEngine.lastEnemyActions[0].damage, 3_000);
+assert.equal(sequentialCurrentHpGravityEngine.lastEnemyActions[1].damage, 2_250);
+assert.equal(sequentialCurrentHpGravityEngine.player.hp, 6_750);
 const reviveEnemyMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(reviveEnemyMonsterDefinition.buffer).setUint32(0xec, 9_022, true);
 const selectedReviveEnemyEngine = new PuzzleEngine({

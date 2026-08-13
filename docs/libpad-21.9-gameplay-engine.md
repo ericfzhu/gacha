@@ -647,6 +647,33 @@ gate. An eligible fallback retains its authored `sENEAI+5` weight without
 scaling. The browser selector exposes this as `probabilityScale` while keeping
 the already decoded condition-owned RNG state transitions intact.
 
+Enemy skill type `50` deals fixed damage equal to a percentage of the player's
+current HP. Its late dispatch entry targets `0x62974c`, setup targets `0x621530`,
+and its unconditional AI condition targets `0x61a630`. Setup copies signed
+definition integer `+0x10` to runtime `sMONSTER+0x678`, marks the monster's
+prepared action state, and consumes no RNG.
+
+Execution reads protected player current HP. A runtime percentage of exactly
+100 bypasses arithmetic and uses the current value directly. Otherwise it
+converts current HP and the signed percentage to binary32, multiplies, divides
+by binary32 100, and calls `izMathRound` (`0x36a9bc`), whose half values round
+away from zero. `_setEnemyAttackMain` receives the positive result through its
+fixed-damage integer override while its ordinary attack multiplier is zero.
+Nonpositive results therefore produce no damage rather than falling back to the
+enemy's base attack.
+
+The browser preserves every binary32 boundary and, when multiple enemies act,
+computes later current-HP gravity against HP after already pending damage in
+that enemy phase. An immediate new-AI selection consumes its one probability
+LCG draw and no setup draw. Raw runtime decoding reads the materialized percent
+from `+0x678`.
+
+Neighboring type `51` is not exposed as a gameplay effect. Its condition entry
+at `0x61c01c` returns the routine's initialized zero, setup `0x621c94` writes
+`-1` to the selected-skill index and returns `-1.0`, and dispatch points to the
+common no-effect finalizer `0x62be50`. The browser continues to reject that
+control/sentinel record instead of inventing visible behavior.
+
 Enemy skill type `52` resurrects one unavailable or dead enemy monster. Its
 late dispatch entry targets `0x6297ac`, setup targets `0x620350`, and AI
 condition targets `0x61a9d0`. Signed definition integer `+0x10` is the
