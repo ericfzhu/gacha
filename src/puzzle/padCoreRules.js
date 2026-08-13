@@ -195,10 +195,16 @@ export function tracePadPointerCells(
   return cells;
 }
 
-function matchShape(cells) {
+function matchShape(cells, rowCount, columnCount) {
   const coordinates = new Set(cells.map(({ row, column }) => `${row}:${column}`));
   const rows = new Set(cells.map(({ row }) => row));
   const columns = new Set(cells.map(({ column }) => column));
+  const isHorizontal = rows.size === 1;
+  const isVertical = columns.size === 1;
+  const isRow = [...rows].some((row) =>
+    Array.from({ length: columnCount }, (_, column) => coordinates.has(`${row}:${column}`)).every(Boolean));
+  const isColumn = [...columns].some((column) =>
+    Array.from({ length: rowCount }, (_, row) => coordinates.has(`${row}:${column}`)).every(Boolean));
   const isBox = cells.length === 9 && rows.size === 3 && columns.size === 3 &&
     [...rows].every((row) => [...columns].every((column) => coordinates.has(`${row}:${column}`)));
   const isCross = cells.length === 5 && cells.some(({ row, column }) =>
@@ -213,7 +219,7 @@ function matchShape(cells) {
     ];
     return arms.some((offsets) => offsets.every(([dr, dc]) => coordinates.has(`${row + dr}:${column + dc}`)));
   });
-  return { isRow: rows.size === 1, isColumn: columns.size === 1, isBox, isCross, isL };
+  return { isHorizontal, isVertical, isRow, isColumn, isBox, isCross, isL };
 }
 
 export function findPadMatches(board, getType = (cell) => cell?.type, minimum = PAD_MINIMUM_MATCH) {
@@ -275,7 +281,7 @@ export function findPadMatches(board, getType = (cell) => cell?.type, minimum = 
         cells,
         size: cells.length,
         isMassAttack: cells.length >= PAD_MASS_ATTACK_ORBS,
-        ...matchShape(cells),
+        ...matchShape(cells, rowCount, columnCount),
       });
     }
   }

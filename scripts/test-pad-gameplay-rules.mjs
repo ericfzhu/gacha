@@ -64,6 +64,23 @@ assert.equal(matches[0].size, 8);
 assert.equal(matches[0].isMassAttack, true);
 assert.equal(matches[0].isRow, false);
 
+const horizontalMatches = findPadMatches([
+  ['R', 'R', 'R', 'B', 'G', 'L'],
+  ['B', 'G', 'L', 'D', 'H', 'R'],
+  ['G', 'L', 'D', 'H', 'R', 'B'],
+], (cell) => cell);
+assert.equal(horizontalMatches[0].isHorizontal, true);
+assert.equal(horizontalMatches[0].isRow, false);
+
+const fullRowMatches = findPadMatches([
+  ['R', 'R', 'R', 'R', 'R', 'R'],
+  ['B', 'G', 'R', 'D', 'H', 'B'],
+  ['G', 'L', 'R', 'H', 'B', 'G'],
+], (cell) => cell);
+assert.equal(fullRowMatches[0].size, 8);
+assert.equal(fullRowMatches[0].isHorizontal, false);
+assert.equal(fullRowMatches[0].isRow, true);
+
 assert.equal(padOrbMatchMultiplier(3), 1);
 assert.equal(padOrbMatchMultiplier(5), 1.5);
 assert.equal(padComboMultiplier(1), 1);

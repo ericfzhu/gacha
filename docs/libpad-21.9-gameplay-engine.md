@@ -124,7 +124,10 @@ layout through its board-size control.
 The native combo list is a fixed list of 88-byte `sCOMBO` records with linked-list
 indices stored around game-work offset `0x57a8`. Version 21.9 also records modern
 shape metadata and passive-skill flags. The browser rules layer now returns mass
-attack, row, column, cross, L, and 3x3 box metadata for each connected match.
+attack, full-row, full-column, cross, L, and 3x3 box metadata for each connected
+match. Horizontal/vertical orientation is tracked separately: an ordinary
+three-orb horizontal match is not incorrectly reported as a full row, while a
+full row remains flagged if a perpendicular marked run joins the same combo.
 
 Native block types `0`–`5` are fire, water, wood, light, dark, and heart;
 `_doPoisonBlockN` explicitly treats types `7` and `8` as the two poison classes,
