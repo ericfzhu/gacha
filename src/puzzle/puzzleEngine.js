@@ -34,6 +34,8 @@ import {
 } from './padCoreRules.js';
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
+  PAD_ENEMY_SKILL_SOURCE_TO_POISON,
+  PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON,
   PAD_ENEMY_SKILL_POISON_BLOCKS,
   PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS,
   PAD_ENEMY_SKILL_POISON_BLOCK_N_COUNTED,
@@ -902,6 +904,21 @@ export class PuzzleEngine {
             >= definition.effect.count;
           return { eligible, rngState: this.rng.state };
         }
+        if (definition.effect.kind === 'sourceToPoison') {
+          const sourceType = definition.effect.sourceType;
+          const sourceMask = sourceType === 7 || sourceType === 8
+            ? 1 << 7
+            : sourceType >= 0 && sourceType < 16 ? 1 << sourceType : 0;
+          const count = sourceMask === 0 ? 0 : this.countBlockBits(sourceMask);
+          const probabilityScale = count < 1
+            ? 0
+            : Math.fround(Math.min(1, Math.fround(Math.fround(count) / Math.fround(3))));
+          return {
+            eligible: probabilityScale > 0,
+            probabilityScale,
+            rngState: this.rng.state,
+          };
+        }
         return { eligible: false, rngState: this.rng.state };
       },
     });
@@ -1033,6 +1050,16 @@ export class PuzzleEngine {
   applyEnemySkillRecord(record) {
     const skill = normalizePadEnemySkillRecord(record);
     this.lastEnemySkill = skill;
+    if (skill.supported && skill.kind === 'sourceToPoison') {
+      const effectFlags = this.doBlockSwap(
+        skill.sourceType,
+        skill.destinationType,
+        0,
+        { poisonResist: false },
+      );
+      this.message = `Enemy converted one orb color to poison (effect ${effectFlags}).`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'blockMinus') {
       const changed = this.doBlockMinus(
         true,
@@ -1157,6 +1184,8 @@ export class PuzzleEngine {
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
       if (![
         PAD_ENEMY_SKILL_BLACK_FALL,
+        PAD_ENEMY_SKILL_SOURCE_TO_POISON,
+        PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON,
         PAD_ENEMY_SKILL_POISON_BLOCKS,
         PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS,
         PAD_ENEMY_SKILL_POISON_BLOCK_N_COUNTED,
@@ -1517,6 +1546,27 @@ export class PuzzleEngine {
     const applied = padResolveBlockSwapPassive(resolved.assignments, initialEffectFlags, blockFlag);
     this.applyBlockSwapAssignments(applied.assignments);
     return applied.effectFlags;
+  }
+
+  // _doBlockSwap (0x6afa84) is the deterministic source-type writer used by
+  // enemy skill types 56/58. Native source 7 or 8 denotes the whole poison
+  // family; all other sources match exactly. Locked cells reject the write and
+  // no LCG state is consumed.
+  doBlockSwap(sourceType, destinationType, initialEffectFlags = 0, blockFlag = null) {
+    const source = Math.trunc(Number(sourceType));
+    const selectedRows = this.board.map((row) => row.reduce((bits, orb, column) => {
+      const type = ORB_TYPES.findIndex((candidate) => candidate.id === orb.type);
+      const matches = source === 7 || source === 8
+        ? type === 7 || type === 8
+        : type === source;
+      return matches ? bits | (1 << column) : bits;
+    }, 0));
+    return this.doBitReplace(
+      selectedRows,
+      destinationType,
+      initialEffectFlags,
+      blockFlag,
+    );
   }
 
   doBlockSwap5(sourceTypeMask, destinationTypeMask, initialEffectFlags = 0, blockFlag = null) {

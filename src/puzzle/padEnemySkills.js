@@ -1,4 +1,6 @@
+export const PAD_ENEMY_SKILL_SOURCE_TO_POISON = 56;
 export const PAD_ENEMY_SKILL_POISON_BLOCKS = 57;
+export const PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON = 58;
 export const PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS = 59;
 export const PAD_ENEMY_SKILL_POISON_BLOCK_N_COUNTED = 60;
 export const PAD_ENEMY_SKILL_MORTAL_POISON_BLOCK_N_COUNTED = 61;
@@ -78,6 +80,19 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
     ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
     : null;
+  if (
+    type === PAD_ENEMY_SKILL_SOURCE_TO_POISON
+    || type === PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON
+  ) {
+    return Object.freeze({
+      type,
+      kind: 'sourceToPoison',
+      supported: true,
+      sourceType: definition.getInt32(0x10, true),
+      destinationType: type === PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON ? 8 : 7,
+      attackWithSkillValue,
+    });
+  }
   if (
     type === PAD_ENEMY_SKILL_POISON_BLOCKS
     || type === PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS
@@ -290,6 +305,23 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
 
 export function normalizePadEnemySkillRecord(record) {
   const type = Math.trunc(Number(record?.type));
+  if (
+    type === PAD_ENEMY_SKILL_SOURCE_TO_POISON
+    || type === PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON
+    || record?.kind === 'sourceToPoison'
+  ) {
+    const sourcePoisonType = type === PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON
+      || Number(record?.destinationType) === 8
+      ? PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON
+      : PAD_ENEMY_SKILL_SOURCE_TO_POISON;
+    return Object.freeze({
+      type: sourcePoisonType,
+      kind: 'sourceToPoison',
+      supported: true,
+      sourceType: Math.trunc(Number(record?.sourceType) || 0),
+      destinationType: sourcePoisonType === PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON ? 8 : 7,
+    });
+  }
   if (
     type === PAD_ENEMY_SKILL_POISON_BLOCKS
     || type === PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS

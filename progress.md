@@ -2,6 +2,24 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 source-color poison writers and scaled AI conditions
+
+- Mapped enemy skill types `56`/`58` to shared late handler `0x62917c`, setup
+  `0x61ff08`, and condition `0x61a63c`; authored `+0x10` is the source orb type,
+  while the type ID chooses poison 7 or mortal poison 8.
+- Traced the condition float through `_chooseEnemyAiNew`: immediate probability
+  is multiplied by `min(source count / 3, 1)` in binary32, while fallback uses
+  only positive eligibility and retains the authored weight.
+- Ported deterministic `_doBlockSwap` source-type conversion. It consumes no
+  execution RNG, rejects locked writes, clears incompatible special state, and
+  treats source 7/8 as the combined poison family just like native.
+- Pure fixtures cover full-chance selection, one-orb scaled rejection, unscaled
+  fallback admission, locked cells counting for AI but rejecting mutation, and
+  both destinations. Exact restored-table inspection, build, exhaustive browser
+  regression, generic gameplay client, state output, and visual captures pass.
+- Next: audit neighboring types `54/55` or `62/63`, prioritizing distinct board
+  mechanics and preserving any non-boolean condition return values.
+
 ## 2026-08-14 count-gated individual poison writers
 
 - Mapped types `60` and `61` to shared late handler `0x6291e0`, setup

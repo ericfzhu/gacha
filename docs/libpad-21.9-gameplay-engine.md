@@ -635,8 +635,40 @@ cap and the selected skill's cost is subtracted. For type 128,
 `_chooseEnemyAiSub` (`0x61a58c`) returns one only while black-fall is inactive,
 so an active copy cannot be selected again. `setEnemyAiDefinitionPool` wires
 this raw record path into enemy turns and reports the chosen skill ID, budget,
-and RNG state. Other condition callbacks, flow-control records, and the legacy
-selector are rejected explicitly until decoded rather than approximated.
+and RNG state. Remaining condition callbacks, flow-control records, and the
+legacy selector are rejected explicitly until decoded rather than approximated.
+
+The selector does not reduce every condition callback to a boolean. In the
+immediate path at `0x61d844`, `_chooseEnemyAiSub` returns a binary32 multiplier;
+native multiplies the truncated authored probability by that value, clamps the
+result to 10,000, and then performs its LCG test. In the fallback path at
+`0x61d96c`, the same return is used only as a greater-than-zero eligibility
+gate. An eligible fallback retains its authored `sENEAI+5` weight without
+scaling. The browser selector exposes this as `probabilityScale` while keeping
+the already decoded condition-owned RNG state transitions intact.
+
+Enemy skill types `56` and `58` are deterministic source-color poison writers.
+Both resolve through late dispatch handler `0x62917c`, setup `0x61ff08`, and AI
+condition `0x61a63c`. Definition `+0x10` is the signed source orb type copied to
+`sMONSTER+0x678`. Type 56 writes poison type 7; type 58 writes mortal poison
+type 8.
+
+The condition calls `_countBlockType` (`0x65213c`) and returns
+`min(sourceCellCount / 3, 1)` in binary32, or zero when no source cell exists.
+Consequently one source orb gives one-third of the authored immediate chance,
+two give two-thirds, and three or more give the full chance. Locks do not affect
+the count. The fallback path admits any positive count but does not scale its
+weight.
+
+Execution calls `_doBlockSwap(int, int, bool, bool *)` at `0x6afa84`. It walks
+the whole board without consuming LCG state, rewrites every unlocked matching
+source cell, and delegates each write to `_doBlockSwapMain` for special-state
+cleanup and passive resistance. Ordinary source types match exactly; source 7
+or 8 intentionally denotes the combined poison/mortal-poison family. The
+browser `doBlockSwap` primitive preserves that grouping and lock behavior.
+Fixtures prove the float-scaled immediate failure, unscaled fallback admission,
+locked-cell count/write distinction, zero execution RNG, and both poison
+destinations.
 
 Enemy skill types `60` and `61` are count-gated individual poison writers.
 Both use late handler `0x6291e0`, setup `0x61fee4`, and AI condition `0x61a710`.

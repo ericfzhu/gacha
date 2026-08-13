@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
+  PAD_ENEMY_SKILL_SOURCE_TO_POISON,
+  PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON,
   PAD_ENEMY_SKILL_POISON_BLOCKS,
   PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS,
   PAD_ENEMY_SKILL_POISON_BLOCK_N_COUNTED,
@@ -634,6 +636,38 @@ assert.deepEqual(decodePadEnemySkillDefinition(enemyAiMortalPoisonBlocksDefiniti
   supported: true,
   count: 2,
   excludeHeart: true,
+  destinationType: 8,
+  attackWithSkillValue: 0,
+});
+const enemyAiSourceToPoisonDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiSourceToPoisonView = new DataView(enemyAiSourceToPoisonDefinition.buffer);
+enemyAiSourceToPoisonView.setUint32(0x00, 9_017, true);
+enemyAiSourceToPoisonView.setInt16(0x04, PAD_ENEMY_SKILL_SOURCE_TO_POISON, true);
+enemyAiSourceToPoisonView.setInt32(0x10, 0, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiSourceToPoisonDefinition), {
+  type: 56,
+  kind: 'sourceToPoison',
+  supported: true,
+  sourceType: 0,
+  destinationType: 7,
+  attackWithSkillValue: 0,
+});
+const enemyAiSourceToMortalPoisonDefinition = enemyAiSourceToPoisonDefinition.slice();
+const enemyAiSourceToMortalPoisonView = new DataView(
+  enemyAiSourceToMortalPoisonDefinition.buffer,
+);
+enemyAiSourceToMortalPoisonView.setUint32(0x00, 9_018, true);
+enemyAiSourceToMortalPoisonView.setInt16(
+  0x04,
+  PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON,
+  true,
+);
+enemyAiSourceToMortalPoisonView.setInt32(0x10, 1, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiSourceToMortalPoisonDefinition), {
+  type: 58,
+  kind: 'sourceToPoison',
+  supported: true,
+  sourceType: 1,
   destinationType: 8,
   attackWithSkillValue: 0,
 });
@@ -1833,6 +1867,97 @@ rejectedPoisonBlockNCountedEngine.setBoardFromCodes([
 rejectedPoisonBlockNCountedEngine.setRngState(21_900);
 assert.equal(rejectedPoisonBlockNCountedEngine.takeEnemySkill(0), null);
 assert.equal(rejectedPoisonBlockNCountedEngine.rng.state, 21_900);
+const sourceToPoisonMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(sourceToPoisonMonsterDefinition.buffer).setUint32(0xec, 9_017, true);
+const selectedSourceToPoisonEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: sourceToPoisonMonsterDefinition,
+    skillDefinitions: [enemyAiSourceToPoisonDefinition],
+  }],
+});
+selectedSourceToPoisonEngine.setBoardFromCodes([
+  'RRRBBB', 'BBBBBB', 'BBBBBB', 'BBBBBB', 'BBBBBB',
+]);
+selectedSourceToPoisonEngine.setOrbState(0, 2, { locked: true });
+selectedSourceToPoisonEngine.setRngState(21_900);
+selectedSourceToPoisonEngine.enemies[0].counter = 1;
+selectedSourceToPoisonEngine.enemies[1].counter = 99;
+selectedSourceToPoisonEngine.resolveEnemyTurn();
+const sourceToPoisonState = selectedSourceToPoisonEngine.snapshot();
+assert.equal(sourceToPoisonState.lastEnemyActions[0].skill.type, 56);
+assert.equal(sourceToPoisonState.lastEnemyActions[0].skill.skillId, 9_017);
+assert.equal(selectedSourceToPoisonEngine.board.flat()
+  .filter((orb) => orb.type === 'poison').length, 2);
+assert.equal(selectedSourceToPoisonEngine.board[0][2].type, 'fire');
+assert.equal(selectedSourceToPoisonEngine.rng.state, padLcgStep(21_900).state);
+assert.equal(sourceToPoisonState.enemies[0].enemyAiBudget, 80);
+const rejectedScaledSourceToPoisonEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: sourceToPoisonMonsterDefinition,
+    skillDefinitions: [enemyAiSourceToPoisonDefinition],
+  }],
+});
+rejectedScaledSourceToPoisonEngine.setBoardFromCodes([
+  'RBBBBB', 'BBBBBB', 'BBBBBB', 'BBBBBB', 'BBBBBB',
+]);
+rejectedScaledSourceToPoisonEngine.setRngState(21_900);
+assert.equal(rejectedScaledSourceToPoisonEngine.takeEnemySkill(0), null);
+assert.equal(rejectedScaledSourceToPoisonEngine.rng.state, padLcgStep(21_900).state);
+const fallbackSourceToPoisonMonsterDefinition = sourceToPoisonMonsterDefinition.slice();
+const fallbackSourceToPoisonMonsterView = new DataView(
+  fallbackSourceToPoisonMonsterDefinition.buffer,
+);
+fallbackSourceToPoisonMonsterView.setUint8(0xf1, 1);
+const fallbackSourceToPoisonEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: fallbackSourceToPoisonMonsterDefinition,
+    skillDefinitions: [enemyAiSourceToPoisonDefinition],
+  }],
+});
+fallbackSourceToPoisonEngine.setBoardFromCodes([
+  'RBBBBB', 'BBBBBB', 'BBBBBB', 'BBBBBB', 'BBBBBB',
+]);
+fallbackSourceToPoisonEngine.setRngState(21_900);
+const fallbackSourceToPoisonSkill = fallbackSourceToPoisonEngine.takeEnemySkill(0);
+assert.equal(fallbackSourceToPoisonSkill.type, 56);
+assert.equal(fallbackSourceToPoisonSkill.skillId, 9_017);
+assert.equal(fallbackSourceToPoisonEngine.rng.state,
+  padLcgStep(padLcgStep(21_900).state).state);
+const sourceToMortalPoisonMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(sourceToMortalPoisonMonsterDefinition.buffer).setUint32(0xec, 9_018, true);
+const selectedSourceToMortalPoisonEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: sourceToMortalPoisonMonsterDefinition,
+    skillDefinitions: [enemyAiSourceToMortalPoisonDefinition],
+  }],
+});
+selectedSourceToMortalPoisonEngine.setBoardFromCodes([
+  'BBBRRR', 'RRRRRR', 'RRRRRR', 'RRRRRR', 'RRRRRR',
+]);
+selectedSourceToMortalPoisonEngine.setRngState(21_900);
+selectedSourceToMortalPoisonEngine.enemies[0].counter = 1;
+selectedSourceToMortalPoisonEngine.enemies[1].counter = 99;
+selectedSourceToMortalPoisonEngine.resolveEnemyTurn();
+const sourceToMortalPoisonState = selectedSourceToMortalPoisonEngine.snapshot();
+assert.equal(sourceToMortalPoisonState.lastEnemyActions[0].skill.type, 58);
+assert.equal(sourceToMortalPoisonState.lastEnemyActions[0].skill.skillId, 9_018);
+assert.equal(selectedSourceToMortalPoisonEngine.board.flat()
+  .filter((orb) => orb.type === 'mortalPoison').length, 3);
+assert.equal(selectedSourceToMortalPoisonEngine.rng.state, padLcgStep(21_900).state);
+const poisonFamilySwapEngine = new PuzzleEngine({ seed: 21_900 });
+poisonFamilySwapEngine.setBoardFromCodes([
+  'PMBBBB', 'BBBBBB', 'BBBBBB', 'BBBBBB', 'BBBBBB',
+]);
+poisonFamilySwapEngine.setOrbState(0, 1, { locked: true });
+const poisonFamilySwapSeed = poisonFamilySwapEngine.rng.state;
+assert.equal(poisonFamilySwapEngine.doBlockSwap(8, 0), 1);
+assert.equal(poisonFamilySwapEngine.board[0][0].type, 'fire');
+assert.equal(poisonFamilySwapEngine.board[0][1].type, 'mortalPoison');
+assert.equal(poisonFamilySwapEngine.rng.state, poisonFamilySwapSeed);
 assert.equal(blackFallEngine.board[0][0].nail, false);
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);

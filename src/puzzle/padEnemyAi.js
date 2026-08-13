@@ -1,6 +1,8 @@
 import { padLcgStep } from './padCoreRules.js';
 import {
   PAD_ENEMY_SKILL_BLACK_FALL,
+  PAD_ENEMY_SKILL_SOURCE_TO_POISON,
+  PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON,
   PAD_ENEMY_SKILL_POISON_BLOCKS,
   PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS,
   PAD_ENEMY_SKILL_POISON_BLOCK_N_COUNTED,
@@ -112,6 +114,8 @@ function normalizeDefinitionMap(definitions) {
 function isStaticallyEligible(definition, state) {
   if (!definition.effect.supported || ![
     PAD_ENEMY_SKILL_BLACK_FALL,
+    PAD_ENEMY_SKILL_SOURCE_TO_POISON,
+    PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON,
     PAD_ENEMY_SKILL_POISON_BLOCKS,
     PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS,
     PAD_ENEMY_SKILL_POISON_BLOCK_N_COUNTED,
@@ -134,9 +138,12 @@ function isStaticallyEligible(definition, state) {
 }
 
 function evaluateCondition(definition, state, rngState) {
-  if (!isStaticallyEligible(definition, state)) return { eligible: false, rngState };
+  if (!isStaticallyEligible(definition, state)) {
+    return { eligible: false, probabilityScale: 0, rngState };
+  }
   if (definition.effect.type === PAD_ENEMY_SKILL_BLACK_FALL) {
-    return { eligible: !state.blackFallActive, rngState };
+    const eligible = !state.blackFallActive;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   // The decoded line and poison-list transformations all map to the
   // unconditional 1.0 handler at 0x61a630, with no board dry run.
@@ -150,16 +157,19 @@ function evaluateCondition(definition, state, rngState) {
     || definition.effect.type === PAD_ENEMY_SKILL_POISON_MASK_SWAP
     || definition.effect.type === PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT
   ) {
-    return { eligible: true, rngState };
+    return { eligible: true, probabilityScale: 1, rngState };
   }
   if (typeof state.evaluateCondition === 'function') {
     const result = state.evaluateCondition(definition, rngState) || {};
     return {
       eligible: Boolean(result.eligible),
+      probabilityScale: Math.fround(Number(result.probabilityScale ?? (
+        result.eligible ? 1 : 0
+      )) || 0),
       rngState: Number(result.rngState ?? rngState) >>> 0,
     };
   }
-  return { eligible: false, rngState };
+  return { eligible: false, probabilityScale: 0, rngState };
 }
 
 function advanceRoll(state, scale) {
@@ -170,18 +180,21 @@ function advanceRoll(state, scale) {
   };
 }
 
-function immediateProbability(definition, slot) {
+function immediateProbability(definition, slot, conditionScale = 1) {
   const product = Math.imul(
     Math.imul(definition.immediateFactor0, definition.immediateFactor1),
     slot.immediateChance,
   );
-  return Math.fround(Math.min(10_000, Math.trunc(product / 100_000)));
+  const base = Math.fround(Math.trunc(product / 100_000));
+  const scaled = Math.fround(base * Math.fround(conditionScale));
+  return Math.fround(Math.min(10_000, scaled));
 }
 
 // Supported subset of chooseEnemyAiNew (0x61d450). Flow-control definitions
 // and condition callbacks outside the explicitly decoded set remain rejected.
-// The native scan performs immediate probability rolls in slot order, then a
-// single weighted fallback roll across eligible +0xf1 entries.
+// The native scan multiplies immediate chance by chooseEnemyAiSub's float32
+// return, but uses that return only as a positive gate for the later unscaled
+// +0xf1 weighted fallback.
 export function selectPadEnemyAiNew(monster, definitions, state = {}) {
   const definitionMap = normalizeDefinitionMap(definitions);
   const current = {
@@ -203,7 +216,7 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     const condition = evaluateCondition(definition, current, rngState);
     rngState = condition.rngState;
     if (!condition.eligible) continue;
-    const probability = immediateProbability(definition, slot);
+    const probability = immediateProbability(definition, slot, condition.probabilityScale);
     if (probability <= 0) continue;
     const roll = advanceRoll(rngState, 10_000);
     rngState = roll.state;

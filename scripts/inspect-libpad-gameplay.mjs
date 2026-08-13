@@ -20,6 +20,11 @@ const ENEMY_SKILL_CONDITION_BASE = 0x61a630;
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
+const SOURCE_TO_POISON_ENEMY_SKILL_TYPE = 56;
+const SOURCE_TO_MORTAL_POISON_ENEMY_SKILL_TYPE = 58;
+const SOURCE_TO_POISON_HANDLER = 0x62917c;
+const SOURCE_TO_POISON_SETUP_HANDLER = 0x61ff08;
+const SOURCE_TO_POISON_CONDITION_HANDLER = 0x61a63c;
 const POISON_BLOCKS_ENEMY_SKILL_TYPE = 57;
 const MORTAL_POISON_BLOCKS_ENEMY_SKILL_TYPE = 59;
 const POISON_BLOCKS_HANDLER = 0x6291b8;
@@ -86,6 +91,7 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['board', 'getRandomBlock', '_ZN9cGAMEMAIN15_getRandomBlockEibb', 0x617874],
   ['board', 'getRandomBlockOnFace', '_ZN9cGAMEMAIN21_getRandomBlockOnFaceEPibbb', 0x6179fc],
   ['board', 'countBlockBits', '_ZNK9cGAMEMAIN15_countBlockBitsEt', 0x651fa4],
+  ['board', 'countBlockType', '_ZNK9cGAMEMAIN15_countBlockTypeEi', 0x65213c],
   ['board', 'spawnNewBlock', '_ZN9cGAMEMAIN14_spawnNewBlockERjj', 0x661978],
   ['board', 'spawnNewBlockInBits', '_ZN9cGAMEMAIN20_spawnNewBlockInBitsEt', 0x62771c],
   ['board', 'buildBlockList', '_ZN9cGAMEMAIN15_buildBlockListEPfj', 0x6615e8],
@@ -113,6 +119,7 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['orb-state', 'doPoisonBlockN2', '_ZN9cGAMEMAIN16_doPoisonBlockN2EijjbbPt', 0x61c344],
   ['orb-state', 'doBitReplace', '_ZN9cGAMEMAIN13_doBitReplaceEPKtiRiP10sBLOCKFLAG', 0x6adf2c],
   ['orb-state', 'doBlockSwapMain', '_ZN9cGAMEMAIN16_doBlockSwapMainEP6sBLOCKiRiP10sBLOCKFLAG', 0x6ae028],
+  ['orb-state', 'doBlockSwap', '_ZN9cGAMEMAIN12_doBlockSwapEiibPb', 0x6afa84],
   ['orb-state', 'doBlockSwapNew', '_ZN9cGAMEMAIN15_doBlockSwapNewEPhiP10sBLOCKFLAGj', 0x6aee90],
   ['orb-state', 'doBlockSwap4', '_ZN9cGAMEMAIN13_doBlockSwap4EtP10sBLOCKFLAG', 0x6af6cc],
   ['orb-state', 'doBlockSwap5', '_ZN9cGAMEMAIN13_doBlockSwap5EttP10sBLOCKFLAG', 0x6af564],
@@ -217,6 +224,42 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     const entry = readUint16Virtual(restoredElf, restoredBytes, table + (type - 1) * 2);
     return base + entry * 4;
   };
+  const sourceToPoisonDispatchTarget = resolveEnemySkillTarget(
+    SOURCE_TO_POISON_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const sourceToPoisonSetupTarget = resolveEnemySkillTarget(
+    SOURCE_TO_POISON_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const sourceToPoisonConditionTarget = resolveEnemySkillTarget(
+    SOURCE_TO_POISON_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const sourceToMortalPoisonDispatchTarget = resolveEnemySkillTarget(
+    SOURCE_TO_MORTAL_POISON_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const sourceToMortalPoisonSetupTarget = resolveEnemySkillTarget(
+    SOURCE_TO_MORTAL_POISON_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const sourceToMortalPoisonConditionTarget = resolveEnemySkillTarget(
+    SOURCE_TO_MORTAL_POISON_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const sourceToPoisonDispatchMatches = sourceToPoisonDispatchTarget === null
+    ? null : sourceToPoisonDispatchTarget === SOURCE_TO_POISON_HANDLER;
+  const sourceToPoisonSetupMatches = sourceToPoisonSetupTarget === null
+    ? null : sourceToPoisonSetupTarget === SOURCE_TO_POISON_SETUP_HANDLER;
+  const sourceToPoisonConditionMatches = sourceToPoisonConditionTarget === null
+    ? null : sourceToPoisonConditionTarget === SOURCE_TO_POISON_CONDITION_HANDLER;
+  const sourceToMortalPoisonDispatchMatches = sourceToMortalPoisonDispatchTarget === null
+    ? null : sourceToMortalPoisonDispatchTarget === SOURCE_TO_POISON_HANDLER;
+  const sourceToMortalPoisonSetupMatches = sourceToMortalPoisonSetupTarget === null
+    ? null : sourceToMortalPoisonSetupTarget === SOURCE_TO_POISON_SETUP_HANDLER;
+  const sourceToMortalPoisonConditionMatches = sourceToMortalPoisonConditionTarget === null
+    ? null : sourceToMortalPoisonConditionTarget === SOURCE_TO_POISON_CONDITION_HANDLER;
   const poisonBlocksDispatchTarget = resolveEnemySkillTarget(
     POISON_BLOCKS_ENEMY_SKILL_TYPE,
     ENEMY_SKILL_DISPATCH_TABLE,
@@ -788,6 +831,12 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       allAddressesMatch21_9: mismatches.length === 0,
       blackFallDispatchMatches21_9: blackFallDispatchMatches,
       blackFallSetupMatches21_9: blackFallSetupMatches,
+      sourceToPoisonDispatchMatches21_9: sourceToPoisonDispatchMatches,
+      sourceToPoisonSetupMatches21_9: sourceToPoisonSetupMatches,
+      sourceToPoisonConditionMatches21_9: sourceToPoisonConditionMatches,
+      sourceToMortalPoisonDispatchMatches21_9: sourceToMortalPoisonDispatchMatches,
+      sourceToMortalPoisonSetupMatches21_9: sourceToMortalPoisonSetupMatches,
+      sourceToMortalPoisonConditionMatches21_9: sourceToMortalPoisonConditionMatches,
       poisonBlocksDispatchMatches21_9: poisonBlocksDispatchMatches,
       poisonBlocksSetupMatches21_9: poisonBlocksSetupMatches,
       poisonBlocksConditionMatches21_9: poisonBlocksConditionMatches,
@@ -862,6 +911,26 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       setupEntry: blackFallSetupEntry === null ? null : hex(blackFallSetupEntry),
       setupTarget: blackFallSetupTarget === null ? null : hex(blackFallSetupTarget),
       setupMatches21_9: blackFallSetupMatches,
+      sourceToPoisonType: SOURCE_TO_POISON_ENEMY_SKILL_TYPE,
+      sourceToPoisonDispatchTarget: sourceToPoisonDispatchTarget === null
+        ? null : hex(sourceToPoisonDispatchTarget),
+      sourceToPoisonDispatchMatches21_9: sourceToPoisonDispatchMatches,
+      sourceToPoisonSetupTarget: sourceToPoisonSetupTarget === null
+        ? null : hex(sourceToPoisonSetupTarget),
+      sourceToPoisonSetupMatches21_9: sourceToPoisonSetupMatches,
+      sourceToPoisonConditionTarget: sourceToPoisonConditionTarget === null
+        ? null : hex(sourceToPoisonConditionTarget),
+      sourceToPoisonConditionMatches21_9: sourceToPoisonConditionMatches,
+      sourceToMortalPoisonType: SOURCE_TO_MORTAL_POISON_ENEMY_SKILL_TYPE,
+      sourceToMortalPoisonDispatchTarget: sourceToMortalPoisonDispatchTarget === null
+        ? null : hex(sourceToMortalPoisonDispatchTarget),
+      sourceToMortalPoisonDispatchMatches21_9: sourceToMortalPoisonDispatchMatches,
+      sourceToMortalPoisonSetupTarget: sourceToMortalPoisonSetupTarget === null
+        ? null : hex(sourceToMortalPoisonSetupTarget),
+      sourceToMortalPoisonSetupMatches21_9: sourceToMortalPoisonSetupMatches,
+      sourceToMortalPoisonConditionTarget: sourceToMortalPoisonConditionTarget === null
+        ? null : hex(sourceToMortalPoisonConditionTarget),
+      sourceToMortalPoisonConditionMatches21_9: sourceToMortalPoisonConditionMatches,
       poisonBlocksType: POISON_BLOCKS_ENEMY_SKILL_TYPE,
       poisonBlocksDispatchTarget: poisonBlocksDispatchTarget === null
         ? null : hex(poisonBlocksDispatchTarget),
@@ -1069,6 +1138,11 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
   if (
     missing.length || mismatches.length
     || blackFallDispatchMatches === false || blackFallSetupMatches === false
+    || sourceToPoisonDispatchMatches === false || sourceToPoisonSetupMatches === false
+    || sourceToPoisonConditionMatches === false
+    || sourceToMortalPoisonDispatchMatches === false
+    || sourceToMortalPoisonSetupMatches === false
+    || sourceToMortalPoisonConditionMatches === false
     || poisonBlocksDispatchMatches === false || poisonBlocksSetupMatches === false
     || poisonBlocksConditionMatches === false
     || mortalPoisonBlocksDispatchMatches === false || mortalPoisonBlocksSetupMatches === false
