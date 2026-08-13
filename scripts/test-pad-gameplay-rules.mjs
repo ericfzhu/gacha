@@ -259,6 +259,38 @@ assert.deepEqual(
   [{ attribute: 'fire', value: 113 }, { attribute: 'wood', value: 7 }, { attribute: 'water', value: 38 }],
 );
 
+const attackOrderEngine = new PuzzleEngine({ seed: 11 });
+attackOrderEngine.party = [
+  { id: 'one', name: 'One', attribute: 'fire', tertiaryAttribute: 'wood', secondaryAttribute: 'water', attack: 90, recovery: 0 },
+  { id: 'two', name: 'Two', attribute: 'water', tertiaryAttribute: 'light', secondaryAttribute: 'dark', attack: 90, recovery: 0 },
+];
+attackOrderEngine.enemies[0] = { ...attackOrderEngine.enemies[0], attribute: 'light', defense: 0 };
+attackOrderEngine.enemies[1].hp = 0;
+attackOrderEngine.comboCount = 5;
+attackOrderEngine.turnMatches = ['fire', 'water', 'wood', 'light', 'dark'].map((type) => ({ type, size: 3, enhancedCount: 0 }));
+attackOrderEngine.resolvePlayerTurn();
+assert.deepEqual(
+  attackOrderEngine.floatingText.filter(({ kind }) => kind === 'damage').map(({ attribute }) => attribute),
+  ['fire', 'water', 'wood', 'light', 'water', 'dark'],
+);
+
+const retargetEngine = new PuzzleEngine({ seed: 12 });
+retargetEngine.party = [
+  { id: 'one', name: 'One', attribute: 'fire', attack: 30, recovery: 0 },
+  { id: 'two', name: 'Two', attribute: 'fire', attack: 30, recovery: 0 },
+];
+retargetEngine.enemies[0] = { ...retargetEngine.enemies[0], hp: 10, attribute: 'light', defense: 0 };
+retargetEngine.enemies[1] = { ...retargetEngine.enemies[1], hp: 1_000, attribute: 'light', defense: 0 };
+retargetEngine.selectEnemy(0);
+retargetEngine.comboCount = 1;
+retargetEngine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+retargetEngine.resolvePlayerTurn();
+assert.deepEqual(
+  retargetEngine.floatingText.filter(({ kind }) => kind === 'damage').map(({ enemy }) => enemy),
+  [0, 1],
+);
+assert.equal(retargetEngine.manualTarget, false);
+
 const stateEngine = new PuzzleEngine({ seed: 3 });
 stateEngine.setBoardFromCodes(['GGGHRD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD']);
 stateEngine.setOrbState(0, 0, { enhanced: true, locked: true });

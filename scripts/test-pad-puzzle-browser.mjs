@@ -3,7 +3,8 @@ import fs from 'node:fs/promises';
 const { chromium } = await import(process.env.GACHA_PLAYWRIGHT_MODULE || 'playwright');
 const url = process.argv[2] || 'http://127.0.0.1:4173/puzzle';
 const outputPath = process.argv[3] || '/tmp/gacha-pad-puzzle.png';
-const apkPath = process.argv[4] || null;
+const apkArgument = process.argv[4];
+const apkPath = apkArgument && !apkArgument.startsWith('--') ? apkArgument : null;
 const showOrbStates = process.argv.includes('--orb-states');
 const renderAtlasSheet = process.argv.includes('--atlas-sheet');
 const testBombResolution = process.argv.includes('--bomb-resolution');
@@ -11,6 +12,7 @@ const testThornInput = process.argv.includes('--thorn-input');
 const testLargeBoard = process.argv.includes('--large-board');
 const testTapTurn = process.argv.includes('--tap-turn');
 const testMatchShapes = process.argv.includes('--match-shapes');
+const testAttackRounds = process.argv.includes('--attack-rounds');
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 980, height: 900 } });
 const consoleMessages = [];
@@ -232,10 +234,38 @@ try {
     matchShape.type !== 'fire' || matchShape.size !== 8 || matchShape.isRow !== true ||
     matchShape.isHorizontal !== false || matchShape.cascadeDepth !== 1
   )) throw new Error(`Turn-level match shape mismatch: ${JSON.stringify(matchShape)}`);
+  const attackRounds = testAttackRounds ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    engine.reset();
+    engine.party = [
+      { id: 'one', name: 'One', attribute: 'fire', attack: 30, recovery: 0 },
+      { id: 'two', name: 'Two', attribute: 'fire', attack: 30, recovery: 0 },
+    ];
+    engine.enemies[0] = { ...engine.enemies[0], hp: 10, attribute: 'light', defense: 0 };
+    engine.enemies[1] = { ...engine.enemies[1], hp: 1_000, attribute: 'light', defense: 0 };
+    engine.selectEnemy(0);
+    const selected = engine.snapshot();
+    engine.comboCount = 1;
+    engine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+    engine.resolvePlayerTurn();
+    const resolved = engine.snapshot();
+    return {
+      selectedTarget: selected.targetEnemy,
+      selectedManually: selected.manualTarget,
+      damageTargets: engine.floatingText.filter(({ kind }) => kind === 'damage').map(({ enemy }) => enemy),
+      resolvedTarget: resolved.targetEnemy,
+      resolvedManually: resolved.manualTarget,
+    };
+  }) : null;
+  if (attackRounds && (
+    attackRounds.selectedTarget !== 0 || attackRounds.selectedManually !== true ||
+    JSON.stringify(attackRounds.damageTargets) !== JSON.stringify([0, 1]) ||
+    attackRounds.resolvedTarget !== 1 || attackRounds.resolvedManually !== false
+  )) throw new Error(`Attack round retarget mismatch: ${JSON.stringify(attackRounds)}`);
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, largeBoard, tapTurn, matchShape, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, largeBoard, tapTurn, matchShape, attackRounds, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, largeBoard, tapTurn, matchShape, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, largeBoard, tapTurn, matchShape, attackRounds, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

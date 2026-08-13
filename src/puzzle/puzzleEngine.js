@@ -124,6 +124,7 @@ export class PuzzleEngine {
     };
     this.enemies = copyEnemies();
     this.targetEnemy = 0;
+    this.manualTarget = false;
     this.skill = { name: 'Tide Shift', cooldown: 0, maxCooldown: 5 };
     this.drag = null;
     this.pendingMatches = [];
@@ -230,7 +231,33 @@ export class PuzzleEngine {
   }
 
   selectEnemy(index) {
-    if (this.enemies[index]?.hp > 0) this.targetEnemy = index;
+    if (this.enemies[index]?.hp <= 0) return;
+    if (this.manualTarget && this.targetEnemy === index) {
+      this.manualTarget = false;
+      return;
+    }
+    this.targetEnemy = index;
+    this.manualTarget = true;
+  }
+
+  chooseAttackTarget(attribute, attack) {
+    if (this.manualTarget && this.enemies[this.targetEnemy]?.hp > 0) return this.targetEnemy;
+    this.manualTarget = false;
+    const candidates = this.enemies.map((enemy, index) => {
+      if (enemy.hp <= 0) return null;
+      const damage = padDamageAfterDefense(
+        attack,
+        padAttributeMultiplier(attribute, enemy.attribute),
+        enemy.defense,
+      );
+      return { index, damage, lethal: damage >= enemy.hp, ratio: damage / enemy.hp };
+    }).filter(Boolean);
+    candidates.sort((left, right) =>
+      Number(right.lethal) - Number(left.lethal) ||
+      right.ratio - left.ratio ||
+      left.index - right.index);
+    this.targetEnemy = candidates[0]?.index ?? 0;
+    return this.targetEnemy;
   }
 
   useSkill() {
@@ -414,33 +441,33 @@ export class PuzzleEngine {
     this.applyPlayerHpResolution(healing, poisonDamage);
 
     let totalDamage = 0;
-    const target = this.enemies[this.targetEnemy]?.hp > 0 ? this.targetEnemy : this.enemies.findIndex((enemy) => enemy.hp > 0);
-    this.targetEnemy = Math.max(0, target);
-    this.party.forEach((member) => {
-      const attackLanes = [
-        { attribute: member.attribute, attack: member.attack },
-        {
-          attribute: member.tertiaryAttribute,
-          attack: padTertiaryAttributeAttack(member.attack, member.tertiaryAttribute),
-        },
-        {
-          attribute: member.secondaryAttribute,
-          attack: padSecondaryAttributeAttack(
-            member.attack,
-            member.attribute,
-            member.secondaryAttribute,
-            member.secondaryAttributeChanged,
-          ),
-        },
-      ];
-      attackLanes.forEach((lane) => {
+    const attackRounds = [
+      (member) => ({ attribute: member.attribute, attack: member.attack }),
+      (member) => ({
+        attribute: member.tertiaryAttribute,
+        attack: padTertiaryAttributeAttack(member.attack, member.tertiaryAttribute),
+      }),
+      (member) => ({
+        attribute: member.secondaryAttribute,
+        attack: padSecondaryAttributeAttack(
+          member.attack,
+          member.attribute,
+          member.secondaryAttribute,
+          member.secondaryAttributeChanged,
+        ),
+      }),
+    ];
+    attackRounds.forEach((getLane) => {
+      this.party.forEach((member) => {
+        const lane = getLane(member);
         const matches = byType.get(lane.attribute) || [];
         if (!lane.attack || !matches.length) return;
         const matchAttack = padNativeBaseAttackPower(lane.attack, matches, this.comboCount);
         const raw = padApplyAttackMultipliers(matchAttack, [leader, leader]);
         const isMassAttack = matches.some((match) => match.size >= 5);
+        const target = isMassAttack ? -1 : this.chooseAttackTarget(lane.attribute, raw);
         this.enemies.forEach((enemy, enemyIndex) => {
-          if (enemy.hp <= 0 || (!isMassAttack && enemyIndex !== this.targetEnemy)) return;
+          if (enemy.hp <= 0 || (!isMassAttack && enemyIndex !== target)) return;
           const damage = padDamageAfterDefense(raw, padAttributeMultiplier(lane.attribute, enemy.attribute), enemy.defense);
           enemy.hp = Math.max(0, enemy.hp - damage);
           totalDamage += damage;
@@ -552,6 +579,7 @@ export class PuzzleEngine {
         helper,
       })),
       targetEnemy: this.targetEnemy,
+      manualTarget: this.manualTarget,
       enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter }) => ({ id, name, attribute, hp, maxHp, counter, maxCounter })),
       skill: { ...this.skill, ready: this.skill.cooldown === 0 },
       message: this.message,
