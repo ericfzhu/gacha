@@ -9,6 +9,7 @@ const renderAtlasSheet = process.argv.includes('--atlas-sheet');
 const testBombResolution = process.argv.includes('--bomb-resolution');
 const testThornInput = process.argv.includes('--thorn-input');
 const testLargeBoard = process.argv.includes('--large-board');
+const testTapTurn = process.argv.includes('--tap-turn');
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 980, height: 900 } });
 const consoleMessages = [];
@@ -199,10 +200,27 @@ try {
     largeBoard.rowCount !== 6 || largeBoard.columnCount !== 7 ||
     largeBoard.dragColumn !== 6 || largeBoard.pathLength !== 1
   )) throw new Error(`Large board mismatch: ${JSON.stringify(largeBoard)}`);
+  const tapTurn = testTapTurn ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    engine.reset();
+    engine.start();
+    const board = engine.snapshot().board;
+    return { board, turn: engine.turn };
+  }) : null;
+  if (tapTurn) {
+    const tapPoint = internalPoint(box, 35, 447);
+    await page.mouse.click(tapPoint.x, tapPoint.y);
+    const tapped = JSON.parse(await page.evaluate(() => window.render_game_to_text()));
+    if (tapped.turn !== tapTurn.turn + 1 || tapped.phase !== 'detect' ||
+        JSON.stringify(tapped.board) !== JSON.stringify(tapTurn.board)) {
+      throw new Error(`Zero-distance tap turn mismatch: ${JSON.stringify(tapped)}`);
+    }
+    tapTurn.after = { turn: tapped.turn, phase: tapped.phase, boardUnchanged: true };
+  }
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, largeBoard, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, largeBoard, tapTurn, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, largeBoard, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, largeBoard, tapTurn, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

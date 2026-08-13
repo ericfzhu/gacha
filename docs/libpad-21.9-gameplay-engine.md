@@ -86,6 +86,13 @@ adjacent swaps when its destination is farther away. Therefore a coalesced brows
 must be expanded into the orthogonal grid boundaries crossed by the motion; a
 single direct diagonal exchange is incorrect in normal play.
 
+`_gamePhaseMove` reads the current touch-state field at `sPAD+0xb2`. Value `1`
+keeps the move active; release/cancel takes the turn-ending path beginning at
+`0x6826c4`. The swap count at game-work offset `0x6edc` controls movement-side
+effects but is not required to end the turn. Consequently, selecting and
+releasing the same orb without crossing a cell consumes a turn while leaving
+the board unchanged, which the browser input state machine also preserves.
+
 The JS engine now uses a fractional pointer-segment crossing trace with
 deterministic horizontal corner ties. Every emitted step has Manhattan distance
 one. The segment is clamped to the 6x5 board before traversal, matching the

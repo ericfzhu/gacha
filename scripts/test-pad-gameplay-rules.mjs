@@ -144,6 +144,16 @@ assert.equal(engine.moveDrag(1, 1, 120, 120), true);
 assert.equal(engine.drag.pathLength, 2);
 assert.deepEqual(engine.snapshot().board.slice(0, 2), ['BLGHLD', 'GRDBHR']);
 
+const tapEngine = new PuzzleEngine({ seed: 9 });
+tapEngine.setBoardFromCodes(['RBGHLD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD']);
+tapEngine.start();
+const tapBoard = tapEngine.snapshot().board;
+assert.equal(tapEngine.startDrag(0, 0, 50, 50), true);
+assert.equal(tapEngine.endDrag(), true);
+assert.equal(tapEngine.turn, 1);
+assert.equal(tapEngine.phase, 'detect');
+assert.deepEqual(tapEngine.snapshot().board, tapBoard);
+
 const largeBoardEngine = new PuzzleEngine({ seed: 7, columns: 7, rows: 6 });
 largeBoardEngine.setBoardFromCodes([
   'RBGHLDR',

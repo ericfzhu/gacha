@@ -204,6 +204,9 @@ export class PuzzleEngine {
 
   endDrag() {
     if (!this.drag) return false;
+    // Native _gamePhaseMove ends the move whenever sPAD+0xb2 is no longer the
+    // active-touch value 1. Its swap counter only drives movement effects, so
+    // releasing the selected orb without crossing a cell still spends a turn.
     this.drag = null;
     this.turn += 1;
     this.comboCount = 0;
