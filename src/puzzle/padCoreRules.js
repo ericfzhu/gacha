@@ -99,7 +99,7 @@ export function padThornDamage(maxHp, percent = PAD_DEFAULT_THORN_HP_PERCENT) {
 // rejects diagonal neighbours, so a sparse event must be expanded into the
 // orthogonal grid boundaries crossed by its line segment. Exact corner ties are
 // resolved horizontally first and never become a one-step diagonal swap.
-export function tracePadDragCells(fromRow, fromColumn, toRow, toColumn) {
+export function tracePadDragCells(fromRow, fromColumn, toRow, toColumn, allowDiagonal = false) {
   if (![fromRow, fromColumn, toRow, toColumn].every(Number.isInteger)) {
     throw new Error('PAD drag coordinates must be integer cells.');
   }
@@ -117,7 +117,12 @@ export function tracePadDragCells(fromRow, fromColumn, toRow, toColumn) {
   const columnIncrement = columnDistance ? 1 / columnDistance : Infinity;
   const cells = [];
   while (row !== toRow || column !== toColumn) {
-    if (column !== toColumn && columnCrossing <= rowCrossing) {
+    if (allowDiagonal && row !== toRow && column !== toColumn && columnCrossing === rowCrossing) {
+      row += rowStep;
+      column += columnStep;
+      rowCrossing += rowIncrement;
+      columnCrossing += columnIncrement;
+    } else if (column !== toColumn && columnCrossing <= rowCrossing) {
       column += columnStep;
       columnCrossing += columnIncrement;
     } else {
@@ -142,6 +147,7 @@ export function tracePadPointerCells(
   toGridRow,
   rowCount = PAD_BOARD_ROWS,
   columnCount = PAD_BOARD_COLUMNS,
+  allowDiagonal = false,
 ) {
   if (![fromRow, fromColumn, rowCount, columnCount].every(Number.isInteger) ||
       ![fromGridColumn, fromGridRow, toGridColumn, toGridRow].every(Number.isFinite) ||
@@ -172,7 +178,12 @@ export function tracePadPointerCells(
   let column = fromColumn;
   const cells = [];
   while (row !== targetRow || column !== targetColumn) {
-    if (column !== targetColumn && columnCrossing <= rowCrossing) {
+    if (allowDiagonal && row !== targetRow && column !== targetColumn && columnCrossing === rowCrossing) {
+      row += rowStep;
+      column += columnStep;
+      rowCrossing += rowIncrement;
+      columnCrossing += columnIncrement;
+    } else if (column !== targetColumn && columnCrossing <= rowCrossing) {
       column += columnStep;
       columnCrossing += columnIncrement;
     } else {

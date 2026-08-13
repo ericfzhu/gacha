@@ -19,6 +19,7 @@ import {
 } from '../src/puzzle/padCoreRules.js';
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);
+assert.deepEqual(tracePadDragCells(0, 0, 2, 2, true), [{ row: 1, column: 1 }, { row: 2, column: 2 }]);
 assert.deepEqual(tracePadDragCells(4, 5, 1, 3), [
   { row: 3, column: 5 },
   { row: 3, column: 4 },
@@ -36,6 +37,10 @@ for (const path of [tracePadDragCells(0, 0, 4, 5), tracePadDragCells(4, 5, 0, 0)
 assert.deepEqual(tracePadPointerCells(0, 0, 0.9, 0.2, 1.1, 1.9), [
   { row: 1, column: 0 },
   { row: 1, column: 1 },
+]);
+assert.deepEqual(tracePadPointerCells(0, 0, 0.5, 0.5, 2.5, 2.5, 5, 6, true), [
+  { row: 1, column: 1 },
+  { row: 2, column: 2 },
 ]);
 assert.deepEqual(tracePadPointerCells(0, 0, 0.5, 0.5, 8, -2), [
   { row: 0, column: 1 },
@@ -139,6 +144,17 @@ assert.equal(largeBoardEngine.drag.column, 6);
 assert.equal(largeBoardEngine.drag.pathLength, 1);
 assert.equal(largeBoardEngine.snapshot().board[5], 'RGLDBRH');
 assert.throws(() => new PuzzleEngine({ columns: 16, rows: 6 }), /1 through 15/);
+
+const diagonalEngine = new PuzzleEngine({ seed: 8, allowDiagonalMoves: true });
+diagonalEngine.setBoardFromCodes(['RBGHLD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD']);
+diagonalEngine.setOrbState(1, 1, { thornPercent: 4 });
+diagonalEngine.start();
+diagonalEngine.startDrag(0, 0, 50, 475, 0.5, 0.5);
+diagonalEngine.moveDrag(1, 1, 120, 545, 1.5, 1.5);
+assert.equal(diagonalEngine.drag.pathLength, 1);
+assert.deepEqual({ row: diagonalEngine.drag.row, column: diagonalEngine.drag.column }, { row: 1, column: 1 });
+assert.equal(diagonalEngine.lastThornDamage, 480);
+assert.equal(diagonalEngine.snapshot().moveAdjacency, 'eight-way');
 
 const poisonEngine = new PuzzleEngine({ seed: 2 });
 poisonEngine.setBoardFromCodes(['PPPBGH', 'HHHLDB', 'BGHRDL', 'DLGRHB', 'HRBGLD']);

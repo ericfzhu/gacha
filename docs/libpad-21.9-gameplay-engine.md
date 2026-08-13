@@ -77,8 +77,12 @@ six columns are active.
 
 Normal `_isNeighborBlock` accepts one orthogonal step: one coordinate must be
 equal and the other must differ by less than two. A special board-mode byte at
-`+0x75` permits one-cell diagonal adjacency. `_swapBlock` repeats adjacent swaps
-when its destination is farther away. Therefore a coalesced browser pointer move
+`+0x75` permits diagonal adjacency when the absolute row and column deltas are
+equal. `_swapBlock` then advances both coordinates per step; a two-cell diagonal
+therefore performs two diagonal swaps rather than four orthogonal ones. The JS
+engine exposes this recovered mode through `allowDiagonalMoves`, including
+corner-crossing input and per-crossed-orb thorn damage. `_swapBlock` repeats
+adjacent swaps when its destination is farther away. Therefore a coalesced browser pointer move
 must be expanded into the orthogonal grid boundaries crossed by the motion; a
 single direct diagonal exchange is incorrect in normal play.
 

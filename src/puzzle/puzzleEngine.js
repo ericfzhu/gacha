@@ -81,6 +81,7 @@ export class PuzzleEngine {
     moveTime = PAD_DEFAULT_MOVE_TIME_SECONDS,
     columns = PAD_BOARD_COLUMNS,
     rows = PAD_BOARD_ROWS,
+    allowDiagonalMoves = false,
   } = {}) {
     if (![columns, rows].every(Number.isInteger) || columns < 1 || columns > 15 || rows < 1 || rows > 15) {
       throw new Error('PAD board dimensions must be integers from 1 through 15.');
@@ -89,6 +90,7 @@ export class PuzzleEngine {
     this.moveTime = moveTime;
     this.columns = columns;
     this.rows = rows;
+    this.allowDiagonalMoves = Boolean(allowDiagonalMoves);
     this.rng = makeRng(seed);
     this.orbSerial = 0;
     this.visualTime = 0;
@@ -179,6 +181,7 @@ export class PuzzleEngine {
       gridRow,
       this.rows,
       this.columns,
+      this.allowDiagonalMoves,
     );
     this.drag.gridColumn = Math.max(0, Math.min(this.columns - Number.EPSILON * this.columns, gridColumn));
     this.drag.gridRow = Math.max(0, Math.min(this.rows - Number.EPSILON * this.rows, gridRow));
@@ -473,6 +476,7 @@ export class PuzzleEngine {
     return {
       coordinateSystem: `board origin top-left; rows 0-${this.rows - 1} downward; columns 0-${this.columns - 1} rightward`,
       boardDimensions: { rows: this.rows, columns: this.columns },
+      moveAdjacency: this.allowDiagonalMoves ? 'eight-way' : 'orthogonal',
       mode: this.mode,
       phase: this.phase,
       turn: this.turn,
