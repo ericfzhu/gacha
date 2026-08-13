@@ -7,11 +7,9 @@ import {
   padApplyAttackMultipliers,
   padAttributeMultiplier,
   padBombDamage,
-  padComboMultiplier,
   padDamageAfterDefense,
-  padEnhancedOrbMultiplier,
   padNativeBaseAttackPower,
-  padOrbMatchMultiplier,
+  padNativeRecoveryPower,
   padPoisonDamage,
   padSecondaryAttributeAttack,
   padTertiaryAttributeAttack,
@@ -391,7 +389,6 @@ export class PuzzleEngine {
   }
 
   resolvePlayerTurn() {
-    const comboMultiplier = padComboMultiplier(this.comboCount);
     const leader = leaderMultiplier(this.comboCount);
     const leaderPair = leader * leader;
     this.lastLeaderMultiplier = leaderPair;
@@ -404,10 +401,11 @@ export class PuzzleEngine {
     });
 
     const heartMatches = byType.get('heart') || [];
-    const healing = heartMatches.length
-      ? Math.floor(heartMatches.reduce((total, match) => total +
-        this.player.recovery * padOrbMatchMultiplier(match.size) * padEnhancedOrbMultiplier(match.enhancedCount), 0) * comboMultiplier)
-      : 0;
+    const partyRecovery = this.party.reduce((total, member) => total + member.recovery, 0);
+    const recoveryLanes = this.player.recovery === partyRecovery
+      ? this.party.map((member) => member.recovery)
+      : [this.player.recovery];
+    const healing = padNativeRecoveryPower(recoveryLanes, heartMatches, this.comboCount);
     const poisonDamage = padPoisonDamage(
       this.player.maxHp,
       (byType.get('poison') || []).map((match) => match.size),

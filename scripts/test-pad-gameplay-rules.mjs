@@ -11,6 +11,7 @@ import {
   padEnhancedOrbMultiplier,
   padMatchPower,
   padNativeBaseAttackPower,
+  padNativeRecoveryPower,
   padOrbMatchMultiplier,
   padPoisonDamage,
   padSecondaryAttributeAttack,
@@ -119,6 +120,10 @@ assert.equal(padDamageAfterDefense(10, 0.5, 999), 1);
 assert.equal(padEnhancedOrbMultiplier(3), 1.18);
 assert.equal(padNativeBaseAttackPower(100, [{ size: 3, enhancedCount: 3 }], 1), 118);
 assert.equal(padNativeBaseAttackPower(101, [{ size: 3, enhancedCount: 3 }], 1), 120);
+assert.equal(padNativeBaseAttackPower(75, [{ size: 3, enhancedCount: 2 }], 1), 84);
+assert.equal(padNativeRecoveryPower([2], [{ size: 9, enhancedCount: 6 }], 7), 17);
+assert.equal(padNativeRecoveryPower([1, 2], [{ size: 13, enhancedCount: 10 }], 12), 63);
+assert.equal(padNativeRecoveryPower(3, [{ size: 13, enhancedCount: 10 }], 12), 62);
 assert.equal(padSecondaryAttributeAttack(900, 'fire', 'fire'), 90);
 assert.equal(padSecondaryAttributeAttack(900, 'fire', 'water'), 300);
 assert.equal(padSecondaryAttributeAttack(900, 'fire', 'fire', true), 135);

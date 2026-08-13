@@ -45,6 +45,10 @@ export function padEnhancedOrbMultiplier(enhancedCount) {
   return 1 + PAD_ENHANCED_ORB_BONUS * Math.max(0, Number(enhancedCount) || 0);
 }
 
+function padFloat32Multiply(left, right) {
+  return Math.fround(Math.fround(left) * Math.fround(right));
+}
+
 // libpad keeps a per-card integer base lane. _calcCharge adds each same-color
 // match to that lane before _gamePhaseComboWait invokes _applyComboMul for the
 // completed combo. sCARD::dmgUpBase then recomputes the current lane from the
@@ -54,13 +58,15 @@ export function padEnhancedOrbMultiplier(enhancedCount) {
 // sCARD::dmgUp and round positive values with +0.5. _calcAttackPow then applies
 // elemental advantage with izMathCeilingSint64.
 export function padNativeBaseAttackPower(attack, matchSizes, combos) {
-  const comboMultiplier = padComboMultiplier(combos);
+  const comboMultiplier = Math.fround(padComboMultiplier(combos));
   const baseAttack = matchSizes.reduce((total, match) => {
     const size = typeof match === 'number' ? match : match.size;
     const enhancedCount = typeof match === 'number' ? 0 : match.enhancedCount || 0;
-    return total + Math.ceil(attack * padOrbMatchMultiplier(size) * padEnhancedOrbMultiplier(enhancedCount));
+    const orbScaled = padFloat32Multiply(attack, padOrbMatchMultiplier(size));
+    const enhancedScaled = padFloat32Multiply(orbScaled, padEnhancedOrbMultiplier(enhancedCount));
+    return total + Math.ceil(enhancedScaled);
   }, 0);
-  return Math.ceil(baseAttack * comboMultiplier);
+  return Math.ceil(padFloat32Multiply(baseAttack, comboMultiplier));
 }
 
 // _buildAttackCharge keeps secondary and tertiary attributes in separate
@@ -70,9 +76,9 @@ export function padNativeBaseAttackPower(attack, matchSizes, combos) {
 // before match scaling.
 export function padSecondaryAttributeAttack(attack, mainAttribute, secondaryAttribute, attributeChanged = false) {
   if (!secondaryAttribute) return 0;
-  const value = Math.max(0, Number(attack) || 0);
-  if (attributeChanged) return Math.ceil(value * PAD_CHANGED_SECONDARY_ATTRIBUTE_RATIO);
-  return Math.ceil(value / (mainAttribute === secondaryAttribute ? 10 : 3));
+  const value = Math.fround(Math.max(0, Number(attack) || 0));
+  if (attributeChanged) return Math.ceil(padFloat32Multiply(value, PAD_CHANGED_SECONDARY_ATTRIBUTE_RATIO));
+  return Math.ceil(Math.fround(value / (mainAttribute === secondaryAttribute ? 10 : 3)));
 }
 
 // The lane-index 2 path in _buildAttackCharge multiplies by the exact float
@@ -80,11 +86,34 @@ export function padSecondaryAttributeAttack(attack, mainAttribute, secondaryAttr
 // alter the base ratio.
 export function padTertiaryAttributeAttack(attack, tertiaryAttribute) {
   if (!tertiaryAttribute) return 0;
-  return Math.ceil(Math.max(0, Number(attack) || 0) * PAD_TERTIARY_ATTRIBUTE_RATIO);
+  return Math.ceil(padFloat32Multiply(Math.max(0, Number(attack) || 0), PAD_TERTIARY_ATTRIBUTE_RATIO));
 }
 
 export function padApplyAttackMultipliers(attack, multipliers) {
-  return multipliers.reduce((value, multiplier) => Math.floor(value * multiplier + 0.5), attack);
+  return multipliers.reduce((value, multiplier) =>
+    Math.trunc(Math.fround(padFloat32Multiply(value, multiplier) + 0.5)), attack);
+}
+
+// _calcFinalRecPow keeps its per-card recovery contributions in single-
+// precision registers, accumulates those floats, then converts the final sum
+// to an integer with fcvtzs. Accept either the team total or the six native
+// card values; the latter preserves per-card float additions for callers that
+// model recovery modifiers.
+export function padNativeRecoveryPower(recoveries, heartMatches, combos) {
+  const cardRecoveries = Array.isArray(recoveries) ? recoveries : [recoveries];
+  const matchPower = heartMatches.reduce((total, match) => {
+    const size = typeof match === 'number' ? match : match.size;
+    const enhancedCount = typeof match === 'number' ? 0 : match.enhancedCount || 0;
+    const contribution = padFloat32Multiply(padOrbMatchMultiplier(size), padEnhancedOrbMultiplier(enhancedCount));
+    return Math.fround(total + contribution);
+  }, Math.fround(0));
+  const comboMultiplier = Math.fround(padComboMultiplier(combos));
+  const total = cardRecoveries.reduce((sum, recovery) => {
+    const matchScaled = padFloat32Multiply(Math.max(0, Number(recovery) || 0), matchPower);
+    const comboScaled = padFloat32Multiply(matchScaled, comboMultiplier);
+    return Math.fround(sum + comboScaled);
+  }, Math.fround(0));
+  return Math.trunc(total);
 }
 
 export function padDamageAfterDefense(attack, attributeMultiplier, defense) {

@@ -233,7 +233,11 @@ being independently multiplied and rounded. Later attack multipliers call
 `sCARD::dmgUp`, which rounds positive values to nearest with `+0.5`;
 `_calcAttackPow` applies elemental advantage/disadvantage with
 `izMathCeilingSint64` before defense. Recovery uses positive `fcvtzs`
-truncation in `_recPowSet`, matching a floor operation.
+truncation in `_recPowSet`, matching a floor operation. Intermediate attack and
+recovery operations held in AArch64 `s` registers are explicitly narrowed with
+JavaScript `Math.fround`; this avoids binary64 artifacts at integer boundaries
+(for example, 75 attack with two enhanced orbs is exactly 84 in the native
+single-precision path, not 85).
 
 The attack records contain independent main, tertiary, and secondary attribute
 lanes, resolved in that order. `_buildAttackCharge` divides a natural secondary
