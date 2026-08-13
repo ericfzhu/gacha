@@ -74,7 +74,8 @@ allocatorLinux.mountSharedObject('/system/lib64/liblog.so', await readFile(resol
 allocatorLinux.mountSharedObject('/system/lib64/libc.so', await readFile(resolve(project, 'public/android-stubs/libc.so')), 0x6200000);
 if (!allocatorLinux.resolveSymbolAddress('fcntl') || !allocatorLinux.resolveSymbolAddress('inotify_add_watch') ||
     !allocatorLinux.resolveSymbolAddress('gettimeofday') || !allocatorLinux.resolveSymbolAddress('sigaction') ||
-    !allocatorLinux.resolveSymbolAddress('rewinddir') || !allocatorLinux.resolveSymbolAddress('pthread_exit') ||
+    !allocatorLinux.resolveSymbolAddress('rewinddir') || !allocatorLinux.resolveSymbolAddress('fgetpos') ||
+    !allocatorLinux.resolveSymbolAddress('pthread_exit') ||
     !allocatorLinux.resolveSymbolAddress('sendmsg') || !allocatorLinux.resolveSymbolAddress('strstr') ||
     !allocatorLinux.resolveSymbolAddress('pthread_once') || !allocatorLinux.resolveSymbolAddress('realloc') ||
     !allocatorLinux.resolveSymbolAddress('recvmsg') || !allocatorLinux.resolveSymbolAddress('__cmsg_nxthdr')) {

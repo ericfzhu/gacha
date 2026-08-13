@@ -441,6 +441,16 @@ int fseek(BrowserFile *file, int64_t offset, int whence) {
 }
 
 __attribute__((visibility("default")))
+int fgetpos(BrowserFile *file, int64_t *position) {
+  if (!file || !file->active) { browser_errno = 9; return -1; }
+  if (!position) { browser_errno = 22; return -1; }
+  int64_t offset = lseek(file->descriptor, 0, 1);
+  if (offset < 0) { browser_errno = (int)-offset; return -1; }
+  *position = offset;
+  return 0;
+}
+
+__attribute__((visibility("default")))
 uint64_t fread(void *output, uint64_t size, uint64_t count, BrowserFile *file) {
   if (!size || !count) return 0;
   if (!file || !file->active || count > UINT64_MAX / size) { browser_errno = 22; return 0; }

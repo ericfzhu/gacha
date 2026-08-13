@@ -381,6 +381,17 @@ canonicalizes selected names to Android's case-sensitive private paths:
 `.bin` files under `files/`. This also makes uppercase host filenames usable
 without changing the path requested by `libpad.so`.
 
+The downloaded-file loader uses `fseek(file, 0, SEEK_END)`, `fgetpos`, rewind,
+then a single full-length `fread`. The first browser ABI initially lacked
+`fgetpos`, so its generic compatibility return left the output position at zero
+and suppressed every payload read. The AArch64 libc shim now implements the
+Android 64-bit `fpos_t` write against the virtual descriptor offset. An exact
+browser trace with the APK's own 91,486-byte `DATA000.BIN` as a structural
+control now records `SEEK_CUR = 91486` and full 91,486-byte reads for both
+runtime paths, including the original `MCD5` header bytes. The control is not
+claimed to be valid downloaded data; it proves that the native format validators
+now receive the supplied payloads rather than stopping in the platform shim.
+
 The full browser smoke test treats this as a verified execution boundary, not
 just a rendered screenshot: it requires the exact-library probe, all six
 lifecycle exports, more than 100 million interpreted guest instructions, more
