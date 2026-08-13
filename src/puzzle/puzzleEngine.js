@@ -11,6 +11,8 @@ import {
   padAttributeMultiplier,
   padBombDamage,
   padComboLeaderMultiplier,
+  padCountBlockBits,
+  padCountNonPoisonBlocks,
   padDamageAfterDefense,
   padNativeBaseAttackPower,
   padNativeRecoveryPower,
@@ -851,6 +853,18 @@ export class PuzzleEngine {
     // preserves the call shape while the deterministic browser model omits it.
     void presentation;
     return selected.assignments.length;
+  }
+
+  countBlockBits(typeMask) {
+    return padCountBlockBits(this.board.map((row) => row.map((orb) => (
+      ORB_TYPES.findIndex((candidate) => candidate.id === orb.type)
+    ))), typeMask);
+  }
+
+  countNonPoisonBlocks(excludeHeart = false) {
+    return padCountNonPoisonBlocks(this.board.map((row) => row.map((orb) => (
+      ORB_TYPES.findIndex((candidate) => candidate.id === orb.type)
+    ))), excludeHeart);
   }
 
   isCell(row, column) {

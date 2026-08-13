@@ -2,6 +2,23 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 native board-mask queries
+
+- Recovered `_countBlockBits` at `0x651fa4` and completed the already anchored
+  `_countNonPoisonBlocks` contract at `0x61c250` as prerequisites for the native
+  block-swap/replacement family.
+- Ported the native mortal-poison alias: type 8 responds to both its own bit 8
+  and ordinary poison bit 7. The non-poison query excludes types 7/8, optionally
+  excludes Heart, and deliberately ignores lock/enhancement state.
+- Added pure, engine, locked-cell, and browser fixtures and expanded the exact
+  restored-binary inspector to 44 gameplay anchors.
+- Verification passed: gameplay rules, production build, exact inspector,
+  exhaustive browser suite, generic tap-turn/text-state loop, console checks,
+  and both canvas/full-page screenshot inspection.
+- Next: recover `_doBitReplace`/`_doBlockSwapMain` mutation flags and then the
+  public `_doBlockSwap4`/`_doBlockSwap5` mask wrappers without flattening their
+  special-orb passive interactions into ordinary conversions.
+
 ## 2026-08-14 masked block-change fidelity
 
 - Recovered `_doPoisonBlockN2` at `0x61c344`, including both candidate modes:

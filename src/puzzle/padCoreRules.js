@@ -309,6 +309,41 @@ export function padSelectMaskedBlockChanges(
   };
 }
 
+// _countBlockBits (0x651fa4) tests a uint16 type mask over the live board.
+// Mortal poison type 8 deliberately also exposes poison bit 7, so a poison-mask
+// query counts both poison variants while bit 8 can still target mortal poison.
+export function padCountBlockBits(boardTypes, typeMask) {
+  const mask = Number(typeMask) & 0xffff;
+  if (!Array.isArray(boardTypes)) return 0;
+  let count = 0;
+  boardTypes.forEach((row) => {
+    if (!Array.isArray(row)) return;
+    row.forEach((value) => {
+      const type = Math.trunc(Number(value));
+      if (type < 0 || type > 15) return;
+      const bits = (1 << type) | (type === 8 ? 1 << 7 : 0);
+      if ((mask & bits) !== 0) count += 1;
+    });
+  });
+  return count;
+}
+
+// _countNonPoisonBlocks (0x61c250) ignores poison types 7/8 and optionally
+// Heart type 5. It counts every other live board cell regardless of lock or
+// enhancement state.
+export function padCountNonPoisonBlocks(boardTypes, excludeHeart = false) {
+  if (!Array.isArray(boardTypes)) return 0;
+  let count = 0;
+  boardTypes.forEach((row) => {
+    if (!Array.isArray(row)) return;
+    row.forEach((value) => {
+      const type = Math.trunc(Number(value));
+      if (type !== 7 && type !== 8 && (!excludeHeart || type !== 5)) count += 1;
+    });
+  });
+  return count;
+}
+
 // The same native routine builds its candidates from numeric block types
 // 0..5, optionally extends the range through jammer type 6, removes the type
 // supplied in w1, and can suppress heart type 5. It returns the first element

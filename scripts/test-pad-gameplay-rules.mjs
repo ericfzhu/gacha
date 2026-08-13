@@ -10,6 +10,8 @@ import {
   padBombDamage,
   padComboMultiplier,
   padComboLeaderMultiplier,
+  padCountBlockBits,
+  padCountNonPoisonBlocks,
   padDamageAfterDefense,
   padEnhancementPowerMultiplier,
   padEnhancedOrbMultiplier,
@@ -167,6 +169,16 @@ assert.equal(padSelectMaskedBlockChanges(21_900, [[0]], 0, 0, 0).state, 3_803_93
 assert.equal(padSelectMaskedBlockChanges(21_900, [[0]], -1, 0, 0).state, 3_803_934_822);
 assert.equal(padSelectMaskedBlockChanges(21_900, [[0]], 1, 1, 1).state, 3_803_934_822);
 assert.equal(padSelectMaskedBlockChanges(21_900, [], 1, 1, 0).state, 3_803_934_822);
+assert.equal(padCountBlockBits(maskedChangeBoard, 1 << 5), 6);
+assert.equal(padCountBlockBits(maskedChangeBoard, 1 << 7), 1);
+assert.equal(padCountBlockBits(maskedChangeBoard, 1 << 8), 1);
+assert.equal(padCountBlockBits(maskedChangeBoard, (1 << 7) | (1 << 8)), 1);
+assert.equal(padCountBlockBits([[7, 8, 8, 6]], 1 << 7), 3);
+assert.equal(padCountBlockBits([[7, 8, 8, 6]], 1 << 8), 2);
+assert.equal(padCountBlockBits([[7, 8, 8, 6]], 1 << 6), 1);
+assert.equal(padCountBlockBits([[7, 8, 8, 6]], 0), 0);
+assert.equal(padCountNonPoisonBlocks(maskedChangeBoard), 29);
+assert.equal(padCountNonPoisonBlocks(maskedChangeBoard, true), 23);
 assert.deepEqual(padGetRandomBlock(21_900), { state: 3_803_934_822, type: 1 });
 assert.deepEqual(padGetRandomBlock(21_900, 1), { state: 3_803_934_822, type: 2 });
 assert.deepEqual(padGetRandomBlock(21_900, -1, true, true), { state: 3_803_934_822, type: 1 });
@@ -722,6 +734,14 @@ naturalMaskedChangeEngine.setOrbState(2, 5, { enhancementPower: 0.5 });
 assert.equal(naturalMaskedChangeEngine.doPoisonBlockN2(1, 1, 0), 1);
 assert.equal(naturalMaskedChangeEngine.board[2][5].type, 'fire');
 assert.equal(naturalMaskedChangeEngine.board[2][5].enhancementPower, 0.5);
+const blockCountEngine = new PuzzleEngine({ seed: 21_900 });
+blockCountEngine.setBoardFromCodes(['JPMXHD', 'GLDHRG', 'HBGDGL', 'DLGHHB', 'HBGGLD']);
+blockCountEngine.setOrbState(0, 1, { locked: true });
+assert.equal(blockCountEngine.countBlockBits(1 << 7), 2);
+assert.equal(blockCountEngine.countBlockBits(1 << 8), 1);
+assert.equal(blockCountEngine.countBlockBits(1 << 9), 1);
+assert.equal(blockCountEngine.countNonPoisonBlocks(), 28);
+assert.equal(blockCountEngine.countNonPoisonBlocks(true), 22);
 assert.equal(specialLockEngine.doLockDropBits(0x3c0, 4, 0xbeef), true);
 for (let column = 0; column < 4; column += 1) {
   const orb = specialLockEngine.board[0][column];

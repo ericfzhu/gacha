@@ -310,13 +310,22 @@ try {
     const mappedAttempted = engine.doPoisonBlockN2(2, 0xc0, 0xffff_ffff, false, false, selectedRows);
     const mappedTypes = [[2, 5], [0, 3], [2, 0], [4, 3]]
       .map(([row, column]) => engine.board[row][column].type);
+    engine.setBoardFromCodes(['JPMXHD', 'GLDHRG', 'HBGDGL', 'DLGHHB', 'HBGGLD']);
+    engine.setOrbState(0, 1, { locked: true });
+    const blockCounts = {
+      poisonMask: engine.countBlockBits(1 << 7),
+      mortalMask: engine.countBlockBits(1 << 8),
+      bombMask: engine.countBlockBits(1 << 9),
+      nonPoison: engine.countNonPoisonBlocks(),
+      nonPoisonNoHeart: engine.countNonPoisonBlocks(true),
+    };
     engine.reset();
     engine.start();
     return {
       lockedStartState, lockedChanged, lockedEndState, startState, changed, endState,
       beforeMortal, afterMortal, bulkStartState, bulkChanged, bulkEndState, bulkPoison, bulkLockedType,
       maskedDryCount, maskedDryState, maskedAttempted, maskedEndState, maskedTypes,
-      mappedAttempted, selectedRows: [...selectedRows], mappedTypes,
+      mappedAttempted, selectedRows: [...selectedRows], mappedTypes, blockCounts,
     };
   }) : null;
   const advanceLcg = (state, count) => {
@@ -338,7 +347,10 @@ try {
     JSON.stringify(poisonBlockSample.maskedTypes) !== JSON.stringify(['jammer', 'water', 'poison', 'poison']) ||
     poisonBlockSample.mappedAttempted !== 4 ||
     JSON.stringify(poisonBlockSample.selectedRows) !== JSON.stringify([0x08, 0, 0x21, 0, 0x08]) ||
-    JSON.stringify(poisonBlockSample.mappedTypes) !== JSON.stringify(['jammer', 'jammer', 'poison', 'poison'])
+    JSON.stringify(poisonBlockSample.mappedTypes) !== JSON.stringify(['jammer', 'jammer', 'poison', 'poison']) ||
+    JSON.stringify(poisonBlockSample.blockCounts) !== JSON.stringify({
+      poisonMask: 2, mortalMask: 1, bombMask: 1, nonPoison: 28, nonPoisonNoHeart: 22,
+    })
   )) throw new Error(`Poison-block mismatch: ${JSON.stringify(poisonBlockSample)}`);
   if (renderAtlasSheet) {
     const sheet = page.locator('#pad-atlas-sheet');

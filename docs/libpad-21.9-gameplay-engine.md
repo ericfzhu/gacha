@@ -295,6 +295,17 @@ native sound/effect presentation and does not alter board selection. The port's
 `padSelectMaskedBlockChanges` and `PuzzleEngine.doPoisonBlockN2` expose these
 candidate, RNG, bitmap, and mutation rules directly.
 
+Two native board queries feed these replacement decisions. `_countBlockBits`
+at `0x651fa4` scans the active board against a 16-bit type mask without filtering
+locked or enhanced cells. Its type mapping is intentionally asymmetric: mortal
+poison type `8` tests both bit `8` and the ordinary poison bit `7`. Therefore a
+bit-7 query counts poison and mortal poison together, while bit 8 counts only
+mortal poison. `_countNonPoisonBlocks(bool excludeHeart)` at `0x61c250` excludes
+both poison variants and includes Heart unless its argument is true; all other
+cells count regardless of block flags. `padCountBlockBits`,
+`padCountNonPoisonBlocks`, and their `PuzzleEngine` methods expose the same
+eligibility counts used by the native skill paths.
+
 The enemy inverse is `_doBlockMinus(bool, uint32 mask, float, int)` at
 `0x61caa0`. Only cells whose type bit is in the mask and whose current power is
 non-negative are eligible; applying the effect stores the negated binary32
