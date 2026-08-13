@@ -609,11 +609,34 @@ Definition setup is browser-accessible without first constructing a 2,896-byte
 monster record. `decodePadEnemySkillDefinition` reproduces the type-128 setup
 entry, including its nonpositive-chance default, and
 `PuzzleEngine.applyEnemySkillDefinition` executes that materialized record.
-For turn-driven use, `setEnemySkillQueue(enemyIndex, definitions)` supplies the
-already-selected definition sequence at the native AI boundary. Enemy AI choice
-itself remains data-driven: `_doEnemyAi` stores its selected definition index at
-`sMONSTER+0x670`, but its condition records come from the downloaded enemy data
-set and are not fabricated by the browser port.
+For turn-driven use, `setEnemySkillQueue(enemyIndex, definitions)` supplies an
+already-selected definition sequence at the native AI boundary. `_doEnemyAi`
+stores its selected definition index at `sMONSTER+0x670`; the browser also
+accepts the raw downloaded record subset needed to select supported type-128
+definitions without fabricating condition data.
+
+The newer selector is chosen by enemy-definition byte `+0xe0` bit 0.
+`decodePadEnemyAiMonsterDefinition` reads its signed AI budget cap/regeneration
+at `+0xe2/+0xe4` and up to 64 eight-byte slots beginning at `+0xec`; each slot
+contains a 32-bit skill ID plus immediate-chance and fallback-weight bytes at
+`+4/+5`. `decodePadEnemyAiSkillDefinition` reads probability factors at
+`sENEMYSKILL+0x30/+0x34`, signed HP threshold percentage at `+0x38`, and budget
+cost at `+0x40`. `_chooseEnemyAiNew` (`0x61d450`) scans slots in order, requires
+`currentHP / maxHP * 100 <= threshold` and sufficient pre-regeneration budget,
+then computes the immediate basis-point chance as
+`factor0 * factor1 * slotChance / 100000`, capped at 10,000. Every admitted
+immediate test spends the ordinary game-work LCG stream.
+
+If no immediate test succeeds, one further LCG step selects among the eligible
+`+5` weights. The native routine still spends that fallback step when the
+candidate list exists but its dynamic conditions reduce the effective total to
+zero. After selection, budget regenerates with integer clipping to the decoded
+cap and the selected skill's cost is subtracted. For type 128,
+`_chooseEnemyAiSub` (`0x61a58c`) returns one only while black-fall is inactive,
+so an active copy cannot be selected again. `setEnemyAiDefinitionPool` wires
+this raw record path into enemy turns and reports the chosen skill ID, budget,
+and RNG state. Other condition callbacks, flow-control records, and the legacy
+selector are rejected explicitly until decoded rather than approximated.
 
 The action boundary is recovered independently. `_setupEnemyAttack`
 (`0x622f64`) reads the counter object at `sMONSTER+0x120` and only admits a live

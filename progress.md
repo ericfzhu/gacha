@@ -2,6 +2,26 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-14 data-backed new enemy AI selection
+
+- Recovered `_doEnemyAi`'s mode switch and the supported portion of
+  `_chooseEnemyAiNew`: enemy-definition `+0xe0` bit 0 selects it, `+0xe2/+0xe4`
+  hold budget cap/regeneration, and 64 slots at `+0xec` carry skill ID,
+  immediate-chance, and fallback-weight fields.
+- Ported type-128 selection from raw records, including definition probability
+  factors `+0x30/+0x34`, HP threshold `+0x38`, budget cost `+0x40`, slot-order
+  immediate rolls, weighted fallback, exact ordinary LCG consumption, budget
+  regeneration/cost, and the black-fall-already-active condition.
+- Integrated decoded pools into enemy turns while retaining explicit selected
+  queues as an override. Snapshots expose chosen skill IDs, AI budget, and slot
+  count. Unsupported effect conditions, flow control, and the legacy selector
+  remain explicit errors.
+- Pure rules, production build, exhaustive project browser tests, and the
+  generic gameplay client pass. Four selector/condition anchors bring the
+  restored-image inspector to 83 exact gameplay symbols.
+- Next: decode another board-affecting `_doEnemySkill` type and its
+  `_chooseEnemyAiSub` condition, then broaden raw-pool selection to it.
+
 ## 2026-08-14 enemy skill accompanying attacks
 
 - Traced `_setupSkillWithAttack`'s positive definition field `+0x44` through

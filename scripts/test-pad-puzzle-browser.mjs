@@ -539,6 +539,29 @@ try {
     const scheduledBlackFall = engine.snapshot();
     engine.setEnemySkillQueue(0, []);
     engine.setBlackFallRule(null);
+    const enemyAiMonsterDefinition = new Uint8Array(0x2ec);
+    const enemyAiMonsterView = new DataView(enemyAiMonsterDefinition.buffer);
+    enemyAiMonsterView.setUint8(0xe0, 1);
+    enemyAiMonsterView.setInt16(0xe2, 100, true);
+    enemyAiMonsterView.setInt16(0xe4, 10, true);
+    enemyAiMonsterView.setUint32(0xec, 9_001, true);
+    enemyAiMonsterView.setUint8(0xf0, 100);
+    const enemyAiBlackFallDefinition = scheduledBlackFallDefinition.slice();
+    const enemyAiBlackFallView = new DataView(enemyAiBlackFallDefinition.buffer);
+    enemyAiBlackFallView.setUint32(0x00, 9_001, true);
+    enemyAiBlackFallView.setInt32(0x30, 10_000, true);
+    enemyAiBlackFallView.setInt32(0x34, 1_000, true);
+    enemyAiBlackFallView.setInt32(0x38, 100, true);
+    enemyAiBlackFallView.setInt32(0x40, 20, true);
+    engine.setEnemyAiDefinitionPool(0, enemyAiMonsterDefinition, [enemyAiBlackFallDefinition]);
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    const selectedEnemyAiHp = engine.player.hp;
+    engine.resolveEnemyTurn();
+    const selectedEnemyAi = engine.snapshot();
+    engine.setEnemyAiDefinitionPool(0, null);
+    engine.setBlackFallRule(null);
     engine.reset();
     const initialBoard = engine.snapshot().board;
     const initialBoardState = engine.rng.state;
@@ -571,7 +594,7 @@ try {
       enhancedFallPower, enhancedFallRuleState, weakenedFallPower, weakenedFallRuleState,
       blackFallSkillApplied, blackFallOrb, blackFallRuleState, blackFallAfterFresh, blackFallTurnsAfterFresh,
       blackFallAfterExpiry, blackFallRuleAfterExpiry,
-      scheduledBlackFallHp, scheduledBlackFall,
+      scheduledBlackFallHp, scheduledBlackFall, selectedEnemyAiHp, selectedEnemyAi,
       initialBoard, initialBoardState,
     };
   }) : null;
@@ -681,6 +704,13 @@ try {
     poisonBlockSample.scheduledBlackFall.lastEnemyActions?.[0]?.skill?.type !== 128 ||
     poisonBlockSample.scheduledBlackFall.lastEnemyActions?.[0]?.damage !== 925 ||
     poisonBlockSample.scheduledBlackFall.enemies?.[0]?.queuedEnemySkills !== 0 ||
+    poisonBlockSample.selectedEnemyAi.player.hp !== poisonBlockSample.selectedEnemyAiHp - 925 ||
+    poisonBlockSample.selectedEnemyAi.rngState !== 394_448_415 ||
+    poisonBlockSample.selectedEnemyAi.lastEnemyActions?.[0]?.skill?.type !== 128 ||
+    poisonBlockSample.selectedEnemyAi.lastEnemyActions?.[0]?.skill?.skillId !== 9_001 ||
+    poisonBlockSample.selectedEnemyAi.lastEnemyActions?.[0]?.damage !== 925 ||
+    poisonBlockSample.selectedEnemyAi.enemies?.[0]?.enemyAiBudget !== 80 ||
+    poisonBlockSample.selectedEnemyAi.enemies?.[0]?.enemyAiSkillSlots !== 1 ||
     JSON.stringify(poisonBlockSample.initialBoard) !== JSON.stringify([
       'RHGBGG', 'BBGHRL', 'LDBRHR', 'BHLDBH', 'LRLDHR',
     ]) || poisonBlockSample.initialBoardState !== 79_238_434

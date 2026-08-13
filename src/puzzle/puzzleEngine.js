@@ -33,11 +33,17 @@ import {
   tracePadPointerCells,
 } from './padCoreRules.js';
 import {
+  PAD_ENEMY_SKILL_BLACK_FALL,
   decodePadEnemySkillDefinition,
   decodePadEnemySkillRuntime,
   normalizePadEnemySkillRecord,
   padEnemySkillAttack,
 } from './padEnemySkills.js';
+import {
+  decodePadEnemyAiMonsterDefinition,
+  decodePadEnemyAiSkillDefinition,
+  selectPadEnemyAiNew,
+} from './padEnemyAi.js';
 
 export const BOARD_COLUMNS = PAD_BOARD_COLUMNS;
 export const BOARD_ROWS = PAD_BOARD_ROWS;
@@ -125,6 +131,7 @@ export class PuzzleEngine {
     lockFallRules = [],
     lockFallSeed = seed,
     enemySkillQueues = [],
+    enemyAiPools = [],
   } = {}) {
     if (![columns, rows].every(Number.isInteger) || columns < 1 || columns > 15 || rows < 1 || rows > 15) {
       throw new Error('PAD board dimensions must be integers from 1 through 15.');
@@ -156,6 +163,13 @@ export class PuzzleEngine {
         this.setEnemySkillQueue(enemyIndex, queue.definitions || queue, { repeat: queue.repeat });
       }
     });
+    this.enemyAiPools = ENEMY_TEMPLATE.map(() => null);
+    if (!Array.isArray(enemyAiPools)) throw new Error('PAD enemy AI pools must be an array.');
+    enemyAiPools.forEach((pool, enemyIndex) => {
+      if (pool !== null && pool !== undefined) {
+        this.setEnemyAiDefinitionPool(enemyIndex, pool.monsterDefinition, pool.skillDefinitions);
+      }
+    });
     this.rng = createPadRng(seed);
     this.orbSerial = 0;
     this.visualTime = 0;
@@ -182,6 +196,9 @@ export class PuzzleEngine {
     this.lastEnemySkill = null;
     this.lastEnemyActions = [];
     this.enemySkillQueues.forEach((queue) => { queue.position = 0; });
+    this.enemyAiPools.forEach((pool) => {
+      if (pool) pool.aiBudget = pool.monster.budgetCap;
+    });
     this.pendingComboDrops = 0;
     this.comboDropBonusCount = 0;
     this.turnNailCount = 0;
@@ -808,14 +825,29 @@ export class PuzzleEngine {
 
   takeEnemySkill(enemyIndex) {
     const queue = this.enemySkillQueues[enemyIndex];
-    if (!queue?.records.length) return null;
-    if (queue.position >= queue.records.length) {
-      if (!queue.repeat) return null;
-      queue.position = 0;
+    if (queue?.records.length) {
+      if (queue.position >= queue.records.length) {
+        if (queue.repeat) queue.position = 0;
+      }
+      if (queue.position < queue.records.length) {
+        const skill = queue.records[queue.position];
+        queue.position += 1;
+        return skill;
+      }
     }
-    const skill = queue.records[queue.position];
-    queue.position += 1;
-    return skill;
+    const pool = this.enemyAiPools[enemyIndex];
+    if (!pool) return null;
+    const enemy = this.enemies[enemyIndex];
+    const selection = selectPadEnemyAiNew(pool.monster, pool.definitions, {
+      currentHp: enemy.hp,
+      maxHp: enemy.maxHp,
+      aiBudget: pool.aiBudget,
+      blackFallActive: Boolean(this.blackFallRule?.active),
+      rngState: this.rng.state,
+    });
+    this.rng.setState(selection.rngState);
+    pool.aiBudget = selection.aiBudget;
+    return selection.effect ? { ...selection.effect, skillId: selection.skillId } : null;
   }
 
   advanceBlackOrbCountdowns() {
@@ -972,6 +1004,34 @@ export class PuzzleEngine {
       throw new RangeError('PAD scheduled enemy-skill definitions require the native +0x44 attack-with-skill field.');
     }
     this.enemySkillQueues[index] = { records, position: 0, repeat: Boolean(repeat) };
+  }
+
+  setEnemyAiDefinitionPool(enemyIndex, monsterDefinition, skillDefinitions) {
+    const index = Math.trunc(Number(enemyIndex));
+    if (index < 0 || index >= ENEMY_TEMPLATE.length) {
+      throw new RangeError(`PAD enemy index must be between 0 and ${ENEMY_TEMPLATE.length - 1}.`);
+    }
+    if (monsterDefinition === null || monsterDefinition === undefined) {
+      this.enemyAiPools[index] = null;
+      return;
+    }
+    const monster = decodePadEnemyAiMonsterDefinition(monsterDefinition);
+    if (!monster.usesNewAi) throw new Error('PAD legacy enemy AI records are not implemented at this boundary.');
+    if (!Array.isArray(skillDefinitions)) throw new TypeError('PAD enemy AI skill definitions must be an array.');
+    const definitions = skillDefinitions.map((definition) => decodePadEnemyAiSkillDefinition(definition));
+    const definitionsById = new Map(definitions.map((definition) => [definition.skillId, definition]));
+    for (const slot of monster.slots) {
+      const definition = definitionsById.get(slot.skillId);
+      if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
+      if (definition.effect.type !== PAD_ENEMY_SKILL_BLACK_FALL || !definition.effect.supported) {
+        throw new Error(`PAD enemy AI skill ${slot.skillId} uses an unsupported condition/effect type.`);
+      }
+    }
+    this.enemyAiPools[index] = {
+      monster,
+      definitions,
+      aiBudget: monster.budgetCap,
+    };
   }
 
   setEnhancedFallAwakenings(counts) {
@@ -1513,6 +1573,8 @@ export class PuzzleEngine {
           0,
           (this.enemySkillQueues[index]?.records.length || 0) - (this.enemySkillQueues[index]?.position || 0),
         ),
+        enemyAiBudget: this.enemyAiPools[index]?.aiBudget ?? null,
+        enemyAiSkillSlots: this.enemyAiPools[index]?.monster.slots.length ?? 0,
       })),
       skill: { ...this.skill, ready: this.skill.cooldown === 0 },
       message: this.message,

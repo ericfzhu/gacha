@@ -7,6 +7,11 @@ import {
   padEnemySkillAttack,
 } from '../src/puzzle/padEnemySkills.js';
 import {
+  decodePadEnemyAiMonsterDefinition,
+  decodePadEnemyAiSkillDefinition,
+  selectPadEnemyAiNew,
+} from '../src/puzzle/padEnemyAi.js';
+import {
   createPadLcg,
   createPadRng,
   findPadMatches,
@@ -295,6 +300,96 @@ assert.equal(padEnemySkillAttack(1_850, 50), 925);
 assert.equal(padEnemySkillAttack(10_000_001, 33), 3_300_001);
 assert.equal(padEnemySkillAttack(1_850, 0), 0);
 authoredBlackFallView.setInt32(0x44, 0, true);
+
+const enemyAiMonsterDefinition = new Uint8Array(0x2ec);
+const enemyAiMonsterView = new DataView(enemyAiMonsterDefinition.buffer);
+enemyAiMonsterView.setUint8(0xe0, 1);
+enemyAiMonsterView.setInt16(0xe2, 100, true);
+enemyAiMonsterView.setInt16(0xe4, 10, true);
+enemyAiMonsterView.setUint32(0xec, 9_001, true);
+enemyAiMonsterView.setUint8(0xf0, 100);
+const enemyAiBlackFallDefinition = authoredBlackFallDefinition.slice();
+const enemyAiBlackFallView = new DataView(enemyAiBlackFallDefinition.buffer);
+enemyAiBlackFallView.setUint32(0x00, 9_001, true);
+enemyAiBlackFallView.setInt32(0x30, 10_000, true);
+enemyAiBlackFallView.setInt32(0x34, 1_000, true);
+enemyAiBlackFallView.setInt32(0x38, 100, true);
+enemyAiBlackFallView.setInt32(0x40, 20, true);
+enemyAiBlackFallView.setInt32(0x44, 50, true);
+const decodedEnemyAiMonster = decodePadEnemyAiMonsterDefinition(enemyAiMonsterDefinition);
+const decodedEnemyAiSkill = decodePadEnemyAiSkillDefinition(enemyAiBlackFallDefinition);
+assert.deepEqual(decodedEnemyAiMonster.slots, [{
+  index: 0,
+  skillId: 9_001,
+  immediateChance: 100,
+  fallbackWeight: 0,
+}]);
+assert.deepEqual({
+  usesNewAi: decodedEnemyAiMonster.usesNewAi,
+  budgetCap: decodedEnemyAiMonster.budgetCap,
+  budgetRegen: decodedEnemyAiMonster.budgetRegen,
+}, { usesNewAi: true, budgetCap: 100, budgetRegen: 10 });
+assert.deepEqual({
+  skillId: decodedEnemyAiSkill.skillId,
+  immediateFactor0: decodedEnemyAiSkill.immediateFactor0,
+  immediateFactor1: decodedEnemyAiSkill.immediateFactor1,
+  hpThresholdPercent: decodedEnemyAiSkill.hpThresholdPercent,
+  budgetCost: decodedEnemyAiSkill.budgetCost,
+}, {
+  skillId: 9_001,
+  immediateFactor0: 10_000,
+  immediateFactor1: 1_000,
+  hpThresholdPercent: 100,
+  budgetCost: 20,
+});
+const selectedEnemyAi = selectPadEnemyAiNew(
+  decodedEnemyAiMonster,
+  [decodedEnemyAiSkill],
+  { currentHp: 92_000, maxHp: 92_000, aiBudget: 100, rngState: 21_900 },
+);
+assert.equal(selectedEnemyAi.skillId, 9_001);
+assert.equal(selectedEnemyAi.effect.attackWithSkillValue, 50);
+assert.equal(selectedEnemyAi.rngState, 394_448_415);
+assert.equal(selectedEnemyAi.aiBudget, 80);
+const inactiveEnemyAi = selectPadEnemyAiNew(
+  decodedEnemyAiMonster,
+  [decodedEnemyAiSkill],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    blackFallActive: true,
+    rngState: 21_900,
+  },
+);
+assert.equal(inactiveEnemyAi.skillId, null);
+assert.equal(inactiveEnemyAi.rngState, 21_900);
+assert.equal(inactiveEnemyAi.aiBudget, 100);
+const weightedEnemyAiMonsterDefinition = enemyAiMonsterDefinition.slice();
+const weightedEnemyAiMonsterView = new DataView(weightedEnemyAiMonsterDefinition.buffer);
+weightedEnemyAiMonsterView.setUint8(0xf0, 0);
+weightedEnemyAiMonsterView.setUint8(0xf1, 1);
+const weightedEnemyAiMonster = decodePadEnemyAiMonsterDefinition(weightedEnemyAiMonsterDefinition);
+const weightedEnemyAi = selectPadEnemyAiNew(
+  weightedEnemyAiMonster,
+  [decodedEnemyAiSkill],
+  { currentHp: 92_000, maxHp: 92_000, aiBudget: 100, rngState: 21_900 },
+);
+assert.equal(weightedEnemyAi.skillId, 9_001);
+assert.equal(weightedEnemyAi.rngState, 394_448_415);
+const blockedWeightedEnemyAi = selectPadEnemyAiNew(
+  weightedEnemyAiMonster,
+  [decodedEnemyAiSkill],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    blackFallActive: true,
+    rngState: 21_900,
+  },
+);
+assert.equal(blockedWeightedEnemyAi.skillId, null);
+assert.equal(blockedWeightedEnemyAi.rngState, 394_448_415);
 assert.deepEqual(padResolveEnhancementFall(21_900, 0, Array(6).fill(0)), {
   state: 394_448_415,
   enhancementPower: 0,
@@ -993,6 +1088,26 @@ assert.deepEqual(scheduledSkillEngine.lastEnemyActions, [{
   kind: 'attack',
   damage: scheduledSkillEngine.enemies[0].attack,
 }]);
+
+const selectedAiEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: enemyAiMonsterDefinition,
+    skillDefinitions: [enemyAiBlackFallDefinition],
+  }],
+});
+selectedAiEngine.setRngState(21_900);
+selectedAiEngine.enemies[0].counter = 1;
+selectedAiEngine.enemies[1].counter = 99;
+const selectedAiHp = selectedAiEngine.player.hp;
+selectedAiEngine.resolveEnemyTurn();
+assert.equal(selectedAiEngine.player.hp, selectedAiHp - 925);
+assert.equal(selectedAiEngine.rng.state, 394_448_415);
+assert.equal(selectedAiEngine.snapshot().enemies[0].enemyAiBudget, 80);
+assert.equal(selectedAiEngine.snapshot().enemies[0].enemyAiSkillSlots, 1);
+assert.equal(selectedAiEngine.lastEnemyActions[0].skill.type, 128);
+assert.equal(selectedAiEngine.lastEnemyActions[0].skill.skillId, 9_001);
+assert.equal(selectedAiEngine.lastEnemyActions[0].damage, 925);
 assert.equal(blackFallEngine.board[0][0].nail, false);
 
 assert.deepEqual(tracePadDragCells(0, 0, 1, 1), [{ row: 0, column: 1 }, { row: 1, column: 1 }]);

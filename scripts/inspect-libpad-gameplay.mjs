@@ -64,6 +64,10 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['orb-state', 'doBlockSwap3', '_ZN9cGAMEMAIN13_doBlockSwap3EPKN9sSAVEDATA11sSKILLDATA210sSKILLDATAE', 0x6aea98],
   ['board', 'setupDungeons', '_ZN9cGAMEMAIN14_setupDungeonsEv', 0x65ac0c],
   ['enemy-ai', 'chooseEnemyAi', '_ZN9cGAMEMAIN14_chooseEnemyAiEP8sMONSTER', 0x61dd68],
+  ['enemy-ai', 'chooseEnemyAiNew', '_ZN9cGAMEMAIN17_chooseEnemyAiNewEP8sMONSTER', 0x61d450],
+  ['enemy-ai', 'chooseEnemyAiSub', '_ZN9cGAMEMAIN17_chooseEnemyAiSubEP8sMONSTERPK10sENESKILLSf', 0x61a58c],
+  ['enemy-ai', 'parseFlowControl', '_ZN9cGAMEMAIN17_parseFlowControlEP8sMONSTERPKN12sPADCARDDATA7sENEAISEPK10sENESKILLSdRi', 0x619ad0],
+  ['enemy-ai', 'checkSameSkillOnTurn', '_ZNK9cGAMEMAIN20checkSameSkillOnTurnEi', 0x61da00],
   ['enemy-ai', 'setupEnemyAiTime', '_ZN9cGAMEMAIN17_setupEnemyAiTimeEP8sMONSTERPK10sENESKILLS', 0x61f5ac],
   ['enemy-ai', 'setupSkillWithAttack', '_ZN9cGAMEMAIN21_setupSkillWithAttackEP8sMONSTERPK10sENESKILLS', 0x61fcec],
   ['enemy-ai', 'setupEnemyAttackSub', '_ZN9cGAMEMAIN20_setupEnemyAttackSubEP8sMONSTERPK10sENESKILLS', 0x61fd78],
@@ -246,6 +250,16 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       aiStateOffset: 'sMONSTER+0x7dc',
       readyCondition: 'counter <= 0',
     },
+    enemyAi: {
+      modeFlagsOffset: 'enemy definition+0xe0 (bit 0 selects chooseEnemyAiNew)',
+      budgetCapOffset: 'enemy definition+0xe2 (int16)',
+      budgetRegenOffset: 'enemy definition+0xe4 (int16)',
+      slotArrayOffset: 'enemy definition+0xec (64 records, 8-byte stride)',
+      slotFields: 'uint32 skill id, uint8 immediate chance, uint8 fallback weight',
+      skillProbabilityOffsets: 'sENEMYSKILL+0x30/+0x34 (signed int32 factors)',
+      skillHpThresholdOffset: 'sENEMYSKILL+0x38 (signed int32 percent)',
+      skillBudgetCostOffset: 'sENEMYSKILL+0x40 (signed int32)',
+    },
     symbols,
   };
 
@@ -281,6 +295,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     }
     console.log('\n[enemy turn]');
     for (const [key, value] of Object.entries(report.enemyTurn)) {
+      console.log(`  ${key.padEnd(23)} ${value}`);
+    }
+    console.log('\n[enemy AI]');
+    for (const [key, value] of Object.entries(report.enemyAi)) {
       console.log(`  ${key.padEnd(23)} ${value}`);
     }
   }
