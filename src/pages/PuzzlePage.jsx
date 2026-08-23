@@ -450,6 +450,19 @@ function render(ctx, engine) {
       57,
     );
   }
+  const activeSkyfallRules = Object.values(engine.skyfallRateRules || {}).filter(Boolean);
+  if (activeSkyfallRules.length > 0) {
+    const skyfallText = activeSkyfallRules.map((rule) => {
+      const types = ORB_TYPES.slice(0, 9)
+        .filter((_, type) => (rule.typeMask & (1 << type)) !== 0)
+        .map((orb) => orb.code)
+        .join('/');
+      return `${types} ${rule.chancePercent}% ${rule.turnsRemaining}T`;
+    }).join(' · ');
+    ctx.fillStyle = '#bfe9ff';
+    ctx.font = '700 9px "Barlow Condensed", sans-serif';
+    ctx.fillText(`SKY ${skyfallText}`, 434, engine.moveTimeReduction ? 69 : 57);
+  }
 
   const visibleTarget = engine.manualTarget ? engine.targetEnemy : -1;
   engine.enemies.forEach((enemy, index) => drawEnemy(ctx, enemy, index, visibleTarget, engine.visualTime));

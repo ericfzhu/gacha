@@ -52,6 +52,7 @@ import {
   PAD_ENEMY_SKILL_INACTIVITY,
   PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL,
   PAD_ENEMY_SKILL_COMBO_ABSORB,
+  PAD_ENEMY_SKILL_SKYFALL_RATE,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -210,6 +211,7 @@ export class PuzzleEngine {
     this.rows = rows;
     this.allowDiagonalMoves = Boolean(allowDiagonalMoves);
     this.setFaceTypes(faceTypes);
+    this.skyfallRateRules = { natural: null, hazard: null };
     this.setDropRates(dropRates);
     this.skyfallExclusionMask = Number(skyfallExclusionMask) >>> 0;
     this.comboDropChanceBasisPoints = Math.max(0, Math.trunc(Number(comboDropChanceBasisPoints) || 0));
@@ -293,6 +295,8 @@ export class PuzzleEngine {
     this.pendingComboDrops = 0;
     this.comboDropBonusCount = 0;
     this.turnNailCount = 0;
+    this.skyfallRateRules = { natural: null, hazard: null };
+    this.recomputeDropRates();
     this.hpResolutionApplied = false;
     this.lastLeaderMultiplier = 1;
     this.message = 'Drag one orb through the board to rearrange the whole path.';
@@ -953,6 +957,7 @@ export class PuzzleEngine {
     this.advanceEnemyAttributeNullifyTurns();
     this.advanceEnemyAttributeAbsorbTurns();
     this.advanceEnemyComboAbsorbTurns();
+    this.advanceSkyfallRateRules();
     this.advanceMoveTimeReductionTurns();
     this.advanceBlackOrbCountdowns();
     if (this.blackFallRule?.active && this.blackFallRule.turnsRemaining !== null) {
@@ -1055,6 +1060,10 @@ export class PuzzleEngine {
       maxHp: enemy.maxHp,
       attributeAbsorbTurns: enemy.attributeAbsorbTurns,
       comboAbsorbTurns: enemy.comboAbsorbTurns,
+      skyfallNaturalTurns: this.skyfallRateRules.natural?.turnsRemaining || 0,
+      skyfallNaturalMask: this.skyfallRateRules.natural?.typeMask || 0,
+      skyfallHazardTurns: this.skyfallRateRules.hazard?.turnsRemaining || 0,
+      skyfallHazardMask: this.skyfallRateRules.hazard?.typeMask || 0,
       defenseBoostTurns: enemy.defenseBoostTurns,
       attributeNullifyTurns: enemy.attributeNullifyTurns,
       scaledAttackGate: enemy.scaledAttackGate,
@@ -1285,6 +1294,13 @@ export class PuzzleEngine {
         setupMaterialized: true,
       });
     }
+    if (skill.supported && skill.kind === 'skyfallRate' && !skill.setupMaterialized) {
+      return Object.freeze({
+        ...record,
+        durationTurns: this.rollEnemySkillDuration(skill.durationMin, skill.durationMax),
+        setupMaterialized: true,
+      });
+    }
     if (skill.supported && skill.kind === 'activeSkillSeal' && !skill.setupMaterialized) {
       return Object.freeze({
         ...record,
@@ -1470,6 +1486,16 @@ export class PuzzleEngine {
     });
   }
 
+  advanceSkyfallRateRules() {
+    for (const category of ['natural', 'hazard']) {
+      const rule = this.skyfallRateRules[category];
+      if (!rule) continue;
+      rule.turnsRemaining = Math.max(0, Math.trunc(Number(rule.turnsRemaining) || 0) - 1);
+      if (rule.turnsRemaining === 0) this.skyfallRateRules[category] = null;
+    }
+    this.recomputeDropRates();
+  }
+
   advanceEnemyStatusShieldTurns() {
     this.enemies.forEach((enemy) => {
       enemy.statusShieldTurns = Math.max(
@@ -1579,7 +1605,24 @@ export class PuzzleEngine {
     if (!Array.isArray(rates) || rates.length > 10 || rates.some((rate) => !Number.isFinite(Number(rate)))) {
       throw new Error('PAD drop rates must contain at most ten finite numeric lanes.');
     }
-    this.dropRates = Array.from({ length: 10 }, (_, index) => Math.fround(Number(rates[index]) || 0));
+    this.baseDropRates = Array.from(
+      { length: 10 },
+      (_, index) => Math.fround(Number(rates[index]) || 0),
+    );
+    this.recomputeDropRates();
+  }
+
+  recomputeDropRates() {
+    this.dropRates = [...(this.baseDropRates || Array(10).fill(0))];
+    Object.values(this.skyfallRateRules || {}).forEach((rule) => {
+      if (!rule || Number(rule.turnsRemaining) <= 0) return;
+      const rate = Math.fround(Number(rule.chancePercent) / 100);
+      for (let type = 0; type <= 8; type += 1) {
+        if ((rule.typeMask & (1 << type)) !== 0) {
+          this.dropRates[type] = Math.fround(this.dropRates[type] + rate);
+        }
+      }
+    });
   }
 
   setComboDropAwakenings(counts) {
@@ -1864,6 +1907,28 @@ export class PuzzleEngine {
       this.message = `Enemy absorbs ${skill.comboThreshold} combos or fewer for ${skill.durationTurns} turn${skill.durationTurns === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'skyfallRate') {
+      const durationTurns = Math.max(0, Math.trunc(Number(skill.durationTurns) || 0));
+      const naturalMask = skill.typeMask & 0x3f;
+      const hazardMask = skill.typeMask & 0x1c0;
+      if (naturalMask !== 0) {
+        this.skyfallRateRules.natural = {
+          typeMask: naturalMask,
+          chancePercent: skill.chancePercent,
+          turnsRemaining: durationTurns,
+        };
+      }
+      if (hazardMask !== 0) {
+        this.skyfallRateRules.hazard = {
+          typeMask: hazardMask,
+          chancePercent: skill.chancePercent,
+          turnsRemaining: durationTurns,
+        };
+      }
+      this.recomputeDropRates();
+      this.message = `Selected orbs fall at ${skill.chancePercent}% for ${durationTurns} turn${durationTurns === 1 ? '' : 's'}.`;
+      return naturalMask !== 0 || hazardMask !== 0;
+    }
     if (skill.supported && skill.kind === 'bindLeaderHelper') {
       const durationTurns = this.rollEnemySkillDuration(skill.durationMin, skill.durationMax);
       const result = this.doBind(skill.targetMask || 0, durationTurns);
@@ -2053,6 +2118,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_INACTIVITY,
         PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL,
         PAD_ENEMY_SKILL_COMBO_ABSORB,
+        PAD_ENEMY_SKILL_SKYFALL_RATE,
         PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
         PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -2587,6 +2653,10 @@ export class PuzzleEngine {
       lockFallRngState: this.lockFallRng.state,
       faceTypes: [...this.faceTypes],
       dropRates: [...this.dropRates],
+      skyfallRateRules: {
+        natural: this.skyfallRateRules.natural ? { ...this.skyfallRateRules.natural } : null,
+        hazard: this.skyfallRateRules.hazard ? { ...this.skyfallRateRules.hazard } : null,
+      },
       skyfallExclusionMask: this.skyfallExclusionMask,
       comboDropChanceBasisPoints: this.comboDropChanceBasisPoints,
       comboDropCap: this.comboDropCap,

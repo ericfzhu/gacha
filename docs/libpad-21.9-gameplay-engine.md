@@ -764,6 +764,25 @@ status decrements at the next enemy-turn boundary. With seed 21900 and range
 stores four turns, and ends at RNG state `3803934822`. DadGuide identifies the
 same raw record as `ESAbsorbCombo` type 67.
 
+Enemy skill type `68` changes skyfall rates. Its dispatch, setup, and condition
+entries target `0x629984`, `0x6200a4`, and `0x61af40`. Definition `+0x10` is a
+nine-bit orb-type mask. Setup copies it to runtime `+0x678`, spends one global
+LCG draw on the inclusive duration `+0x14..+0x18` and stores that at `+0x67c`,
+then copies chance percentage `+0x1c` to `+0x680`. Execution forwards those
+three materialized values without rerolling.
+
+The condition reveals two independently replaceable native status categories:
+natural orb bits `0x03f` and hazard bits `0x1c0`. A requested category is
+eligible when inactive or when its active mask differs; a record is rejected
+only when every requested category is already active with the same mask. The
+browser preserves that split, overlays each selected lane's authored percent
+onto the baseline ten-lane drop-rate vector, and removes the overlay when its
+enemy-turn duration expires. Consequently the already-recovered
+`_spawnNewBlock` weighted two-draw path consumes these effects directly. Seed
+21900 with mask `0x81`, range 2–4, and chance 25% selects four turns after the
+AI probability plus setup draws and ends at `3803934822`. DadGuide identifies
+the same record as `ESSkyfall` type 68.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

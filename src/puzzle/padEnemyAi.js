@@ -18,6 +18,7 @@ import {
   PAD_ENEMY_SKILL_INACTIVITY,
   PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL,
   PAD_ENEMY_SKILL_COMBO_ABSORB,
+  PAD_ENEMY_SKILL_SKYFALL_RATE,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -164,6 +165,7 @@ function isStaticallyEligible(definition, state) {
     PAD_ENEMY_SKILL_INACTIVITY,
     PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL,
     PAD_ENEMY_SKILL_COMBO_ABSORB,
+    PAD_ENEMY_SKILL_SKYFALL_RATE,
     PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
     PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
     PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -416,6 +418,18 @@ function evaluateCondition(definition, state, rngState) {
     const eligible = state.comboAbsorbTurns <= 0;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
+  if (definition.effect.type === PAD_ENEMY_SKILL_SKYFALL_RATE) {
+    const naturalMask = definition.effect.typeMask & 0x3f;
+    const hazardMask = definition.effect.typeMask & 0x1c0;
+    const naturalEligible = naturalMask !== 0 && (
+      state.skyfallNaturalTurns <= 0 || state.skyfallNaturalMask !== naturalMask
+    );
+    const hazardEligible = hazardMask !== 0 && (
+      state.skyfallHazardTurns <= 0 || state.skyfallHazardMask !== hazardMask
+    );
+    const eligible = naturalEligible || hazardEligible;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
   if (definition.effect.type === PAD_ENEMY_SKILL_BIND_LEADER_HELPER) {
     const party = Array.isArray(state.party) ? state.party : [];
     const eligible = (
@@ -498,6 +512,10 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     playerMaxHp: Math.max(0, Number(state.playerMaxHp) || 0),
     attributeAbsorbTurns: Math.max(0, Math.trunc(Number(state.attributeAbsorbTurns) || 0)),
     comboAbsorbTurns: Math.max(0, Math.trunc(Number(state.comboAbsorbTurns) || 0)),
+    skyfallNaturalTurns: Math.max(0, Math.trunc(Number(state.skyfallNaturalTurns) || 0)),
+    skyfallNaturalMask: Math.trunc(Number(state.skyfallNaturalMask) || 0) & 0x3f,
+    skyfallHazardTurns: Math.max(0, Math.trunc(Number(state.skyfallHazardTurns) || 0)),
+    skyfallHazardMask: Math.trunc(Number(state.skyfallHazardMask) || 0) & 0x1c0,
     scaledAttackGate: Math.trunc(Number(state.scaledAttackGate) || 0),
     enemyAttackBoostTurns: Math.max(0, Math.trunc(Number(state.enemyAttackBoostTurns) || 0)),
     enemyBaseAttack: Math.max(0, Math.trunc(Number(state.enemyBaseAttack) || 0)),

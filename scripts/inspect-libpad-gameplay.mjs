@@ -90,6 +90,10 @@ const COMBO_ABSORB_ENEMY_SKILL_TYPE = 67;
 const COMBO_ABSORB_HANDLER = 0x629968;
 const COMBO_ABSORB_SETUP_HANDLER = 0x61ffe8;
 const COMBO_ABSORB_CONDITION_HANDLER = 0x61ab6c;
+const SKYFALL_RATE_ENEMY_SKILL_TYPE = 68;
+const SKYFALL_RATE_HANDLER = 0x629984;
+const SKYFALL_RATE_SETUP_HANDLER = 0x6200a4;
+const SKYFALL_RATE_CONDITION_HANDLER = 0x61af40;
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -651,6 +655,21 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : comboAbsorbSetupTarget === COMBO_ABSORB_SETUP_HANDLER;
   const comboAbsorbConditionMatches = comboAbsorbConditionTarget === null
     ? null : comboAbsorbConditionTarget === COMBO_ABSORB_CONDITION_HANDLER;
+  const skyfallRateDispatchTarget = resolveEnemySkillTarget(
+    SKYFALL_RATE_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const skyfallRateSetupTarget = resolveEnemySkillTarget(
+    SKYFALL_RATE_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const skyfallRateConditionTarget = resolveEnemySkillTarget(
+    SKYFALL_RATE_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const skyfallRateDispatchMatches = skyfallRateDispatchTarget === null
+    ? null : skyfallRateDispatchTarget === SKYFALL_RATE_HANDLER;
+  const skyfallRateSetupMatches = skyfallRateSetupTarget === null
+    ? null : skyfallRateSetupTarget === SKYFALL_RATE_SETUP_HANDLER;
+  const skyfallRateConditionMatches = skyfallRateConditionTarget === null
+    ? null : skyfallRateConditionTarget === SKYFALL_RATE_CONDITION_HANDLER;
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1585,6 +1604,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       comboAbsorbDispatchMatches21_9: comboAbsorbDispatchMatches,
       comboAbsorbSetupMatches21_9: comboAbsorbSetupMatches,
       comboAbsorbConditionMatches21_9: comboAbsorbConditionMatches,
+      skyfallRateDispatchMatches21_9: skyfallRateDispatchMatches,
+      skyfallRateSetupMatches21_9: skyfallRateSetupMatches,
+      skyfallRateConditionMatches21_9: skyfallRateConditionMatches,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -1875,6 +1897,18 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       comboAbsorbConditionMatches21_9: comboAbsorbConditionMatches,
       comboAbsorbSemantics:
         'type 67: one-LCG inclusive +0x10..+0x14 duration stored at sMONSTER+0x678; +0x18 combo threshold stored at +0x67c; handler applies them to +0x8b0/+0x8a0; condition admits only while the protected duration is below one',
+      skyfallRateType: SKYFALL_RATE_ENEMY_SKILL_TYPE,
+      skyfallRateDispatchTarget: skyfallRateDispatchTarget === null
+        ? null : hex(skyfallRateDispatchTarget),
+      skyfallRateDispatchMatches21_9: skyfallRateDispatchMatches,
+      skyfallRateSetupTarget: skyfallRateSetupTarget === null
+        ? null : hex(skyfallRateSetupTarget),
+      skyfallRateSetupMatches21_9: skyfallRateSetupMatches,
+      skyfallRateConditionTarget: skyfallRateConditionTarget === null
+        ? null : hex(skyfallRateConditionTarget),
+      skyfallRateConditionMatches21_9: skyfallRateConditionMatches,
+      skyfallRateSemantics:
+        'type 68: +0x10 nine-bit orb mask, one-LCG inclusive +0x14..+0x18 duration, and +0x1c chance are materialized at sMONSTER+0x678/+0x67c/+0x680; execution applies separate natural 0x03f and hazard 0x1c0 status categories; same active masks reject while different masks can replace them',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -2315,6 +2349,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || comboAbsorbDispatchMatches === false
     || comboAbsorbSetupMatches === false
     || comboAbsorbConditionMatches === false
+    || skyfallRateDispatchMatches === false
+    || skyfallRateSetupMatches === false
+    || skyfallRateConditionMatches === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

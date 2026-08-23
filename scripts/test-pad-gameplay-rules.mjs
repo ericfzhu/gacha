@@ -19,6 +19,7 @@ import {
   PAD_ENEMY_SKILL_INACTIVITY,
   PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL,
   PAD_ENEMY_SKILL_COMBO_ABSORB,
+  PAD_ENEMY_SKILL_SKYFALL_RATE,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -1924,6 +1925,54 @@ assert.equal(directComboAbsorbEngine.applyEnemySkillDefinition(
 assert.equal(directComboAbsorbEngine.enemies[0].comboAbsorbTurns, 2);
 assert.equal(directComboAbsorbEngine.enemies[0].comboAbsorbThreshold, 3);
 assert.equal(directComboAbsorbEngine.rng.state, padLcgStep(21_900).state);
+const enemyAiSkyfallRateDefinition = enemyAiInactivityDefinition.slice();
+const enemyAiSkyfallRateView = new DataView(enemyAiSkyfallRateDefinition.buffer);
+enemyAiSkyfallRateView.setUint32(0x00, 9_047, true);
+enemyAiSkyfallRateView.setInt16(0x04, PAD_ENEMY_SKILL_SKYFALL_RATE, true);
+enemyAiSkyfallRateView.setUint32(0x10, 0x81, true);
+enemyAiSkyfallRateView.setInt32(0x14, 2, true);
+enemyAiSkyfallRateView.setInt32(0x18, 4, true);
+enemyAiSkyfallRateView.setInt32(0x1c, 25, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiSkyfallRateDefinition), {
+  type: 68,
+  kind: 'skyfallRate',
+  supported: true,
+  typeMask: 0x81,
+  durationMin: 2,
+  durationMax: 4,
+  chancePercent: 25,
+  attackWithSkillValue: 0,
+});
+const skyfallRateRuntime = new Uint8Array(0x684);
+const skyfallRateRuntimeView = new DataView(skyfallRateRuntime.buffer);
+skyfallRateRuntimeView.setUint32(0x678, 0x81, true);
+skyfallRateRuntimeView.setInt32(0x67c, 4, true);
+skyfallRateRuntimeView.setInt32(0x680, 25, true);
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiSkyfallRateDefinition,
+  skyfallRateRuntime,
+), {
+  type: 68,
+  kind: 'skyfallRate',
+  supported: true,
+  typeMask: 0x81,
+  durationTurns: 4,
+  chancePercent: 25,
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
+const directSkyfallRateEngine = new PuzzleEngine({ seed: 21_900 });
+directSkyfallRateEngine.setRngState(21_900);
+assert.equal(directSkyfallRateEngine.applyEnemySkillDefinition(
+  enemyAiSkyfallRateDefinition,
+), true);
+assert.deepEqual(directSkyfallRateEngine.skyfallRateRules, {
+  natural: { typeMask: 0x01, chancePercent: 25, turnsRemaining: 2 },
+  hazard: { typeMask: 0x80, chancePercent: 25, turnsRemaining: 2 },
+});
+assert.equal(directSkyfallRateEngine.dropRates[0], 0.25);
+assert.equal(directSkyfallRateEngine.dropRates[7], 0.25);
+assert.equal(directSkyfallRateEngine.rng.state, padLcgStep(21_900).state);
 const enemyAiAttributeAbsorbDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiAttributeAbsorbView = new DataView(enemyAiAttributeAbsorbDefinition.buffer);
 enemyAiAttributeAbsorbView.setUint32(0x00, 9_021, true);
@@ -4220,6 +4269,61 @@ comboAbsorbDamageEngine.resolvePlayerTurn();
 assert.ok(comboAbsorbDamageEngine.lastDamage > 0);
 assert.equal(comboAbsorbDamageEngine.lastAbsorbedDamage, 0);
 assert.ok(comboAbsorbDamageEngine.enemies[0].hp < 50_000);
+const skyfallRateMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(skyfallRateMonsterDefinition.buffer).setUint32(0xec, 9_047, true);
+const selectedSkyfallRateEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: skyfallRateMonsterDefinition,
+    skillDefinitions: [enemyAiSkyfallRateDefinition],
+  }],
+});
+selectedSkyfallRateEngine.setRngState(21_900);
+selectedSkyfallRateEngine.enemies[0].counter = 1;
+selectedSkyfallRateEngine.enemies[1].counter = 99;
+selectedSkyfallRateEngine.resolveEnemyTurn();
+const selectedSkyfallRateState = selectedSkyfallRateEngine.snapshot();
+assert.equal(selectedSkyfallRateState.lastEnemyActions[0].skill.type, 68);
+assert.deepEqual(selectedSkyfallRateState.skyfallRateRules, {
+  natural: { typeMask: 0x01, chancePercent: 25, turnsRemaining: 4 },
+  hazard: { typeMask: 0x80, chancePercent: 25, turnsRemaining: 4 },
+});
+assert.equal(selectedSkyfallRateState.dropRates[0], 0.25);
+assert.equal(selectedSkyfallRateState.dropRates[7], 0.25);
+assert.equal(
+  selectedSkyfallRateState.rngState,
+  padLcgStep(padLcgStep(21_900).state).state,
+);
+selectedSkyfallRateEngine.setRngState(21_900);
+assert.equal(selectedSkyfallRateEngine.takeEnemySkill(0), null);
+assert.equal(selectedSkyfallRateEngine.rng.state, 21_900);
+selectedSkyfallRateEngine.enemyAiPools[0].definitions = new Map([[
+  9_047,
+  {
+    ...decodePadEnemyAiSkillDefinition(enemyAiSkyfallRateDefinition),
+    effect: {
+      ...decodePadEnemyAiSkillDefinition(enemyAiSkyfallRateDefinition).effect,
+      typeMask: 0x82,
+    },
+  },
+]]);
+selectedSkyfallRateEngine.setRngState(21_900);
+const replacementSkyfallRate = selectedSkyfallRateEngine.takeEnemySkill(0);
+assert.equal(replacementSkyfallRate.typeMask, 0x82);
+assert.equal(replacementSkyfallRate.durationTurns, 4);
+assert.equal(
+  selectedSkyfallRateEngine.rng.state,
+  padLcgStep(padLcgStep(21_900).state).state,
+);
+selectedSkyfallRateEngine.skyfallRateRules.natural.turnsRemaining = 1;
+selectedSkyfallRateEngine.skyfallRateRules.hazard.turnsRemaining = 1;
+selectedSkyfallRateEngine.enemies[0].counter = 99;
+selectedSkyfallRateEngine.resolveEnemyTurn();
+assert.deepEqual(selectedSkyfallRateEngine.skyfallRateRules, {
+  natural: null,
+  hazard: null,
+});
+assert.deepEqual(selectedSkyfallRateEngine.dropRates, Array(10).fill(0));
 const bindLeaderHelperMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(bindLeaderHelperMonsterDefinition.buffer).setUint32(0xec, 9_020, true);
 const selectedBindLeaderHelperEngine = new PuzzleEngine({

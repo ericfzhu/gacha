@@ -2,6 +2,22 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 enemy skyfall-rate skill
+
+- Recovered type `68`: dispatch `0x629984`, setup `0x6200a4`, and condition
+  `0x61af40`. Definition `+0x10` is a nine-bit orb mask, `+0x14..+0x18` is the
+  one-draw inclusive duration, and `+0x1c` is the skyfall chance percentage.
+- Preserved the native split between replaceable natural `0x03f` and hazard
+  `0x1c0` status categories. Identical active masks reject without RNG;
+  different requested masks remain eligible for replacement.
+- Ported baseline-plus-status drop-rate composition, independent countdowns,
+  weighted spawn integration, snapshots, and a visible `SKY` status. Seeded
+  direct/scheduled, runtime, replacement, expiry, exact-table, and focused
+  browser fixtures pass; mask `0x81` yields fire/poison 25% for four turns and
+  scheduled RNG `3803934822`.
+- Production build plus generic and full browser regressions pass.
+- Next: continue type 69 after this separate checkpoint.
+
 ## 2026-08-23 combo-absorb enemy skill
 
 - Recovered type `67`: dispatch `0x629968`, setup `0x61ffe8`, and condition
