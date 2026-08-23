@@ -2,6 +2,27 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 enemy defense and attribute-nullification shields
+
+- Recovered early live enemy skill type `9` as a timed additive defense boost:
+  dispatch `0x629360`, setup `0x6212ac`, and unconditional-scale condition
+  `0x61bb98`. Definition `+0x10` is duration; one LCG step selects an inclusive
+  `+0x14..+0x18` percentage. Execution stores signed-int16 turns at
+  `sMONSTER+0x810` and `round(float32(int64(baseDefense*percent))/100)` at
+  protected additive-defense lane `+0x800`.
+- Recovered types `10` and `11` as one- and two-attribute damage-nullification
+  shields. Their dispatch/setup pairs are `0x6293b8/0x61fee4` and
+  `0x6293c8/0x6217a8`; both use condition `0x61bb98`. They build a uint16 mask
+  at `sMONSTER+0x820`, store signed-int16 duration at `+0x830`, and make matching
+  natural-attribute hits exactly zero in `_calcFinalDamage`.
+- Ported definition/runtime decoders, normalizers, type-9 range materialization,
+  new-AI admission and RNG behavior, independent status lifetimes, effective
+  defense, target projection, zero-damage combat, snapshots, exact table checks,
+  and pure/browser fixtures. Attribute nullification remains deliberately
+  separate from type-53 attribute absorb.
+- Next: continue the adjacent early live action table from type `13` without
+  inferring semantics from names alone.
+
 ## 2026-08-23 enemy heal and additional attack
 
 - Recovered paired enemy skill types `7` and `8`, which share setup handler

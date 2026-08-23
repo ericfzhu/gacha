@@ -5,6 +5,9 @@ import {
   PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
   PAD_ENEMY_SKILL_HEAL_ENEMY,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
+  PAD_ENEMY_SKILL_DEFENSE_BOOST,
+  PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
+  PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY,
   PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
@@ -41,10 +44,12 @@ import {
   decodePadEnemySkillRuntime,
   padEnemySkillAttack,
   padEnemySkillAdditionalAttack,
+  padEnemySkillAttributeNullifyMask,
   padEnemySkillBoostedAttack,
   padEnemySkillAttributeCandidates,
   padEnemySkillCurrentHpGravity,
   padEnemySkillEnemyHeal,
+  padEnemySkillDefenseBoost,
   padEnemySkillMoveTimeSeconds,
   padEnemySkillPlayerHeal,
   padEnemySkillPlayerHpCondition,
@@ -946,6 +951,116 @@ assert.deepEqual(decodePadEnemySkillRuntime(
   setupMaterialized: true,
   attackWithSkillValue: 50,
 });
+const enemyAiDefenseBoostDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiDefenseBoostView = new DataView(enemyAiDefenseBoostDefinition.buffer);
+enemyAiDefenseBoostView.setUint32(0x00, 9_038, true);
+enemyAiDefenseBoostView.setInt16(0x04, PAD_ENEMY_SKILL_DEFENSE_BOOST, true);
+enemyAiDefenseBoostView.setInt32(0x10, 3, true);
+enemyAiDefenseBoostView.setInt32(0x14, 150, true);
+enemyAiDefenseBoostView.setInt32(0x18, 200, true);
+enemyAiDefenseBoostView.setInt32(0x30, 10_000, true);
+enemyAiDefenseBoostView.setInt32(0x34, 1_000, true);
+enemyAiDefenseBoostView.setInt32(0x38, 100, true);
+enemyAiDefenseBoostView.setInt32(0x40, 20, true);
+enemyAiDefenseBoostView.setInt32(0x44, 0, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiDefenseBoostDefinition), {
+  type: 9,
+  kind: 'defenseBoost',
+  supported: true,
+  durationTurns: 3,
+  percentMin: 150,
+  percentMax: 200,
+  attackWithSkillValue: 0,
+});
+const defenseBoostMonsterRuntime = new Uint8Array(0x680);
+const defenseBoostMonsterRuntimeView = new DataView(defenseBoostMonsterRuntime.buffer);
+defenseBoostMonsterRuntimeView.setInt32(0x678, 3, true);
+defenseBoostMonsterRuntimeView.setInt32(0x67c, 175, true);
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiDefenseBoostDefinition,
+  defenseBoostMonsterRuntime,
+), {
+  type: 9,
+  kind: 'defenseBoost',
+  supported: true,
+  durationTurns: 3,
+  boostPercent: 175,
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
+assert.equal(padEnemySkillDefenseBoost(120, 175), 210);
+const defenseBoostEngine = new PuzzleEngine({ seed: 21_900 });
+defenseBoostEngine.setRngState(21_900);
+assert.equal(defenseBoostEngine.applyEnemySkillDefinition(enemyAiDefenseBoostDefinition), true);
+assert.equal(defenseBoostEngine.enemies[0].defenseBoostTurns, 3);
+assert.equal(defenseBoostEngine.enemies[0].defenseBoostAmount, 185);
+assert.equal(defenseBoostEngine.lastEnemySkill.boostPercent, 154);
+assert.equal(defenseBoostEngine.rng.state, padLcgStep(21_900).state);
+const enemyAiAttributeNullifyDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiAttributeNullifyView = new DataView(enemyAiAttributeNullifyDefinition.buffer);
+enemyAiAttributeNullifyView.setUint32(0x00, 9_039, true);
+enemyAiAttributeNullifyView.setInt16(0x04, PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY, true);
+enemyAiAttributeNullifyView.setInt32(0x10, 4, true);
+enemyAiAttributeNullifyView.setInt32(0x14, 0, true);
+enemyAiAttributeNullifyView.setInt32(0x44, 0, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiAttributeNullifyDefinition), {
+  type: 10,
+  kind: 'attributeNullify',
+  supported: true,
+  durationTurns: 4,
+  attributes: [0],
+  attackWithSkillValue: 0,
+});
+const attributeNullifyMonsterRuntime = new Uint8Array(0x680);
+const attributeNullifyMonsterRuntimeView = new DataView(attributeNullifyMonsterRuntime.buffer);
+attributeNullifyMonsterRuntimeView.setInt32(0x678, 4, true);
+attributeNullifyMonsterRuntimeView.setInt32(0x67c, 0, true);
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiAttributeNullifyDefinition,
+  attributeNullifyMonsterRuntime,
+), {
+  type: 10,
+  kind: 'attributeNullify',
+  supported: true,
+  durationTurns: 4,
+  attributes: [0],
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
+const enemyAiDualAttributeNullifyDefinition = enemyAiAttributeNullifyDefinition.slice();
+const enemyAiDualAttributeNullifyView = new DataView(enemyAiDualAttributeNullifyDefinition.buffer);
+enemyAiDualAttributeNullifyView.setUint32(0x00, 9_040, true);
+enemyAiDualAttributeNullifyView.setInt16(0x04, PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY, true);
+enemyAiDualAttributeNullifyView.setInt32(0x14, 0, true);
+enemyAiDualAttributeNullifyView.setInt32(0x18, 4, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiDualAttributeNullifyDefinition), {
+  type: 11,
+  kind: 'attributeNullify',
+  supported: true,
+  durationTurns: 4,
+  attributes: [0, 4],
+  attackWithSkillValue: 0,
+});
+assert.equal(padEnemySkillAttributeNullifyMask([0, 4]), 0x11);
+const attributeNullifyEngine = new PuzzleEngine({ seed: 21_900 });
+assert.equal(attributeNullifyEngine.applyEnemySkillDefinition(
+  enemyAiDualAttributeNullifyDefinition,
+), true);
+assert.equal(attributeNullifyEngine.enemies[0].attributeNullifyTurns, 4);
+assert.equal(attributeNullifyEngine.enemies[0].attributeNullifyMask, 0x11);
+attributeNullifyEngine.enemies[0].hp = 50_000;
+attributeNullifyEngine.enemies[1].hp = 0;
+attributeNullifyEngine.party.forEach((member, index) => {
+  if (index !== 0) member.bindTurns = 5;
+});
+attributeNullifyEngine.party[0].leaderSkill = null;
+attributeNullifyEngine.comboCount = 1;
+attributeNullifyEngine.turnMatches = [{
+  type: 'fire', size: 3, enhancedCount: 0, enhancementMultiplier: 1, isMassAttack: false,
+}];
+attributeNullifyEngine.resolvePlayerTurn();
+assert.equal(attributeNullifyEngine.lastDamage, 0);
+assert.equal(attributeNullifyEngine.enemies[0].hp, 50_000);
 const randomSourceOrbConversionDefinition = enemyAiSourceOrbConversionDefinition.slice();
 const randomSourceOrbConversionView = new DataView(randomSourceOrbConversionDefinition.buffer);
 randomSourceOrbConversionView.setInt32(0x10, -1, true);
@@ -3004,6 +3119,65 @@ scaledAdditionalAttackEngine.player.hp = 925;
 scaledAdditionalAttackEngine.setRngState(21_900);
 assert.equal(scaledAdditionalAttackEngine.takeEnemySkill(0), null);
 assert.equal(scaledAdditionalAttackEngine.rng.state, padLcgStep(21_900).state);
+const defenseBoostMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(defenseBoostMonsterDefinition.buffer).setUint32(0xec, 9_038, true);
+const selectedDefenseBoostEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: defenseBoostMonsterDefinition,
+    skillDefinitions: [enemyAiDefenseBoostDefinition],
+  }],
+});
+selectedDefenseBoostEngine.setRngState(21_900);
+selectedDefenseBoostEngine.enemies[0].counter = 1;
+selectedDefenseBoostEngine.enemies[1].counter = 99;
+selectedDefenseBoostEngine.resolveEnemyTurn();
+const selectedDefenseBoostState = selectedDefenseBoostEngine.snapshot();
+assert.equal(selectedDefenseBoostState.lastEnemyActions[0].skill.type, 9);
+assert.equal(selectedDefenseBoostState.lastEnemyActions[0].skill.boostPercent, 195);
+assert.equal(selectedDefenseBoostState.enemies[0].defenseBoostTurns, 3);
+assert.equal(selectedDefenseBoostState.enemies[0].defenseBoostAmount, 234);
+assert.equal(selectedDefenseBoostState.rngState,
+  padLcgStep(padLcgStep(21_900).state).state);
+selectedDefenseBoostEngine.enemies[0].counter = 99;
+selectedDefenseBoostEngine.resolveEnemyTurn();
+assert.equal(selectedDefenseBoostEngine.enemies[0].defenseBoostTurns, 2);
+const attributeNullifyMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(attributeNullifyMonsterDefinition.buffer).setUint32(0xec, 9_039, true);
+const selectedAttributeNullifyEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: attributeNullifyMonsterDefinition,
+    skillDefinitions: [enemyAiAttributeNullifyDefinition],
+  }],
+});
+selectedAttributeNullifyEngine.setRngState(21_900);
+selectedAttributeNullifyEngine.enemies[0].counter = 1;
+selectedAttributeNullifyEngine.enemies[1].counter = 99;
+selectedAttributeNullifyEngine.resolveEnemyTurn();
+const selectedAttributeNullifyState = selectedAttributeNullifyEngine.snapshot();
+assert.equal(selectedAttributeNullifyState.lastEnemyActions[0].skill.type, 10);
+assert.equal(selectedAttributeNullifyState.enemies[0].attributeNullifyTurns, 4);
+assert.equal(selectedAttributeNullifyState.enemies[0].attributeNullifyMask, 0x01);
+assert.equal(selectedAttributeNullifyState.rngState, padLcgStep(21_900).state);
+const dualAttributeNullifyMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(dualAttributeNullifyMonsterDefinition.buffer).setUint32(0xec, 9_040, true);
+const selectedDualAttributeNullifyEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: dualAttributeNullifyMonsterDefinition,
+    skillDefinitions: [enemyAiDualAttributeNullifyDefinition],
+  }],
+});
+selectedDualAttributeNullifyEngine.setRngState(21_900);
+selectedDualAttributeNullifyEngine.enemies[0].counter = 1;
+selectedDualAttributeNullifyEngine.enemies[1].counter = 99;
+selectedDualAttributeNullifyEngine.resolveEnemyTurn();
+const selectedDualAttributeNullifyState = selectedDualAttributeNullifyEngine.snapshot();
+assert.equal(selectedDualAttributeNullifyState.lastEnemyActions[0].skill.type, 11);
+assert.equal(selectedDualAttributeNullifyState.enemies[0].attributeNullifyTurns, 4);
+assert.equal(selectedDualAttributeNullifyState.enemies[0].attributeNullifyMask, 0x11);
+assert.equal(selectedDualAttributeNullifyState.rngState, padLcgStep(21_900).state);
 const statusTriggeredAttackBoostMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(statusTriggeredAttackBoostMonsterDefinition.buffer).setUint32(0xec, 9_031, true);
 const selectedStatusTriggeredAttackBoostEngine = new PuzzleEngine({

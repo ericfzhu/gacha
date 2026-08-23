@@ -37,6 +37,9 @@ import {
   PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
   PAD_ENEMY_SKILL_HEAL_ENEMY,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
+  PAD_ENEMY_SKILL_DEFENSE_BOOST,
+  PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
+  PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY,
   PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
@@ -74,10 +77,12 @@ import {
   normalizePadEnemySkillRecord,
   padEnemySkillAttributeCandidates,
   padEnemySkillAdditionalAttack,
+  padEnemySkillAttributeNullifyMask,
   padEnemySkillBoostedAttack,
   padEnemySkillCurrentHpGravity,
   padEnemySkillMoveTimeSeconds,
   padEnemySkillEnemyHeal,
+  padEnemySkillDefenseBoost,
   padEnemySkillPlayerHeal,
   padEnemySkillReviveHp,
 } from './padEnemySkills.js';
@@ -136,8 +141,8 @@ const PARTY = Object.freeze([
 ]);
 
 const ENEMY_TEMPLATE = Object.freeze([
-  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
-  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
+  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
+  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
 ]);
 
 function clamp(value, min, max) {
@@ -453,10 +458,18 @@ export class PuzzleEngine {
     const candidates = this.enemies.map((enemy, index) => {
       if (enemy.hp <= 0) return null;
       const attributeMultiplier = padAttributeMultiplier(attribute, enemy.attribute);
-      const damage = padDamageAfterDefense(
+      const attributeIndex = PAD_ATTRIBUTE_INDEX[attribute];
+      const nullified = Number(enemy.attributeNullifyTurns || 0) > 0
+        && Number.isInteger(attributeIndex)
+        && attributeIndex <= 4
+        && (Number(enemy.attributeNullifyMask || 0) & (1 << attributeIndex)) !== 0;
+      const effectiveDefense = Number(enemy.defense || 0) + (
+        Number(enemy.defenseBoostTurns || 0) > 0 ? Number(enemy.defenseBoostAmount || 0) : 0
+      );
+      const damage = nullified ? 0 : padDamageAfterDefense(
         attack,
         attributeMultiplier,
-        enemy.defense,
+        effectiveDefense,
         damageCap,
       );
       return {
@@ -804,14 +817,23 @@ export class PuzzleEngine {
         const target = isMassAttack ? -1 : this.chooseAttackTarget(lane.attribute, raw, member.damageCap);
         this.enemies.forEach((enemy, enemyIndex) => {
           if (enemy.hp <= 0 || (!isMassAttack && enemyIndex !== target)) return;
-          const damage = padDamageAfterDefense(
+          const attributeIndex = PAD_ATTRIBUTE_INDEX[lane.attribute];
+          const nullified = Number(enemy.attributeNullifyTurns || 0) > 0
+            && Number.isInteger(attributeIndex)
+            && attributeIndex <= 4
+            && (Number(enemy.attributeNullifyMask || 0) & (1 << attributeIndex)) !== 0;
+          const effectiveDefense = Number(enemy.defense || 0) + (
+            Number(enemy.defenseBoostTurns || 0) > 0
+              ? Number(enemy.defenseBoostAmount || 0)
+              : 0
+          );
+          const damage = nullified ? 0 : padDamageAfterDefense(
             raw,
             padAttributeMultiplier(lane.attribute, enemy.attribute),
-            enemy.defense,
+            effectiveDefense,
             member.damageCap,
           );
           if (damage > 0) damagedThisTurn.add(enemyIndex);
-          const attributeIndex = PAD_ATTRIBUTE_INDEX[lane.attribute];
           if (
             Number(enemy.attributeAbsorbTurns || 0) > 0
             && Number.isInteger(attributeIndex)
@@ -824,7 +846,9 @@ export class PuzzleEngine {
           }
           enemy.hp = Math.max(0, enemy.hp - damage);
           totalDamage += damage;
-          this.floatingText.push({ kind: 'damage', value: damage, enemy: enemyIndex, attribute: lane.attribute, age: 0 });
+          if (damage > 0) {
+            this.floatingText.push({ kind: 'damage', value: damage, enemy: enemyIndex, attribute: lane.attribute, age: 0 });
+          }
         });
       });
     });
@@ -880,6 +904,8 @@ export class PuzzleEngine {
     // immediately on the same action boundary.
     this.advanceEnemyStatusShieldTurns();
     this.advanceEnemyAttackBoostTurns();
+    this.advanceEnemyDefenseBoostTurns();
+    this.advanceEnemyAttributeNullifyTurns();
     this.advanceEnemyAttributeAbsorbTurns();
     this.advanceMoveTimeReductionTurns();
     this.advanceBlackOrbCountdowns();
@@ -964,6 +990,8 @@ export class PuzzleEngine {
       currentHp: enemy.hp,
       maxHp: enemy.maxHp,
       attributeAbsorbTurns: enemy.attributeAbsorbTurns,
+      defenseBoostTurns: enemy.defenseBoostTurns,
+      attributeNullifyTurns: enemy.attributeNullifyTurns,
       scaledAttackGate: enemy.scaledAttackGate,
       enemyAttackBoostTurns: enemy.attackBoostTurns,
       enemyBaseAttack: enemy.attack,
@@ -1099,13 +1127,16 @@ export class PuzzleEngine {
     if (skill.supported && [
       'healEnemy',
       'additionalAttack',
+      'defenseBoost',
     ].includes(skill.kind) && !skill.setupMaterialized) {
       const percent = this.rollEnemySkillDuration(skill.percentMin, skill.percentMax);
       return Object.freeze({
         ...record,
         ...(skill.kind === 'healEnemy'
           ? { healPercent: percent }
-          : { damagePercent: percent }),
+          : skill.kind === 'additionalAttack'
+            ? { damagePercent: percent }
+            : { boostPercent: percent }),
         setupMaterialized: true,
       });
     }
@@ -1256,6 +1287,26 @@ export class PuzzleEngine {
         Math.trunc(Number(enemy.attackBoostTurns) || 0) - 1,
       );
       if (enemy.attackBoostTurns === 0) enemy.attackBoostPercent = 100;
+    });
+  }
+
+  advanceEnemyDefenseBoostTurns() {
+    this.enemies.forEach((enemy) => {
+      enemy.defenseBoostTurns = Math.max(
+        0,
+        Math.trunc(Number(enemy.defenseBoostTurns) || 0) - 1,
+      );
+      if (enemy.defenseBoostTurns === 0) enemy.defenseBoostAmount = 0;
+    });
+  }
+
+  advanceEnemyAttributeNullifyTurns() {
+    this.enemies.forEach((enemy) => {
+      enemy.attributeNullifyTurns = Math.max(
+        0,
+        Math.trunc(Number(enemy.attributeNullifyTurns) || 0) - 1,
+      );
+      if (enemy.attributeNullifyTurns === 0) enemy.attributeNullifyMask = 0;
     });
   }
 
@@ -1424,6 +1475,22 @@ export class PuzzleEngine {
     }
     if (skill.supported && skill.kind === 'additionalAttack') {
       this.message = `Enemy adds an attack at ${skill.damagePercent}% power.`;
+      return true;
+    }
+    if (skill.supported && skill.kind === 'defenseBoost') {
+      const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
+      if (!enemy) return false;
+      enemy.defenseBoostTurns = Math.max(0, (skill.durationTurns << 16) >> 16);
+      enemy.defenseBoostAmount = padEnemySkillDefenseBoost(enemy.defense, skill.boostPercent);
+      this.message = `${enemy.name} raises defense by ${enemy.defenseBoostAmount.toLocaleString()} for ${enemy.defenseBoostTurns} turn${enemy.defenseBoostTurns === 1 ? '' : 's'}.`;
+      return true;
+    }
+    if (skill.supported && skill.kind === 'attributeNullify') {
+      const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
+      if (!enemy) return false;
+      enemy.attributeNullifyTurns = Math.max(0, (skill.durationTurns << 16) >> 16);
+      enemy.attributeNullifyMask = padEnemySkillAttributeNullifyMask(skill.attributes);
+      this.message = `${enemy.name} nullifies selected attributes for ${enemy.attributeNullifyTurns} turn${enemy.attributeNullifyTurns === 1 ? '' : 's'}.`;
       return true;
     }
     if (skill.supported && [
@@ -1682,6 +1749,9 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
         PAD_ENEMY_SKILL_HEAL_ENEMY,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
+        PAD_ENEMY_SKILL_DEFENSE_BOOST,
+        PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
+        PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY,
         PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
         PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
@@ -2285,7 +2355,7 @@ export class PuzzleEngine {
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,
-      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0 }, index) => ({
+      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0 }, index) => ({
         id,
         name,
         attribute,
@@ -2296,6 +2366,10 @@ export class PuzzleEngine {
         scaledAttackGate,
         attackBoostTurns,
         attackBoostPercent,
+        defenseBoostTurns,
+        defenseBoostAmount,
+        attributeNullifyTurns,
+        attributeNullifyMask,
         damagedTurnCount,
         transientDebuffActive,
         statusShieldTurns,

@@ -712,6 +712,35 @@ real immediate-probability scale while fallback selection only tests it for a
 positive value. Neither condition consumes RNG; the shared setup consumes the
 single range-selection step after a skill is selected.
 
+Enemy skill type `9` is a timed additive defense boost. Its dispatch, setup,
+and condition targets are `0x629360`, `0x6212ac`, and `0x61bb98`. Setup copies
+definition duration `+0x10` to runtime `sMONSTER+0x678`, then spends one global
+LCG step to select an inclusive signed percentage from `+0x14..+0x18` into
+`+0x67c`. Execution stores duration through the protected signed-int16 lane at
+`sMONSTER+0x810` and writes
+`izMathRound(float32(int64(baseDefense * percent)) / float32(100))` to the
+protected additive-defense lane at `+0x800`. The damage path adds this amount
+to the protected base defense at `+0x280/+0x290` only while the counter is
+positive. The browser keeps the base defense immutable and models the same
+timed addition separately.
+
+Types `10` and `11` are timed attribute-damage nullification shields. Their
+dispatch targets are `0x6293b8` and `0x6293c8`; setup targets are `0x61fee4`
+and `0x6217a8`. Type 10 takes duration `+0x10` and one attribute at `+0x14`.
+Type 11 takes the same duration plus two attributes at `+0x14/+0x18`.
+Execution builds `1 << attribute` masks, stores their low unsigned 16 bits at
+the protected `sMONSTER+0x820` lane, and stores duration through the protected
+signed-int16 counter at `+0x830`. `_calcFinalDamage` applies this only to
+natural attack attributes 0 through 4 and forces a matching hit to exactly
+zero before HP change; it is distinct from the later attribute-absorb status.
+
+All three conditions share `0x61bb98`, which returns the incoming binary32
+probability scale unchanged and consumes no RNG. Existing counters advance
+before enemy action setup, so a newly installed status does not immediately
+lose a turn. The port preserves that ordering, type 9's post-selection RNG,
+the two protected status lifetimes, effective defense, exact zero-damage
+behavior, target projection, and snapshot visibility.
+
 Type `12` is the dedicated source-color-to-jammer variant. Its dispatch target
 is `0x6293f8`, setup is `0x61ff08`, and condition is `0x61a63c`. Setup copies
 definition source type `+0x10` to runtime `sMONSTER+0x678`; execution calls the

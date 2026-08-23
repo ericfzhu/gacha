@@ -2,6 +2,9 @@ export const PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION = 4;
 export const PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS = 6;
 export const PAD_ENEMY_SKILL_HEAL_ENEMY = 7;
 export const PAD_ENEMY_SKILL_ADDITIONAL_ATTACK = 8;
+export const PAD_ENEMY_SKILL_DEFENSE_BOOST = 9;
+export const PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY = 10;
+export const PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY = 11;
 export const PAD_ENEMY_SKILL_SOURCE_TO_JAMMER = 12;
 export const PAD_ENEMY_SKILL_LONE_ATTACK_BOOST = 17;
 export const PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST = 18;
@@ -126,6 +129,39 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       supported: percentMax >= percentMin,
       percentMin,
       percentMax,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
+    requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    const percentMin = definition.getInt32(0x14, true);
+    const percentMax = definition.getInt32(0x18, true);
+    return Object.freeze({
+      type,
+      kind: 'defenseBoost',
+      supported: percentMax >= percentMin,
+      durationTurns: definition.getInt32(0x10, true),
+      percentMin,
+      percentMax,
+      attackWithSkillValue,
+    });
+  }
+  if (
+    type === PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY
+    || type === PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY
+  ) {
+    if (type === PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY) {
+      requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    }
+    const attributes = type === PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY
+      ? [definition.getInt32(0x14, true), definition.getInt32(0x18, true)]
+      : [definition.getInt32(0x14, true)];
+    return Object.freeze({
+      type,
+      kind: 'attributeNullify',
+      supported: true,
+      durationTurns: definition.getInt32(0x10, true),
+      attributes: Object.freeze(attributes),
       attackWithSkillValue,
     });
   }
@@ -539,6 +575,24 @@ export function padEnemySkillAdditionalAttack(baseAttack, damagePercent) {
   return Math.trunc(Math.fround(scaled + (scaled < 0 ? -0.5 : 0.5)));
 }
 
+// Type 9 reconstructs the protected int64 base defense, multiplies it by the
+// signed runtime percentage, converts the product to binary32, divides by
+// binary32 100, and passes the result through izMathRound.
+export function padEnemySkillDefenseBoost(baseDefense, boostPercent) {
+  const defense = Math.max(0, Math.trunc(Number(baseDefense) || 0));
+  const percent = Math.trunc(Number(boostPercent) || 0);
+  const scaled = Math.fround(
+    Math.fround(defense * percent) / Math.fround(100),
+  );
+  return Math.trunc(Math.fround(scaled + (scaled < 0 ? -0.5 : 0.5)));
+}
+
+export function padEnemySkillAttributeNullifyMask(attributes) {
+  return (Array.isArray(attributes) ? attributes : []).reduce((mask, attribute) => (
+    mask + ((1 << (Math.trunc(Number(attribute) || 0) & 31)) & 0xffff)
+  ), 0) & 0xffff;
+}
+
 // Type 50 reads current player HP, scales it by runtime +0x678 in binary32,
 // and calls izMathRound. Its 100% fast path returns current HP directly.
 export function padEnemySkillCurrentHpGravity(currentHp, damagePercent) {
@@ -645,6 +699,39 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
       ...(type === PAD_ENEMY_SKILL_HEAL_ENEMY
         ? { healPercent: monster.getInt32(0x678, true) }
         : { damagePercent: monster.getInt32(0x678, true) }),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
+    return Object.freeze({
+      type,
+      kind: 'defenseBoost',
+      supported: true,
+      durationTurns: monster.getInt32(0x678, true),
+      boostPercent: monster.getInt32(0x67c, true),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
+  if (
+    type === PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY
+    || type === PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY
+  ) {
+    return Object.freeze({
+      type,
+      kind: 'attributeNullify',
+      supported: true,
+      durationTurns: monster.getInt32(0x678, true),
+      attributes: Object.freeze(type === PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY
+        ? [monster.getInt32(0x67c, true), monster.getInt32(0x680, true)]
+        : [monster.getInt32(0x67c, true)]),
       setupMaterialized: true,
       attackWithSkillValue: definitionBytes.byteLength
           >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
@@ -912,6 +999,45 @@ export function normalizePadEnemySkillRecord(record) {
           : { damagePercent: Math.trunc(Number(record.damagePercent) || 0) }
         : { percentMin, percentMax }),
       setupMaterialized: Boolean(record?.setupMaterialized || percentPresent),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST || record?.kind === 'defenseBoost') {
+    const percentPresent = record?.boostPercent !== undefined && record?.boostPercent !== null;
+    const percentMin = Math.trunc(Number(record?.percentMin) || 0);
+    const percentMax = Math.trunc(Number(record?.percentMax) || 0);
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_DEFENSE_BOOST,
+      kind: 'defenseBoost',
+      supported: percentPresent || percentMax >= percentMin,
+      durationTurns: Math.trunc(Number(record?.durationTurns) || 0),
+      ...(percentPresent
+        ? { boostPercent: Math.trunc(Number(record.boostPercent) || 0) }
+        : { percentMin, percentMax }),
+      setupMaterialized: Boolean(record?.setupMaterialized || percentPresent),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (
+    type === PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY
+    || type === PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY
+    || record?.kind === 'attributeNullify'
+  ) {
+    const dual = type === PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY
+      || (type !== PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY && record?.attributes?.length > 1);
+    return Object.freeze({
+      type: dual ? PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY : PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
+      kind: 'attributeNullify',
+      supported: true,
+      durationTurns: Math.trunc(Number(record?.durationTurns) || 0),
+      attributes: Object.freeze((Array.isArray(record?.attributes) ? record.attributes : [])
+        .slice(0, dual ? 2 : 1)
+        .map((attribute) => Math.trunc(Number(attribute) || 0))),
+      setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

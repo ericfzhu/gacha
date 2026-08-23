@@ -33,6 +33,11 @@ const ADDITIONAL_ATTACK_ENEMY_SKILL_TYPE = 8;
 const ADDITIONAL_ATTACK_HANDLER = 0x629304;
 const ADDITIONAL_ATTACK_SETUP_HANDLER = 0x61ff5c;
 const ADDITIONAL_ATTACK_CONDITION_HANDLER = 0x61b450;
+const EARLY_DEFENSE_SHIELD_SKILLS = Object.freeze([
+  Object.freeze({ type: 9, kind: 'defenseBoost', dispatch: 0x629360, setup: 0x6212ac }),
+  Object.freeze({ type: 10, kind: 'attributeNullify', dispatch: 0x6293b8, setup: 0x61fee4 }),
+  Object.freeze({ type: 11, kind: 'dualAttributeNullify', dispatch: 0x6293c8, setup: 0x6217a8 }),
+].map((entry) => Object.freeze({ ...entry, condition: 0x61bb98 })));
 const SOURCE_TO_JAMMER_ENEMY_SKILL_TYPE = 12;
 const SOURCE_TO_JAMMER_HANDLER = 0x6293f8;
 const SOURCE_TO_JAMMER_SETUP_HANDLER = 0x61ff08;
@@ -393,6 +398,30 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : additionalAttackSetupTarget === ADDITIONAL_ATTACK_SETUP_HANDLER;
   const additionalAttackConditionMatches = additionalAttackConditionTarget === null
     ? null : additionalAttackConditionTarget === ADDITIONAL_ATTACK_CONDITION_HANDLER;
+  const earlyDefenseShieldTargets = EARLY_DEFENSE_SHIELD_SKILLS.map((entry) => {
+    const dispatchTarget = resolveEnemySkillTarget(
+      entry.type, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+    );
+    const setupTarget = resolveEnemySkillTarget(
+      entry.type, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+    );
+    const conditionTarget = resolveEnemySkillTarget(
+      entry.type, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+    );
+    return Object.freeze({
+      ...entry,
+      dispatchTarget,
+      setupTarget,
+      conditionTarget,
+      matches21_9: dispatchTarget === null ? null : (
+        dispatchTarget === entry.dispatch
+        && setupTarget === entry.setup
+        && conditionTarget === entry.condition
+      ),
+    });
+  });
+  const earlyDefenseShieldEntriesMatch = restoredElf === null
+    ? null : earlyDefenseShieldTargets.every((entry) => entry.matches21_9);
   const sourceToJammerDispatchTarget = resolveEnemySkillTarget(
     SOURCE_TO_JAMMER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1316,6 +1345,7 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       additionalAttackDispatchMatches21_9: additionalAttackDispatchMatches,
       additionalAttackSetupMatches21_9: additionalAttackSetupMatches,
       additionalAttackConditionMatches21_9: additionalAttackConditionMatches,
+      earlyDefenseShieldEntriesMatch21_9: earlyDefenseShieldEntriesMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -1502,6 +1532,18 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       additionalAttackConditionMatches21_9: additionalAttackConditionMatches,
       additionalAttackSemantics:
         'one-LCG inclusive +0x10..+0x14 percentage; add round(float32(int64 attack*percent)/100); condition clipF(float32(player HP)/float32(enemy attack), 0, 2)',
+      earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
+        type: entry.type,
+        kind: entry.kind,
+        dispatchTarget: entry.dispatchTarget === null ? null : hex(entry.dispatchTarget),
+        setupTarget: entry.setupTarget === null ? null : hex(entry.setupTarget),
+        conditionTarget: entry.conditionTarget === null ? null : hex(entry.conditionTarget),
+        matches21_9: entry.matches21_9,
+      })),
+      defenseBoostSemantics:
+        'type 9: +0x10 duration; one-LCG inclusive +0x14..+0x18 percent; +0x800 = round(float32(int64 base defense*percent)/100), +0x810 signed-int16 turns',
+      attributeNullifySemantics:
+        'types 10/11: +0x10 duration and one/two +0x14/+0x18 attributes; bitmask at +0x820 and signed-int16 turns at +0x830 force matching attributes 0..4 to zero damage',
       sourceToJammerType: SOURCE_TO_JAMMER_ENEMY_SKILL_TYPE,
       sourceToJammerDispatchTarget: sourceToJammerDispatchTarget === null
         ? null : hex(sourceToJammerDispatchTarget),
@@ -1904,6 +1946,7 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || additionalAttackDispatchMatches === false
     || additionalAttackSetupMatches === false
     || additionalAttackConditionMatches === false
+    || earlyDefenseShieldEntriesMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

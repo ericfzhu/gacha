@@ -4,6 +4,9 @@ import {
   PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
   PAD_ENEMY_SKILL_HEAL_ENEMY,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
+  PAD_ENEMY_SKILL_DEFENSE_BOOST,
+  PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
+  PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY,
   PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
@@ -137,6 +140,9 @@ function isStaticallyEligible(definition, state) {
     PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
     PAD_ENEMY_SKILL_HEAL_ENEMY,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
+    PAD_ENEMY_SKILL_DEFENSE_BOOST,
+    PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
+    PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY,
     PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
     PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
     PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
@@ -212,6 +218,15 @@ function evaluateCondition(definition, state, rngState) {
       : state.playerCurrentHp > 0 ? 2 : 0;
     const probabilityScale = Math.fround(Math.min(2, Math.max(0, ratio)));
     return { eligible: probabilityScale > 0, probabilityScale, rngState };
+  }
+  if (
+    definition.effect.type === PAD_ENEMY_SKILL_DEFENSE_BOOST
+    || definition.effect.type === PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY
+    || definition.effect.type === PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY
+  ) {
+    // Types 9-11 all map to 0x61bb98, which returns the incoming float32
+    // probability scale unchanged and consumes no RNG.
+    return { eligible: true, probabilityScale: 1, rngState };
   }
   if (
     definition.effect.type === PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION

@@ -27,6 +27,7 @@ const renderStatusShieldState = process.argv.includes('--status-shield-render');
 const renderAttackBoostState = process.argv.includes('--attack-boost-render');
 const renderClearPlayerBuffsState = process.argv.includes('--clear-player-buffs-render');
 const renderEarlyHealAttackState = process.argv.includes('--early-heal-attack-render');
+const renderEarlyDefenseShieldsState = process.argv.includes('--early-defense-shields-render');
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 980, height: 900 } });
 const consoleMessages = [];
@@ -2256,6 +2257,61 @@ try {
     || earlyHealAttackRenderState.attackState?.player?.hp !== 8_522
   )) throw new Error(`Early heal/attack render-state mismatch: ${JSON.stringify(earlyHealAttackRenderState)}`);
   if (earlyHealAttackRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
+  const earlyDefenseShieldsRenderState = renderEarlyDefenseShieldsState ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    const makeSkill = (skillId, type, parameter0, parameter1, parameter2) => {
+      const bytes = new Uint8Array(0x48);
+      const view = new DataView(bytes.buffer);
+      view.setUint32(0x00, skillId, true);
+      view.setInt16(0x04, type, true);
+      view.setInt32(0x10, parameter0, true);
+      view.setInt32(0x14, parameter1, true);
+      view.setInt32(0x18, parameter2, true);
+      view.setInt32(0x30, 10_000, true);
+      view.setInt32(0x34, 1_000, true);
+      view.setInt32(0x38, 100, true);
+      view.setInt32(0x40, 20, true);
+      return bytes;
+    };
+    engine.reset();
+    engine.start();
+    engine.setRngState(21_900);
+    const defenseApplied = engine.applyEnemySkillDefinition(
+      makeSkill(9_038, 9, 3, 150, 200),
+    );
+    const defenseState = engine.snapshot();
+    engine.reset();
+    engine.start();
+    const nullifyApplied = engine.applyEnemySkillDefinition(
+      makeSkill(9_040, 11, 4, 0, 4),
+    );
+    engine.enemies[0].hp = 50_000;
+    engine.enemies[1].hp = 0;
+    engine.party.forEach((member, index) => {
+      if (index !== 0) member.bindTurns = 5;
+    });
+    engine.party[0].leaderSkill = null;
+    engine.comboCount = 1;
+    engine.turnMatches = [{
+      type: 'fire', size: 3, enhancedCount: 0, enhancementMultiplier: 1, isMassAttack: false,
+    }];
+    engine.resolvePlayerTurn();
+    return { defenseApplied, defenseState, nullifyApplied, nullifyState: engine.snapshot() };
+  }) : null;
+  if (earlyDefenseShieldsRenderState && (
+    earlyDefenseShieldsRenderState.defenseApplied !== true
+    || earlyDefenseShieldsRenderState.defenseState?.lastEnemySkill?.type !== 9
+    || earlyDefenseShieldsRenderState.defenseState?.lastEnemySkill?.boostPercent !== 154
+    || earlyDefenseShieldsRenderState.defenseState?.enemies?.[0]?.defenseBoostTurns !== 3
+    || earlyDefenseShieldsRenderState.defenseState?.enemies?.[0]?.defenseBoostAmount !== 185
+    || earlyDefenseShieldsRenderState.nullifyApplied !== true
+    || earlyDefenseShieldsRenderState.nullifyState?.lastEnemySkill?.type !== 11
+    || earlyDefenseShieldsRenderState.nullifyState?.enemies?.[0]?.attributeNullifyTurns !== 4
+    || earlyDefenseShieldsRenderState.nullifyState?.enemies?.[0]?.attributeNullifyMask !== 0x11
+    || earlyDefenseShieldsRenderState.nullifyState?.lastDamage !== 0
+    || earlyDefenseShieldsRenderState.nullifyState?.enemies?.[0]?.hp !== 50_000
+  )) throw new Error(`Early defense/shield render-state mismatch: ${JSON.stringify(earlyDefenseShieldsRenderState)}`);
+  if (earlyDefenseShieldsRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   const attackBoostRenderState = renderAttackBoostState ? await page.evaluate(() => {
     const engine = window.__puzzleGame;
     engine.reset();
@@ -2281,9 +2337,9 @@ try {
   )) throw new Error(`Attack-boost render-state mismatch: ${JSON.stringify(attackBoostRenderState)}`);
   if (attackBoostRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, attackBoostRenderState, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, attackBoostRenderState, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, attackBoostRenderState, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, attackBoostRenderState, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }
