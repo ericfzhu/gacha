@@ -1380,6 +1380,24 @@ at shared state 3803934822. After the ordinary AI-selection draw, it displays at
 `(3,2)` and ends at 1929471377. Positive authored origins `(2,2)` instead place
 it at `(1,2)` without changing shared state.
 
+Enemy skill type `105` applies a timed player-recovery multiplier. Its dispatch,
+generic setup, and condition targets are `0x62a298`, `0x6217c0`, and `0x61b80c`;
+the independent parser identifies `ESDebuffRCV`. Definition `+0x10` is the
+duration and signed `+0x14` is the recovery percentage. Execution converts that
+percentage to binary32, divides by binary32 100.0, stores the multiplier at
+protected `sGAMEWORK+0x86e38`, and installs the duration at `+0x86e48` with a
+fresh status edge. No setup or execution RNG is consumed.
+
+The downstream native recovery path checks that duration and multiplies its
+completed charge by the stored value at `_calcCharge+0x6c`. The browser uses
+the same float32 multiplication stage before its final integer truncation,
+keeps the debuff lifetime independent from other player statuses, and displays
+an `RCV` percentage/turn indicator. With team recovery 820, a three-heart match
+under a 50% record heals 410 and leaves seed 21900 untouched. Condition
+`0x61b80c` rejects a new record while an active multiplier is below 1.0, but
+admits an inactive lane or a current value at least 1.0; the scheduled fixture
+therefore falls back to its ordinary attack when a 50% debuff is already live.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

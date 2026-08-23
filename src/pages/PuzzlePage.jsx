@@ -477,6 +477,16 @@ function render(ctx, engine) {
     );
     playerStatusY += 12;
   }
+  if (engine.recoveryDebuff?.turnsRemaining > 0) {
+    ctx.fillStyle = '#ffb8d5';
+    ctx.font = '700 9px "Barlow Condensed", sans-serif';
+    ctx.fillText(
+      `RCV ${engine.recoveryDebuff.recoveryPercent}% · ${engine.recoveryDebuff.turnsRemaining}T`,
+      434,
+      playerStatusY,
+    );
+    playerStatusY += 12;
+  }
   const activeSkyfallRules = Object.values(engine.skyfallRateRules || {}).filter(Boolean);
   if (activeSkyfallRules.length > 0) {
     const skyfallText = activeSkyfallRules.map((rule) => {

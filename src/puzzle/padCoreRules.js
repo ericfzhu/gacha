@@ -1325,6 +1325,7 @@ export function padNativeRecoveryPower(
   heartMatches,
   combos,
   extraComboBonus = PAD_EXTRA_COMBO_BONUS,
+  recoveryMultiplier = 1,
 ) {
   const cardRecoveries = Array.isArray(recoveries) ? recoveries : [recoveries];
   const matchPower = heartMatches.reduce((total, match) => {
@@ -1338,7 +1339,7 @@ export function padNativeRecoveryPower(
     const comboScaled = padFloat32Multiply(matchScaled, comboMultiplier);
     return Math.fround(sum + comboScaled);
   }, Math.fround(0));
-  return Math.trunc(total);
+  return Math.trunc(padFloat32Multiply(total, Math.fround(Number(recoveryMultiplier) || 0)));
 }
 
 export function padDamageAfterDefense(

@@ -61,6 +61,7 @@ import {
   PAD_ENEMY_SKILL_RANDOM_BOMBS,
   PAD_ENEMY_SKILL_FIXED_BOMBS,
   PAD_ENEMY_SKILL_CLOUD,
+  PAD_ENEMY_SKILL_RECOVERY_DEBUFF,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -335,6 +336,7 @@ export class PuzzleEngine {
     this.orbSealRowTurns = 0;
     this.forcedStart = null;
     this.cloud = null;
+    this.recoveryDebuff = null;
     this.leaderSwapTurns = 0;
     this.leaderSwapIndex = null;
     this.enemySkillQueues.forEach((queue) => { queue.position = 0; });
@@ -964,7 +966,13 @@ export class PuzzleEngine {
         .map((member) => member.recovery)
       : [this.player.recovery];
     const extraComboBonus = this.allowDiagonalMoves ? 0.5 : 0.25;
-    const healing = padNativeRecoveryPower(recoveryLanes, heartMatches, this.comboCount, extraComboBonus);
+    const healing = padNativeRecoveryPower(
+      recoveryLanes,
+      heartMatches,
+      this.comboCount,
+      extraComboBonus,
+      this.recoveryDebuff?.multiplier ?? 1,
+    );
     const poisonDamage = padPoisonDamage(
       this.player.maxHp,
       (byType.get('poison') || []).map((match) => match.size),
@@ -1136,6 +1144,7 @@ export class PuzzleEngine {
     this.advanceBlackOrbCountdowns();
     this.advanceOrbSealTurns();
     this.advanceCloudTurns();
+    this.advanceRecoveryDebuffTurns();
     if (this.blackFallRule?.active && this.blackFallRule.turnsRemaining !== null) {
       this.blackFallRule.turnsRemaining = Math.max(0, this.blackFallRule.turnsRemaining - 1);
       if (this.blackFallRule.turnsRemaining === 0) this.blackFallRule.active = false;
@@ -1264,6 +1273,8 @@ export class PuzzleEngine {
       orbSealActive: this.orbSealColumnTurns > 0 || this.orbSealRowTurns > 0,
       forcedStartActive: Boolean(this.forcedStart),
       cloudActive: Boolean(this.cloud?.turnsRemaining > 0),
+      playerRecovery: this.player.recovery,
+      recoveryMultiplier: this.recoveryDebuff?.multiplier ?? 1,
       enemyAttribute: PAD_ATTRIBUTE_INDEX[enemy.attribute] ?? -1,
       playerCurrentHp: this.player.hp,
       playerMaxHp: this.player.maxHp,
@@ -2390,6 +2401,17 @@ export class PuzzleEngine {
       this.message = `Clouds obscured a ${width} × ${height} area for ${this.cloud.turnsRemaining} turn${this.cloud.turnsRemaining === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'recoveryDebuff') {
+      const multiplier = Math.fround(skill.recoveryPercent / 100);
+      this.recoveryDebuff = {
+        turnsRemaining: Math.max(0, skill.durationTurns) & 0x3ff,
+        recoveryPercent: skill.recoveryPercent,
+        multiplier,
+      };
+      this.lastEnemySkill = Object.freeze({ ...skill, multiplier });
+      this.message = `Recovery changed to ${skill.recoveryPercent}% for ${this.recoveryDebuff.turnsRemaining} turn${this.recoveryDebuff.turnsRemaining === 1 ? '' : 's'}.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'clearPlayerBuffs') {
       // _doItetukuHadou clears both recovered sGAMEWORK positive-status lanes,
       // then type 6 invokes _applyLeaderSkill(false). Leader effects in this
@@ -2929,6 +2951,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_RANDOM_BOMBS,
         PAD_ENEMY_SKILL_FIXED_BOMBS,
         PAD_ENEMY_SKILL_CLOUD,
+        PAD_ENEMY_SKILL_RECOVERY_DEBUFF,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -3530,6 +3553,12 @@ export class PuzzleEngine {
     if (this.cloud.turnsRemaining === 0) this.cloud = null;
   }
 
+  advanceRecoveryDebuffTurns() {
+    if (!this.recoveryDebuff || this.recoveryDebuff.turnsRemaining <= 0) return;
+    this.recoveryDebuff.turnsRemaining = Math.max(0, this.recoveryDebuff.turnsRemaining - 1);
+    if (this.recoveryDebuff.turnsRemaining === 0) this.recoveryDebuff = null;
+  }
+
   snapshot() {
     return {
       coordinateSystem: `board origin top-left; rows 0-${this.rows - 1} downward; columns 0-${this.columns - 1} rightward`,
@@ -3574,6 +3603,7 @@ export class PuzzleEngine {
       },
       forcedStart: this.forcedStart ? { ...this.forcedStart } : null,
       cloud: this.cloud ? { ...this.cloud } : null,
+      recoveryDebuff: this.recoveryDebuff ? { ...this.recoveryDebuff } : null,
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({
         code: ORB_BY_ID[orb.type].code,

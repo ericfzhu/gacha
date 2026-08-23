@@ -2,6 +2,22 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 type-105 recovery debuff
+
+- Recovered type `105` at dispatch/setup/condition `0x62a298`, `0x6217c0`, and
+  `0x61b80c`; the independent parser corroborates `ESDebuffRCV`.
+- Execution installs authored duration `+0x10` at protected
+  `sGAMEWORK+0x86e48` and binary32(`+0x14`) / 100 at `+0x86e38`.
+  `_calcCharge` multiplies the completed recovery charge by that value while
+  the duration is active. Setup and execution consume no RNG.
+- Condition admits an inactive lane or an active multiplier at least 1.0, but
+  refuses to overwrite an existing sub-1.0 recovery debuff. Ported decoding,
+  AI admission, float32-stage recovery math, independent lifetime/reset/state,
+  and the browser `RCV` indicator. Pure fixtures, twenty-five ARM64 anchors,
+  focused Chromium, screenshot inspection, and the generic browser client
+  pass, along with the full native inspector, PAD data checks, and production
+  build. Next: type `106`.
+
 ## 2026-08-24 type-104 cloud
 
 - Recovered type `104` at dispatch/setup/condition `0x62a178`, `0x621950`, and

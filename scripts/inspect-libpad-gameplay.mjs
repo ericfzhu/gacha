@@ -464,6 +464,37 @@ const CLOUD_INSTRUCTION_ANCHORS = Object.freeze([
   [0x61ba4c, 0x7200251f], // inspect its low ten active bits
   [0x61ba50, 0x54000981], // active cloud rejects reapplication
 ]);
+const RECOVERY_DEBUFF_ENEMY_SKILL_TYPE = 105;
+const RECOVERY_DEBUFF_HANDLER = 0x62a298;
+const RECOVERY_DEBUFF_SETUP_HANDLER = 0x6217c0;
+const RECOVERY_DEBUFF_CONDITION_HANDLER = 0x61b80c;
+const RECOVERY_DEBUFF_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x62a2a4, 0xb94012a1], // load authored +0x10 duration
+  [0x62a2b0, 0x528dc908], // address protected recovery-duration lane +0x86e48
+  [0x62a2bc, 0x97f37e45], // install authored duration through its status owner
+  [0x62a2c0, 0xbd4016a0], // load authored +0x14 recovery percentage
+  [0x62a2d8, 0x5e21d800], // convert the signed percentage to binary32
+  [0x62a2dc, 0x1e211800], // divide it by exact binary32 100.0
+  [0x62a2e0, 0x8b0a0120], // address multiplier lane +0x86e38
+  [0x62a2e4, 0x97f3c1ff], // store the recovery multiplier
+  [0x62a2f8, 0x7869690a], // load companion status bits at +0x86e58
+  [0x62a308, 0x1215114a], // retain only the status high bits
+  [0x62a30c, 0x3216014a], // set its native fresh edge
+  [0x62a314, 0x7829690a], // persist the fresh status
+  [0x61b80c, 0x528dc908], // condition addresses recovery-duration +0x86e48
+  [0x61b818, 0x97f44452], // read the current signed duration
+  [0x61b824, 0x54ff706d], // nonpositive duration admits the skill
+  [0x61b82c, 0x528dc709], // otherwise address multiplier +0x86e38
+  [0x61b838, 0x97f3d136], // load current binary32 multiplier
+  [0x61b83c, 0x1e2e1001], // compare against exact 1.0
+  [0x61b844, 0x54ff6f6a], // admit only a non-debuff multiplier
+  [0x65045c, 0x528dc909], // recovery calculation checks active duration
+  [0x650468, 0x97f3713e], // read that signed counter
+  [0x650490, 0xf9400368], // active calculation returns to shared game work
+  [0x650494, 0x528dc709], // address the recovery multiplier
+  [0x6504a0, 0x97f2fe1c], // load it as binary32
+  [0x6504a4, 0x1e200908], // multiply native recovery charge by the debuff
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -1560,6 +1591,31 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     : CLOUD_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
+  const recoveryDebuffDispatchTarget = resolveEnemySkillTarget(
+    RECOVERY_DEBUFF_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const recoveryDebuffSetupTarget = resolveEnemySkillTarget(
+    RECOVERY_DEBUFF_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const recoveryDebuffConditionTarget = resolveEnemySkillTarget(
+    RECOVERY_DEBUFF_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const recoveryDebuffDispatchMatches = recoveryDebuffDispatchTarget === null
+    ? null : recoveryDebuffDispatchTarget === RECOVERY_DEBUFF_HANDLER;
+  const recoveryDebuffSetupMatches = recoveryDebuffSetupTarget === null
+    ? null : recoveryDebuffSetupTarget === RECOVERY_DEBUFF_SETUP_HANDLER;
+  const recoveryDebuffConditionMatches = recoveryDebuffConditionTarget === null
+    ? null : recoveryDebuffConditionTarget === RECOVERY_DEBUFF_CONDITION_HANDLER;
+  const recoveryDebuffInstructionAnchorsMatch = restoredElf === null ? null
+    : RECOVERY_DEBUFF_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -2598,6 +2654,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       cloudSetupMatches21_9: cloudSetupMatches,
       cloudConditionMatches21_9: cloudConditionMatches,
       cloudInstructionAnchorsMatch21_9: cloudInstructionAnchorsMatch,
+      recoveryDebuffDispatchMatches21_9: recoveryDebuffDispatchMatches,
+      recoveryDebuffSetupMatches21_9: recoveryDebuffSetupMatches,
+      recoveryDebuffConditionMatches21_9: recoveryDebuffConditionMatches,
+      recoveryDebuffInstructionAnchorsMatch21_9: recoveryDebuffInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -3237,6 +3297,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       cloudInstructionAnchorsMatch21_9: cloudInstructionAnchorsMatch,
       cloudSemantics:
         'type 104 uses +0x10 duration, +0x14/+0x18 row/column extents, and one-based +0x1c/+0x20 Y/right-origin-X coordinates; positive origins clamp without RNG, otherwise setup spends two shared-LCG draws over fitting positions at runtime +0x678/+0x67c; execution mirrors X into left-origin browser space and installs protected low-ten-bit duration at +0x875b8, while condition rejects an active cloud',
+      recoveryDebuffType: RECOVERY_DEBUFF_ENEMY_SKILL_TYPE,
+      recoveryDebuffDispatchTarget: recoveryDebuffDispatchTarget === null
+        ? null : hex(recoveryDebuffDispatchTarget),
+      recoveryDebuffDispatchMatches21_9: recoveryDebuffDispatchMatches,
+      recoveryDebuffSetupTarget: recoveryDebuffSetupTarget === null
+        ? null : hex(recoveryDebuffSetupTarget),
+      recoveryDebuffSetupMatches21_9: recoveryDebuffSetupMatches,
+      recoveryDebuffConditionTarget: recoveryDebuffConditionTarget === null
+        ? null : hex(recoveryDebuffConditionTarget),
+      recoveryDebuffConditionMatches21_9: recoveryDebuffConditionMatches,
+      recoveryDebuffInstructionAnchorsMatch21_9: recoveryDebuffInstructionAnchorsMatch,
+      recoveryDebuffSemantics:
+        'type 105 owns no setup RNG; execution installs +0x10 duration at protected +0x86e48 and binary32(+0x14)/100 at +0x86e38, whose active value multiplies the native recovery charge; condition admits an inactive lane or a multiplier at least 1.0 but rejects overwriting a current sub-1.0 recovery debuff',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -3779,6 +3852,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || cloudSetupMatches === false
     || cloudConditionMatches === false
     || cloudInstructionAnchorsMatch === false
+    || recoveryDebuffDispatchMatches === false
+    || recoveryDebuffSetupMatches === false
+    || recoveryDebuffConditionMatches === false
+    || recoveryDebuffInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

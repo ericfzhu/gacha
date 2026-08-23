@@ -72,6 +72,7 @@ export const PAD_ENEMY_SKILL_FIXED_START = 101;
 export const PAD_ENEMY_SKILL_RANDOM_BOMBS = 102;
 export const PAD_ENEMY_SKILL_FIXED_BOMBS = 103;
 export const PAD_ENEMY_SKILL_CLOUD = 104;
+export const PAD_ENEMY_SKILL_RECOVERY_DEBUFF = 105;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -415,6 +416,17 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       cloudWidthColumns: definition.getInt32(0x18, true),
       authoredOriginY: definition.getInt32(0x1c, true),
       authoredOriginX: definition.getInt32(0x20, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_RECOVERY_DEBUFF) {
+    requireLength(definitionBytes, 0x18, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'recoveryDebuff',
+      supported: true,
+      durationTurns: definition.getInt32(0x10, true),
+      recoveryPercent: definition.getInt32(0x14, true),
       attackWithSkillValue,
     });
   }
@@ -1416,6 +1428,10 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
       setupMaterialized: true,
     });
   }
+  if (type === PAD_ENEMY_SKILL_RECOVERY_DEBUFF) {
+    // Type 105 uses generic setup and reads both authored operands directly.
+    return decodePadEnemySkillDefinition(definitionBytes);
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -2269,6 +2285,18 @@ export function normalizePadEnemySkillRecord(record) {
           Math.max(0, Math.trunc(Number(record.originColumnFromRight) || 0)) & 0xff,
       } : {}),
       setupMaterialized: Boolean(record?.setupMaterialized || positionPresent),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_RECOVERY_DEBUFF || record?.kind === 'recoveryDebuff') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_RECOVERY_DEBUFF,
+      kind: 'recoveryDebuff',
+      supported: record?.supported !== false,
+      durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)),
+      recoveryPercent: Math.trunc(Number(record?.recoveryPercent) || 0),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

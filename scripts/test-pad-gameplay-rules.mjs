@@ -26,6 +26,7 @@ import {
   PAD_ENEMY_SKILL_RANDOM_BOMBS,
   PAD_ENEMY_SKILL_FIXED_BOMBS,
   PAD_ENEMY_SKILL_CLOUD,
+  PAD_ENEMY_SKILL_RECOVERY_DEBUFF,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1392,6 +1393,28 @@ assert.deepEqual(decodePadEnemySkillRuntime(enemyAiCloudDefinition, cloudRuntime
   setupMaterialized: true,
   attackWithSkillValue: 0,
 });
+const enemyAiRecoveryDebuffDefinition = enemyAiCloudDefinition.slice();
+const enemyAiRecoveryDebuffView = new DataView(enemyAiRecoveryDebuffDefinition.buffer);
+enemyAiRecoveryDebuffView.setUint32(0x00, 9_085, true);
+enemyAiRecoveryDebuffView.setInt16(0x04, PAD_ENEMY_SKILL_RECOVERY_DEBUFF, true);
+enemyAiRecoveryDebuffView.setInt32(0x10, 3, true);
+enemyAiRecoveryDebuffView.setInt32(0x14, 50, true);
+const expectedRecoveryDebuffDefinition = {
+  type: 105,
+  kind: 'recoveryDebuff',
+  supported: true,
+  durationTurns: 3,
+  recoveryPercent: 50,
+  attackWithSkillValue: 0,
+};
+assert.deepEqual(
+  decodePadEnemySkillDefinition(enemyAiRecoveryDebuffDefinition),
+  expectedRecoveryDebuffDefinition,
+);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiRecoveryDebuffDefinition, new Uint8Array(0x680)),
+  expectedRecoveryDebuffDefinition,
+);
 assert.deepEqual(decodePadEnemySkillRuntime(
   enemyAiUnconditionalHealDefinition,
   healEnemyMonsterRuntime,
@@ -5464,6 +5487,73 @@ assert.equal(rejectedCloudState.lastEnemyActions[0].kind, 'attack');
 assert.equal(rejectedCloudState.rngState, 21_900);
 assert.equal(rejectedCloudState.cloud.turnsRemaining, 1);
 
+const directRecoveryDebuffEngine = new PuzzleEngine({ seed: 21_900 });
+directRecoveryDebuffEngine.setRngState(21_900);
+assert.equal(directRecoveryDebuffEngine.applyEnemySkillDefinition(
+  enemyAiRecoveryDebuffDefinition,
+), true);
+assert.deepEqual(directRecoveryDebuffEngine.snapshot().recoveryDebuff, {
+  turnsRemaining: 3,
+  recoveryPercent: 50,
+  multiplier: 0.5,
+});
+assert.equal(directRecoveryDebuffEngine.rng.state, 21_900);
+directRecoveryDebuffEngine.player.hp = 1_000;
+directRecoveryDebuffEngine.comboCount = 1;
+directRecoveryDebuffEngine.turnMatches = [{ type: 'heart', size: 3, enhancedCount: 0 }];
+directRecoveryDebuffEngine.enemies.forEach((enemy) => { enemy.hp = 0; });
+directRecoveryDebuffEngine.resolvePlayerTurn();
+assert.equal(directRecoveryDebuffEngine.lastHealing, 410);
+assert.equal(directRecoveryDebuffEngine.player.hp, 1_410);
+directRecoveryDebuffEngine.advanceRecoveryDebuffTurns();
+directRecoveryDebuffEngine.advanceRecoveryDebuffTurns();
+assert.equal(directRecoveryDebuffEngine.snapshot().recoveryDebuff.turnsRemaining, 1);
+directRecoveryDebuffEngine.advanceRecoveryDebuffTurns();
+assert.equal(directRecoveryDebuffEngine.snapshot().recoveryDebuff, null);
+
+const recoveryDebuffMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(recoveryDebuffMonsterDefinition.buffer).setUint32(0xec, 9_085, true);
+const selectedRecoveryDebuffEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: recoveryDebuffMonsterDefinition,
+    skillDefinitions: [enemyAiRecoveryDebuffDefinition],
+  }],
+});
+selectedRecoveryDebuffEngine.enemies[0].counter = 1;
+selectedRecoveryDebuffEngine.enemies[1].counter = 99;
+selectedRecoveryDebuffEngine.setRngState(21_900);
+selectedRecoveryDebuffEngine.resolveEnemyTurn();
+const selectedRecoveryDebuffState = selectedRecoveryDebuffEngine.snapshot();
+assert.equal(selectedRecoveryDebuffState.lastEnemyActions[0].skill.type, 105);
+assert.deepEqual(selectedRecoveryDebuffState.recoveryDebuff, {
+  turnsRemaining: 3,
+  recoveryPercent: 50,
+  multiplier: 0.5,
+});
+assert.equal(selectedRecoveryDebuffState.rngState, 394_448_415);
+assert.equal(selectedRecoveryDebuffState.player.hp, 12_000);
+assert.equal(selectedRecoveryDebuffState.message, 'Recovery changed to 50% for 3 turns.');
+
+const rejectedRecoveryDebuffEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: recoveryDebuffMonsterDefinition,
+    skillDefinitions: [enemyAiRecoveryDebuffDefinition],
+  }],
+});
+rejectedRecoveryDebuffEngine.recoveryDebuff = {
+  turnsRemaining: 2, recoveryPercent: 50, multiplier: 0.5,
+};
+rejectedRecoveryDebuffEngine.enemies[0].counter = 1;
+rejectedRecoveryDebuffEngine.enemies[1].counter = 99;
+rejectedRecoveryDebuffEngine.setRngState(21_900);
+rejectedRecoveryDebuffEngine.resolveEnemyTurn();
+const rejectedRecoveryDebuffState = rejectedRecoveryDebuffEngine.snapshot();
+assert.equal(rejectedRecoveryDebuffState.lastEnemyActions[0].kind, 'attack');
+assert.equal(rejectedRecoveryDebuffState.rngState, 21_900);
+assert.equal(rejectedRecoveryDebuffState.recoveryDebuff.turnsRemaining, 1);
+
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;
 exactDamageAbsorbEngine.enemies[0].damageAbsorbTurns = 3;
@@ -6875,6 +6965,7 @@ assert.equal(padNativeRecoveryPower([2], [{ size: 9, enhancedCount: 6 }], 7), 16
 assert.equal(padNativeRecoveryPower([1, 2], [{ size: 13, enhancedCount: 10 }], 12), 62);
 assert.equal(padNativeRecoveryPower(3, [{ size: 13, enhancedCount: 10 }], 12), 62);
 assert.equal(padNativeRecoveryPower([100], [{ size: 3, enhancedCount: 0 }], 3, 0.5), 200);
+assert.equal(padNativeRecoveryPower([100], [{ size: 3, enhancedCount: 0 }], 3, 0.5, 0.5), 100);
 assert.equal(padSecondaryAttributeAttack(900, 'fire', 'fire'), 90);
 assert.equal(padSecondaryAttributeAttack(900, 'fire', 'water'), 300);
 assert.equal(padSecondaryAttributeAttack(900, 'fire', 'fire', true), 135);
