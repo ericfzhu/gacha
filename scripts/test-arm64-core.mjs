@@ -301,6 +301,32 @@ if (runtime.exports.arm64_get_register(0) !== 0x200000002n || runtime.exports.ar
 }
 
 runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x41, 0x34, 0x00, 0x4f, // orr v1.4s, #2, lsl #8 (exact post-touch frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(1, 0x0000000100000001n);
+runtime.exports.arm64_set_vector_hi(1, 0x0000000400000004n);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(1) !== 0x0000020100000201n ||
+    runtime.exports.arm64_get_vector_hi(1) !== 0x0000020400000204n) {
+  throw new Error('NEON ORR 4S shifted-immediate semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x41, 0x34, 0x00, 0x0f, // orr v1.2s, #2, lsl #8
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(1, 0x0000000100000001n);
+runtime.exports.arm64_set_vector_hi(1, 0xffffffffffffffffn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(1) !== 0x0000020100000201n ||
+    runtime.exports.arm64_get_vector_hi(1) !== 0n) {
+  throw new Error('NEON ORR 2S shifted-immediate semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
   0x01, 0xe4, 0x00, 0x6f, // movi v1.2d, #0
   0x20, 0x00, 0x66, 0x9e, // fmov x0, d1
   0xc0, 0x03, 0x5f, 0xd6, // ret
@@ -397,6 +423,365 @@ runtime.trace(5);
 if (runtime.exports.arm64_get_vector_lo(2) !== 0x1020304050607080n ||
     runtime.exports.arm64_get_vector_hi(2) !== 0x0102030405060708n) {
   throw new Error('NEON ORR/MOV 16B semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x03, 0x40, 0x00, 0x6e, // ext v3.16b, v0.16b, v0.16b, #8 (exact post-touch frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(0, 0x0706050403020100n);
+runtime.exports.arm64_set_vector_hi(0, 0x0f0e0d0c0b0a0908n);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(3) !== 0x0f0e0d0c0b0a0908n ||
+    runtime.exports.arm64_get_vector_hi(3) !== 0x0706050403020100n) {
+  throw new Error('NEON EXT 16B semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x03, 0x20, 0x01, 0x2e, // ext v3.8b, v0.8b, v1.8b, #4
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(0, 0x0706050403020100n);
+runtime.exports.arm64_set_vector_lo(1, 0x0f0e0d0c0b0a0908n);
+runtime.exports.arm64_set_vector_hi(3, 0xffffffffffffffffn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(3) !== 0x0b0a090807060504n ||
+    runtime.exports.arm64_get_vector_hi(3) !== 0n) {
+  throw new Error('NEON EXT 8B semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x02, 0x80, 0x65, 0x2e, // umlal v2.4s, v0.4h, v5.4h (exact post-touch frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(0, 0x0005000400030002n);
+runtime.exports.arm64_set_vector_hi(0, 0xffffffffffffffffn);
+runtime.exports.arm64_set_vector_lo(5, 0x0011000d000b0007n);
+runtime.exports.arm64_set_vector_hi(5, 0xffffffffffffffffn);
+runtime.exports.arm64_set_vector_lo(2, 0x000000c800000064n);
+runtime.exports.arm64_set_vector_hi(2, 0x000001900000012cn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(2) !== 0x000000e900000072n ||
+    runtime.exports.arm64_get_vector_hi(2) !== 0x000001e500000160n) {
+  throw new Error('NEON UMLAL 4S semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x02, 0x80, 0x65, 0x6e, // umlal2 v2.4s, v0.8h, v5.8h
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(0, 0xffffffffffffffffn);
+runtime.exports.arm64_set_vector_hi(0, 0x0005000400030002n);
+runtime.exports.arm64_set_vector_lo(5, 0xffffffffffffffffn);
+runtime.exports.arm64_set_vector_hi(5, 0x0011000d000b0007n);
+runtime.exports.arm64_set_vector_lo(2, 0x000000c800000064n);
+runtime.exports.arm64_set_vector_hi(2, 0x000001900000012cn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(2) !== 0x000000e900000072n ||
+    runtime.exports.arm64_get_vector_hi(2) !== 0x000001e500000160n) {
+  throw new Error('NEON UMLAL2 4S semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x40, 0x84, 0x14, 0x0f, // shrn v0.4h, v2.4s, #12 (exact post-touch frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(2, 0x23456def12345abcn);
+runtime.exports.arm64_set_vector_hi(2, 0x456789ab34567890n);
+runtime.exports.arm64_set_vector_hi(0, 0xffffffffffffffffn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(0) !== 0x5678456734562345n ||
+    runtime.exports.arm64_get_vector_hi(0) !== 0n) {
+  throw new Error('NEON SHRN 4H semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x40, 0x84, 0x14, 0x4f, // shrn2 v0.8h, v2.4s, #12
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(2, 0x23456def12345abcn);
+runtime.exports.arm64_set_vector_hi(2, 0x456789ab34567890n);
+runtime.exports.arm64_set_vector_lo(0, 0x0706050403020100n);
+runtime.exports.arm64_set_vector_hi(0, 0n);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(0) !== 0x0706050403020100n ||
+    runtime.exports.arm64_get_vector_hi(0) !== 0x5678456734562345n) {
+  throw new Error('NEON SHRN2 8H semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x00, 0x9e, 0x60, 0x4e, // mul v0.8h, v16.8h, v0.8h (exact post-touch frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(16, 0x0005000400030002n);
+runtime.exports.arm64_set_vector_hi(16, 0x0009000800070006n);
+runtime.exports.arm64_set_vector_lo(0, 0x000d000c000b000an);
+runtime.exports.arm64_set_vector_hi(0, 0x00110010000f000en);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(0) !== 0x0041003000210014n ||
+    runtime.exports.arm64_get_vector_hi(0) !== 0x0099008000690054n) {
+  throw new Error('NEON MUL 8H semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x00, 0x9e, 0x60, 0x0e, // mul v0.4h, v16.4h, v0.4h
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(16, 0x0005000400030002n);
+runtime.exports.arm64_set_vector_lo(0, 0x000d000c000b000an);
+runtime.exports.arm64_set_vector_hi(0, 0xffffffffffffffffn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(0) !== 0x0041003000210014n ||
+    runtime.exports.arm64_get_vector_hi(0) !== 0n) {
+  throw new Error('NEON MUL 4H semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x98, 0x96, 0x67, 0x0e, // mla v24.4h, v20.4h, v7.4h (exact post-touch frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(20, 0x0005000400030002n);
+runtime.exports.arm64_set_vector_lo(7, 0x0011000d000b0007n);
+runtime.exports.arm64_set_vector_lo(24, 0x0190012c00c80064n);
+runtime.exports.arm64_set_vector_hi(24, 0xffffffffffffffffn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(24) !== 0x01e5016000e90072n ||
+    runtime.exports.arm64_get_vector_hi(24) !== 0n) {
+  throw new Error('NEON MLA 4H semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x98, 0x96, 0x67, 0x4e, // mla v24.8h, v20.8h, v7.8h
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(20, 0x0005000400030002n);
+runtime.exports.arm64_set_vector_hi(20, 0x0005000400030002n);
+runtime.exports.arm64_set_vector_lo(7, 0x0011000d000b0007n);
+runtime.exports.arm64_set_vector_hi(7, 0x0011000d000b0007n);
+runtime.exports.arm64_set_vector_lo(24, 0x0190012c00c80064n);
+runtime.exports.arm64_set_vector_hi(24, 0x0190012c00c80064n);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(24) !== 0x01e5016000e90072n ||
+    runtime.exports.arm64_get_vector_hi(24) !== 0x01e5016000e90072n) {
+  throw new Error('NEON MLA 8H semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x25, 0x28, 0x43, 0x4e, // trn1 v5.8h, v1.8h, v3.8h (exact post-touch frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(1, 0x0004000300020001n);
+runtime.exports.arm64_set_vector_hi(1, 0x0008000700060005n);
+runtime.exports.arm64_set_vector_lo(3, 0x000e000d000c000bn);
+runtime.exports.arm64_set_vector_hi(3, 0x001200110010000fn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(5) !== 0x000d0003000b0001n ||
+    runtime.exports.arm64_get_vector_hi(5) !== 0x00110007000f0005n) {
+  throw new Error('NEON TRN1 8H semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x25, 0x28, 0x43, 0x0e, // trn1 v5.4h, v1.4h, v3.4h
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(1, 0x0004000300020001n);
+runtime.exports.arm64_set_vector_lo(3, 0x000e000d000c000bn);
+runtime.exports.arm64_set_vector_hi(5, 0xffffffffffffffffn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(5) !== 0x000d0003000b0001n ||
+    runtime.exports.arm64_get_vector_hi(5) !== 0n) {
+  throw new Error('NEON TRN1 4H semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x21, 0x68, 0x43, 0x4e, // trn2 v1.8h, v1.8h, v3.8h (exact post-touch frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(1, 0x0004000300020001n);
+runtime.exports.arm64_set_vector_hi(1, 0x0008000700060005n);
+runtime.exports.arm64_set_vector_lo(3, 0x000e000d000c000bn);
+runtime.exports.arm64_set_vector_hi(3, 0x001200110010000fn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(1) !== 0x000e0004000c0002n ||
+    runtime.exports.arm64_get_vector_hi(1) !== 0x0012000800100006n) {
+  throw new Error('NEON TRN2 8H alias semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x32, 0x3a, 0x86, 0x4e, // zip1 v18.4s, v17.4s, v6.4s (exact post-touch frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(17, 0x0000000200000001n);
+runtime.exports.arm64_set_vector_hi(17, 0x0000000400000003n);
+runtime.exports.arm64_set_vector_lo(6, 0x0000000c0000000bn);
+runtime.exports.arm64_set_vector_hi(6, 0x0000000e0000000dn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(18) !== 0x0000000b00000001n ||
+    runtime.exports.arm64_get_vector_hi(18) !== 0x0000000c00000002n) {
+  throw new Error('NEON ZIP1 4S semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x31, 0x7a, 0x86, 0x4e, // zip2 v17.4s, v17.4s, v6.4s
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(17, 0x0000000200000001n);
+runtime.exports.arm64_set_vector_hi(17, 0x0000000400000003n);
+runtime.exports.arm64_set_vector_lo(6, 0x0000000c0000000bn);
+runtime.exports.arm64_set_vector_hi(6, 0x0000000e0000000dn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(17) !== 0x0000000d00000003n ||
+    runtime.exports.arm64_get_vector_hi(17) !== 0x0000000e00000004n) {
+  throw new Error('NEON ZIP2 4S alias semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0xa2, 0xa6, 0x01, 0x4f, // movi v2.8h, #53, lsl #8 (exact post-touch frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(2) !== 0x3500350035003500n ||
+    runtime.exports.arm64_get_vector_hi(2) !== 0x3500350035003500n) {
+  throw new Error('NEON MOVI 8H shifted-immediate semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0xa2, 0xb6, 0x01, 0x0f, // orr v2.4h, #53, lsl #8
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(2, 0x0004000300020001n);
+runtime.exports.arm64_set_vector_hi(2, 0xffffffffffffffffn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(2) !== 0x3504350335023501n ||
+    runtime.exports.arm64_get_vector_hi(2) !== 0n) {
+  throw new Error('NEON ORR 4H shifted-immediate semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0xc1, 0x84, 0x72, 0x4e, // add v1.8h, v6.8h, v18.8h (exact post-touch frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(6, 0x0004000300020001n);
+runtime.exports.arm64_set_vector_hi(6, 0x0008000700060005n);
+runtime.exports.arm64_set_vector_lo(18, 0x0028001e0014000an);
+runtime.exports.arm64_set_vector_hi(18, 0x00500046003c0032n);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(1) !== 0x002c00210016000bn ||
+    runtime.exports.arm64_get_vector_hi(1) !== 0x0058004d00420037n) {
+  throw new Error('NEON ADD 8H semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0xc1, 0x84, 0x72, 0x2e, // sub v1.4h, v6.4h, v18.4h
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(6, 0x0028001e0014000an);
+runtime.exports.arm64_set_vector_lo(18, 0x0004000300020001n);
+runtime.exports.arm64_set_vector_hi(1, 0xffffffffffffffffn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(1) !== 0x0024001b00120009n ||
+    runtime.exports.arm64_get_vector_hi(1) !== 0n) {
+  throw new Error('NEON SUB 4H semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x70, 0xb4, 0x62, 0x4e, // sqdmulh v16.8h, v3.8h, v2.8h (exact post-touch frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(3, 0x7fffc00040008000n);
+runtime.exports.arm64_set_vector_hi(3, 0x7fffc00040008000n);
+runtime.exports.arm64_set_vector_lo(2, 0x7fff400040008000n);
+runtime.exports.arm64_set_vector_hi(2, 0x7fff400040008000n);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(16) !== 0x7ffee00020007fffn ||
+    runtime.exports.arm64_get_vector_hi(16) !== 0x7ffee00020007fffn) {
+  throw new Error('NEON SQDMULH 8H semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x70, 0xb4, 0x62, 0x0e, // sqdmulh v16.4h, v3.4h, v2.4h
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(3, 0x7fffc00040008000n);
+runtime.exports.arm64_set_vector_lo(2, 0x7fff400040008000n);
+runtime.exports.arm64_set_vector_hi(16, 0xffffffffffffffffn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(16) !== 0x7ffee00020007fffn ||
+    runtime.exports.arm64_get_vector_hi(16) !== 0n) {
+  throw new Error('NEON SQDMULH 4H semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0xa5, 0x54, 0x11, 0x4f, // shl v5.8h, v5.8h, #1 (exact post-touch frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(5, 0x8000400000020001n);
+runtime.exports.arm64_set_vector_hi(5, 0x8000400000020001n);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(5) !== 0x0000800000040002n ||
+    runtime.exports.arm64_get_vector_hi(5) !== 0x0000800000040002n) {
+  throw new Error('NEON SHL 8H immediate semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0xa5, 0x54, 0x11, 0x0f, // shl v5.4h, v5.4h, #1
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(5, 0x8000400000020001n);
+runtime.exports.arm64_set_vector_hi(5, 0xffffffffffffffffn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(5) !== 0x0000800000040002n ||
+    runtime.exports.arm64_get_vector_hi(5) !== 0n) {
+  throw new Error('NEON SHL 4H immediate semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0xe7, 0x94, 0x0b, 0x0f, // sqshrn v7.8b, v7.8h, #5 (exact post-touch frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(7, 0xf0000fe080007fffn);
+runtime.exports.arm64_set_vector_hi(7, 0x00400000ffe00020n);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(7) !== 0x0200ff01807f807fn ||
+    runtime.exports.arm64_get_vector_hi(7) !== 0n) {
+  throw new Error('NEON SQSHRN 8B semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0xe7, 0x94, 0x0b, 0x4f, // sqshrn2 v7.16b, v7.8h, #5
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(7, 0xf0000fe080007fffn);
+runtime.exports.arm64_set_vector_hi(7, 0x00400000ffe00020n);
+runtime.trace(5);
+if (BigInt.asUintN(64, runtime.exports.arm64_get_vector_lo(7)) !== 0xf0000fe080007fffn ||
+    runtime.exports.arm64_get_vector_hi(7) !== 0x0200ff01807f807fn) {
+  throw new Error('NEON SQSHRN2 16B semantics failed');
 }
 
 runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
@@ -948,6 +1333,36 @@ if (BigInt.asUintN(64, runtime.exports.arm64_get_vector_lo(3)) !== 0xf00ff00ff00
     BigInt.asUintN(64, runtime.exports.arm64_get_vector_hi(3)) !== 0xffffffffffffffffn) throw new Error('NEON EOR 16B semantics failed');
 
 const structureMemoryAddress = vectorZeroProbeAddress + 0x200;
+runtime.writeUint64(structureMemoryAddress, 0n);
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0xa2, 0x85, 0x00, 0x4d, // st1 {v2.d}[1], [x13] (exact post-touch frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_register(13, BigInt(structureMemoryAddress));
+runtime.exports.arm64_set_vector_lo(2, 0xaabbccddeeff0011n);
+runtime.exports.arm64_set_vector_hi(2, 0x1122334455667788n);
+runtime.trace(5);
+if (new DataView(runtime.readBytes(structureMemoryAddress, 8).buffer).getBigUint64(0, true) !== 0x1122334455667788n) {
+  throw new Error('NEON ST1 D[1] single-lane semantics failed');
+}
+
+runtime.loadBytes(structureMemoryAddress, new Uint8Array([0x34, 0x12]));
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0xa2, 0x59, 0xdf, 0x4d, // ld1 {v2.h}[7], [x13], #2
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_register(13, BigInt(structureMemoryAddress));
+runtime.exports.arm64_set_vector_lo(2, 0x0706050403020100n);
+runtime.exports.arm64_set_vector_hi(2, 0x000e0d0c0b0a0908n);
+runtime.trace(5);
+if (runtime.exports.arm64_get_register(13) !== BigInt(structureMemoryAddress + 2) ||
+    runtime.exports.arm64_get_vector_lo(2) !== 0x0706050403020100n ||
+    runtime.exports.arm64_get_vector_hi(2) !== 0x12340d0c0b0a0908n) {
+  throw new Error('NEON LD1 H[7] post-index semantics failed');
+}
+
 runtime.writeUint64(structureMemoryAddress, 0x1111222233334444n);
 runtime.writeUint64(structureMemoryAddress + 8, 0x5555666677778888n);
 runtime.writeUint64(structureMemoryAddress + 16, 0x9999aaaabbbbccccn);

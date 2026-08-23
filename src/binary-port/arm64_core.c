@@ -1040,17 +1040,30 @@ int32_t arm64_step(void) {
     return cpu.status;
   }
 
-  /* NEON MOVI Vd.2S/4S, #imm8, optionally shifted by 8/16/24 bits. */
-  if ((instruction & UINT32_C(0xbf800c00)) == UINT32_C(0x0f000400)) {
+  /*
+   * NEON MOVI/ORR Vd.4H/8H/2S/4S, #imm8, optionally shifted within each lane.
+   * Even cmode values replace the active lanes (MOVI); odd values OR the
+   * replicated immediate into them. A 64-bit vector write clears the inactive
+   * upper half just like the other Q=0 Advanced SIMD operations.
+   */
+  if ((instruction & UINT32_C(0xbff80c00)) == UINT32_C(0x0f000400)) {
     uint32_t cmode = (instruction >> 12) & 15;
-    if ((cmode & 1) == 0 && cmode <= 6) {
+    if (cmode <= 11) {
       uint32_t rd = instruction & 31;
       uint32_t q = (instruction >> 30) & 1;
       uint32_t immediate = ((instruction >> 5) & 0x1f) | ((instruction >> 11) & 0xe0);
-      uint32_t lane = immediate << ((cmode >> 1) * 8);
-      uint64_t lanes = lane | ((uint64_t)lane << 32);
-      cpu.q_lo[rd] = lanes;
-      cpu.q_hi[rd] = q ? lanes : 0;
+      uint32_t element_bits = cmode < 8 ? 32 : 16;
+      uint32_t shift = cmode < 8 ? (cmode >> 1) * 8 : ((cmode - 8) >> 1) * 8;
+      uint64_t lane = (uint64_t)immediate << shift;
+      uint64_t lanes = 0;
+      for (uint32_t offset = 0; offset < 64; offset += element_bits) lanes |= lane << offset;
+      if (cmode & 1) {
+        cpu.q_lo[rd] |= lanes;
+        cpu.q_hi[rd] = q ? cpu.q_hi[rd] | lanes : 0;
+      } else {
+        cpu.q_lo[rd] = lanes;
+        cpu.q_hi[rd] = q ? lanes : 0;
+      }
       return cpu.status;
     }
   }
@@ -1329,6 +1342,370 @@ int32_t arm64_step(void) {
     return cpu.status;
   }
 
+  /*
+   * NEON EXT Vd.8B/16B, Vn, Vm, #index: concatenate the two active source
+   * vectors and copy one vector-width window beginning at the byte index.
+   */
+  if ((instruction & UINT32_C(0xbfe08400)) == UINT32_C(0x2e000000)) {
+    uint32_t q = (instruction >> 30) & 1;
+    uint32_t rm = (instruction >> 16) & 31;
+    uint32_t index = (instruction >> 11) & 15;
+    uint32_t rn = (instruction >> 5) & 31;
+    uint32_t rd = instruction & 31;
+    uint32_t vector_bytes = q ? 16 : 8;
+    if (index >= vector_bytes) return fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc);
+    uint64_t rn_lo = cpu.q_lo[rn], rn_hi = cpu.q_hi[rn];
+    uint64_t rm_lo = cpu.q_lo[rm], rm_hi = cpu.q_hi[rm];
+    uint64_t result_lo = 0, result_hi = 0;
+    for (uint32_t byte = 0; byte < vector_bytes; byte++) {
+      uint32_t source_byte = index + byte;
+      uint64_t source_half;
+      uint32_t source_offset;
+      if (source_byte < vector_bytes) {
+        source_half = source_byte < 8 ? rn_lo : rn_hi;
+        source_offset = source_byte & 7;
+      } else {
+        uint32_t rm_byte = source_byte - vector_bytes;
+        source_half = rm_byte < 8 ? rm_lo : rm_hi;
+        source_offset = rm_byte & 7;
+      }
+      uint64_t value = (source_half >> (source_offset * 8)) & UINT64_C(0xff);
+      if (byte < 8) result_lo |= value << (byte * 8);
+      else result_hi |= value << ((byte - 8) * 8);
+    }
+    cpu.q_lo[rd] = result_lo;
+    cpu.q_hi[rd] = q ? result_hi : 0;
+    return cpu.status;
+  }
+
+  /*
+   * NEON UMLAL/UMLAL2: unsigned widening multiply-add from the lower/upper
+   * source half into a full 128-bit vector of double-width accumulator lanes.
+   */
+  if ((instruction & UINT32_C(0xbf20fc00)) == UINT32_C(0x2e208000)) {
+    uint32_t upper = (instruction >> 30) & 1;
+    uint32_t size = (instruction >> 22) & 3;
+    uint32_t rm = (instruction >> 16) & 31;
+    uint32_t rn = (instruction >> 5) & 31;
+    uint32_t rd = instruction & 31;
+    if (size == 3) return fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc);
+    uint32_t source_bits = 8u << size;
+    uint32_t destination_bits = source_bits * 2;
+    uint32_t lanes = 128 / destination_bits;
+    uint64_t source_mask = width_mask(source_bits);
+    uint64_t destination_mask = width_mask(destination_bits);
+    uint64_t rn_lo = cpu.q_lo[rn], rn_hi = cpu.q_hi[rn];
+    uint64_t rm_lo = cpu.q_lo[rm], rm_hi = cpu.q_hi[rm];
+    uint64_t rd_lo = cpu.q_lo[rd], rd_hi = cpu.q_hi[rd];
+    uint64_t result_lo = 0, result_hi = 0;
+    for (uint32_t lane = 0; lane < lanes; lane++) {
+      uint32_t source_lane = lane + (upper ? lanes : 0);
+      uint32_t source_bit = source_lane * source_bits;
+      uint64_t left_half = source_bit < 64 ? rn_lo : rn_hi;
+      uint64_t right_half = source_bit < 64 ? rm_lo : rm_hi;
+      uint32_t source_offset = source_bit & 63;
+      uint64_t left = (left_half >> source_offset) & source_mask;
+      uint64_t right = (right_half >> source_offset) & source_mask;
+      uint32_t destination_bit = lane * destination_bits;
+      uint64_t accumulator_half = destination_bit < 64 ? rd_lo : rd_hi;
+      uint32_t destination_offset = destination_bit & 63;
+      uint64_t accumulator = (accumulator_half >> destination_offset) & destination_mask;
+      uint64_t value = (accumulator + left * right) & destination_mask;
+      if (destination_bit < 64) result_lo |= value << destination_offset;
+      else result_hi |= value << destination_offset;
+    }
+    cpu.q_lo[rd] = result_lo;
+    cpu.q_hi[rd] = result_hi;
+    return cpu.status;
+  }
+
+  /*
+   * NEON SHRN/SHRN2: logical right shift each full-width source lane, narrow
+   * to half width, and write the lower/upper 64-bit half of the destination.
+   */
+  if ((instruction & UINT32_C(0xbf80fc00)) == UINT32_C(0x0f008400)) {
+    uint32_t upper = (instruction >> 30) & 1;
+    uint32_t encoded_immediate = (instruction >> 16) & 0x7f;
+    uint32_t rn = (instruction >> 5) & 31;
+    uint32_t rd = instruction & 31;
+    uint32_t source_bits;
+    if (encoded_immediate >= 32) source_bits = 64;
+    else if (encoded_immediate >= 16) source_bits = 32;
+    else if (encoded_immediate >= 8) source_bits = 16;
+    else return fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc);
+    uint32_t shift = source_bits - encoded_immediate;
+    uint32_t destination_bits = source_bits / 2;
+    if (shift == 0 || shift > destination_bits) {
+      return fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc);
+    }
+    uint32_t lanes = 128 / source_bits;
+    uint64_t destination_mask = width_mask(destination_bits);
+    uint64_t rn_lo = cpu.q_lo[rn], rn_hi = cpu.q_hi[rn];
+    uint64_t result = 0;
+    for (uint32_t lane = 0; lane < lanes; lane++) {
+      uint32_t source_bit = lane * source_bits;
+      uint64_t source_half = source_bit < 64 ? rn_lo : rn_hi;
+      uint32_t source_offset = source_bit & 63;
+      uint64_t value = ((source_half >> source_offset) >> shift) & destination_mask;
+      result |= value << (lane * destination_bits);
+    }
+    if (upper) cpu.q_hi[rd] = result;
+    else {
+      cpu.q_lo[rd] = result;
+      cpu.q_hi[rd] = 0;
+    }
+    return cpu.status;
+  }
+
+  /* NEON SQSHRN/SQSHRN2: signed arithmetic shift with signed saturation. */
+  if ((instruction & UINT32_C(0xbf80fc00)) == UINT32_C(0x0f009400)) {
+    uint32_t upper = (instruction >> 30) & 1;
+    uint32_t encoded_immediate = (instruction >> 16) & 0x7f;
+    uint32_t rn = (instruction >> 5) & 31;
+    uint32_t rd = instruction & 31;
+    uint32_t source_bits;
+    if (encoded_immediate >= 32) source_bits = 64;
+    else if (encoded_immediate >= 16) source_bits = 32;
+    else if (encoded_immediate >= 8) source_bits = 16;
+    else return fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc);
+    uint32_t shift = source_bits - encoded_immediate;
+    uint32_t destination_bits = source_bits / 2;
+    if (shift == 0 || shift > destination_bits) {
+      return fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc);
+    }
+    uint32_t lanes = 128 / source_bits;
+    uint64_t source_mask = width_mask(source_bits);
+    uint64_t destination_mask = width_mask(destination_bits);
+    int64_t destination_minimum = -(INT64_C(1) << (destination_bits - 1));
+    int64_t destination_maximum = (INT64_C(1) << (destination_bits - 1)) - 1;
+    uint64_t rn_lo = cpu.q_lo[rn], rn_hi = cpu.q_hi[rn];
+    uint64_t result = 0;
+    for (uint32_t lane = 0; lane < lanes; lane++) {
+      uint32_t source_bit = lane * source_bits;
+      uint64_t source_half = source_bit < 64 ? rn_lo : rn_hi;
+      uint32_t source_offset = source_bit & 63;
+      int64_t source = (int64_t)sign_extend((source_half >> source_offset) & source_mask, source_bits);
+      int64_t shifted = (int64_t)arithmetic_shift_right((uint64_t)source, shift, 64);
+      if (shifted < destination_minimum) shifted = destination_minimum;
+      else if (shifted > destination_maximum) shifted = destination_maximum;
+      result |= ((uint64_t)shifted & destination_mask) << (lane * destination_bits);
+    }
+    if (upper) cpu.q_hi[rd] = result;
+    else {
+      cpu.q_lo[rd] = result;
+      cpu.q_hi[rd] = 0;
+    }
+    return cpu.status;
+  }
+
+  /* NEON SHL by immediate across byte, halfword, word, and doubleword lanes. */
+  if ((instruction & UINT32_C(0xbf80fc00)) == UINT32_C(0x0f005400)) {
+    uint32_t q = (instruction >> 30) & 1;
+    uint32_t encoded_immediate = (instruction >> 16) & 0x7f;
+    uint32_t rn = (instruction >> 5) & 31;
+    uint32_t rd = instruction & 31;
+    uint32_t element_bits;
+    if (encoded_immediate >= 64) element_bits = 64;
+    else if (encoded_immediate >= 32) element_bits = 32;
+    else if (encoded_immediate >= 16) element_bits = 16;
+    else if (encoded_immediate >= 8) element_bits = 8;
+    else return fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc);
+    uint32_t shift = encoded_immediate - element_bits;
+    uint32_t lanes = (q ? 128u : 64u) / element_bits;
+    uint64_t element_mask = width_mask(element_bits);
+    uint64_t rn_lo = cpu.q_lo[rn], rn_hi = cpu.q_hi[rn];
+    uint64_t result_lo = 0, result_hi = 0;
+    for (uint32_t lane = 0; lane < lanes; lane++) {
+      uint32_t bit = lane * element_bits;
+      uint64_t source_half = bit < 64 ? rn_lo : rn_hi;
+      uint32_t offset = bit & 63;
+      uint64_t value = (((source_half >> offset) & element_mask) << shift) & element_mask;
+      if (bit < 64) result_lo |= value << offset;
+      else result_hi |= value << offset;
+    }
+    cpu.q_lo[rd] = result_lo;
+    cpu.q_hi[rd] = q ? result_hi : 0;
+    return cpu.status;
+  }
+
+  /* NEON MUL Vd.8B/16B/4H/8H/2S/4S: wrapping per-lane integer products. */
+  if ((instruction & UINT32_C(0xbf20fc00)) == UINT32_C(0x0e209c00)) {
+    uint32_t q = (instruction >> 30) & 1;
+    uint32_t size = (instruction >> 22) & 3;
+    uint32_t rm = (instruction >> 16) & 31;
+    uint32_t rn = (instruction >> 5) & 31;
+    uint32_t rd = instruction & 31;
+    if (size == 3) return fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc);
+    uint32_t element_bits = 8u << size;
+    uint32_t lanes = (q ? 128u : 64u) / element_bits;
+    uint64_t element_mask = width_mask(element_bits);
+    uint64_t rn_lo = cpu.q_lo[rn], rn_hi = cpu.q_hi[rn];
+    uint64_t rm_lo = cpu.q_lo[rm], rm_hi = cpu.q_hi[rm];
+    uint64_t result_lo = 0, result_hi = 0;
+    for (uint32_t lane = 0; lane < lanes; lane++) {
+      uint32_t bit = lane * element_bits;
+      uint64_t left_half = bit < 64 ? rn_lo : rn_hi;
+      uint64_t right_half = bit < 64 ? rm_lo : rm_hi;
+      uint32_t offset = bit & 63;
+      uint64_t left = (left_half >> offset) & element_mask;
+      uint64_t right = (right_half >> offset) & element_mask;
+      uint64_t value = (left * right) & element_mask;
+      if (bit < 64) result_lo |= value << offset;
+      else result_hi |= value << offset;
+    }
+    cpu.q_lo[rd] = result_lo;
+    cpu.q_hi[rd] = q ? result_hi : 0;
+    return cpu.status;
+  }
+
+  /* NEON MLA across byte, halfword, and word lanes with wrapping products. */
+  if ((instruction & UINT32_C(0xbf20fc00)) == UINT32_C(0x0e209400)) {
+    uint32_t q = (instruction >> 30) & 1;
+    uint32_t size = (instruction >> 22) & 3;
+    uint32_t rm = (instruction >> 16) & 31;
+    uint32_t rn = (instruction >> 5) & 31;
+    uint32_t rd = instruction & 31;
+    if (size == 3) return fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc);
+    uint32_t element_bits = 8u << size;
+    uint32_t lanes = (q ? 128u : 64u) / element_bits;
+    uint64_t element_mask = width_mask(element_bits);
+    uint64_t rn_lo = cpu.q_lo[rn], rn_hi = cpu.q_hi[rn];
+    uint64_t rm_lo = cpu.q_lo[rm], rm_hi = cpu.q_hi[rm];
+    uint64_t rd_lo = cpu.q_lo[rd], rd_hi = cpu.q_hi[rd];
+    uint64_t result_lo = 0, result_hi = 0;
+    for (uint32_t lane = 0; lane < lanes; lane++) {
+      uint32_t bit = lane * element_bits;
+      uint64_t left_half = bit < 64 ? rn_lo : rn_hi;
+      uint64_t right_half = bit < 64 ? rm_lo : rm_hi;
+      uint64_t accumulator_half = bit < 64 ? rd_lo : rd_hi;
+      uint32_t offset = bit & 63;
+      uint64_t left = (left_half >> offset) & element_mask;
+      uint64_t right = (right_half >> offset) & element_mask;
+      uint64_t accumulator = (accumulator_half >> offset) & element_mask;
+      uint64_t value = (accumulator + left * right) & element_mask;
+      if (bit < 64) result_lo |= value << offset;
+      else result_hi |= value << offset;
+    }
+    cpu.q_lo[rd] = result_lo;
+    cpu.q_hi[rd] = q ? result_hi : 0;
+    return cpu.status;
+  }
+
+  /*
+   * NEON SQDMULH Vd.4H/8H/2S/4S: signed doubling multiply, take the high
+   * half, and saturate the sole overflowing min*min product to signed max.
+   */
+  if ((instruction & UINT32_C(0xbf20fc00)) == UINT32_C(0x0e20b400)) {
+    uint32_t q = (instruction >> 30) & 1;
+    uint32_t size = (instruction >> 22) & 3;
+    uint32_t rm = (instruction >> 16) & 31;
+    uint32_t rn = (instruction >> 5) & 31;
+    uint32_t rd = instruction & 31;
+    if (size == 0 || size == 3) return fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc);
+    uint32_t element_bits = 8u << size;
+    uint32_t lanes = (q ? 128u : 64u) / element_bits;
+    uint64_t element_mask = width_mask(element_bits);
+    int64_t signed_minimum = -(INT64_C(1) << (element_bits - 1));
+    uint64_t signed_maximum = (UINT64_C(1) << (element_bits - 1)) - 1;
+    uint64_t rn_lo = cpu.q_lo[rn], rn_hi = cpu.q_hi[rn];
+    uint64_t rm_lo = cpu.q_lo[rm], rm_hi = cpu.q_hi[rm];
+    uint64_t result_lo = 0, result_hi = 0;
+    for (uint32_t lane = 0; lane < lanes; lane++) {
+      uint32_t bit = lane * element_bits;
+      uint64_t left_half = bit < 64 ? rn_lo : rn_hi;
+      uint64_t right_half = bit < 64 ? rm_lo : rm_hi;
+      uint32_t offset = bit & 63;
+      int64_t left = (int64_t)sign_extend((left_half >> offset) & element_mask, element_bits);
+      int64_t right = (int64_t)sign_extend((right_half >> offset) & element_mask, element_bits);
+      uint64_t value;
+      if (left == signed_minimum && right == signed_minimum) value = signed_maximum;
+      else {
+        uint64_t product = (uint64_t)(left * right);
+        value = arithmetic_shift_right(product, element_bits - 1, 64) & element_mask;
+      }
+      if (bit < 64) result_lo |= value << offset;
+      else result_hi |= value << offset;
+    }
+    cpu.q_lo[rd] = result_lo;
+    cpu.q_hi[rd] = q ? result_hi : 0;
+    return cpu.status;
+  }
+
+  /* NEON TRN1/TRN2: interleave the even/odd lanes from two source vectors. */
+  uint32_t neon_trn_class = instruction & UINT32_C(0xbf20fc00);
+  if (neon_trn_class == UINT32_C(0x0e002800) ||
+      neon_trn_class == UINT32_C(0x0e006800)) {
+    uint32_t q = (instruction >> 30) & 1;
+    uint32_t odd = neon_trn_class == UINT32_C(0x0e006800);
+    uint32_t size = (instruction >> 22) & 3;
+    uint32_t rm = (instruction >> 16) & 31;
+    uint32_t rn = (instruction >> 5) & 31;
+    uint32_t rd = instruction & 31;
+    if (size == 3 && !q) return fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc);
+    uint32_t element_bits = 8u << size;
+    uint32_t lanes = (q ? 128u : 64u) / element_bits;
+    uint64_t element_mask = width_mask(element_bits);
+    uint64_t rn_lo = cpu.q_lo[rn], rn_hi = cpu.q_hi[rn];
+    uint64_t rm_lo = cpu.q_lo[rm], rm_hi = cpu.q_hi[rm];
+    uint64_t result_lo = 0, result_hi = 0;
+    for (uint32_t pair = 0; pair < lanes / 2; pair++) {
+      uint32_t source_lane = pair * 2 + odd;
+      uint32_t source_bit = source_lane * element_bits;
+      uint64_t left_half = source_bit < 64 ? rn_lo : rn_hi;
+      uint64_t right_half = source_bit < 64 ? rm_lo : rm_hi;
+      uint32_t source_offset = source_bit & 63;
+      uint64_t left = (left_half >> source_offset) & element_mask;
+      uint64_t right = (right_half >> source_offset) & element_mask;
+      uint32_t left_bit = pair * 2 * element_bits;
+      uint32_t right_bit = left_bit + element_bits;
+      if (left_bit < 64) result_lo |= left << (left_bit & 63);
+      else result_hi |= left << (left_bit & 63);
+      if (right_bit < 64) result_lo |= right << (right_bit & 63);
+      else result_hi |= right << (right_bit & 63);
+    }
+    cpu.q_lo[rd] = result_lo;
+    cpu.q_hi[rd] = q ? result_hi : 0;
+    return cpu.status;
+  }
+
+  /* NEON ZIP1/ZIP2: interleave the lower/upper halves of two lane vectors. */
+  uint32_t neon_zip_class = instruction & UINT32_C(0xbf20fc00);
+  if (neon_zip_class == UINT32_C(0x0e003800) ||
+      neon_zip_class == UINT32_C(0x0e007800)) {
+    uint32_t q = (instruction >> 30) & 1;
+    uint32_t upper = neon_zip_class == UINT32_C(0x0e007800);
+    uint32_t size = (instruction >> 22) & 3;
+    uint32_t rm = (instruction >> 16) & 31;
+    uint32_t rn = (instruction >> 5) & 31;
+    uint32_t rd = instruction & 31;
+    if (size == 3 && !q) return fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc);
+    uint32_t element_bits = 8u << size;
+    uint32_t lanes = (q ? 128u : 64u) / element_bits;
+    uint32_t source_start = upper ? lanes / 2 : 0;
+    uint64_t element_mask = width_mask(element_bits);
+    uint64_t rn_lo = cpu.q_lo[rn], rn_hi = cpu.q_hi[rn];
+    uint64_t rm_lo = cpu.q_lo[rm], rm_hi = cpu.q_hi[rm];
+    uint64_t result_lo = 0, result_hi = 0;
+    for (uint32_t pair = 0; pair < lanes / 2; pair++) {
+      uint32_t source_lane = source_start + pair;
+      uint32_t source_bit = source_lane * element_bits;
+      uint64_t left_half = source_bit < 64 ? rn_lo : rn_hi;
+      uint64_t right_half = source_bit < 64 ? rm_lo : rm_hi;
+      uint32_t source_offset = source_bit & 63;
+      uint64_t left = (left_half >> source_offset) & element_mask;
+      uint64_t right = (right_half >> source_offset) & element_mask;
+      uint32_t left_bit = pair * 2 * element_bits;
+      uint32_t right_bit = left_bit + element_bits;
+      if (left_bit < 64) result_lo |= left << (left_bit & 63);
+      else result_hi |= left << (left_bit & 63);
+      if (right_bit < 64) result_lo |= right << (right_bit & 63);
+      else result_hi |= right << (right_bit & 63);
+    }
+    cpu.q_lo[rd] = result_lo;
+    cpu.q_hi[rd] = q ? result_hi : 0;
+    return cpu.status;
+  }
+
   /* NEON INS Vd.<T>[dst], Vn.<T>[src] (MOV vector-element alias). */
   if ((instruction & UINT32_C(0xff200400)) == UINT32_C(0x6e000400)) {
     uint32_t imm5 = (instruction >> 16) & 31;
@@ -1366,28 +1743,35 @@ int32_t arm64_step(void) {
     return cpu.status;
   }
 
-  /* NEON ADD/SUB Vd.8B/16B, Vn.8B/16B, Vm.8B/16B. */
-  uint32_t neon_byte_arithmetic_class = instruction & UINT32_C(0xbfe0fc00);
-  if (neon_byte_arithmetic_class == UINT32_C(0x0e208400) ||
-      neon_byte_arithmetic_class == UINT32_C(0x2e208400)) {
+  /* NEON wrapping integer ADD/SUB across byte, halfword, word, and 2D lanes. */
+  uint32_t neon_integer_arithmetic_class = instruction & UINT32_C(0xbf20fc00);
+  if (neon_integer_arithmetic_class == UINT32_C(0x0e208400) ||
+      neon_integer_arithmetic_class == UINT32_C(0x2e208400)) {
     uint32_t q = (instruction >> 30) & 1;
-    uint32_t subtract = neon_byte_arithmetic_class == UINT32_C(0x2e208400);
+    uint32_t subtract = neon_integer_arithmetic_class == UINT32_C(0x2e208400);
+    uint32_t size = (instruction >> 22) & 3;
     uint32_t rm = (instruction >> 16) & 31;
     uint32_t rn = (instruction >> 5) & 31;
     uint32_t rd = instruction & 31;
+    if (size == 3 && !q) return fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc);
+    uint32_t element_bits = 8u << size;
+    uint32_t lanes = (q ? 128u : 64u) / element_bits;
+    uint64_t element_mask = width_mask(element_bits);
+    uint64_t rn_lo = cpu.q_lo[rn], rn_hi = cpu.q_hi[rn];
+    uint64_t rm_lo = cpu.q_lo[rm], rm_hi = cpu.q_hi[rm];
     uint64_t output[2] = { 0, 0 };
-    uint32_t lanes = q ? 16 : 8;
     for (uint32_t lane = 0; lane < lanes; lane++) {
-      uint64_t left = lane < 8 ? cpu.q_lo[rn] : cpu.q_hi[rn];
-      uint64_t right = lane < 8 ? cpu.q_lo[rm] : cpu.q_hi[rm];
-      uint32_t shift = (lane & 7) * 8;
-      uint8_t left_byte = (uint8_t)(left >> shift);
-      uint8_t right_byte = (uint8_t)(right >> shift);
-      uint8_t result = subtract ? (uint8_t)(left_byte - right_byte) : (uint8_t)(left_byte + right_byte);
-      output[lane >= 8] |= (uint64_t)result << shift;
+      uint32_t bit = lane * element_bits;
+      uint64_t left_half = bit < 64 ? rn_lo : rn_hi;
+      uint64_t right_half = bit < 64 ? rm_lo : rm_hi;
+      uint32_t offset = bit & 63;
+      uint64_t left = (left_half >> offset) & element_mask;
+      uint64_t right = (right_half >> offset) & element_mask;
+      uint64_t result = (subtract ? left - right : left + right) & element_mask;
+      output[bit >= 64] |= result << offset;
     }
     cpu.q_lo[rd] = output[0];
-    cpu.q_hi[rd] = output[1];
+    cpu.q_hi[rd] = q ? output[1] : 0;
     return cpu.status;
   }
 
@@ -1820,6 +2204,56 @@ int32_t arm64_step(void) {
     }
     cpu.q_lo[rd] = output_low;
     cpu.q_hi[rd] = output_high;
+    return cpu.status;
+  }
+
+  /*
+   * NEON LD1/ST1 single element to/from one vector register, optionally with
+   * immediate or register post-index writeback.
+   */
+  if ((instruction & UINT32_C(0xbf200000)) == UINT32_C(0x0d000000)) {
+    uint32_t q = (instruction >> 30) & 1;
+    uint32_t post_index = (instruction >> 23) & 1;
+    uint32_t load = (instruction >> 22) & 1;
+    uint32_t rm = (instruction >> 16) & 31;
+    uint32_t opcode = (instruction >> 13) & 7;
+    uint32_t s = (instruction >> 12) & 1;
+    uint32_t size = (instruction >> 10) & 3;
+    uint32_t rn = (instruction >> 5) & 31;
+    uint32_t rt = instruction & 31;
+    uint32_t element_bits;
+    uint32_t lane;
+    if (opcode == 0) {
+      element_bits = 8;
+      lane = q * 8 + s * 4 + size;
+    } else if (opcode == 2 && (size & 1) == 0) {
+      element_bits = 16;
+      lane = q * 4 + s * 2 + (size >> 1);
+    } else if (opcode == 4 && size == 0) {
+      element_bits = 32;
+      lane = q * 2 + s;
+    } else if (opcode == 4 && !s && size == 1) {
+      element_bits = 64;
+      lane = q;
+    } else return fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc);
+    if ((!post_index && rm != 0) || lane >= 128 / element_bits) {
+      return fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc);
+    }
+    uint32_t element_bytes = element_bits / 8;
+    uint64_t address = read_register(rn, 1);
+    if (!address_is_valid(address, element_bytes)) return fail(ARM64_FAULT_MEMORY, address);
+    uint32_t bit = lane * element_bits;
+    uint64_t *vector_half = bit < 64 ? &cpu.q_lo[rt] : &cpu.q_hi[rt];
+    uint32_t offset = bit & 63;
+    uint64_t element_mask = width_mask(element_bits);
+    if (load) {
+      uint64_t value = load_integer(address, element_bytes) & element_mask;
+      *vector_half = (*vector_half & ~(element_mask << offset)) | (value << offset);
+    } else store_integer(address, (*vector_half >> offset) & element_mask, element_bytes);
+    if (post_index) {
+      uint64_t increment = rm == 31 ? element_bytes : read_register(rm, 0);
+      write_register(rn, address + increment, 1, 1);
+    }
     return cpu.status;
   }
 

@@ -21,7 +21,7 @@ const RETURN_SENTINEL = 0xffffffffffffffffn;
 // the APK bootstrap and then fail much later in a native frame callback. The
 // version identifies the decoder generation that includes the live NEG.2S,
 // USHL.2S, CCMP/CCMN, LDPSW, and scalar ADDP frame instructions.
-export const ARM64_CORE_SOURCE = '/wasm/arm64_core.wasm?v=20260823-frame2';
+export const ARM64_CORE_SOURCE = '/wasm/arm64_core.wasm?v=20260824-frame17';
 const R_AARCH64_RELATIVE = 1027;
 const R_AARCH64_ABS64 = 257;
 const R_AARCH64_GLOB_DAT = 1025;
