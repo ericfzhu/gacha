@@ -844,6 +844,17 @@ if (runtime.exports.arm64_get_vector_lo(3) !== 0x00000001ffffffffn ||
     BigInt.asUintN(64, runtime.exports.arm64_get_vector_hi(3)) !== 0x8000000080000001n) throw new Error('NEON NEG 4S semantics failed');
 
 runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x42, 0xb8, 0xa0, 0x2e, // neg v2.2s, v2.2s (exact native-frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(2, 0xffffffff00000001n);
+runtime.exports.arm64_set_vector_hi(2, 0x800000007fffffffn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(2) !== 0x00000001ffffffffn ||
+    runtime.exports.arm64_get_vector_hi(2) !== 0n) throw new Error('NEON NEG 2S semantics failed');
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
   0x02, 0x3c, 0x04, 0x0e, // mov w2, v0.s[0]
   0xc0, 0x03, 0x5f, 0xd6, // ret
 ]));

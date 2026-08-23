@@ -2,6 +2,25 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 native frame NEG.2S decoder repair
+
+- Reproduced the post-startup browser failure reported as CPU status `-1` at
+  guest PC `0x2c3c90c`; the exact rejected instruction `0x2ea0b842` decodes as
+  `neg v2.2s, v2.2s` inside `onDrawFrame`.
+- Generalized the existing NEON signed-word negation decoder from the 128-bit
+  `4S` form to both architectural `2S/4S` forms. The 64-bit form now clears the
+  inactive upper half of the destination vector, and the exact fault opcode is
+  covered by the Wasm regression suite.
+- Full Chromium APK regression passed through 150 native frames, 16,500 GLES
+  draw calls, four touch callbacks, and the expected private `data048.bin` /
+  `data030.bin` requests with no page or console errors. The rendered native
+  client remains on its authentic Japanese age/purchase warning when private
+  account/cache state is absent.
+- The protected first load still interprets roughly 152 million guest
+  instructions and can take over a minute depending on the host. A future
+  performance pass should add a local post-restoration checkpoint/cache without
+  checking proprietary restored bytes into the repository.
+
 ## 2026-08-14 source-to-jammer conversion
 
 - Identified enemy skill type `12`: dispatch `0x6293f8`, setup `0x61ff08`,

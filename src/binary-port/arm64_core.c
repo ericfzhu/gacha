@@ -1263,16 +1263,19 @@ int32_t arm64_step(void) {
     return cpu.status;
   }
 
-  /* NEON NEG Vd.4S, Vn.4S: wrapping two's-complement negation per lane. */
-  if ((instruction & UINT32_C(0xfffffc00)) == UINT32_C(0x6ea0b800)) {
+  /* NEON NEG Vd.2S/4S, Vn.2S/4S: wrapping two's-complement negation per lane. */
+  if ((instruction & UINT32_C(0xbffffc00)) == UINT32_C(0x2ea0b800)) {
+    uint32_t q = (instruction >> 30) & 1;
     uint32_t rn = (instruction >> 5) & 31;
     uint32_t rd = instruction & 31;
     uint64_t source_low = cpu.q_lo[rn];
     uint64_t source_high = cpu.q_hi[rn];
     cpu.q_lo[rd] = (uint32_t)(0u - (uint32_t)source_low) |
       ((uint64_t)(uint32_t)(0u - (uint32_t)(source_low >> 32)) << 32);
-    cpu.q_hi[rd] = (uint32_t)(0u - (uint32_t)source_high) |
-      ((uint64_t)(uint32_t)(0u - (uint32_t)(source_high >> 32)) << 32);
+    cpu.q_hi[rd] = q
+      ? (uint32_t)(0u - (uint32_t)source_high) |
+        ((uint64_t)(uint32_t)(0u - (uint32_t)(source_high >> 32)) << 32)
+      : 0;
     return cpu.status;
   }
 
