@@ -808,6 +808,25 @@ value it forces probability scale 1.0; otherwise it preserves the incoming
 scale. The recovered new-AI caller supplies 1.0, so type `15` remains eligible
 without condition-owned RNG at this boundary.
 
+Enemy skill type `16` is an inactivity or skip-turn action. Its setup entry is
+the generic no-parameter tail `0x6217c0`, and its dispatch entry `0x62be50`
+performs no record-specific effect. This classification is also independently
+present in the [DadGuide raw-data parser](https://github.com/TsubakiBotPad/pad-data-pipeline/blob/master/etl/pad/raw/skills/enemy_skill_info.py#L318-L325),
+where type 16 is `ESInactivity16` and type 15 is separately parsed as the
+multi-hit attack. Selecting type 16 consumes the monster's action rather than
+falling through to an ordinary attack. As for every action record, a positive
+definition `+0x44` accompanying hit is prepared by the generic prologue before
+the no-effect dispatch and remains independent of the inactivity itself.
+
+Its condition callback `0x61acbc` reads the acting monster's base attribute
+byte at definition `+0x0c`. It returns binary32 1.0 when that byte is 1 (water)
+and otherwise returns binary32 `1.0 - incomingScale`. Both calls from
+`chooseEnemyAiNew` pass incoming scale 1.0, so type 16 is admitted only for a
+water-attribute monster at this recovered boundary. The callback consumes no
+RNG; a selected immediate action spends only the normal selector probability
+draw. The browser preserves the rejected non-water path, selected water path,
+unchanged player HP, action snapshot, and explicit inactivity message.
+
 Enemy skill type `17` is the lone-enemy attack boost. Its late dispatch entry
 targets shared boost handler `0x629064`, setup targets `0x61ffdc`, and AI
 condition targets `0x61acdc`. Setup copies definition duration `+0x14` to

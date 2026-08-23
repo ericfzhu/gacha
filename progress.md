@@ -2,6 +2,25 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 attribute-gated inactivity enemy skill
+
+- Recovered live enemy skill type `16` as an inactivity/skip-turn record:
+  dispatch `0x62be50` is the common no-effect tail, setup `0x6217c0` copies no
+  parameters, and AI condition `0x61acbc` returns 1.0 for a water-attribute
+  acting monster or `1.0 - incomingScale` otherwise. Both recovered new-AI
+  call sites supply incoming scale 1.0, so non-water records are rejected.
+- Cross-checked the semantic name against the independent DadGuide raw-data
+  parser, where type 16 is `ESInactivity16` and type 15 is separately
+  `ESAttackMultihit`. The selected inactivity record consumes the enemy action
+  without falling back to an ordinary attack; the universal definition
+  `+0x44` accompanying hit remains independently composable.
+- Ported definition/runtime records, normalization, water-only new-AI
+  admission, no-condition-RNG behavior, action snapshots, no-damage turn
+  execution, exact table checks, and pure/focused-browser fixtures. The browser
+  renders the water enemy and explicit “does nothing” action with unchanged HP.
+- Next: continue the remaining early live action table from the already
+  separated type `17`–`20` family.
+
 ## 2026-08-23 repeat-attack enemy skill
 
 - Recovered live enemy skill type `15`: dispatch `0x62be50`, setup

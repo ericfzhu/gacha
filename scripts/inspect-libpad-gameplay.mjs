@@ -62,6 +62,10 @@ const REPEAT_ATTACK_ENEMY_SKILL_TYPE = 15;
 const REPEAT_ATTACK_HANDLER = 0x62be50;
 const REPEAT_ATTACK_SETUP_HANDLER = 0x6214a8;
 const REPEAT_ATTACK_CONDITION_HANDLER = 0x61b49c;
+const INACTIVITY_ENEMY_SKILL_TYPE = 16;
+const INACTIVITY_HANDLER = 0x62be50;
+const INACTIVITY_SETUP_HANDLER = 0x6217c0;
+const INACTIVITY_CONDITION_HANDLER = 0x61acbc;
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -502,6 +506,21 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : repeatAttackSetupTarget === REPEAT_ATTACK_SETUP_HANDLER;
   const repeatAttackConditionMatches = repeatAttackConditionTarget === null
     ? null : repeatAttackConditionTarget === REPEAT_ATTACK_CONDITION_HANDLER;
+  const inactivityDispatchTarget = resolveEnemySkillTarget(
+    INACTIVITY_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const inactivitySetupTarget = resolveEnemySkillTarget(
+    INACTIVITY_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const inactivityConditionTarget = resolveEnemySkillTarget(
+    INACTIVITY_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const inactivityDispatchMatches = inactivityDispatchTarget === null
+    ? null : inactivityDispatchTarget === INACTIVITY_HANDLER;
+  const inactivitySetupMatches = inactivitySetupTarget === null
+    ? null : inactivitySetupTarget === INACTIVITY_SETUP_HANDLER;
+  const inactivityConditionMatches = inactivityConditionTarget === null
+    ? null : inactivityConditionTarget === INACTIVITY_CONDITION_HANDLER;
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1415,6 +1434,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       repeatAttackDispatchMatches21_9: repeatAttackDispatchMatches,
       repeatAttackSetupMatches21_9: repeatAttackSetupMatches,
       repeatAttackConditionMatches21_9: repeatAttackConditionMatches,
+      inactivityDispatchMatches21_9: inactivityDispatchMatches,
+      inactivitySetupMatches21_9: inactivitySetupMatches,
+      inactivityConditionMatches21_9: inactivityConditionMatches,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -1432,6 +1454,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
         'type 14: one-LCG inclusive +0x10..+0x14 duration; 20% per resistance awakening plus badge; add into protected low-ten-bit sGAMEWORK+0x87250 and count down in _doOnPostEnemyAttack',
       repeatAttackSemantics:
         'type 15: one-LCG inclusive +0x10..+0x14 hit count capped at 15; +0x18 percent is sent once per hit through _setEnemyAttack; +0x67c is the completed-hit bitset',
+      inactivitySemantics:
+        'type 16: generic no-parameter setup and no-effect dispatch; condition scale is 1.0 for water monsters and 1.0 minus incoming scale otherwise; recovered new-AI callers supply 1.0',
       healPlayerDispatchMatches21_9: healPlayerDispatchMatches,
       healPlayerSetupMatches21_9: healPlayerSetupMatches,
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
@@ -1624,6 +1648,15 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       repeatAttackConditionTarget: repeatAttackConditionTarget === null
         ? null : hex(repeatAttackConditionTarget),
       repeatAttackConditionMatches21_9: repeatAttackConditionMatches,
+      inactivityType: INACTIVITY_ENEMY_SKILL_TYPE,
+      inactivityDispatchTarget: inactivityDispatchTarget === null
+        ? null : hex(inactivityDispatchTarget),
+      inactivityDispatchMatches21_9: inactivityDispatchMatches,
+      inactivitySetupTarget: inactivitySetupTarget === null ? null : hex(inactivitySetupTarget),
+      inactivitySetupMatches21_9: inactivitySetupMatches,
+      inactivityConditionTarget: inactivityConditionTarget === null
+        ? null : hex(inactivityConditionTarget),
+      inactivityConditionMatches21_9: inactivityConditionMatches,
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -2043,6 +2076,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || repeatAttackDispatchMatches === false
     || repeatAttackSetupMatches === false
     || repeatAttackConditionMatches === false
+    || inactivityDispatchMatches === false
+    || inactivitySetupMatches === false
+    || inactivityConditionMatches === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

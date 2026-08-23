@@ -11,6 +11,7 @@ import {
   PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
   PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
   PAD_ENEMY_SKILL_REPEAT_ATTACK,
+  PAD_ENEMY_SKILL_INACTIVITY,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -150,6 +151,7 @@ function isStaticallyEligible(definition, state) {
     PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
     PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
     PAD_ENEMY_SKILL_REPEAT_ATTACK,
+    PAD_ENEMY_SKILL_INACTIVITY,
     PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
     PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
     PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -263,6 +265,18 @@ function evaluateCondition(definition, state, rngState) {
       ? Math.fround(1)
       : incomingScale;
     return { eligible: true, probabilityScale, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_INACTIVITY) {
+    // Type 16's 0x61acbc callback returns 1.0 for a water-attribute acting
+    // monster and 1.0 minus the incoming scale otherwise. Both recovered
+    // chooseEnemyAiNew call sites supply an incoming scale of 1.0, making the
+    // inactivity record eligible only for water at this boundary. No RNG is
+    // consumed by the condition itself.
+    const incomingScale = Math.fround(1);
+    const probabilityScale = state.enemyAttribute === 1
+      ? Math.fround(1)
+      : Math.fround(Math.fround(1) - incomingScale);
+    return { eligible: probabilityScale > 0, probabilityScale, rngState };
   }
   if (
     definition.effect.type === PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION

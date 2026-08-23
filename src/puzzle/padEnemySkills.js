@@ -9,6 +9,7 @@ export const PAD_ENEMY_SKILL_SOURCE_TO_JAMMER = 12;
 export const PAD_ENEMY_SKILL_RANDOM_PARTY_BIND = 13;
 export const PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL = 14;
 export const PAD_ENEMY_SKILL_REPEAT_ATTACK = 15;
+export const PAD_ENEMY_SKILL_INACTIVITY = 16;
 export const PAD_ENEMY_SKILL_LONE_ATTACK_BOOST = 17;
 export const PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST = 18;
 export const PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST = 19;
@@ -212,6 +213,14 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       hitCountMin,
       hitCountMax,
       damagePercent: definition.getInt32(0x18, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_INACTIVITY) {
+    return Object.freeze({
+      type,
+      kind: 'inactivity',
+      supported: true,
       attackWithSkillValue,
     });
   }
@@ -838,6 +847,17 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_INACTIVITY) {
+    return Object.freeze({
+      type,
+      kind: 'inactivity',
+      supported: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (
     type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST
     || type === PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST
@@ -1155,6 +1175,16 @@ export function normalizePadEnemySkillRecord(record) {
       damagePercent: Math.trunc(Number(record?.damagePercent) || 0),
       completedHitMask: Math.trunc(Number(record?.completedHitMask) || 0) >>> 0,
       setupMaterialized: Boolean(record?.setupMaterialized || hitCountPresent),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_INACTIVITY || record?.kind === 'inactivity') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_INACTIVITY,
+      kind: 'inactivity',
+      supported: true,
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

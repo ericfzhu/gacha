@@ -45,6 +45,7 @@ import {
   PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
   PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
   PAD_ENEMY_SKILL_REPEAT_ATTACK,
+  PAD_ENEMY_SKILL_INACTIVITY,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -1626,6 +1627,11 @@ export class PuzzleEngine {
       this.message = `Enemy attacks ${Math.max(0, skill.hitCount)} times at ${skill.damagePercent}% power.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'inactivity') {
+      const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
+      this.message = `${enemy?.name || 'Enemy'} does nothing.`;
+      return true;
+    }
     if (skill.supported && [
       'loneAttackBoost',
       'statusTriggeredAttackBoost',
@@ -1889,6 +1895,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
         PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
         PAD_ENEMY_SKILL_REPEAT_ATTACK,
+        PAD_ENEMY_SKILL_INACTIVITY,
         PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
         PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,

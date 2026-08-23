@@ -12,6 +12,7 @@ import {
   PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
   PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
   PAD_ENEMY_SKILL_REPEAT_ATTACK,
+  PAD_ENEMY_SKILL_INACTIVITY,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -1622,6 +1623,34 @@ assert.equal(cappedRepeatAttackEngine.applyEnemySkillDefinition(cappedRepeatAtta
 assert.equal(cappedRepeatAttackEngine.lastEnemySkill.hitCount, 15);
 assert.equal(cappedRepeatAttackEngine.lastEnemySkill.completedHitMask, 0);
 assert.equal(cappedRepeatAttackEngine.rng.state, padLcgStep(21_900).state);
+const enemyAiInactivityDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiInactivityView = new DataView(enemyAiInactivityDefinition.buffer);
+enemyAiInactivityView.setUint32(0x00, 9_040, true);
+enemyAiInactivityView.setInt16(0x04, PAD_ENEMY_SKILL_INACTIVITY, true);
+enemyAiInactivityView.setInt32(0x30, 10_000, true);
+enemyAiInactivityView.setInt32(0x34, 1_000, true);
+enemyAiInactivityView.setInt32(0x38, 100, true);
+enemyAiInactivityView.setInt32(0x40, 20, true);
+enemyAiInactivityView.setInt32(0x44, 0, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiInactivityDefinition), {
+  type: 16,
+  kind: 'inactivity',
+  supported: true,
+  attackWithSkillValue: 0,
+});
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiInactivityDefinition, new Uint8Array(0x680)),
+  {
+    type: 16,
+    kind: 'inactivity',
+    supported: true,
+    attackWithSkillValue: 0,
+  },
+);
+const directInactivityEngine = new PuzzleEngine({ seed: 21_900 });
+assert.equal(directInactivityEngine.applyEnemySkillDefinition(enemyAiInactivityDefinition), true);
+assert.equal(directInactivityEngine.lastEnemySkill.kind, 'inactivity');
+assert.equal(directInactivityEngine.message, 'Verdant Shell does nothing.');
 const enemyAiAttributeAbsorbDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiAttributeAbsorbView = new DataView(enemyAiAttributeAbsorbDefinition.buffer);
 enemyAiAttributeAbsorbView.setUint32(0x00, 9_021, true);
@@ -3664,6 +3693,36 @@ assert.equal(
   selectedRepeatAttackState.rngState,
   padLcgStep(padLcgStep(21_900).state).state,
 );
+const inactivityMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(inactivityMonsterDefinition.buffer).setUint32(0xec, 9_040, true);
+const selectedInactivityEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: inactivityMonsterDefinition,
+    skillDefinitions: [enemyAiInactivityDefinition],
+  }],
+});
+selectedInactivityEngine.enemies[0].attribute = 'water';
+selectedInactivityEngine.setRngState(21_900);
+selectedInactivityEngine.enemies[0].counter = 1;
+selectedInactivityEngine.enemies[1].counter = 99;
+selectedInactivityEngine.resolveEnemyTurn();
+const selectedInactivityState = selectedInactivityEngine.snapshot();
+assert.equal(selectedInactivityState.lastEnemyActions[0].skill.type, 16);
+assert.equal(selectedInactivityState.lastEnemyActions[0].damage, undefined);
+assert.equal(selectedInactivityState.player.hp, 12_000);
+assert.equal(selectedInactivityState.message, 'Verdant Shell does nothing.');
+assert.equal(selectedInactivityState.rngState, padLcgStep(21_900).state);
+const rejectedInactivityEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: inactivityMonsterDefinition,
+    skillDefinitions: [enemyAiInactivityDefinition],
+  }],
+});
+rejectedInactivityEngine.setRngState(21_900);
+assert.equal(rejectedInactivityEngine.takeEnemySkill(0), null);
+assert.equal(rejectedInactivityEngine.rng.state, 21_900);
 const bindLeaderHelperMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(bindLeaderHelperMonsterDefinition.buffer).setUint32(0xec, 9_020, true);
 const selectedBindLeaderHelperEngine = new PuzzleEngine({
