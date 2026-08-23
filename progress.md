@@ -2,6 +2,22 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 type-108 attack plus mask orb change
+
+- Recovered type `108` at dispatch/setup/condition `0x62a4c8`, `0x6219f4`, and
+  `0x61b84c`; the independent parser corroborates `ESOrbChangeAttackBits`.
+- Setup copies `+0x10` attack percentage and `+0x14/+0x18` source/destination
+  masks to runtime `+0x690/+0x688/+0x68c` without RNG. Its staged execution
+  performs the attack and calls the already recovered mask block-swap helper.
+- The condition folds poison/mortal-poison into a source mask naming neither,
+  scans orb types 0 through 9, and admits only when one source orb exists. The
+  port combines exact percentage damage with the existing per-cell RNG and
+  balanced/fallback distribution. A 150% Fire-to-Water fixture changes seven
+  cells, deals 2,775 damage, and ends at seed 1256568788 after selection and
+  replacement. Pure tests, thirty-two ARM64 anchors, focused Chromium with APK
+  art, screenshot inspection, generic browser smoke, native inspector, PAD
+  data checks, and production build pass. Next: type `109`.
+
 ## 2026-08-24 type-107 unmatchable attributes
 
 - Recovered type `107` at dispatch/setup/condition `0x62a358`, `0x6217c0`, and

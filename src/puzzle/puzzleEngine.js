@@ -64,6 +64,7 @@ import {
   PAD_ENEMY_SKILL_RECOVERY_DEBUFF,
   PAD_ENEMY_SKILL_TURN_CHANGE,
   PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK,
+  PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1205,6 +1206,12 @@ export class PuzzleEngine {
               skill.damagePercent,
               activeBoostPercent,
             );
+          } else if (skill.kind === 'attackOrbChange') {
+            damage = padEnemySkillBoostedAttack(
+              enemy.attack,
+              skill.damagePercent,
+              activeBoostPercent,
+            );
           } else if (skill.kind === 'additionalAttack') {
             damage += padEnemySkillAdditionalAttack(enemy.attack, skill.damagePercent);
           } else if (skill.kind === 'repeatAttack') {
@@ -1340,6 +1347,12 @@ export class PuzzleEngine {
             probabilityScale,
             rngState: this.rng.state,
           };
+        }
+        if (definition.effect.kind === 'attackOrbChange') {
+          let effectiveSourceMask = definition.effect.sourceTypeMask & 0xffff;
+          if ((effectiveSourceMask & 0x180) === 0) effectiveSourceMask |= 0x180;
+          const eligible = this.countBlockBits(effectiveSourceMask) >= 1;
+          return { eligible, probabilityScale: eligible ? 1 : 0, rngState: this.rng.state };
         }
         if (definition.effect.kind === 'sourceToJammer') {
           const sourceType = definition.effect.sourceType;
@@ -2454,6 +2467,23 @@ export class PuzzleEngine {
       this.message = `${blockedTypes || 'Selected orbs'} cannot be matched for ${this.attributeBlock.turnsRemaining} turn${this.attributeBlock.turnsRemaining === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'attackOrbChange') {
+      const beforeTypes = this.board.map((row) => row.map((orb) => orb.type));
+      const effectFlags = this.doBlockSwap5(
+        skill.sourceTypeMask,
+        skill.destinationTypeMask,
+        0,
+        null,
+      );
+      const changedOrbCount = this.board.reduce((total, row, rowIndex) => (
+        total + row.reduce((count, orb, columnIndex) => (
+          count + Number(orb.type !== beforeTypes[rowIndex][columnIndex])
+        ), 0)
+      ), 0);
+      this.lastEnemySkill = Object.freeze({ ...skill, effectFlags, changedOrbCount });
+      this.message = `Enemy attacked and changed ${changedOrbCount} orb${changedOrbCount === 1 ? '' : 's'}.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'clearPlayerBuffs') {
       // _doItetukuHadou clears both recovered sGAMEWORK positive-status lanes,
       // then type 6 invokes _applyLeaderSkill(false). Leader effects in this
@@ -2996,6 +3026,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_RECOVERY_DEBUFF,
         PAD_ENEMY_SKILL_TURN_CHANGE,
         PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK,
+        PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,

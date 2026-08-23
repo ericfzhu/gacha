@@ -1441,6 +1441,26 @@ lifetime. In the focused mask `0x11` fixture, a Fire triplet is ignored while a
 Water triplet still matches; seed 21900 remains unchanged outside ordinary AI
 selection.
 
+Enemy skill type `108` combines an attack with mask-based orb replacement. Its
+dispatch, setup, and condition entries resolve to `0x62a4c8`, `0x6219f4`, and
+`0x61b84c`; the independent parser identifies `ESOrbChangeAttackBits`.
+Definition `+0x10` is the accompanying attack percentage, `+0x14` is the
+source-type mask, and `+0x18` is the destination-type mask. Setup copies these
+values to runtime `sMONSTER+0x690/+0x688/+0x68c`. A positive percentage also
+configures the native staged attack presentation, but consumes no setup RNG.
+
+After the attack stage, execution passes the two masks and zero initial effect
+flags into the same `_doBlockSwap5`/mask-replacement path recovered for the
+browser's core swap rules. Its per-eligible-cell LCG draws, three-of-each
+balancing, low-count shuffle fallback, locked-cell behavior, and special-orb
+state cleanup are therefore shared rather than approximated anew. Condition
+`0x61b84c` scans board counts for enabled source types 0 through 9. If neither
+poison bit is named, it folds both bits 7 and 8 into the effective mask exactly
+like the swap helper, and it consumes no RNG. With source mask Fire,
+destination mask Water, and seven Fire cells, direct seed 21900 changes all
+seven and ends at 891458469. Ordinary AI selection first spends its own draw;
+the combined 150% action then deals 2,775 damage and ends at 1256568788.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

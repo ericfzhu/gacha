@@ -579,6 +579,44 @@ const ATTRIBUTE_BLOCK_INSTRUCTION_ANCHORS = Object.freeze([
   [0x66ab90, 0x97f2b42c], // read its attribute mask
   [0x66ab94, 0x37481bc0], // mask bit nine suppresses bomb handling
 ]);
+const ATTACK_ORB_CHANGE_ENEMY_SKILL_TYPE = 108;
+const ATTACK_ORB_CHANGE_HANDLER = 0x62a4c8;
+const ATTACK_ORB_CHANGE_SETUP_HANDLER = 0x6219f4;
+const ATTACK_ORB_CHANGE_CONDITION_HANDLER = 0x61b84c;
+const ATTACK_ORB_CHANGE_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x6219f4, 0xb94012a8], // load authored +0x10 attack percentage
+  [0x6219f8, 0xb9069268], // store it at runtime +0x690
+  [0x621a00, 0x7100051f], // test whether the accompanying attack is positive
+  [0x621a14, 0xb9068268], // configure the attack presentation at +0x680
+  [0x621a30, 0xb9001a69], // mark its native attack-stage state
+  [0x621a34, 0xb94016a8], // load authored +0x14 source mask
+  [0x621a38, 0xb9068a68], // copy source mask to runtime +0x688
+  [0x621a3c, 0xb9401aa8], // load authored +0x18 destination mask
+  [0x621a40, 0xb9068e68], // copy destination mask to runtime +0x68c
+  [0x62a4c8, 0xb9469268], // execution checks runtime attack-stage value
+  [0x62a4cc, 0x3500cc28], // a live attack stage returns to the shared epilogue
+  [0x62a4d0, 0xb9468a62], // load prepared source mask
+  [0x62a4d4, 0xb9468e63], // load prepared destination mask
+  [0x62a4dc, 0x2a1f03e1], // start mask replacement with zero effect flags
+  [0x62a4e0, 0x97f3ffec], // invoke the native mask-based block-swap helper
+  [0x61b84c, 0xb9401668], // condition loads authored +0x14 source mask
+  [0x61b850, 0x32190509], // prepare poison and mortal-poison bits
+  [0x61b854, 0x7219051f], // preserve an explicitly authored poison bit
+  [0x61b858, 0x1a890113], // otherwise fold both poison types into the mask
+  [0x61b85c, 0x360000d3], // begin scanning enabled type bits at zero
+  [0x61b868, 0x97f3d44e], // count type-zero blocks on the board
+  [0x61b86c, 0x7100041f], // admit on the first present source type
+  [0x61b8ec, 0x363000d3], // continue through jammer type six
+  [0x61b8f8, 0x97f3d42a], // count jammer blocks when requested
+  [0x61b904, 0x363800d3], // test folded poison bit seven
+  [0x61b910, 0x97f3d424], // count poison-family blocks
+  [0x61b91c, 0x364000d3], // test explicit mortal-poison bit eight
+  [0x61b928, 0x97f3d41e], // count that source lane
+  [0x61b934, 0x36483753], // finish with bomb bit nine
+  [0x61b940, 0x97f3d418], // count bomb blocks when requested
+  [0x61b948, 0x54ff674c], // admit if the final source count is positive
+  [0x61b94c, 0x140001b4], // reject when no requested source exists
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -1750,6 +1788,31 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     : ATTRIBUTE_BLOCK_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
+  const attackOrbChangeDispatchTarget = resolveEnemySkillTarget(
+    ATTACK_ORB_CHANGE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const attackOrbChangeSetupTarget = resolveEnemySkillTarget(
+    ATTACK_ORB_CHANGE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const attackOrbChangeConditionTarget = resolveEnemySkillTarget(
+    ATTACK_ORB_CHANGE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const attackOrbChangeDispatchMatches = attackOrbChangeDispatchTarget === null
+    ? null : attackOrbChangeDispatchTarget === ATTACK_ORB_CHANGE_HANDLER;
+  const attackOrbChangeSetupMatches = attackOrbChangeSetupTarget === null
+    ? null : attackOrbChangeSetupTarget === ATTACK_ORB_CHANGE_SETUP_HANDLER;
+  const attackOrbChangeConditionMatches = attackOrbChangeConditionTarget === null
+    ? null : attackOrbChangeConditionTarget === ATTACK_ORB_CHANGE_CONDITION_HANDLER;
+  const attackOrbChangeInstructionAnchorsMatch = restoredElf === null ? null
+    : ATTACK_ORB_CHANGE_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -2800,6 +2863,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       attributeBlockSetupMatches21_9: attributeBlockSetupMatches,
       attributeBlockConditionMatches21_9: attributeBlockConditionMatches,
       attributeBlockInstructionAnchorsMatch21_9: attributeBlockInstructionAnchorsMatch,
+      attackOrbChangeDispatchMatches21_9: attackOrbChangeDispatchMatches,
+      attackOrbChangeSetupMatches21_9: attackOrbChangeSetupMatches,
+      attackOrbChangeConditionMatches21_9: attackOrbChangeConditionMatches,
+      attackOrbChangeInstructionAnchorsMatch21_9: attackOrbChangeInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -3478,6 +3545,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       attributeBlockInstructionAnchorsMatch21_9: attributeBlockInstructionAnchorsMatch,
       attributeBlockSemantics:
         'type 107 consumes no RNG; execution clears conflicting player-side status ids 87..96, installs unsigned +0x10 in the protected low-ten-bit duration at +0x8763c, and stores raw low-16-bit +0x14 at +0x87640; calcBlocks marks groups whose orb-type bit is set as unmatchable, bit 9 also suppresses bomb handling, incTurn decrements and clears the status, and the AI condition rejects an already-active duration',
+      attackOrbChangeType: ATTACK_ORB_CHANGE_ENEMY_SKILL_TYPE,
+      attackOrbChangeDispatchTarget: attackOrbChangeDispatchTarget === null
+        ? null : hex(attackOrbChangeDispatchTarget),
+      attackOrbChangeDispatchMatches21_9: attackOrbChangeDispatchMatches,
+      attackOrbChangeSetupTarget: attackOrbChangeSetupTarget === null
+        ? null : hex(attackOrbChangeSetupTarget),
+      attackOrbChangeSetupMatches21_9: attackOrbChangeSetupMatches,
+      attackOrbChangeConditionTarget: attackOrbChangeConditionTarget === null
+        ? null : hex(attackOrbChangeConditionTarget),
+      attackOrbChangeConditionMatches21_9: attackOrbChangeConditionMatches,
+      attackOrbChangeInstructionAnchorsMatch21_9: attackOrbChangeInstructionAnchorsMatch,
+      attackOrbChangeSemantics:
+        'type 108 copies +0x10 attack percentage and +0x14/+0x18 source/destination masks to runtime +0x690/+0x688/+0x68c without setup RNG; its staged execution performs the accompanying attack and the native mask-based block swap, whose recovered per-cell distribution owns the execution RNG; condition folds poison/mortal-poison into a source mask that names neither and admits only when at least one requested board type exists',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -4032,6 +4112,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || attributeBlockSetupMatches === false
     || attributeBlockConditionMatches === false
     || attributeBlockInstructionAnchorsMatch === false
+    || attackOrbChangeDispatchMatches === false
+    || attackOrbChangeSetupMatches === false
+    || attackOrbChangeConditionMatches === false
+    || attackOrbChangeInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

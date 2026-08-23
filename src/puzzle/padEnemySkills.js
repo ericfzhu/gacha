@@ -75,6 +75,7 @@ export const PAD_ENEMY_SKILL_CLOUD = 104;
 export const PAD_ENEMY_SKILL_RECOVERY_DEBUFF = 105;
 export const PAD_ENEMY_SKILL_TURN_CHANGE = 106;
 export const PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK = 107;
+export const PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE = 108;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -452,6 +453,18 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       supported: true,
       durationTurns: definition.getInt32(0x10, true),
       typeMask: definition.getInt32(0x14, true) & 0xffff,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE) {
+    requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'attackOrbChange',
+      supported: true,
+      damagePercent: definition.getInt32(0x10, true),
+      sourceTypeMask: definition.getInt32(0x14, true) & 0xffff,
+      destinationTypeMask: definition.getInt32(0x18, true) & 0xffff,
       attackWithSkillValue,
     });
   }
@@ -1480,6 +1493,22 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
     // Generic setup leaves both authored operands on the definition record.
     return decodePadEnemySkillDefinition(definitionBytes);
   }
+  if (type === PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE) {
+    // Setup copies +0x10/+0x14/+0x18 to +0x690/+0x688/+0x68c.
+    return Object.freeze({
+      type,
+      kind: 'attackOrbChange',
+      supported: true,
+      damagePercent: monster.getInt32(0x690, true),
+      sourceTypeMask: monster.getInt32(0x688, true) & 0xffff,
+      destinationTypeMask: monster.getInt32(0x68c, true) & 0xffff,
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -2371,6 +2400,20 @@ export function normalizePadEnemySkillRecord(record) {
       supported: record?.supported !== false,
       durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)) & 0x3ff,
       typeMask: Math.trunc(Number(record?.typeMask) || 0) & 0xffff,
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE || record?.kind === 'attackOrbChange') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE,
+      kind: 'attackOrbChange',
+      supported: record?.supported !== false,
+      damagePercent: Math.trunc(Number(record?.damagePercent) || 0),
+      sourceTypeMask: Math.trunc(Number(record?.sourceTypeMask) || 0) & 0xffff,
+      destinationTypeMask: Math.trunc(Number(record?.destinationTypeMask) || 0) & 0xffff,
+      setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

@@ -28,6 +28,7 @@ import {
   PAD_ENEMY_SKILL_RECOVERY_DEBUFF,
   PAD_ENEMY_SKILL_TURN_CHANGE,
   PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK,
+  PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -201,6 +202,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_RECOVERY_DEBUFF,
     PAD_ENEMY_SKILL_TURN_CHANGE,
     PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK,
+    PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
     PAD_ENEMY_SKILL_DEFENSE_BOOST,
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -474,6 +476,7 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
   if (
     definition.effect.type === PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION
     || definition.effect.type === PAD_ENEMY_SKILL_SOURCE_TO_JAMMER
+    || definition.effect.type === PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE
   ) {
     if (typeof state.evaluateCondition !== 'function') {
       return { eligible: false, probabilityScale: 0, rngState };
