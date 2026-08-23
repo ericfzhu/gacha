@@ -2,6 +2,21 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 unconditional enemy self-heal
+
+- Recovered type `86` as the unconditional variant of enemy self-heal. Its
+  dispatch/setup/condition entries are `0x629098`, `0x61ff5c`, and `0x61a630`:
+  it shares type `7`'s one-LCG inclusive `+0x10..+0x14` percentage setup and
+  max-HP heal execution, but not type 7's player-HP survival condition.
+- Preserved the type identity through definition/runtime decoding and
+  normalization while reusing the exact binary64 max-HP calculation and
+  existing capped enemy-HP application. A low-player-HP differential fixture
+  proves type 7 is rejected without RNG while type 86 is admitted, selects 29%,
+  heals 26,680 HP, and ends after the normal selection plus setup RNG draws.
+- Pure rules, exact 21.9 table inspection, focused Chromium rendering, generic
+  browser interaction, and the production build pass without page errors.
+  Next: recover type `87` damage-absorb status as a separate checkpoint.
+
 ## 2026-08-24 enemy multi-attack controller
 
 - Recovered enemy skill type `83` as the native structural multi-attack/

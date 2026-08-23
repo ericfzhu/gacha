@@ -8,6 +8,7 @@ import {
   PAD_ENEMY_SKILL_RANDOM_SUB_BIND,
   PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
   PAD_ENEMY_SKILL_HEAL_ENEMY,
+  PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -942,6 +943,34 @@ assert.equal(directHealEnemyEngine.enemies[0].hp, 69_320);
 assert.equal(directHealEnemyEngine.lastEnemySkill.healPercent, 21);
 assert.equal(directHealEnemyEngine.lastEnemySkill.healedHp, 19_320);
 assert.equal(directHealEnemyEngine.rng.state, padLcgStep(21_900).state);
+const enemyAiUnconditionalHealDefinition = enemyAiHealEnemyDefinition.slice();
+const enemyAiUnconditionalHealView = new DataView(enemyAiUnconditionalHealDefinition.buffer);
+enemyAiUnconditionalHealView.setUint32(0x00, 9_067, true);
+enemyAiUnconditionalHealView.setInt16(
+  0x04,
+  PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL,
+  true,
+);
+enemyAiUnconditionalHealView.setInt32(0x44, 0, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiUnconditionalHealDefinition), {
+  type: 86,
+  kind: 'healEnemy',
+  supported: true,
+  percentMin: 20,
+  percentMax: 30,
+  attackWithSkillValue: 0,
+});
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiUnconditionalHealDefinition,
+  healEnemyMonsterRuntime,
+), {
+  type: 86,
+  kind: 'healEnemy',
+  supported: true,
+  healPercent: 27,
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
 const enemyAiAdditionalAttackDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiAdditionalAttackView = new DataView(enemyAiAdditionalAttackDefinition.buffer);
 enemyAiAdditionalAttackView.setUint32(0x00, 9_037, true);
@@ -3955,6 +3984,31 @@ rejectedHealEnemyEngine.player.hp = 1_849;
 rejectedHealEnemyEngine.setRngState(21_900);
 assert.equal(rejectedHealEnemyEngine.takeEnemySkill(0), null);
 assert.equal(rejectedHealEnemyEngine.rng.state, 21_900);
+const unconditionalHealMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(unconditionalHealMonsterDefinition.buffer).setUint32(0xec, 9_067, true);
+const selectedUnconditionalHealEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: unconditionalHealMonsterDefinition,
+    skillDefinitions: [enemyAiUnconditionalHealDefinition],
+  }],
+});
+selectedUnconditionalHealEngine.player.hp = 1;
+selectedUnconditionalHealEngine.enemies[0].hp = 50_000;
+selectedUnconditionalHealEngine.enemies[0].counter = 1;
+selectedUnconditionalHealEngine.enemies[1].counter = 99;
+selectedUnconditionalHealEngine.setRngState(21_900);
+selectedUnconditionalHealEngine.resolveEnemyTurn();
+const selectedUnconditionalHealState = selectedUnconditionalHealEngine.snapshot();
+assert.equal(selectedUnconditionalHealState.lastEnemyActions[0].skill.type, 86);
+assert.equal(selectedUnconditionalHealState.lastEnemyActions[0].skill.healPercent, 29);
+assert.equal(selectedUnconditionalHealState.lastEnemyActions[0].damage, undefined);
+assert.equal(selectedUnconditionalHealState.enemies[0].hp, 76_680);
+assert.equal(selectedUnconditionalHealState.player.hp, 1);
+assert.equal(
+  selectedUnconditionalHealState.rngState,
+  padLcgStep(padLcgStep(21_900).state).state,
+);
 const additionalAttackMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(additionalAttackMonsterDefinition.buffer).setUint32(0xec, 9_037, true);
 const selectedAdditionalAttackEngine = new PuzzleEngine({

@@ -988,6 +988,24 @@ turn deals 3,000 then 1,850 damage, leaves 7,150 HP, charges only the parent's
 20-point budget, and ends at RNG state `394448415` after the single parent
 probability roll.
 
+Enemy skill type `86` is the unconditional counterpart to the earlier type-7
+enemy heal. Its dispatch and setup entries target the same `0x629098` and
+`0x61ff5c` handlers as type 7. Setup consumes one LCG value and materializes an
+inclusive random percentage from signed definition `+0x10..+0x14` at
+`sMONSTER+0x678`. Execution reconstructs the protected int64 maximum HP,
+converts the selected percentage through binary64, divides by 100, rounds with
+`izMathRoundSint64`, and adds the result through `sMONSTER::addHp`, which caps
+at maximum HP.
+
+The distinction is entirely in admission: type 86 maps to unconditional
+condition `0x61a630`, whereas type 7 maps to `0x61b418` and requires player
+current HP to be at least the acting enemy's low-32-bit base attack. The browser
+keeps separate numeric types through decoding and normalization while sharing
+their identical setup and execution math. With player HP forced to 1, the
+differential fixture rejects type 7 before RNG but admits type 86, selects 29%
+after the parent and setup draws, and heals Verdant Shell from 50,000 to 76,680
+HP without damaging the player.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

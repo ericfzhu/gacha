@@ -54,6 +54,7 @@ export const PAD_ENEMY_SKILL_NORMAL_ATTACK = 82;
 export const PAD_ENEMY_SKILL_MULTI_ATTACK = 83;
 export const PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT = 84;
 export const PAD_ENEMY_SKILL_POISON_MASK_SWAP = 85;
+export const PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL = 86;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -178,12 +179,17 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       attackWithSkillValue,
     });
   }
-  if (type === PAD_ENEMY_SKILL_HEAL_ENEMY || type === PAD_ENEMY_SKILL_ADDITIONAL_ATTACK) {
+  if (
+    type === PAD_ENEMY_SKILL_HEAL_ENEMY
+    || type === PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL
+    || type === PAD_ENEMY_SKILL_ADDITIONAL_ATTACK
+  ) {
+    const healEnemy = type !== PAD_ENEMY_SKILL_ADDITIONAL_ATTACK;
     const percentMin = definition.getInt32(0x10, true);
     const percentMax = definition.getInt32(0x14, true);
     return Object.freeze({
       type,
-      kind: type === PAD_ENEMY_SKILL_HEAL_ENEMY ? 'healEnemy' : 'additionalAttack',
+      kind: healEnemy ? 'healEnemy' : 'additionalAttack',
       supported: percentMax >= percentMin,
       percentMin,
       percentMax,
@@ -978,12 +984,17 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
-  if (type === PAD_ENEMY_SKILL_HEAL_ENEMY || type === PAD_ENEMY_SKILL_ADDITIONAL_ATTACK) {
+  if (
+    type === PAD_ENEMY_SKILL_HEAL_ENEMY
+    || type === PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL
+    || type === PAD_ENEMY_SKILL_ADDITIONAL_ATTACK
+  ) {
+    const healEnemy = type !== PAD_ENEMY_SKILL_ADDITIONAL_ATTACK;
     return Object.freeze({
       type,
-      kind: type === PAD_ENEMY_SKILL_HEAL_ENEMY ? 'healEnemy' : 'additionalAttack',
+      kind: healEnemy ? 'healEnemy' : 'additionalAttack',
       supported: true,
-      ...(type === PAD_ENEMY_SKILL_HEAL_ENEMY
+      ...(healEnemy
         ? { healPercent: monster.getInt32(0x678, true) }
         : { damagePercent: monster.getInt32(0x678, true) }),
       setupMaterialized: true,
@@ -1536,18 +1547,26 @@ export function normalizePadEnemySkillRecord(record) {
   }
   if (
     type === PAD_ENEMY_SKILL_HEAL_ENEMY
+    || type === PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL
     || type === PAD_ENEMY_SKILL_ADDITIONAL_ATTACK
     || record?.kind === 'healEnemy'
     || record?.kind === 'additionalAttack'
   ) {
-    const healEnemy = type === PAD_ENEMY_SKILL_HEAL_ENEMY || record?.kind === 'healEnemy';
+    const healEnemy = type === PAD_ENEMY_SKILL_HEAL_ENEMY
+      || type === PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL
+      || record?.kind === 'healEnemy';
     const percentPresent = healEnemy
       ? record?.healPercent !== undefined && record?.healPercent !== null
       : record?.damagePercent !== undefined && record?.damagePercent !== null;
     const percentMin = Math.trunc(Number(record?.percentMin) || 0);
     const percentMax = Math.trunc(Number(record?.percentMax) || 0);
+    const normalizedType = !healEnemy
+      ? PAD_ENEMY_SKILL_ADDITIONAL_ATTACK
+      : type === PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL
+        ? PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL
+        : PAD_ENEMY_SKILL_HEAL_ENEMY;
     return Object.freeze({
-      type: healEnemy ? PAD_ENEMY_SKILL_HEAL_ENEMY : PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
+      type: normalizedType,
       kind: healEnemy ? 'healEnemy' : 'additionalAttack',
       supported: percentPresent || percentMax >= percentMin,
       ...(percentPresent

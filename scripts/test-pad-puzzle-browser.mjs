@@ -2689,7 +2689,19 @@ try {
     engine.enemies[1].counter = 99;
     engine.setRngState(21_900);
     engine.resolveEnemyTurn();
-    return { healState, attackState: engine.snapshot() };
+    const attackState = engine.snapshot();
+    engine.reset();
+    engine.start();
+    const unconditionalHeal = makeSkill(9_067, 86, 20, 30);
+    new DataView(unconditionalHeal.buffer).setInt32(0x44, 0, true);
+    engine.setEnemyAiDefinitionPool(0, makeMonster(9_067), [unconditionalHeal]);
+    engine.player.hp = 1;
+    engine.enemies[0].hp = 50_000;
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.setRngState(21_900);
+    engine.resolveEnemyTurn();
+    return { healState, attackState, unconditionalHealState: engine.snapshot() };
   }) : null;
   if (earlyHealAttackRenderState && (
     earlyHealAttackRenderState.healState?.enemies?.[0]?.hp !== 76_680
@@ -2700,6 +2712,12 @@ try {
     || earlyHealAttackRenderState.attackState?.lastEnemyActions?.[0]?.skill?.damagePercent !== 138
     || earlyHealAttackRenderState.attackState?.lastEnemyActions?.[0]?.damage !== 3_478
     || earlyHealAttackRenderState.attackState?.player?.hp !== 8_522
+    || earlyHealAttackRenderState.unconditionalHealState?.lastEnemyActions?.[0]?.skill?.type !== 86
+    || earlyHealAttackRenderState.unconditionalHealState?.lastEnemyActions?.[0]?.skill?.healPercent !== 29
+    || earlyHealAttackRenderState.unconditionalHealState?.lastEnemyActions?.[0]?.damage !== undefined
+    || earlyHealAttackRenderState.unconditionalHealState?.enemies?.[0]?.hp !== 76_680
+    || earlyHealAttackRenderState.unconditionalHealState?.player?.hp !== 1
+    || earlyHealAttackRenderState.unconditionalHealState?.rngState !== 3_803_934_822
   )) throw new Error(`Early heal/attack render-state mismatch: ${JSON.stringify(earlyHealAttackRenderState)}`);
   if (earlyHealAttackRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   const earlyDefenseShieldsRenderState = renderEarlyDefenseShieldsState ? await page.evaluate(() => {

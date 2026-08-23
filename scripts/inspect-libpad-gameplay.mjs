@@ -141,6 +141,10 @@ const MULTI_ATTACK_INSTRUCTION_ANCHORS = Object.freeze([
   [0x628550, 0x13041d09], // signed extract of completed-child nibble
   [0x628570, 0xb907de68], // persist completed-child advance
 ]);
+const UNCONDITIONAL_HEAL_ENEMY_SKILL_TYPE = 86;
+const UNCONDITIONAL_HEAL_HANDLER = 0x629098;
+const UNCONDITIONAL_HEAL_SETUP_HANDLER = 0x61ff5c;
+const UNCONDITIONAL_HEAL_CONDITION_HANDLER = 0x61a630;
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -881,6 +885,27 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     : MULTI_ATTACK_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
+  const unconditionalHealDispatchTarget = resolveEnemySkillTarget(
+    UNCONDITIONAL_HEAL_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const unconditionalHealSetupTarget = resolveEnemySkillTarget(
+    UNCONDITIONAL_HEAL_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const unconditionalHealConditionTarget = resolveEnemySkillTarget(
+    UNCONDITIONAL_HEAL_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const unconditionalHealDispatchMatches = unconditionalHealDispatchTarget === null
+    ? null : unconditionalHealDispatchTarget === UNCONDITIONAL_HEAL_HANDLER;
+  const unconditionalHealSetupMatches = unconditionalHealSetupTarget === null
+    ? null : unconditionalHealSetupTarget === UNCONDITIONAL_HEAL_SETUP_HANDLER;
+  const unconditionalHealConditionMatches = unconditionalHealConditionTarget === null
+    ? null : unconditionalHealConditionTarget === UNCONDITIONAL_HEAL_CONDITION_HANDLER;
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1846,6 +1871,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       multiAttackSetupMatches21_9: multiAttackSetupMatches,
       multiAttackConditionMatches21_9: multiAttackConditionMatches,
       multiAttackInstructionAnchorsMatch21_9: multiAttackInstructionAnchorsMatch,
+      unconditionalHealDispatchMatches21_9: unconditionalHealDispatchMatches,
+      unconditionalHealSetupMatches21_9: unconditionalHealSetupMatches,
+      unconditionalHealConditionMatches21_9: unconditionalHealConditionMatches,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -2254,6 +2282,18 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       multiAttackInstructionAnchorsMatch21_9: multiAttackInstructionAnchorsMatch,
       multiAttackSemantics:
         'type 83: unconditional structural parent with up to eight positive child IDs at +0x10..+0x2c; packed sMONSTER+0x7dc stores active bit 8, signed completed-child nibble 4..7, low-nibble cursor, and parent ID in bits 9..31; each child condition runs at scale 1.0 without child slot/HP/budget gates, eligible children execute in order in the same enemy turn, type 82 or a rejected child takes the -1.0 ordinary-attack path and terminates, while the zero/missing-child -1000.0 path ends without another attack',
+      unconditionalHealType: UNCONDITIONAL_HEAL_ENEMY_SKILL_TYPE,
+      unconditionalHealDispatchTarget: unconditionalHealDispatchTarget === null
+        ? null : hex(unconditionalHealDispatchTarget),
+      unconditionalHealDispatchMatches21_9: unconditionalHealDispatchMatches,
+      unconditionalHealSetupTarget: unconditionalHealSetupTarget === null
+        ? null : hex(unconditionalHealSetupTarget),
+      unconditionalHealSetupMatches21_9: unconditionalHealSetupMatches,
+      unconditionalHealConditionTarget: unconditionalHealConditionTarget === null
+        ? null : hex(unconditionalHealConditionTarget),
+      unconditionalHealConditionMatches21_9: unconditionalHealConditionMatches,
+      unconditionalHealSemantics:
+        'type 86: shares type 7 dispatch/setup, selecting one inclusive +0x10..+0x14 max-HP percentage with one LCG roll and adding round(maxHP*percent/100); unlike type 7 it uses the unconditional 1.0 condition at 0x61a630',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -2725,6 +2765,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || multiAttackSetupMatches === false
     || multiAttackConditionMatches === false
     || multiAttackInstructionAnchorsMatch === false
+    || unconditionalHealDispatchMatches === false
+    || unconditionalHealSetupMatches === false
+    || unconditionalHealConditionMatches === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false
