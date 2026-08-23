@@ -334,15 +334,23 @@ function drawParty(ctx, engine) {
     roundedRect(ctx, x - 29, 284, 58, 54, 12);
     ctx.fillStyle = gradient;
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,.24)';
+    const swappedLeader = index === 0 && Number(engine.leaderSwapTurns || 0) > 0;
+    ctx.strokeStyle = swappedLeader ? '#f4c95d' : 'rgba(255,255,255,.24)';
+    ctx.lineWidth = swappedLeader ? 2 : 1;
     ctx.stroke();
+    ctx.lineWidth = 1;
     ctx.fillStyle = '#fff';
     ctx.font = '800 18px "Barlow Condensed", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(member.name[0], x, 309);
+    ctx.fillText(member.name[0], x, swappedLeader ? 315 : 309);
     ctx.font = '600 9px "Noto Sans", sans-serif';
     ctx.fillStyle = '#dce4ef';
-    ctx.fillText(member.attack, x, 328);
+    ctx.fillText(member.attack, x, swappedLeader ? 331 : 328);
+    if (swappedLeader) {
+      ctx.font = '800 8px "Barlow Condensed", sans-serif';
+      ctx.fillStyle = '#fff0a6';
+      ctx.fillText(`SWAP ${engine.leaderSwapTurns}T`, x, 295);
+    }
     if (Number(member.bindTurns || 0) > 0) {
       roundedRect(ctx, x - 29, 284, 58, 54, 12);
       ctx.fillStyle = 'rgba(12, 15, 24, .72)';

@@ -43,6 +43,7 @@ export const PAD_ENEMY_SKILL_DAMAGE_VOID = 71;
 export const PAD_ENEMY_SKILL_ATTRIBUTE_RESIST = 72;
 export const PAD_ENEMY_SKILL_RESOLVE = 73;
 export const PAD_ENEMY_SKILL_DAMAGE_SHIELD = 74;
+export const PAD_ENEMY_SKILL_LEADER_SWAP = 75;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES_4 = 76;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES = 77;
 export const PAD_ENEMY_SKILL_HORIZONTAL_LINES_4 = 78;
@@ -332,6 +333,17 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       supported: true,
       durationTurns: Math.max(0, (definition.getInt32(0x10, true) << 16) >> 16),
       shieldPercent: Math.min(100, Math.max(0, definition.getInt32(0x14, true))),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_LEADER_SWAP) {
+    requireLength(definitionBytes, 0x14, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'leaderSwap',
+      supported: true,
+      durationTurns: Math.max(0, (definition.getInt32(0x10, true) << 16) >> 16),
+      selectedPartyIndex: null,
       attackWithSkillValue,
     });
   }
@@ -1138,6 +1150,21 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_LEADER_SWAP) {
+    requireLength(monsterBytes, 0x680, 'PAD monster runtime');
+    return Object.freeze({
+      type,
+      kind: 'leaderSwap',
+      supported: true,
+      durationTurns: Math.max(0, (monster.getInt32(0x678, true) << 16) >> 16),
+      selectedPartyIndex: monster.getInt32(0x67c, true),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (
     type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST
     || type === PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST
@@ -1646,6 +1673,20 @@ export function normalizePadEnemySkillRecord(record) {
         0,
         Math.trunc(Number(record?.shieldPercent) || 0),
       )),
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_LEADER_SWAP || record?.kind === 'leaderSwap') {
+    const selectedPartyIndex = Number(record?.selectedPartyIndex);
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_LEADER_SWAP,
+      kind: 'leaderSwap',
+      supported: record?.supported !== false,
+      durationTurns: Math.max(0, (Math.trunc(Number(record?.durationTurns) || 0) << 16) >> 16),
+      selectedPartyIndex: Number.isInteger(selectedPartyIndex) ? selectedPartyIndex : null,
       setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null

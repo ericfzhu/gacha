@@ -61,6 +61,7 @@ import {
   PAD_ENEMY_SKILL_ATTRIBUTE_RESIST,
   PAD_ENEMY_SKILL_RESOLVE,
   PAD_ENEMY_SKILL_DAMAGE_SHIELD,
+  PAD_ENEMY_SKILL_LEADER_SWAP,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -305,6 +306,8 @@ export class PuzzleEngine {
     this.playerAttackBoostTurns = this.initialPlayerAttackBoostTurns;
     this.skillSealTurns = 0;
     this.skillSealSkipPostEnemyCountdown = false;
+    this.leaderSwapTurns = 0;
+    this.leaderSwapIndex = null;
     this.enemySkillQueues.forEach((queue) => { queue.position = 0; });
     this.enemyAiPools.forEach((pool) => {
       if (pool) pool.aiBudget = pool.monster.budgetCap;
@@ -1054,6 +1057,7 @@ export class PuzzleEngine {
     this.advanceEnemyComboAbsorbTurns();
     this.advanceEnemyDamageVoidTurns();
     this.advanceEnemyDamageShieldTurns();
+    this.advanceLeaderSwapTurns();
     this.advanceSkyfallRateRules();
     this.advanceMoveTimeReductionTurns();
     this.advanceBlackOrbCountdowns();
@@ -1159,6 +1163,8 @@ export class PuzzleEngine {
       comboAbsorbTurns: enemy.comboAbsorbTurns,
       enemyDamageVoidTurns: enemy.damageVoidTurns,
       enemyDamageShieldTurns: enemy.damageShieldTurns,
+      leaderSwapTurns: this.leaderSwapTurns,
+      leaderSwapCandidateCount: this.leaderSwapCandidateIndices().length,
       skyfallNaturalTurns: this.skyfallRateRules.natural?.turnsRemaining || 0,
       skyfallNaturalMask: this.skyfallRateRules.natural?.typeMask || 0,
       skyfallHazardTurns: this.skyfallRateRules.hazard?.turnsRemaining || 0,
@@ -1324,6 +1330,18 @@ export class PuzzleEngine {
         ...record,
         hitCount: Math.min(selectedHitCount, 15),
         completedHitMask: 0,
+        setupMaterialized: true,
+      });
+    }
+    if (skill.supported && skill.kind === 'leaderSwap' && !skill.setupMaterialized) {
+      const candidates = this.leaderSwapCandidateIndices();
+      const roll = this.rng.nextUint16();
+      const selectedPartyIndex = candidates.length > 0
+        ? candidates[Math.imul(roll, candidates.length) >>> 16]
+        : -1;
+      return Object.freeze({
+        ...record,
+        selectedPartyIndex,
         setupMaterialized: true,
       });
     }
@@ -1603,6 +1621,23 @@ export class PuzzleEngine {
       );
       if (enemy.damageShieldTurns === 0) enemy.damageShieldPercent = 0;
     });
+  }
+
+  leaderSwapCandidateIndices() {
+    return [1, 2, 3, 4].filter((index) => (
+      Boolean(this.party[index]) && this.party[index].present !== false
+    ));
+  }
+
+  advanceLeaderSwapTurns() {
+    if (this.leaderSwapTurns <= 0) return;
+    this.leaderSwapTurns = Math.max(0, Math.trunc(Number(this.leaderSwapTurns) || 0) - 1);
+    if (this.leaderSwapTurns !== 0) return;
+    const index = Math.trunc(Number(this.leaderSwapIndex));
+    if (index >= 1 && index <= 4 && this.party[index]) {
+      [this.party[0], this.party[index]] = [this.party[index], this.party[0]];
+    }
+    this.leaderSwapIndex = null;
   }
 
   advanceSkyfallRateRules() {
@@ -1958,6 +1993,25 @@ export class PuzzleEngine {
       this.message = `${enemy.name} reduces damage by ${skill.shieldPercent}% for ${skill.durationTurns} turn${skill.durationTurns === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'leaderSwap') {
+      const selectedPartyIndex = Math.trunc(Number(skill.selectedPartyIndex));
+      if (
+        this.leaderSwapTurns > 0
+        || skill.durationTurns <= 0
+        || selectedPartyIndex < 1
+        || selectedPartyIndex > 4
+        || !this.party[selectedPartyIndex]
+        || this.party[selectedPartyIndex].present === false
+      ) return false;
+      [this.party[0], this.party[selectedPartyIndex]] = [
+        this.party[selectedPartyIndex],
+        this.party[0],
+      ];
+      this.leaderSwapTurns = Math.max(0, (skill.durationTurns << 16) >> 16);
+      this.leaderSwapIndex = selectedPartyIndex;
+      this.message = `${this.party[0].name} was swapped into the leader slot for ${this.leaderSwapTurns} turn${this.leaderSwapTurns === 1 ? '' : 's'}.`;
+      return true;
+    }
     if (skill.supported && [
       'loneAttackBoost',
       'statusTriggeredAttackBoost',
@@ -2270,6 +2324,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_ATTRIBUTE_RESIST,
         PAD_ENEMY_SKILL_RESOLVE,
         PAD_ENEMY_SKILL_DAMAGE_SHIELD,
+        PAD_ENEMY_SKILL_LEADER_SWAP,
         PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
         PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -2894,6 +2949,8 @@ export class PuzzleEngine {
         skill: action.skill ? { ...action.skill } : undefined,
       })),
       leaderPairMultiplier: this.lastLeaderMultiplier,
+      leaderSwapTurns: this.leaderSwapTurns,
+      leaderSwapIndex: this.leaderSwapIndex,
       nativePlayerBuffStatus: {
         auxiliaryTurns: this.playerAuxiliaryBuffTurns,
         attackBoostTurns: this.playerAttackBoostTurns,

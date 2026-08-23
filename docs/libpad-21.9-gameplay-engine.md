@@ -911,6 +911,32 @@ fire hit to 1,974 damage, leaves the status at three turns immediately after
 installation, and ends the standard 100% scheduling draw at RNG state
 `394448415`.
 
+Enemy skill type `75` is the timed leader swap identified by DadGuide as
+`ESLeaderSwap`. Its dispatch, setup, and condition entries target `0x629ad8`,
+`0x620444`, and `0x61ab74`. Definition `+0x10` supplies the duration. Setup
+stores its signed-int16 value at runtime `sMONSTER+0x678`, calls the native
+changeable-sub counter, consumes exactly one LCG value, selects a one-based
+rank with `floor(roll16 * count / 65536) + 1`, and walks party indices 1–4 to
+store the selected index at runtime `+0x67c`. The condition calls the same
+counter and only tests whether it is positive; target selection therefore
+does not consume RNG until setup, after the ordinary new-AI probability draw.
+
+Execution installs the global duration and selected party index in the leader-
+change controller, then `_doLeaderChange(sCARD*, int, bool)` exchanges that sub
+with party slot 0. Because leader skills are read from the current slot-0 card,
+the replacement card immediately becomes the leader for damage calculation.
+At expiry the same two slots are exchanged again, restoring the original
+order. The native candidate scan also consults card/evolution metadata not
+present in this compact browser party model; among represented records, the
+browser treats every present sub in indices 1–4 as changeable.
+
+The browser reproduces the one-roll setup selection, refuses a second swap
+while one is active, changes slot-0 leader-skill output, counts down before the
+next enemy action, restores the party on expiry, exposes the global controller
+in snapshots, and marks the temporary leader with `SWAP nT`. With seed 21900,
+the standard 100% AI draw followed by setup selects party index 4 and ends at
+RNG state `3803934822`.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

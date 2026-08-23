@@ -2,6 +2,24 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 enemy leader swap
+
+- Recovered live enemy skill type `75` (`ESLeaderSwap`) at dispatch/setup/
+  condition `0x629ad8`, `0x620444`, and `0x61ab74`. Setup copies signed-int16
+  definition `+0x10` turns to runtime `+0x678`, consumes one LCG roll, ranks
+  eligible party indices 1–4, and stores the chosen index at `+0x67c`; its
+  condition only checks that the native changeable-sub count is positive.
+- Ported global leader-change state, post-AI target materialization, physical
+  slot-0/sub exchange, leader-skill consequences, enemy-turn countdown,
+  restoration, reset behavior, snapshots, and a visible `SWAP nT` leader badge.
+  The compact demo model treats present indices 1–4 as eligible because it does
+  not carry the native card/evolution metadata used by the remaining filters.
+- Pure definition/runtime, RNG, AI-rejection, leader-effect, and expiry tests
+  pass. Exact table inspection matches all three 21.9 addresses; the focused
+  browser fixture selects Nyx at index 4 with seed 21900, reaches RNG state
+  `3803934822`, and renders the swapped leader without page errors.
+- Next: recover type `76` as a separate checkpoint.
+
 ## 2026-08-24 enemy damage-reduction shield
 
 - Recovered live enemy skill type `74` (`ESDamageShield`) at dispatch/setup/

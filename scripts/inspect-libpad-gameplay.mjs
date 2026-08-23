@@ -118,6 +118,10 @@ const DAMAGE_SHIELD_ENEMY_SKILL_TYPE = 74;
 const DAMAGE_SHIELD_HANDLER = 0x629a78;
 const DAMAGE_SHIELD_SETUP_HANDLER = 0x61fee4;
 const DAMAGE_SHIELD_CONDITION_HANDLER = 0x61af8c;
+const LEADER_SWAP_ENEMY_SKILL_TYPE = 75;
+const LEADER_SWAP_HANDLER = 0x629ad8;
+const LEADER_SWAP_SETUP_HANDLER = 0x620444;
+const LEADER_SWAP_CONDITION_HANDLER = 0x61ab74;
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -311,6 +315,7 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['enemy-ai', 'doItetukuHadou', '_ZN9cGAMEMAIN15_doItetukuHadouEv', 0x618d04],
   ['enemy-ai', 'getCountClearParams', '_ZNK9cGAMEMAIN20_getCountClearParamsEP8sMONSTER', 0x618320],
   ['enemy-ai', 'applyLeaderSkill', '_ZN9cGAMEMAIN17_applyLeaderSkillEb', 0x63a7e8],
+  ['enemy-ai', 'doLeaderChange', '_ZN9cGAMEMAIN15_doLeaderChangeEP5sCARDib', 0x6b5afc],
   ['enemy-ai', 'monsterAddHp', '_ZN8sMONSTER5addHpEx', 0x6246e8],
   ['enemy-ai', 'playerMaxHp', '_ZNK7sPLAYER3mhpEv', 0x66b840],
   ['enemy-ai', 'playerAddHp', '_ZN7sPLAYER5addHpEib', 0x678838],
@@ -796,6 +801,21 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : damageShieldSetupTarget === DAMAGE_SHIELD_SETUP_HANDLER;
   const damageShieldConditionMatches = damageShieldConditionTarget === null
     ? null : damageShieldConditionTarget === DAMAGE_SHIELD_CONDITION_HANDLER;
+  const leaderSwapDispatchTarget = resolveEnemySkillTarget(
+    LEADER_SWAP_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const leaderSwapSetupTarget = resolveEnemySkillTarget(
+    LEADER_SWAP_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const leaderSwapConditionTarget = resolveEnemySkillTarget(
+    LEADER_SWAP_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const leaderSwapDispatchMatches = leaderSwapDispatchTarget === null
+    ? null : leaderSwapDispatchTarget === LEADER_SWAP_HANDLER;
+  const leaderSwapSetupMatches = leaderSwapSetupTarget === null
+    ? null : leaderSwapSetupTarget === LEADER_SWAP_SETUP_HANDLER;
+  const leaderSwapConditionMatches = leaderSwapConditionTarget === null
+    ? null : leaderSwapConditionTarget === LEADER_SWAP_CONDITION_HANDLER;
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1751,6 +1771,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       damageShieldDispatchMatches21_9: damageShieldDispatchMatches,
       damageShieldSetupMatches21_9: damageShieldSetupMatches,
       damageShieldConditionMatches21_9: damageShieldConditionMatches,
+      leaderSwapDispatchMatches21_9: leaderSwapDispatchMatches,
+      leaderSwapSetupMatches21_9: leaderSwapSetupMatches,
+      leaderSwapConditionMatches21_9: leaderSwapConditionMatches,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -2122,6 +2145,18 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       damageShieldConditionMatches21_9: damageShieldConditionMatches,
       damageShieldSemantics:
         'type 74: setup copies +0x10/+0x14 to runtime +0x678/+0x67c; execution installs signed-int16 turns at sMONSTER+0x940 and clamps the shield percentage to 0..100 at +0x950; condition requires the turn controller to be inactive; chcekDamageRatio4DamageDisp multiplies binary32((100-percent)/100) into the passive attribute ratio before calcAttackPow rounds upward once',
+      leaderSwapType: LEADER_SWAP_ENEMY_SKILL_TYPE,
+      leaderSwapDispatchTarget: leaderSwapDispatchTarget === null
+        ? null : hex(leaderSwapDispatchTarget),
+      leaderSwapDispatchMatches21_9: leaderSwapDispatchMatches,
+      leaderSwapSetupTarget: leaderSwapSetupTarget === null
+        ? null : hex(leaderSwapSetupTarget),
+      leaderSwapSetupMatches21_9: leaderSwapSetupMatches,
+      leaderSwapConditionTarget: leaderSwapConditionTarget === null
+        ? null : hex(leaderSwapConditionTarget),
+      leaderSwapConditionMatches21_9: leaderSwapConditionMatches,
+      leaderSwapSemantics:
+        'type 75: condition checks that the native changeable-sub count is positive; setup copies signed-int16 +0x10 turns to runtime +0x678, consumes one LCG roll, selects one eligible party index 1..4 by rank, and stores it at +0x67c; execution installs the global leader-change duration and selected index, swaps that sub with slot 0 through _doLeaderChange, and restores the original order on expiry',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -2583,6 +2618,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || damageShieldDispatchMatches === false
     || damageShieldSetupMatches === false
     || damageShieldConditionMatches === false
+    || leaderSwapDispatchMatches === false
+    || leaderSwapSetupMatches === false
+    || leaderSwapConditionMatches === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

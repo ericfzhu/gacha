@@ -26,6 +26,7 @@ import {
   PAD_ENEMY_SKILL_ATTRIBUTE_RESIST,
   PAD_ENEMY_SKILL_RESOLVE,
   PAD_ENEMY_SKILL_DAMAGE_SHIELD,
+  PAD_ENEMY_SKILL_LEADER_SWAP,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -2229,6 +2230,52 @@ assert.equal(directDamageShieldEngine.applyEnemySkillDefinition(
 ), true);
 assert.equal(directDamageShieldEngine.enemies[0].damageShieldTurns, 3);
 assert.equal(directDamageShieldEngine.enemies[0].damageShieldPercent, 50);
+const enemyAiLeaderSwapDefinition = enemyAiInactivityDefinition.slice();
+const enemyAiLeaderSwapView = new DataView(enemyAiLeaderSwapDefinition.buffer);
+enemyAiLeaderSwapView.setUint32(0x00, 9_054, true);
+enemyAiLeaderSwapView.setInt16(0x04, PAD_ENEMY_SKILL_LEADER_SWAP, true);
+enemyAiLeaderSwapView.setInt32(0x10, 3, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiLeaderSwapDefinition), {
+  type: 75,
+  kind: 'leaderSwap',
+  supported: true,
+  durationTurns: 3,
+  selectedPartyIndex: null,
+  attackWithSkillValue: 0,
+});
+const leaderSwapRuntime = new Uint8Array(0x680);
+const leaderSwapRuntimeView = new DataView(leaderSwapRuntime.buffer);
+leaderSwapRuntimeView.setInt32(0x678, 3, true);
+leaderSwapRuntimeView.setInt32(0x67c, 4, true);
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiLeaderSwapDefinition,
+  leaderSwapRuntime,
+), {
+  type: 75,
+  kind: 'leaderSwap',
+  supported: true,
+  durationTurns: 3,
+  selectedPartyIndex: 4,
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
+const directLeaderSwapEngine = new PuzzleEngine({ seed: 21_900 });
+directLeaderSwapEngine.setRngState(21_900);
+assert.equal(directLeaderSwapEngine.applyEnemySkillDefinition(
+  enemyAiLeaderSwapDefinition,
+), true);
+assert.equal(directLeaderSwapEngine.rng.state, padLcgStep(21_900).state);
+assert.equal(directLeaderSwapEngine.leaderSwapTurns, 3);
+assert.equal(directLeaderSwapEngine.leaderSwapIndex, 1);
+assert.deepEqual(directLeaderSwapEngine.party.slice(0, 2).map(({ id }) => id), [
+  'marina', 'ember',
+]);
+directLeaderSwapEngine.reset();
+assert.equal(directLeaderSwapEngine.leaderSwapTurns, 0);
+assert.equal(directLeaderSwapEngine.leaderSwapIndex, null);
+assert.deepEqual(directLeaderSwapEngine.party.slice(0, 2).map(({ id }) => id), [
+  'ember', 'marina',
+]);
 const enemyAiAttributeAbsorbDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiAttributeAbsorbView = new DataView(enemyAiAttributeAbsorbDefinition.buffer);
 enemyAiAttributeAbsorbView.setUint32(0x00, 9_021, true);
@@ -4655,6 +4702,61 @@ shieldBeforeVoidEngine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 
 shieldBeforeVoidEngine.resolvePlayerTurn();
 assert.equal(shieldBeforeVoidEngine.lastDamage, 1_974);
 assert.equal(shieldBeforeVoidEngine.lastVoidedDamage, 0);
+const leaderSwapMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(leaderSwapMonsterDefinition.buffer).setUint32(0xec, 9_054, true);
+const selectedLeaderSwapEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: leaderSwapMonsterDefinition,
+    skillDefinitions: [enemyAiLeaderSwapDefinition],
+  }],
+});
+const noLeaderSwapCandidateEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: leaderSwapMonsterDefinition,
+    skillDefinitions: [enemyAiLeaderSwapDefinition],
+  }],
+});
+noLeaderSwapCandidateEngine.party.slice(1, 5).forEach((member) => {
+  member.present = false;
+});
+noLeaderSwapCandidateEngine.setRngState(21_900);
+assert.equal(noLeaderSwapCandidateEngine.takeEnemySkill(0), null);
+assert.equal(noLeaderSwapCandidateEngine.rng.state, 21_900);
+selectedLeaderSwapEngine.setRngState(21_900);
+selectedLeaderSwapEngine.enemies[0].counter = 1;
+selectedLeaderSwapEngine.enemies[1].counter = 99;
+selectedLeaderSwapEngine.resolveEnemyTurn();
+const selectedLeaderSwapState = selectedLeaderSwapEngine.snapshot();
+assert.equal(selectedLeaderSwapState.lastEnemyActions[0].skill.type, 75);
+assert.equal(selectedLeaderSwapState.lastEnemyActions[0].skill.selectedPartyIndex, 4);
+assert.equal(selectedLeaderSwapState.leaderSwapTurns, 3);
+assert.equal(selectedLeaderSwapState.leaderSwapIndex, 4);
+assert.deepEqual(selectedLeaderSwapState.party.map(({ id }) => id), [
+  'nyx', 'marina', 'briar', 'sol', 'ember', 'helper',
+]);
+assert.equal(
+  selectedLeaderSwapEngine.rng.state,
+  padLcgStep(padLcgStep(21_900).state).state,
+);
+const activeLeaderSwapRng = selectedLeaderSwapEngine.rng.state;
+assert.equal(selectedLeaderSwapEngine.takeEnemySkill(0), null);
+assert.equal(selectedLeaderSwapEngine.rng.state, activeLeaderSwapRng);
+selectedLeaderSwapEngine.enemies[0].counter = 99;
+selectedLeaderSwapEngine.resolveEnemyTurn();
+assert.equal(selectedLeaderSwapEngine.leaderSwapTurns, 2);
+selectedLeaderSwapEngine.comboCount = 7;
+selectedLeaderSwapEngine.turnMatches = [];
+selectedLeaderSwapEngine.resolvePlayerTurn();
+assert.equal(selectedLeaderSwapEngine.lastLeaderMultiplier, 3.5);
+selectedLeaderSwapEngine.resolveEnemyTurn();
+selectedLeaderSwapEngine.resolveEnemyTurn();
+assert.equal(selectedLeaderSwapEngine.leaderSwapTurns, 0);
+assert.equal(selectedLeaderSwapEngine.leaderSwapIndex, null);
+assert.deepEqual(selectedLeaderSwapEngine.party.map(({ id }) => id), [
+  'ember', 'marina', 'briar', 'sol', 'nyx', 'helper',
+]);
 const comboAbsorbMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(comboAbsorbMonsterDefinition.buffer).setUint32(0xec, 9_046, true);
 const selectedComboAbsorbEngine = new PuzzleEngine({
