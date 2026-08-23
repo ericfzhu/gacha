@@ -72,6 +72,7 @@ import {
   PAD_ENEMY_SKILL_BRANCH_COMBO,
   PAD_ENEMY_SKILL_BRANCH_ATTACK_ATTRIBUTES,
   PAD_ENEMY_SKILL_BRANCH_SKILL_USE,
+  PAD_ENEMY_SKILL_BRANCH_DAMAGE,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1517,6 +1518,13 @@ export class PuzzleEngine {
         }
         if (skill.kind === 'branchSkillUse') {
           queue.position = this.lastSkillUseCount >= skill.branchValue
+            ? skill.targetRound
+            : queue.position + 1;
+          controlFlowSteps += 1;
+          continue;
+        }
+        if (skill.kind === 'branchDamage') {
+          queue.position = this.lastDamage >= skill.damageThreshold
             ? skill.targetRound
             : queue.position + 1;
           controlFlowSteps += 1;
@@ -3119,6 +3127,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_BRANCH_COMBO,
         PAD_ENEMY_SKILL_BRANCH_ATTACK_ATTRIBUTES,
         PAD_ENEMY_SKILL_BRANCH_SKILL_USE,
+        PAD_ENEMY_SKILL_BRANCH_DAMAGE,
       ].includes(decoded.type)) return decoded;
       if (!reference) {
         throw new TypeError(`PAD type-${decoded.type} branches require a skill-reference record.`);

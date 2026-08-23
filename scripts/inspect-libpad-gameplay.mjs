@@ -774,6 +774,18 @@ const SKILL_USE_BRANCH_INSTRUCTION_ANCHORS = Object.freeze([
   [0x61a5c0, 0xb9000fff], // condition callback initializes return scale to zero
   [0x61c01c, 0xbd400fe0], // type 115 returns that zero ordinary-AI scale
 ]);
+const DAMAGE_BRANCH_ENEMY_SKILL_TYPE = 116;
+const DAMAGE_BRANCH_HANDLER = 0x62be50;
+const DAMAGE_BRANCH_SETUP_HANDLER = 0x621c94;
+const DAMAGE_BRANCH_CONDITION_HANDLER = 0x61c01c;
+const DAMAGE_BRANCH_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x621c94, 0x12800008], // setup writes selected-skill sentinel -1
+  [0x621c98, 0xb9067268], // persist sentinel at sMONSTER+0x670
+  [0x621c9c, 0x1e3e1000], // return setup scale -1.0 for the control record
+  [0x62be50, 0x900045e9], // ordinary execution enters the generic inert tail
+  [0x61a5c0, 0xb9000fff], // condition callback initializes return scale to zero
+  [0x61c01c, 0xbd400fe0], // type 116 returns that zero ordinary-AI scale
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -2145,6 +2157,31 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     : SKILL_USE_BRANCH_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
+  const damageBranchDispatchTarget = resolveEnemySkillTarget(
+    DAMAGE_BRANCH_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const damageBranchSetupTarget = resolveEnemySkillTarget(
+    DAMAGE_BRANCH_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const damageBranchConditionTarget = resolveEnemySkillTarget(
+    DAMAGE_BRANCH_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const damageBranchDispatchMatches = damageBranchDispatchTarget === null
+    ? null : damageBranchDispatchTarget === DAMAGE_BRANCH_HANDLER;
+  const damageBranchSetupMatches = damageBranchSetupTarget === null
+    ? null : damageBranchSetupTarget === DAMAGE_BRANCH_SETUP_HANDLER;
+  const damageBranchConditionMatches = damageBranchConditionTarget === null
+    ? null : damageBranchConditionTarget === DAMAGE_BRANCH_CONDITION_HANDLER;
+  const damageBranchInstructionAnchorsMatch = restoredElf === null ? null
+    : DAMAGE_BRANCH_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -3228,6 +3265,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       skillUseBranchSetupMatches21_9: skillUseBranchSetupMatches,
       skillUseBranchConditionMatches21_9: skillUseBranchConditionMatches,
       skillUseBranchInstructionAnchorsMatch21_9: skillUseBranchInstructionAnchorsMatch,
+      damageBranchDispatchMatches21_9: damageBranchDispatchMatches,
+      damageBranchSetupMatches21_9: damageBranchSetupMatches,
+      damageBranchConditionMatches21_9: damageBranchConditionMatches,
+      damageBranchInstructionAnchorsMatch21_9: damageBranchInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -4011,6 +4052,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       skillUseBranchInstructionAnchorsMatch21_9: skillUseBranchInstructionAnchorsMatch,
       skillUseBranchSemantics:
         'type 115 is an enemy-skill-list control record: ordinary dispatch/setup/condition are inert; the monster reference slot enemy_ai byte is the minimum number of active skills used during the previous player turn and enemy_rnd is the zero-based destination; >= branches without consuming an enemy action or RNG',
+      damageBranchType: DAMAGE_BRANCH_ENEMY_SKILL_TYPE,
+      damageBranchDispatchTarget: damageBranchDispatchTarget === null
+        ? null : hex(damageBranchDispatchTarget),
+      damageBranchDispatchMatches21_9: damageBranchDispatchMatches,
+      damageBranchSetupTarget: damageBranchSetupTarget === null
+        ? null : hex(damageBranchSetupTarget),
+      damageBranchSetupMatches21_9: damageBranchSetupMatches,
+      damageBranchConditionTarget: damageBranchConditionTarget === null
+        ? null : hex(damageBranchConditionTarget),
+      damageBranchConditionMatches21_9: damageBranchConditionMatches,
+      damageBranchInstructionAnchorsMatch21_9: damageBranchInstructionAnchorsMatch,
+      damageBranchSemantics:
+        'type 116 is an enemy-skill-list control record: ordinary dispatch/setup/condition are inert; signed definition +0x14 is the inclusive previous-turn total-damage threshold and reference-slot enemy_rnd is the zero-based destination; >= branches without consuming an enemy action or RNG',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -4597,6 +4651,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || skillUseBranchSetupMatches === false
     || skillUseBranchConditionMatches === false
     || skillUseBranchInstructionAnchorsMatch === false
+    || damageBranchDispatchMatches === false
+    || damageBranchSetupMatches === false
+    || damageBranchConditionMatches === false
+    || damageBranchInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

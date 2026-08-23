@@ -51,6 +51,7 @@ const renderFixedTargetState = process.argv.includes('--fixed-target-render');
 const renderComboBranchState = process.argv.includes('--combo-branch-render');
 const renderAttackAttributeBranchState = process.argv.includes('--attack-attribute-branch-render');
 const renderSkillUseBranchState = process.argv.includes('--skill-use-branch-render');
+const renderDamageBranchState = process.argv.includes('--damage-branch-render');
 const renderAttributeResistState = process.argv.includes('--attribute-resist-render');
 const renderResolveState = process.argv.includes('--resolve-render');
 const renderDamageShieldState = process.argv.includes('--damage-shield-render');
@@ -3374,6 +3375,51 @@ try {
     || skillUseBranchRenderState.exact?.snapshot?.rngState !== 21_900
   )) throw new Error(`Skill-use-branch render-state mismatch: ${JSON.stringify(skillUseBranchRenderState)}`);
   if (skillUseBranchRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
+  const damageBranchRenderState = renderDamageBranchState ? await page.evaluate(() => {
+    const makeDefinition = (skillId, type, parameter0 = 0, parameter1 = 0) => {
+      const bytes = new Uint8Array(0x48);
+      const view = new DataView(bytes.buffer);
+      view.setUint32(0x00, skillId, true);
+      view.setInt16(0x04, type, true);
+      view.setInt32(0x10, parameter0, true);
+      view.setInt32(0x14, parameter1, true);
+      view.setInt32(0x44, 0, true);
+      return bytes;
+    };
+    const run = (lastDamage) => {
+      const engine = window.__puzzleGame;
+      engine.reset();
+      engine.start();
+      engine.setRngState(21_900);
+      engine.enemies[0].counter = 1;
+      engine.enemies[1].hp = 0;
+      engine.setEnemySkillQueue(0, [
+        { definition: makeDefinition(9_102, 116, 0, 1_660), enemyAi: 0, enemyRnd: 2 },
+        makeDefinition(9_103, 82),
+        makeDefinition(9_104, 47, 0, 150),
+      ]);
+      engine.lastDamage = lastDamage;
+      engine.resolveEnemyTurn();
+      return {
+        lastDamage,
+        queuePosition: engine.enemySkillQueues[0].position,
+        snapshot: engine.snapshot(),
+      };
+    };
+    return { below: run(1_659), exact: run(1_660) };
+  }) : null;
+  if (damageBranchRenderState && (
+    damageBranchRenderState.below?.snapshot?.lastEnemyActions?.[0]?.skill?.type !== 82
+    || damageBranchRenderState.below?.snapshot?.player?.hp !== 10_150
+    || damageBranchRenderState.below?.queuePosition !== 2
+    || damageBranchRenderState.below?.snapshot?.rngState !== 21_900
+    || damageBranchRenderState.exact?.snapshot?.lastEnemyActions?.[0]?.skill?.type !== 47
+    || damageBranchRenderState.exact?.snapshot?.lastEnemyActions?.[0]?.damage !== 2_775
+    || damageBranchRenderState.exact?.snapshot?.player?.hp !== 9_225
+    || damageBranchRenderState.exact?.queuePosition !== 3
+    || damageBranchRenderState.exact?.snapshot?.rngState !== 21_900
+  )) throw new Error(`Damage-branch render-state mismatch: ${JSON.stringify(damageBranchRenderState)}`);
+  if (damageBranchRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   const attributeResistRenderState = renderAttributeResistState ? await page.evaluate(() => {
     const engine = window.__puzzleGame;
     const monsterDefinition = new Uint8Array(0x2ec);
@@ -4242,9 +4288,9 @@ try {
   )) throw new Error(`Attack-boost render-state mismatch: ${JSON.stringify(attackBoostRenderState)}`);
   if (attackBoostRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, comboAbsorbRenderState, skyfallRateRenderState, deathCryRenderState, damageVoidRenderState, damageAbsorbRenderState, awakeningBindRenderState, skillDelayRenderState, presenceCheckRenderState, maskedRandomOrbChangeRenderState, nativeNoEffectRenderState, lockRandomOrbsRenderState, enemyEscapeRenderState, lockedSkyfallRenderState, stickyBlindRandomRenderState, stickyBlindFixedRenderState, orbSealColumnsRenderState, orbSealRowsRenderState, fixedStartRenderState, randomBombsRenderState, fixedBombsRenderState, cloudRenderState, recoveryDebuffRenderState, turnChangeRenderState, attributeBlockRenderState, attackOrbChangeRenderState, randomSpinnersRenderState, fixedSpinnersRenderState, maxHpChangeRenderState, fixedTargetRenderState, comboBranchRenderState, attackAttributeBranchRenderState, skillUseBranchRenderState, attributeResistRenderState, resolveRenderState, damageShieldRenderState, leaderSwapRenderState, normalAttackRenderState, multiAttackRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, earlyPartyControlRenderState, bindAttackRenderState, randomSubBindRenderState, repeatAttackRenderState, entireBlindRenderState, inactivityRenderState, attackBoostRenderState, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, comboAbsorbRenderState, skyfallRateRenderState, deathCryRenderState, damageVoidRenderState, damageAbsorbRenderState, awakeningBindRenderState, skillDelayRenderState, presenceCheckRenderState, maskedRandomOrbChangeRenderState, nativeNoEffectRenderState, lockRandomOrbsRenderState, enemyEscapeRenderState, lockedSkyfallRenderState, stickyBlindRandomRenderState, stickyBlindFixedRenderState, orbSealColumnsRenderState, orbSealRowsRenderState, fixedStartRenderState, randomBombsRenderState, fixedBombsRenderState, cloudRenderState, recoveryDebuffRenderState, turnChangeRenderState, attributeBlockRenderState, attackOrbChangeRenderState, randomSpinnersRenderState, fixedSpinnersRenderState, maxHpChangeRenderState, fixedTargetRenderState, comboBranchRenderState, attackAttributeBranchRenderState, skillUseBranchRenderState, damageBranchRenderState, attributeResistRenderState, resolveRenderState, damageShieldRenderState, leaderSwapRenderState, normalAttackRenderState, multiAttackRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, earlyPartyControlRenderState, bindAttackRenderState, randomSubBindRenderState, repeatAttackRenderState, entireBlindRenderState, inactivityRenderState, attackBoostRenderState, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, comboAbsorbRenderState, skyfallRateRenderState, deathCryRenderState, damageVoidRenderState, damageAbsorbRenderState, awakeningBindRenderState, skillDelayRenderState, presenceCheckRenderState, maskedRandomOrbChangeRenderState, nativeNoEffectRenderState, lockRandomOrbsRenderState, enemyEscapeRenderState, lockedSkyfallRenderState, stickyBlindRandomRenderState, stickyBlindFixedRenderState, orbSealColumnsRenderState, orbSealRowsRenderState, fixedStartRenderState, randomBombsRenderState, fixedBombsRenderState, cloudRenderState, recoveryDebuffRenderState, turnChangeRenderState, attributeBlockRenderState, attackOrbChangeRenderState, randomSpinnersRenderState, fixedSpinnersRenderState, maxHpChangeRenderState, fixedTargetRenderState, comboBranchRenderState, attackAttributeBranchRenderState, skillUseBranchRenderState, attributeResistRenderState, resolveRenderState, damageShieldRenderState, leaderSwapRenderState, normalAttackRenderState, multiAttackRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, earlyPartyControlRenderState, bindAttackRenderState, randomSubBindRenderState, repeatAttackRenderState, entireBlindRenderState, inactivityRenderState, attackBoostRenderState, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, comboAbsorbRenderState, skyfallRateRenderState, deathCryRenderState, damageVoidRenderState, damageAbsorbRenderState, awakeningBindRenderState, skillDelayRenderState, presenceCheckRenderState, maskedRandomOrbChangeRenderState, nativeNoEffectRenderState, lockRandomOrbsRenderState, enemyEscapeRenderState, lockedSkyfallRenderState, stickyBlindRandomRenderState, stickyBlindFixedRenderState, orbSealColumnsRenderState, orbSealRowsRenderState, fixedStartRenderState, randomBombsRenderState, fixedBombsRenderState, cloudRenderState, recoveryDebuffRenderState, turnChangeRenderState, attributeBlockRenderState, attackOrbChangeRenderState, randomSpinnersRenderState, fixedSpinnersRenderState, maxHpChangeRenderState, fixedTargetRenderState, comboBranchRenderState, attackAttributeBranchRenderState, skillUseBranchRenderState, damageBranchRenderState, attributeResistRenderState, resolveRenderState, damageShieldRenderState, leaderSwapRenderState, normalAttackRenderState, multiAttackRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, earlyPartyControlRenderState, bindAttackRenderState, randomSubBindRenderState, repeatAttackRenderState, entireBlindRenderState, inactivityRenderState, attackBoostRenderState, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

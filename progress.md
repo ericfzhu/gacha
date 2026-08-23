@@ -2,6 +2,18 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 previous-damage branch
+
+- Recovered type `116` as `ESBranchDamage`; ordinary dispatch/setup/condition
+  share the inert control-record targets `0x62be50`, `0x621c94`, and
+  `0x61c01c`.
+- Signed definition `+0x14` is the inclusive previous-player-turn damage
+  threshold and reference-slot `enemy_rnd` is the zero-based destination.
+- The guarded browser queue now compares against the existing post-resolution
+  integer `lastDamage`, with no enemy-action/RNG cost. Pure 1,659/1,660 boundary
+  fixtures, six ARM64 anchors, focused Chromium with APK art, and screenshot
+  inspection pass. Next: type `117`.
+
 ## 2026-08-24 previous active-skill-use branch
 
 - Recovered type `115` as `ESBranchSkillUse`; ordinary dispatch/setup/condition

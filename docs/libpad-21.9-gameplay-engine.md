@@ -636,7 +636,7 @@ cap and the selected skill's cost is subtracted. For type 128,
 so an active copy cannot be selected again. `setEnemyAiDefinitionPool` wires
 this raw record path into enemy turns and reports the chosen skill ID, budget,
 and RNG state. Remaining condition callbacks, flow-control records other than
-types 113 through 115, and the rest of the legacy selector are rejected
+types 113 through 116, and the rest of the legacy selector are rejected
 explicitly until decoded rather than approximated.
 
 The selector does not reduce every condition callback to a boolean. In the
@@ -1608,6 +1608,20 @@ current accumulator before enemy selection. Both values are exposed in the
 text snapshot. The structural branch consumes no enemy action and no RNG; a
 zero-use fixture falls through, while one successful Tide Shift satisfies a
 minimum of one and jumps to slot two.
+
+Enemy skill type `116` is the previous-turn damage threshold branch identified
+by the independent parser as `ESBranchDamage`. Its ordinary native tables share
+the same inert control-record targets as types 113 through 115. Signed
+definition `+0x14` is the inclusive damage threshold and reference-slot
+`enemy_rnd` is the zero-based destination; `enemy_ai` is not part of this
+predicate.
+
+The browser compares the authored threshold with `lastDamage`, the final
+integer total published after all per-lane native-style rounding and the
+player-attack resolution. `lastDamage >= threshold` jumps; a lower total falls
+through. Selection does not re-run combat calculation and consumes neither an
+enemy action nor RNG. Boundary coverage uses 1,659 and exactly 1,660 against a
+1,660 threshold.
 
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
