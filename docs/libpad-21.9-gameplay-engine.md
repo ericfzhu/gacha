@@ -684,6 +684,34 @@ modeled lanes on execution, and leaves party leader multipliers derived from
 current party state as before. Other native clearable lanes remain outside the
 model until their state and lifetimes are recovered.
 
+Enemy skill types `7` and `8` share the inclusive random-range setup handler
+at `0x61ff5c`. It reads signed definition percentages `+0x10/+0x14`, advances
+the global LCG once, and materializes `minimum + ((roll16 * width) >> 16)` at
+`sMONSTER+0x678`. Type 7 dispatches to `0x629098`; it multiplies the acting
+monster's protected int64 max HP by that percentage in binary64, divides by
+100, rounds with `izMathRoundSint64` (`0x36b3e0`), and passes the result to
+`sMONSTER::addHp` (`0x6246e8`). The browser calls this `healEnemy`, caps the
+result at max HP, and retains any accompanying `+0x44` attack component.
+
+Type 7's condition at `0x61b418` is independent of the enemy's missing HP. It
+compares protected signed player current HP at `sGAMEWORK+0x8aa94` against the
+low 32 bits of the acting monster's protected int64 base attack at
+`sMONSTER+0x260/+0x270`; it returns one only when the player has at least that
+much HP. This unusual survival gate is preserved directly rather than replaced
+with a more intuitive “enemy is damaged” approximation.
+
+Type 8 dispatches to `0x629304`. It performs signed int64
+`baseAttack * runtimePercent`, converts the product to binary32, divides by
+binary32 100, rounds with `izMathRound` (`0x36a9bc`), and adds the result to the
+protected pending-attack accumulator at `sMONSTER+0x7f0`. The browser calls
+this `additionalAttack`, adding it after the ordinary `+0x44` attack component
+without applying the monster's separate attack-boost multiplier twice. Its AI
+condition at `0x61b450` returns
+`izMathClipF(float32(playerHp) / float32(enemyAttack), 0, 2)`, so the ratio is a
+real immediate-probability scale while fallback selection only tests it for a
+positive value. Neither condition consumes RNG; the shared setup consumes the
+single range-selection step after a skill is selected.
+
 Type `12` is the dedicated source-color-to-jammer variant. Its dispatch target
 is `0x6293f8`, setup is `0x61ff08`, and condition is `0x61a63c`. Setup copies
 definition source type `+0x10` to runtime `sMONSTER+0x678`; execution calls the

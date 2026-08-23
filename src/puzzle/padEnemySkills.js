@@ -1,5 +1,7 @@
 export const PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION = 4;
 export const PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS = 6;
+export const PAD_ENEMY_SKILL_HEAL_ENEMY = 7;
+export const PAD_ENEMY_SKILL_ADDITIONAL_ATTACK = 8;
 export const PAD_ENEMY_SKILL_SOURCE_TO_JAMMER = 12;
 export const PAD_ENEMY_SKILL_LONE_ATTACK_BOOST = 17;
 export const PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST = 18;
@@ -112,6 +114,18 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       type,
       kind: 'clearPlayerBuffs',
       supported: true,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_HEAL_ENEMY || type === PAD_ENEMY_SKILL_ADDITIONAL_ATTACK) {
+    const percentMin = definition.getInt32(0x10, true);
+    const percentMax = definition.getInt32(0x14, true);
+    return Object.freeze({
+      type,
+      kind: type === PAD_ENEMY_SKILL_HEAL_ENEMY ? 'healEnemy' : 'additionalAttack',
+      supported: percentMax >= percentMin,
+      percentMin,
+      percentMax,
       attackWithSkillValue,
     });
   }
@@ -505,6 +519,26 @@ export function padEnemySkillReviveHp(maxHp, revivePercent) {
   return Math.trunc(scaled + (scaled < 0 ? -0.5 : 0.5));
 }
 
+// Type 7 multiplies the acting monster's protected int64 max HP by its signed
+// runtime percentage in binary64, divides by 100, and rounds to signed int64.
+export function padEnemySkillEnemyHeal(maxHp, healPercent) {
+  const maximum = Math.max(0, Math.trunc(Number(maxHp) || 0));
+  const percent = Math.trunc(Number(healPercent) || 0);
+  const scaled = maximum * percent / 100;
+  return Math.trunc(scaled + (scaled < 0 ? -0.5 : 0.5));
+}
+
+// Type 8 first performs the signed int64 attack*percentage multiplication,
+// converts that product to binary32, divides by binary32 100, then izMathRound.
+export function padEnemySkillAdditionalAttack(baseAttack, damagePercent) {
+  const attack = Math.max(0, Math.trunc(Number(baseAttack) || 0));
+  const percent = Math.trunc(Number(damagePercent) || 0);
+  const scaled = Math.fround(
+    Math.fround(attack * percent) / Math.fround(100),
+  );
+  return Math.trunc(Math.fround(scaled + (scaled < 0 ? -0.5 : 0.5)));
+}
+
 // Type 50 reads current player HP, scales it by runtime +0x678 in binary32,
 // and calls izMathRound. Its 100% fast path returns current HP directly.
 export function padEnemySkillCurrentHpGravity(currentHp, damagePercent) {
@@ -597,6 +631,21 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
       type,
       kind: 'clearPlayerBuffs',
       supported: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_HEAL_ENEMY || type === PAD_ENEMY_SKILL_ADDITIONAL_ATTACK) {
+    return Object.freeze({
+      type,
+      kind: type === PAD_ENEMY_SKILL_HEAL_ENEMY ? 'healEnemy' : 'additionalAttack',
+      supported: true,
+      ...(type === PAD_ENEMY_SKILL_HEAL_ENEMY
+        ? { healPercent: monster.getInt32(0x678, true) }
+        : { damagePercent: monster.getInt32(0x678, true) }),
+      setupMaterialized: true,
       attackWithSkillValue: definitionBytes.byteLength
           >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
         ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
@@ -836,6 +885,33 @@ export function normalizePadEnemySkillRecord(record) {
       type: PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
       kind: 'clearPlayerBuffs',
       supported: true,
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (
+    type === PAD_ENEMY_SKILL_HEAL_ENEMY
+    || type === PAD_ENEMY_SKILL_ADDITIONAL_ATTACK
+    || record?.kind === 'healEnemy'
+    || record?.kind === 'additionalAttack'
+  ) {
+    const healEnemy = type === PAD_ENEMY_SKILL_HEAL_ENEMY || record?.kind === 'healEnemy';
+    const percentPresent = healEnemy
+      ? record?.healPercent !== undefined && record?.healPercent !== null
+      : record?.damagePercent !== undefined && record?.damagePercent !== null;
+    const percentMin = Math.trunc(Number(record?.percentMin) || 0);
+    const percentMax = Math.trunc(Number(record?.percentMax) || 0);
+    return Object.freeze({
+      type: healEnemy ? PAD_ENEMY_SKILL_HEAL_ENEMY : PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
+      kind: healEnemy ? 'healEnemy' : 'additionalAttack',
+      supported: percentPresent || percentMax >= percentMin,
+      ...(percentPresent
+        ? healEnemy
+          ? { healPercent: Math.trunc(Number(record.healPercent) || 0) }
+          : { damagePercent: Math.trunc(Number(record.damagePercent) || 0) }
+        : { percentMin, percentMax }),
+      setupMaterialized: Boolean(record?.setupMaterialized || percentPresent),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

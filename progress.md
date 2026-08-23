@@ -2,6 +2,27 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 enemy heal and additional attack
+
+- Recovered paired enemy skill types `7` and `8`, which share setup handler
+  `0x61ff5c`: one global LCG advance selects an inclusive signed percentage
+  between definition `+0x10/+0x14` and stores it at `sMONSTER+0x678`.
+- Type `7` dispatches to `0x629098`, heals the acting enemy by a binary64,
+  signed-int64-rounded percentage of max HP, and uses condition `0x61b418`.
+  That condition admits only when signed player current HP is at least the low
+  32 bits of enemy base attack; it does not check whether the enemy is damaged.
+- Type `8` dispatches to `0x629304`, adds
+  `round(float32(int64 attack*percent)/100)` to the pending hit, and uses
+  condition `0x61b450`. Its exact probability scale is binary32
+  `clip(playerHp/enemyAttack, 0, 2)`.
+- Ported shared range materialization, definition/runtime records, AI gates and
+  probability scaling, enemy healing, additive attack composition, native
+  rounding, address/symbol anchors, and pure/browser fixtures. The seeded
+  browser case selects 29% healing and 138% added attack, yielding exact HP and
+  3,478-damage results.
+- Next: continue early live types `9` through `11` and preserve their shared
+  condition/setup paths only after their execution fields are resolved.
+
 ## 2026-08-23 player-buff dispel enemy skill
 
 - Identified live enemy skill type `6`: dispatch `0x6292e8`, no-parameter setup

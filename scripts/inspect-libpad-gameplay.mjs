@@ -25,6 +25,14 @@ const CLEAR_PLAYER_BUFFS_ENEMY_SKILL_TYPE = 6;
 const CLEAR_PLAYER_BUFFS_HANDLER = 0x6292e8;
 const CLEAR_PLAYER_BUFFS_SETUP_HANDLER = 0x6217c0;
 const CLEAR_PLAYER_BUFFS_CONDITION_HANDLER = 0x61b404;
+const HEAL_ENEMY_SKILL_TYPE = 7;
+const HEAL_ENEMY_HANDLER = 0x629098;
+const HEAL_ENEMY_SETUP_HANDLER = 0x61ff5c;
+const HEAL_ENEMY_CONDITION_HANDLER = 0x61b418;
+const ADDITIONAL_ATTACK_ENEMY_SKILL_TYPE = 8;
+const ADDITIONAL_ATTACK_HANDLER = 0x629304;
+const ADDITIONAL_ATTACK_SETUP_HANDLER = 0x61ff5c;
+const ADDITIONAL_ATTACK_CONDITION_HANDLER = 0x61b450;
 const SOURCE_TO_JAMMER_ENEMY_SKILL_TYPE = 12;
 const SOURCE_TO_JAMMER_HANDLER = 0x6293f8;
 const SOURCE_TO_JAMMER_SETUP_HANDLER = 0x61ff08;
@@ -218,6 +226,7 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['enemy-ai', 'doItetukuHadou', '_ZN9cGAMEMAIN15_doItetukuHadouEv', 0x618d04],
   ['enemy-ai', 'getCountClearParams', '_ZNK9cGAMEMAIN20_getCountClearParamsEP8sMONSTER', 0x618320],
   ['enemy-ai', 'applyLeaderSkill', '_ZN9cGAMEMAIN17_applyLeaderSkillEb', 0x63a7e8],
+  ['enemy-ai', 'monsterAddHp', '_ZN8sMONSTER5addHpEx', 0x6246e8],
   ['enemy-ai', 'playerMaxHp', '_ZNK7sPLAYER3mhpEv', 0x66b840],
   ['enemy-ai', 'playerAddHp', '_ZN7sPLAYER5addHpEib', 0x678838],
   ['enemy-ai', 'doBind', '_ZN9cGAMEMAIN7_doBindEPK8sMONSTERjib', 0x616de4],
@@ -230,6 +239,8 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['combat', 'drawAndCountMonsIcons', '_ZN9cGAMEMAIN22_drawAndCountMonsIconsEPiP8sMONSTERR6IS_V2D8IS_RGBA8', 0x6a36fc],
   ['math', 'roundDouble', 'izMathRoundD', 0x36b2ec],
   ['math', 'roundFloat', 'izMathRound', 0x36a9bc],
+  ['math', 'clipFloat', 'izMathClipF', 0x36a9a8],
+  ['math', 'roundSignedInt64', 'izMathRoundSint64', 0x36b3e0],
   ['math', 'signedIntMultiplyAdd', 'izMathSint32MulAdd', 0x36b3fc],
   ['combat', 'setEnemyAttackMain', '_ZN9cGAMEMAIN20__setEnemyAttackMainEP8sMONSTERbfi', 0x62c2cc],
   ['match', 'checkCombos', '_ZN9cGAMEMAIN12_checkCombosEii', 0x659d24],
@@ -352,6 +363,36 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : clearPlayerBuffsSetupTarget === CLEAR_PLAYER_BUFFS_SETUP_HANDLER;
   const clearPlayerBuffsConditionMatches = clearPlayerBuffsConditionTarget === null
     ? null : clearPlayerBuffsConditionTarget === CLEAR_PLAYER_BUFFS_CONDITION_HANDLER;
+  const healEnemyDispatchTarget = resolveEnemySkillTarget(
+    HEAL_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const healEnemySetupTarget = resolveEnemySkillTarget(
+    HEAL_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const healEnemyConditionTarget = resolveEnemySkillTarget(
+    HEAL_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const healEnemyDispatchMatches = healEnemyDispatchTarget === null
+    ? null : healEnemyDispatchTarget === HEAL_ENEMY_HANDLER;
+  const healEnemySetupMatches = healEnemySetupTarget === null
+    ? null : healEnemySetupTarget === HEAL_ENEMY_SETUP_HANDLER;
+  const healEnemyConditionMatches = healEnemyConditionTarget === null
+    ? null : healEnemyConditionTarget === HEAL_ENEMY_CONDITION_HANDLER;
+  const additionalAttackDispatchTarget = resolveEnemySkillTarget(
+    ADDITIONAL_ATTACK_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const additionalAttackSetupTarget = resolveEnemySkillTarget(
+    ADDITIONAL_ATTACK_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const additionalAttackConditionTarget = resolveEnemySkillTarget(
+    ADDITIONAL_ATTACK_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const additionalAttackDispatchMatches = additionalAttackDispatchTarget === null
+    ? null : additionalAttackDispatchTarget === ADDITIONAL_ATTACK_HANDLER;
+  const additionalAttackSetupMatches = additionalAttackSetupTarget === null
+    ? null : additionalAttackSetupTarget === ADDITIONAL_ATTACK_SETUP_HANDLER;
+  const additionalAttackConditionMatches = additionalAttackConditionTarget === null
+    ? null : additionalAttackConditionTarget === ADDITIONAL_ATTACK_CONDITION_HANDLER;
   const sourceToJammerDispatchTarget = resolveEnemySkillTarget(
     SOURCE_TO_JAMMER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1269,6 +1310,12 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       clearPlayerBuffsDispatchMatches21_9: clearPlayerBuffsDispatchMatches,
       clearPlayerBuffsSetupMatches21_9: clearPlayerBuffsSetupMatches,
       clearPlayerBuffsConditionMatches21_9: clearPlayerBuffsConditionMatches,
+      healEnemyDispatchMatches21_9: healEnemyDispatchMatches,
+      healEnemySetupMatches21_9: healEnemySetupMatches,
+      healEnemyConditionMatches21_9: healEnemyConditionMatches,
+      additionalAttackDispatchMatches21_9: additionalAttackDispatchMatches,
+      additionalAttackSetupMatches21_9: additionalAttackSetupMatches,
+      additionalAttackConditionMatches21_9: additionalAttackConditionMatches,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -1432,6 +1479,29 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
         '_getCountClearParams(sMONSTER) as float32; modeled sGAMEWORK+0x86bd4/+0x86c3c lanes are skipped while sMONSTER+0x870 is active',
       clearPlayerBuffsExecution:
         '_doItetukuHadou(); _applyLeaderSkill(false)',
+      healEnemyType: HEAL_ENEMY_SKILL_TYPE,
+      healEnemyDispatchTarget: healEnemyDispatchTarget === null
+        ? null : hex(healEnemyDispatchTarget),
+      healEnemyDispatchMatches21_9: healEnemyDispatchMatches,
+      healEnemySetupTarget: healEnemySetupTarget === null ? null : hex(healEnemySetupTarget),
+      healEnemySetupMatches21_9: healEnemySetupMatches,
+      healEnemyConditionTarget: healEnemyConditionTarget === null
+        ? null : hex(healEnemyConditionTarget),
+      healEnemyConditionMatches21_9: healEnemyConditionMatches,
+      healEnemySemantics:
+        'one-LCG inclusive +0x10..+0x14 percentage; max HP * percent / 100 in binary64; admit when player current HP >= low32 enemy attack',
+      additionalAttackType: ADDITIONAL_ATTACK_ENEMY_SKILL_TYPE,
+      additionalAttackDispatchTarget: additionalAttackDispatchTarget === null
+        ? null : hex(additionalAttackDispatchTarget),
+      additionalAttackDispatchMatches21_9: additionalAttackDispatchMatches,
+      additionalAttackSetupTarget: additionalAttackSetupTarget === null
+        ? null : hex(additionalAttackSetupTarget),
+      additionalAttackSetupMatches21_9: additionalAttackSetupMatches,
+      additionalAttackConditionTarget: additionalAttackConditionTarget === null
+        ? null : hex(additionalAttackConditionTarget),
+      additionalAttackConditionMatches21_9: additionalAttackConditionMatches,
+      additionalAttackSemantics:
+        'one-LCG inclusive +0x10..+0x14 percentage; add round(float32(int64 attack*percent)/100); condition clipF(float32(player HP)/float32(enemy attack), 0, 2)',
       sourceToJammerType: SOURCE_TO_JAMMER_ENEMY_SKILL_TYPE,
       sourceToJammerDispatchTarget: sourceToJammerDispatchTarget === null
         ? null : hex(sourceToJammerDispatchTarget),
@@ -1828,6 +1898,12 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || clearPlayerBuffsDispatchMatches === false
     || clearPlayerBuffsSetupMatches === false
     || clearPlayerBuffsConditionMatches === false
+    || healEnemyDispatchMatches === false
+    || healEnemySetupMatches === false
+    || healEnemyConditionMatches === false
+    || additionalAttackDispatchMatches === false
+    || additionalAttackSetupMatches === false
+    || additionalAttackConditionMatches === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

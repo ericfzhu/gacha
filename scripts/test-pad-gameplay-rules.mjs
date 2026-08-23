@@ -3,6 +3,8 @@ import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
   PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
   PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
+  PAD_ENEMY_SKILL_HEAL_ENEMY,
+  PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
@@ -38,9 +40,11 @@ import {
   decodePadEnemySkillDefinition,
   decodePadEnemySkillRuntime,
   padEnemySkillAttack,
+  padEnemySkillAdditionalAttack,
   padEnemySkillBoostedAttack,
   padEnemySkillAttributeCandidates,
   padEnemySkillCurrentHpGravity,
+  padEnemySkillEnemyHeal,
   padEnemySkillMoveTimeSeconds,
   padEnemySkillPlayerHeal,
   padEnemySkillPlayerHpCondition,
@@ -350,6 +354,8 @@ assert.equal(padEnemySkillCurrentHpGravity(12_000, 25), 3_000);
 assert.equal(padEnemySkillCurrentHpGravity(12_000, 100), 12_000);
 assert.equal(padEnemySkillCurrentHpGravity(16_777_219, 33), 5_536_483);
 assert.equal(padEnemySkillCurrentHpGravity(12_000, -25), 0);
+assert.equal(padEnemySkillEnemyHeal(92_000, 23), 21_160);
+assert.equal(padEnemySkillAdditionalAttack(1_850, 127), 2_350);
 authoredBlackFallView.setInt32(0x44, 0, true);
 
 const enemyAiMonsterDefinition = new Uint8Array(0x2ec);
@@ -868,6 +874,78 @@ assert.deepEqual(clearPlayerBuffsEngine.snapshot().nativePlayerBuffStatus, {
   attackBoostTurns: 0,
 });
 assert.equal(clearPlayerBuffsEngine.lastEnemySkill.clearedBuffCount, 2);
+const enemyAiHealEnemyDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiHealEnemyView = new DataView(enemyAiHealEnemyDefinition.buffer);
+enemyAiHealEnemyView.setUint32(0x00, 9_036, true);
+enemyAiHealEnemyView.setInt16(0x04, PAD_ENEMY_SKILL_HEAL_ENEMY, true);
+enemyAiHealEnemyView.setInt32(0x10, 20, true);
+enemyAiHealEnemyView.setInt32(0x14, 30, true);
+enemyAiHealEnemyView.setInt32(0x30, 10_000, true);
+enemyAiHealEnemyView.setInt32(0x34, 1_000, true);
+enemyAiHealEnemyView.setInt32(0x38, 100, true);
+enemyAiHealEnemyView.setInt32(0x40, 20, true);
+enemyAiHealEnemyView.setInt32(0x44, 50, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiHealEnemyDefinition), {
+  type: 7,
+  kind: 'healEnemy',
+  supported: true,
+  percentMin: 20,
+  percentMax: 30,
+  attackWithSkillValue: 50,
+});
+const healEnemyMonsterRuntime = new Uint8Array(0x680);
+new DataView(healEnemyMonsterRuntime.buffer).setInt32(0x678, 27, true);
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiHealEnemyDefinition,
+  healEnemyMonsterRuntime,
+), {
+  type: 7,
+  kind: 'healEnemy',
+  supported: true,
+  healPercent: 27,
+  setupMaterialized: true,
+  attackWithSkillValue: 50,
+});
+const directHealEnemyEngine = new PuzzleEngine({ seed: 21_900 });
+directHealEnemyEngine.enemies[0].hp = 50_000;
+directHealEnemyEngine.setRngState(21_900);
+assert.equal(directHealEnemyEngine.applyEnemySkillDefinition(enemyAiHealEnemyDefinition), true);
+assert.equal(directHealEnemyEngine.enemies[0].hp, 69_320);
+assert.equal(directHealEnemyEngine.lastEnemySkill.healPercent, 21);
+assert.equal(directHealEnemyEngine.lastEnemySkill.healedHp, 19_320);
+assert.equal(directHealEnemyEngine.rng.state, padLcgStep(21_900).state);
+const enemyAiAdditionalAttackDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiAdditionalAttackView = new DataView(enemyAiAdditionalAttackDefinition.buffer);
+enemyAiAdditionalAttackView.setUint32(0x00, 9_037, true);
+enemyAiAdditionalAttackView.setInt16(0x04, PAD_ENEMY_SKILL_ADDITIONAL_ATTACK, true);
+enemyAiAdditionalAttackView.setInt32(0x10, 120, true);
+enemyAiAdditionalAttackView.setInt32(0x14, 140, true);
+enemyAiAdditionalAttackView.setInt32(0x30, 10_000, true);
+enemyAiAdditionalAttackView.setInt32(0x34, 1_000, true);
+enemyAiAdditionalAttackView.setInt32(0x38, 100, true);
+enemyAiAdditionalAttackView.setInt32(0x40, 20, true);
+enemyAiAdditionalAttackView.setInt32(0x44, 50, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiAdditionalAttackDefinition), {
+  type: 8,
+  kind: 'additionalAttack',
+  supported: true,
+  percentMin: 120,
+  percentMax: 140,
+  attackWithSkillValue: 50,
+});
+const additionalAttackMonsterRuntime = new Uint8Array(0x680);
+new DataView(additionalAttackMonsterRuntime.buffer).setInt32(0x678, 135, true);
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiAdditionalAttackDefinition,
+  additionalAttackMonsterRuntime,
+), {
+  type: 8,
+  kind: 'additionalAttack',
+  supported: true,
+  damagePercent: 135,
+  setupMaterialized: true,
+  attackWithSkillValue: 50,
+});
 const randomSourceOrbConversionDefinition = enemyAiSourceOrbConversionDefinition.slice();
 const randomSourceOrbConversionView = new DataView(randomSourceOrbConversionDefinition.buffer);
 randomSourceOrbConversionView.setInt32(0x10, -1, true);
@@ -2862,6 +2940,70 @@ shieldedClearPlayerBuffsEngine.enemies[0].statusShieldTurns = 1;
 shieldedClearPlayerBuffsEngine.setRngState(21_900);
 assert.equal(shieldedClearPlayerBuffsEngine.takeEnemySkill(0), null);
 assert.equal(shieldedClearPlayerBuffsEngine.rng.state, 21_900);
+const healEnemyMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(healEnemyMonsterDefinition.buffer).setUint32(0xec, 9_036, true);
+const selectedHealEnemyEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: healEnemyMonsterDefinition,
+    skillDefinitions: [enemyAiHealEnemyDefinition],
+  }],
+});
+selectedHealEnemyEngine.enemies[0].hp = 50_000;
+selectedHealEnemyEngine.enemies[0].counter = 1;
+selectedHealEnemyEngine.enemies[1].counter = 99;
+selectedHealEnemyEngine.setRngState(21_900);
+selectedHealEnemyEngine.resolveEnemyTurn();
+const selectedHealEnemyState = selectedHealEnemyEngine.snapshot();
+assert.equal(selectedHealEnemyState.enemies[0].hp, 76_680);
+assert.equal(selectedHealEnemyState.lastEnemyActions[0].skill.type, 7);
+assert.equal(selectedHealEnemyState.lastEnemyActions[0].skill.healPercent, 29);
+assert.equal(selectedHealEnemyState.lastEnemyActions[0].damage, 925);
+assert.equal(selectedHealEnemyState.player.hp, 11_075);
+assert.equal(selectedHealEnemyState.rngState,
+  padLcgStep(padLcgStep(21_900).state).state);
+const rejectedHealEnemyEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: healEnemyMonsterDefinition,
+    skillDefinitions: [enemyAiHealEnemyDefinition],
+  }],
+});
+rejectedHealEnemyEngine.player.hp = 1_849;
+rejectedHealEnemyEngine.setRngState(21_900);
+assert.equal(rejectedHealEnemyEngine.takeEnemySkill(0), null);
+assert.equal(rejectedHealEnemyEngine.rng.state, 21_900);
+const additionalAttackMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(additionalAttackMonsterDefinition.buffer).setUint32(0xec, 9_037, true);
+const selectedAdditionalAttackEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: additionalAttackMonsterDefinition,
+    skillDefinitions: [enemyAiAdditionalAttackDefinition],
+  }],
+});
+selectedAdditionalAttackEngine.enemies[0].counter = 1;
+selectedAdditionalAttackEngine.enemies[1].counter = 99;
+selectedAdditionalAttackEngine.setRngState(21_900);
+selectedAdditionalAttackEngine.resolveEnemyTurn();
+const selectedAdditionalAttackState = selectedAdditionalAttackEngine.snapshot();
+assert.equal(selectedAdditionalAttackState.lastEnemyActions[0].skill.type, 8);
+assert.equal(selectedAdditionalAttackState.lastEnemyActions[0].skill.damagePercent, 138);
+assert.equal(selectedAdditionalAttackState.lastEnemyActions[0].damage, 3_478);
+assert.equal(selectedAdditionalAttackState.player.hp, 8_522);
+assert.equal(selectedAdditionalAttackState.rngState,
+  padLcgStep(padLcgStep(21_900).state).state);
+const scaledAdditionalAttackEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: additionalAttackMonsterDefinition,
+    skillDefinitions: [enemyAiAdditionalAttackDefinition],
+  }],
+});
+scaledAdditionalAttackEngine.player.hp = 925;
+scaledAdditionalAttackEngine.setRngState(21_900);
+assert.equal(scaledAdditionalAttackEngine.takeEnemySkill(0), null);
+assert.equal(scaledAdditionalAttackEngine.rng.state, padLcgStep(21_900).state);
 const statusTriggeredAttackBoostMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(statusTriggeredAttackBoostMonsterDefinition.buffer).setUint32(0xec, 9_031, true);
 const selectedStatusTriggeredAttackBoostEngine = new PuzzleEngine({

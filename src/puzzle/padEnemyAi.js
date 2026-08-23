@@ -2,6 +2,8 @@ import { padLcgStep } from './padCoreRules.js';
 import {
   PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
   PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
+  PAD_ENEMY_SKILL_HEAL_ENEMY,
+  PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
@@ -133,6 +135,8 @@ function isStaticallyEligible(definition, state) {
   if (!definition.effect.supported || ![
     PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
     PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
+    PAD_ENEMY_SKILL_HEAL_ENEMY,
+    PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
     PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
     PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
     PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
@@ -193,6 +197,21 @@ function evaluateCondition(definition, state, rngState) {
       probabilityScale: Math.fround(clearableCount),
       rngState,
     };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_HEAL_ENEMY) {
+    // 0x61b418 compares signed player current HP with the low 32 bits of the
+    // acting monster's protected int64 base attack, returning the incoming
+    // scale unchanged on success and zero otherwise.
+    const eligible = state.playerCurrentHp >= (state.enemyBaseAttack | 0);
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_ADDITIONAL_ATTACK) {
+    // 0x61b450 performs this division and izMathClipF entirely in binary32.
+    const ratio = state.enemyBaseAttack > 0
+      ? Math.fround(Math.fround(state.playerCurrentHp) / Math.fround(state.enemyBaseAttack))
+      : state.playerCurrentHp > 0 ? 2 : 0;
+    const probabilityScale = Math.fround(Math.min(2, Math.max(0, ratio)));
+    return { eligible: probabilityScale > 0, probabilityScale, rngState };
   }
   if (
     definition.effect.type === PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION
@@ -353,6 +372,7 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     attributeAbsorbTurns: Math.max(0, Math.trunc(Number(state.attributeAbsorbTurns) || 0)),
     scaledAttackGate: Math.trunc(Number(state.scaledAttackGate) || 0),
     enemyAttackBoostTurns: Math.max(0, Math.trunc(Number(state.enemyAttackBoostTurns) || 0)),
+    enemyBaseAttack: Math.max(0, Math.trunc(Number(state.enemyBaseAttack) || 0)),
     enemyDamagedTurnCount: Math.max(
       0,
       Math.min(0xffff, Math.trunc(Number(state.enemyDamagedTurnCount) || 0)),

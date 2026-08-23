@@ -35,6 +35,8 @@ import {
 import {
   PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
   PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
+  PAD_ENEMY_SKILL_HEAL_ENEMY,
+  PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
@@ -71,9 +73,11 @@ import {
   decodePadEnemySkillRuntime,
   normalizePadEnemySkillRecord,
   padEnemySkillAttributeCandidates,
+  padEnemySkillAdditionalAttack,
   padEnemySkillBoostedAttack,
   padEnemySkillCurrentHpGravity,
   padEnemySkillMoveTimeSeconds,
+  padEnemySkillEnemyHeal,
   padEnemySkillPlayerHeal,
   padEnemySkillReviveHp,
 } from './padEnemySkills.js';
@@ -907,6 +911,8 @@ export class PuzzleEngine {
               skill.damagePercent,
               activeBoostPercent,
             );
+          } else if (skill.kind === 'additionalAttack') {
+            damage += padEnemySkillAdditionalAttack(enemy.attack, skill.damagePercent);
           }
           total += damage;
           this.lastEnemyActions.push({
@@ -960,6 +966,7 @@ export class PuzzleEngine {
       attributeAbsorbTurns: enemy.attributeAbsorbTurns,
       scaledAttackGate: enemy.scaledAttackGate,
       enemyAttackBoostTurns: enemy.attackBoostTurns,
+      enemyBaseAttack: enemy.attack,
       enemyDamagedTurnCount: enemy.damagedTurnCount,
       enemyTransientDebuffActive: enemy.transientDebuffActive,
       playerAuxiliaryBuffTurns: this.playerAuxiliaryBuffTurns,
@@ -1089,6 +1096,19 @@ export class PuzzleEngine {
 
   materializeEnemySkillRecord(record, enemyIndex = 0) {
     const skill = normalizePadEnemySkillRecord(record);
+    if (skill.supported && [
+      'healEnemy',
+      'additionalAttack',
+    ].includes(skill.kind) && !skill.setupMaterialized) {
+      const percent = this.rollEnemySkillDuration(skill.percentMin, skill.percentMax);
+      return Object.freeze({
+        ...record,
+        ...(skill.kind === 'healEnemy'
+          ? { healPercent: percent }
+          : { damagePercent: percent }),
+        setupMaterialized: true,
+      });
+    }
     if (skill.supported && skill.kind === 'sourceOrbConversion' && !skill.executionMaterialized) {
       const faceCounts = Array.from({ length: 6 }, (_, type) => this.countBlockBits(1 << type));
       const sourceType = skill.sourceType < 0
@@ -1388,6 +1408,24 @@ export class PuzzleEngine {
       this.message = `Enemy dispelled ${cleared} player buff${cleared === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'healEnemy') {
+      const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
+      if (!enemy) return false;
+      const requested = padEnemySkillEnemyHeal(enemy.maxHp, skill.healPercent);
+      const before = enemy.hp;
+      enemy.hp = clamp(enemy.hp + requested, 0, enemy.maxHp);
+      const healed = enemy.hp - before;
+      this.lastEnemySkill = Object.freeze({ ...skill, healedHp: healed });
+      if (healed > 0) {
+        this.floatingText.push({ kind: 'revive', value: healed, enemy: enemyIndex, age: 0 });
+      }
+      this.message = `${enemy.name} restored ${Math.max(0, healed).toLocaleString()} HP.`;
+      return true;
+    }
+    if (skill.supported && skill.kind === 'additionalAttack') {
+      this.message = `Enemy adds an attack at ${skill.damagePercent}% power.`;
+      return true;
+    }
     if (skill.supported && [
       'loneAttackBoost',
       'statusTriggeredAttackBoost',
@@ -1642,6 +1680,8 @@ export class PuzzleEngine {
       if (![
         PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
         PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
+        PAD_ENEMY_SKILL_HEAL_ENEMY,
+        PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
         PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
