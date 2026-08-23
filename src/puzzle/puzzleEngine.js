@@ -50,6 +50,7 @@ import {
   PAD_ENEMY_SKILL_PRESENCE_CHECK,
   PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE,
   PAD_ENEMY_SKILL_NATIVE_NO_EFFECT,
+  PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1330,6 +1331,16 @@ export class PuzzleEngine {
           ) >= 1;
           return { eligible, probabilityScale: eligible ? 1 : 0, rngState: this.rng.state };
         }
+        if (definition.effect.kind === 'lockRandomOrbs') {
+          const typeMask = Number(definition.effect.typeMask) >>> 0;
+          const eligible = this.board.some((row) => row.some((orb) => {
+            const type = ORB_TYPES.findIndex((candidate) => candidate.id === orb.type);
+            return type >= 0
+              && (typeMask & (1 << type)) !== 0
+              && ((Number(orb.blockFlags) >>> 0) & PAD_BLOCK_LOCKED_FLAG) === 0;
+          }));
+          return { eligible, probabilityScale: eligible ? 1 : 0, rngState: this.rng.state };
+        }
         return { eligible: false, rngState: this.rng.state };
       },
     };
@@ -1597,6 +1608,13 @@ export class PuzzleEngine {
       && skill.kind === 'maskedRandomOrbChange'
       && !skill.setupMaterialized
     ) {
+      return Object.freeze({
+        ...record,
+        selectionSeed: this.rng.nextUint16(),
+        setupMaterialized: true,
+      });
+    }
+    if (skill.supported && skill.kind === 'lockRandomOrbs' && !skill.setupMaterialized) {
       return Object.freeze({
         ...record,
         selectionSeed: this.rng.nextUint16(),
@@ -2242,6 +2260,15 @@ export class PuzzleEngine {
       this.message = `${enemy?.name || 'Enemy'} takes no special action.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'lockRandomOrbs') {
+      const before = this.board.flat().filter((orb) => orb.locked).length;
+      const applied = this.doLockDropBits(skill.typeMask, skill.lockCount, skill.selectionSeed);
+      const after = this.board.flat().filter((orb) => orb.locked).length;
+      const lockedOrbCount = Math.max(0, after - before);
+      this.lastEnemySkill = Object.freeze({ ...skill, applied, lockedOrbCount });
+      this.message = `${lockedOrbCount} orb${lockedOrbCount === 1 ? '' : 's'} locked.`;
+      return applied;
+    }
     if (skill.supported && skill.kind === 'damageShield') {
       const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
       if (!enemy) return false;
@@ -2577,6 +2604,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_PRESENCE_CHECK,
         PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE,
         PAD_ENEMY_SKILL_NATIVE_NO_EFFECT,
+        PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,

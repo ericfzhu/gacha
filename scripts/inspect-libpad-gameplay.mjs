@@ -230,6 +230,25 @@ const NATIVE_NO_EFFECT_INSTRUCTION_ANCHORS = Object.freeze([
   [0x61bb1c, 0xb9000fff], // clear the condition callback's control slot
   [0x61bb20, 0x1400013f], // return through the incoming-scale epilogue
 ]);
+const LOCK_RANDOM_ORBS_ENEMY_SKILL_TYPE = 94;
+const LOCK_RANDOM_ORBS_HANDLER = 0x629e5c;
+const LOCK_RANDOM_ORBS_SETUP_HANDLER = 0x6215e4;
+const LOCK_RANDOM_ORBS_CONDITION_HANDLER = 0x61b590;
+const LOCK_RANDOM_ORBS_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x6215e4, 0xb94012a8], // load definition +0x10 type mask
+  [0x6215e8, 0xb9067a68], // store mask at runtime +0x678
+  [0x6215ec, 0xb94016a8], // load definition +0x14 lock count
+  [0x6215f0, 0xb9067e68], // store count at runtime +0x67c
+  [0x621618, 0xb829690a], // persist one shared-LCG setup step
+  [0x621620, 0xb9068668], // store its high 16 bits as private seed at +0x684
+  [0x61b590, 0xb9401273], // condition loads the authored type mask
+  [0x61b6c0, 0x39401464], // inspect the lock flag byte on each board cell
+  [0x61b6d0, 0x6a13007f], // test an unlocked cell's type against the mask
+  [0x61bbc4, 0x7100053f], // accept when at least one lockable cell exists
+  [0x629e5c, 0xb9467a61], // execution loads runtime type mask
+  [0x629e64, 0xb9468663], // execution loads the stored private seed
+  [0x629e6c, 0x97f3e5f1], // call _doLockDropBits(mask, count, seed)
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -1109,6 +1128,25 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : nativeNoEffectConditionTarget === NATIVE_NO_EFFECT_CONDITION_HANDLER;
   const nativeNoEffectInstructionAnchorsMatch = restoredElf === null ? null
     : NATIVE_NO_EFFECT_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
+  const lockRandomOrbsDispatchTarget = resolveEnemySkillTarget(
+    LOCK_RANDOM_ORBS_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const lockRandomOrbsSetupTarget = resolveEnemySkillTarget(
+    LOCK_RANDOM_ORBS_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const lockRandomOrbsConditionTarget = resolveEnemySkillTarget(
+    LOCK_RANDOM_ORBS_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const lockRandomOrbsDispatchMatches = lockRandomOrbsDispatchTarget === null
+    ? null : lockRandomOrbsDispatchTarget === LOCK_RANDOM_ORBS_HANDLER;
+  const lockRandomOrbsSetupMatches = lockRandomOrbsSetupTarget === null
+    ? null : lockRandomOrbsSetupTarget === LOCK_RANDOM_ORBS_SETUP_HANDLER;
+  const lockRandomOrbsConditionMatches = lockRandomOrbsConditionTarget === null
+    ? null : lockRandomOrbsConditionTarget === LOCK_RANDOM_ORBS_CONDITION_HANDLER;
+  const lockRandomOrbsInstructionAnchorsMatch = restoredElf === null ? null
+    : LOCK_RANDOM_ORBS_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
@@ -2104,6 +2142,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       nativeNoEffectSetupMatches21_9: nativeNoEffectSetupMatches,
       nativeNoEffectConditionMatches21_9: nativeNoEffectConditionMatches,
       nativeNoEffectInstructionAnchorsMatch21_9: nativeNoEffectInstructionAnchorsMatch,
+      lockRandomOrbsDispatchMatches21_9: lockRandomOrbsDispatchMatches,
+      lockRandomOrbsSetupMatches21_9: lockRandomOrbsSetupMatches,
+      lockRandomOrbsConditionMatches21_9: lockRandomOrbsConditionMatches,
+      lockRandomOrbsInstructionAnchorsMatch21_9: lockRandomOrbsInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -2603,6 +2645,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       nativeNoEffectInstructionAnchorsMatch21_9: nativeNoEffectInstructionAnchorsMatch,
       nativeNoEffectSemantics:
         'type 93 uses generic sentinel setup and the common no-special-effect dispatch tail; its condition clears an internal control slot and returns the incoming float32 scale unchanged, so it consumes only ordinary selection probability and owns no runtime parameters or RNG',
+      lockRandomOrbsType: LOCK_RANDOM_ORBS_ENEMY_SKILL_TYPE,
+      lockRandomOrbsDispatchTarget: lockRandomOrbsDispatchTarget === null
+        ? null : hex(lockRandomOrbsDispatchTarget),
+      lockRandomOrbsDispatchMatches21_9: lockRandomOrbsDispatchMatches,
+      lockRandomOrbsSetupTarget: lockRandomOrbsSetupTarget === null
+        ? null : hex(lockRandomOrbsSetupTarget),
+      lockRandomOrbsSetupMatches21_9: lockRandomOrbsSetupMatches,
+      lockRandomOrbsConditionTarget: lockRandomOrbsConditionTarget === null
+        ? null : hex(lockRandomOrbsConditionTarget),
+      lockRandomOrbsConditionMatches21_9: lockRandomOrbsConditionMatches,
+      lockRandomOrbsInstructionAnchorsMatch21_9: lockRandomOrbsInstructionAnchorsMatch,
+      lockRandomOrbsSemantics:
+        'type 94 copies +0x10 type mask and +0x14 count to runtime +0x678/+0x67c, advances the shared LCG once, and stores its high 16 bits at +0x684; condition admits when any matching board cell is unlocked; execution calls _doLockDropBits with the private seed, caps to available candidates, and does not advance the shared AI RNG',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -3101,6 +3156,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || nativeNoEffectSetupMatches === false
     || nativeNoEffectConditionMatches === false
     || nativeNoEffectInstructionAnchorsMatch === false
+    || lockRandomOrbsDispatchMatches === false
+    || lockRandomOrbsSetupMatches === false
+    || lockRandomOrbsConditionMatches === false
+    || lockRandomOrbsInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

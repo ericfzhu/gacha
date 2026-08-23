@@ -2,6 +2,24 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 type-94 random orb locking
+
+- Recovered type `94` at dispatch/setup/condition `0x629e5c`, `0x6215e4`, and
+  `0x61b590`. Definition `+0x10/+0x14` supplies type mask and requested count;
+  setup copies them to runtime `+0x678/+0x67c`, takes one shared-LCG step, and
+  stores its high 16 bits at `+0x684` as a private shuffle seed.
+- Execution calls the already recovered `_doLockDropBits(mask, count, seed)`.
+  The condition admits when any matching board cell is unlocked, while
+  execution caps the count to available candidates and never advances the
+  shared RNG during its private shuffle.
+- Ported definition/runtime decoding, normalization, AI gating, setup
+  materialization, execution, snapshot accounting, and browser presentation.
+  The focused fixture requests four Fire/Water locks with one already locked;
+  seed 21900 stores private seed 58043 and newly locks the remaining three.
+- Pure rules, exact tables plus thirteen instruction anchors, focused Chromium
+  rendering, visible lock-marker inspection, and the generic web-game client
+  pass without page errors. Next: recover type `95`.
+
 ## 2026-08-24 type-93 native no-effect record
 
 - Recovered type `93` at dispatch/setup/condition `0x62be50`, `0x6217c0`, and

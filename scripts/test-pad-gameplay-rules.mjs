@@ -15,6 +15,7 @@ import {
   PAD_ENEMY_SKILL_PRESENCE_CHECK,
   PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE,
   PAD_ENEMY_SKILL_NATIVE_NO_EFFECT,
+  PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1049,6 +1050,38 @@ assert.deepEqual(decodePadEnemySkillRuntime(
   type: 93,
   kind: 'nativeNoEffect',
   supported: true,
+  attackWithSkillValue: 0,
+});
+const enemyAiLockRandomOrbsDefinition = enemyAiNativeNoEffectDefinition.slice();
+const enemyAiLockRandomOrbsView = new DataView(enemyAiLockRandomOrbsDefinition.buffer);
+enemyAiLockRandomOrbsView.setUint32(0x00, 9_074, true);
+enemyAiLockRandomOrbsView.setInt16(0x04, PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS, true);
+enemyAiLockRandomOrbsView.setUint32(0x10, 0b11, true);
+enemyAiLockRandomOrbsView.setInt32(0x14, 4, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiLockRandomOrbsDefinition), {
+  type: 94,
+  kind: 'lockRandomOrbs',
+  supported: true,
+  typeMask: 0b11,
+  lockCount: 4,
+  attackWithSkillValue: 0,
+});
+const lockRandomOrbsRuntime = new Uint8Array(0x688);
+const lockRandomOrbsRuntimeView = new DataView(lockRandomOrbsRuntime.buffer);
+lockRandomOrbsRuntimeView.setUint32(0x678, 0b11, true);
+lockRandomOrbsRuntimeView.setInt32(0x67c, 4, true);
+lockRandomOrbsRuntimeView.setUint32(0x684, 6_018, true);
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiLockRandomOrbsDefinition,
+  lockRandomOrbsRuntime,
+), {
+  type: 94,
+  kind: 'lockRandomOrbs',
+  supported: true,
+  typeMask: 0b11,
+  lockCount: 4,
+  selectionSeed: 6_018,
+  setupMaterialized: true,
   attackWithSkillValue: 0,
 });
 assert.deepEqual(decodePadEnemySkillRuntime(
@@ -4479,6 +4512,62 @@ assert.equal(
   selectedNativeNoEffectState.message,
   'Verdant Shell takes no special action.',
 );
+
+const directLockRandomOrbsEngine = new PuzzleEngine({ seed: 21_900 });
+directLockRandomOrbsEngine.setBoardFromCodes([
+  'RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD',
+]);
+directLockRandomOrbsEngine.setOrbState(0, 1, { locked: true });
+directLockRandomOrbsEngine.setRngState(21_900);
+assert.equal(directLockRandomOrbsEngine.applyEnemySkillDefinition(
+  enemyAiLockRandomOrbsDefinition,
+), true);
+assert.equal(directLockRandomOrbsEngine.lastEnemySkill.selectionSeed, 6_018);
+assert.equal(directLockRandomOrbsEngine.lastEnemySkill.lockedOrbCount, 3);
+assert.equal(directLockRandomOrbsEngine.rng.state, padLcgStep(21_900).state);
+assert.equal(directLockRandomOrbsEngine.board[0].slice(0, 4).every((orb) => orb.locked), true);
+
+const lockRandomOrbsMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(lockRandomOrbsMonsterDefinition.buffer).setUint32(0xec, 9_074, true);
+const selectedLockRandomOrbsEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: lockRandomOrbsMonsterDefinition,
+    skillDefinitions: [enemyAiLockRandomOrbsDefinition],
+  }],
+});
+selectedLockRandomOrbsEngine.setBoardFromCodes([
+  'RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD',
+]);
+selectedLockRandomOrbsEngine.setOrbState(0, 1, { locked: true });
+selectedLockRandomOrbsEngine.enemies[0].counter = 1;
+selectedLockRandomOrbsEngine.enemies[1].counter = 99;
+selectedLockRandomOrbsEngine.setRngState(21_900);
+selectedLockRandomOrbsEngine.resolveEnemyTurn();
+const selectedLockRandomOrbsState = selectedLockRandomOrbsEngine.snapshot();
+assert.equal(selectedLockRandomOrbsState.lastEnemyActions[0].skill.type, 94);
+assert.equal(selectedLockRandomOrbsState.lastEnemyActions[0].skill.selectionSeed, 58_043);
+assert.equal(selectedLockRandomOrbsEngine.lastEnemySkill.lockedOrbCount, 3);
+assert.equal(selectedLockRandomOrbsState.player.hp, 12_000);
+assert.equal(selectedLockRandomOrbsState.rngState, padLcgStep(padLcgStep(21_900).state).state);
+assert.equal(selectedLockRandomOrbsEngine.board[0].slice(0, 4).every((orb) => orb.locked), true);
+
+const rejectedLockRandomOrbsEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: lockRandomOrbsMonsterDefinition,
+    skillDefinitions: [enemyAiLockRandomOrbsDefinition],
+  }],
+});
+rejectedLockRandomOrbsEngine.setBoardFromCodes(Array(5).fill('GGGGGG'));
+rejectedLockRandomOrbsEngine.enemies[0].counter = 1;
+rejectedLockRandomOrbsEngine.enemies[1].counter = 99;
+rejectedLockRandomOrbsEngine.setRngState(21_900);
+rejectedLockRandomOrbsEngine.resolveEnemyTurn();
+const rejectedLockRandomOrbsState = rejectedLockRandomOrbsEngine.snapshot();
+assert.equal(rejectedLockRandomOrbsState.lastEnemyActions[0].kind, 'attack');
+assert.equal(rejectedLockRandomOrbsState.rngState, 21_900);
+assert.equal(rejectedLockRandomOrbsState.player.hp, 10_150);
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;

@@ -1157,6 +1157,26 @@ player HP remain unchanged. Definition `+0x44` still composes through the common
 attack-with-skill path when authored positive; the focused fixture sets it to
 zero and renders the inert action directly.
 
+Enemy skill type `94` locks random orbs selected by type. Definition `+0x10` is
+the orb-type mask and `+0x14` is the requested count. Setup `0x6215e4` copies
+them to `sMONSTER+0x678/+0x67c`, advances the shared LCG once, and stores its
+high 16 bits as the private shuffle seed at `+0x684`. Dispatch `0x629e5c` passes
+those three runtime values to `_doLockDropBits` (`0x62676c`).
+
+Condition `0x61b590` scans the current board and accepts when at least one cell
+both matches the authored mask and lacks lock flag `0x800`; it does not require
+the board to satisfy the full requested count. `_doLockDropBits` builds the same
+candidate set, performs its forward private-seed shuffle, caps the request to
+available candidates, and sets `0x800`. Special orb types 6–9 also receive the
+native incompatible-state cleanup already modeled by the shared primitive. The
+private shuffle never changes the saved enemy-AI RNG.
+
+The focused fixture masks Fire and Water, requests four locks, and starts with
+one of its four matching cells already locked. Seed 21900 consumes the ordinary
+selection draw plus one setup draw, stores seed 58043, and newly locks the other
+three cells while preserving 12,000 player HP and shared state 3803934822. A
+board with no matching type rejects the record before the probability roll.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`
