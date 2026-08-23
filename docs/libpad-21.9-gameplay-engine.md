@@ -840,6 +840,27 @@ and keeps enemy HP unchanged while reporting the prevented damage as `VOID`.
 With a 100% immediate record and seed 21900, scheduling consumes the standard
 probability draw and ends at `394448415`.
 
+Enemy skill type `72` is a permanent attribute-resistance passive, not an
+ordinary enemy action. Its ordinary dispatch, setup, and condition entries
+are intentionally inert at `0x62be50`, `0x621c94`, and `0x61c01c`.
+`_checkPassiveSkills(sMONSTER*)` at `0x62d984` instead scans all 64 authored
+monster slots during initialization. Its type-72 branch at `0x62da38` uses
+definition `+0x10` bits 0–4 to select fire, water, wood, light, and dark, then
+stores low16(`+0x14`) in the corresponding `sMONSTER+0xb16..+0xb1e` lanes.
+Later matching records overwrite earlier lanes in native slot order. The
+independent DadGuide parser identifies the same fields as `ESAttributeResist`'s
+attribute bitmap and shield percentage.
+
+`_chcekDamageRatio4DamageDisp()` at `0x684274` reads the lane for the attacking
+attribute. Native value `100` is the no-resist sentinel; otherwise it returns
+binary32 `(100 - value) / 100`. `_calcAttackPow()` widens that ratio, multiplies
+the post-defense integer damage, and rounds upward. The browser reproduces
+that ordering and sentinel, includes passive reduction in automatic target
+projections, never selects the passive as a turn action, consumes no RNG, and
+reinstalls the five lanes from monster slots on reset. A fire/wood 50% fixture
+therefore converts a 3,948-damage fire hit to 1,974 and renders
+`RES R50%/G50%`.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

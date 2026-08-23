@@ -2,6 +2,23 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 passive attribute resistance
+
+- Recovered type `72` as `ESAttributeResist`, an initialization-time passive.
+  Its ordinary dispatch/setup/condition paths are inert at `0x62be50`,
+  `0x621c94`, and `0x61c01c`; `_checkPassiveSkills` at `0x62d984` scans all 64
+  native slots and maps `+0x10` attribute bits plus low16(`+0x14`) into
+  `sMONSTER+0xb16..+0xb1e`.
+- Ported slot-ordered passive installation and replacement, five persistent
+  native lanes, reset/pool-clear behavior, no-action/no-RNG scheduling, target
+  projection, snapshots, and visible `RES` status. The native ratio helper at
+  `0x684274` applies binary32 `(100-value)/100` after defense and preserves the
+  special no-resist sentinel value 100 before upward rounding.
+- Exact-table/symbol, pure, focused-browser, generic-browser, and production
+  build checks pass without page errors. A fire/wood 50% passive reduces the
+  focused hit from 3,948 to 1,974 and renders `RES R50%/G50%`.
+- Next: recover type `73` after this separate checkpoint.
+
 ## 2026-08-23 enemy damage-void shield
 
 - Recovered type `71` at dispatch/setup/condition `0x629a48`, `0x6217a8`, and

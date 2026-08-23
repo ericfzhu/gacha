@@ -14,6 +14,7 @@ import {
   padCountBlockBits,
   padCountNonPoisonBlocks,
   padDamageAfterDefense,
+  padEnemyAttributeResistDamage,
   padNativeBaseAttackPower,
   padNativeRecoveryPower,
   padNailDamage,
@@ -56,6 +57,7 @@ import {
   PAD_ENEMY_SKILL_DEATH_CRY,
   PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION,
   PAD_ENEMY_SKILL_DAMAGE_VOID,
+  PAD_ENEMY_SKILL_ATTRIBUTE_RESIST,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -172,7 +174,12 @@ function normalizeEnhancementPower(value) {
 }
 
 function copyEnemies() {
-  return ENEMY_TEMPLATE.map((enemy) => ({ ...enemy, hp: enemy.maxHp, counter: enemy.maxCounter }));
+  return ENEMY_TEMPLATE.map((enemy) => ({
+    ...enemy,
+    hp: enemy.maxHp,
+    counter: enemy.maxCounter,
+    attributeResistPercentages: Array(5).fill(100),
+  }));
 }
 
 export class PuzzleEngine {
@@ -313,6 +320,7 @@ export class PuzzleEngine {
       recovery: this.party.reduce((total, member) => total + member.recovery, 0),
     };
     this.enemies = copyEnemies().map((enemy) => ({ ...enemy, deathResolved: false }));
+    this.enemyAiPools.forEach((_, enemyIndex) => this.applyEnemyPassiveSkills(enemyIndex));
     this.targetEnemy = 0;
     this.manualTarget = false;
     this.skill = { name: 'Tide Shift', cooldown: 0, maxCooldown: 5 };
@@ -515,12 +523,15 @@ export class PuzzleEngine {
       const effectiveDefense = Number(enemy.defense || 0) + (
         Number(enemy.defenseBoostTurns || 0) > 0 ? Number(enemy.defenseBoostAmount || 0) : 0
       );
-      const damage = nullified ? 0 : padDamageAfterDefense(
-        attack,
-        attributeMultiplier,
-        effectiveDefense,
-        damageCap,
+      const defendedDamage = nullified ? 0 : padDamageAfterDefense(
+        attack, attributeMultiplier, effectiveDefense, damageCap,
       );
+      const damage = Number.isInteger(attributeIndex) && attributeIndex <= 4
+        ? padEnemyAttributeResistDamage(
+          defendedDamage,
+          enemy.attributeResistPercentages?.[attributeIndex] ?? 100,
+        )
+        : defendedDamage;
       return {
         index,
         hp: enemy.hp,
@@ -931,12 +942,16 @@ export class PuzzleEngine {
               ? Number(enemy.defenseBoostAmount || 0)
               : 0
           );
-          const damage = nullified ? 0 : padDamageAfterDefense(
-            raw,
-            padAttributeMultiplier(lane.attribute, enemy.attribute),
-            effectiveDefense,
+          const defendedDamage = nullified ? 0 : padDamageAfterDefense(
+            raw, padAttributeMultiplier(lane.attribute, enemy.attribute), effectiveDefense,
             member.damageCap,
           );
+          const damage = Number.isInteger(attributeIndex) && attributeIndex <= 4
+            ? padEnemyAttributeResistDamage(
+              defendedDamage,
+              enemy.attributeResistPercentages?.[attributeIndex] ?? 100,
+            )
+            : defendedDamage;
           if (
             (Number(enemy.comboAbsorbTurns || 0) > 0
               && this.comboCount <= Number(enemy.comboAbsorbThreshold || 0))
@@ -2169,6 +2184,9 @@ export class PuzzleEngine {
     if (records.some((record) => !record.supported)) {
       throw new Error('PAD enemy skill queue contains a definition type that is not implemented.');
     }
+    if (records.some((record) => record.passive)) {
+      throw new Error('PAD passive enemy skills must be installed through monster skill slots.');
+    }
     if (records.some((record) => record.attackWithSkillValue === null)) {
       throw new RangeError('PAD scheduled enemy-skill definitions require the native +0x44 attack-with-skill field.');
     }
@@ -2182,6 +2200,7 @@ export class PuzzleEngine {
     }
     if (monsterDefinition === null || monsterDefinition === undefined) {
       this.enemyAiPools[index] = null;
+      if (this.enemies) this.applyEnemyPassiveSkills(index);
       return;
     }
     const monster = decodePadEnemyAiMonsterDefinition(monsterDefinition);
@@ -2215,6 +2234,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_DEATH_CRY,
         PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION,
         PAD_ENEMY_SKILL_DAMAGE_VOID,
+        PAD_ENEMY_SKILL_ATTRIBUTE_RESIST,
         PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
         PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -2256,6 +2276,25 @@ export class PuzzleEngine {
       definitionsById,
       aiBudget: monster.budgetCap,
     };
+    if (this.enemies) this.applyEnemyPassiveSkills(index);
+  }
+
+  applyEnemyPassiveSkills(enemyIndex) {
+    const index = Math.trunc(Number(enemyIndex));
+    const enemy = this.enemies?.[index];
+    if (!enemy) return;
+    enemy.attributeResistPercentages = Array(5).fill(100);
+    const pool = this.enemyAiPools?.[index];
+    if (!pool) return;
+    for (const slot of pool.monster.slots) {
+      const effect = pool.definitionsById.get(slot.skillId)?.effect;
+      if (effect?.type !== PAD_ENEMY_SKILL_ATTRIBUTE_RESIST) continue;
+      for (let attributeIndex = 0; attributeIndex < 5; attributeIndex += 1) {
+        if ((effect.attributeMask & (1 << attributeIndex)) !== 0) {
+          enemy.attributeResistPercentages[attributeIndex] = effect.shieldPercent & 0xffff;
+        }
+      }
+    }
   }
 
   setEnhancedFallAwakenings(counts) {
@@ -2839,7 +2878,7 @@ export class PuzzleEngine {
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,
-      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, deathResolved = false, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0, damageVoidTurns = 0, damageVoidThreshold = 0 }, index) => ({
+      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, deathResolved = false, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0, damageVoidTurns = 0, damageVoidThreshold = 0, attributeResistPercentages = [100, 100, 100, 100, 100] }, index) => ({
         id,
         name,
         attribute,
@@ -2864,6 +2903,7 @@ export class PuzzleEngine {
         comboAbsorbThreshold,
         damageVoidTurns,
         damageVoidThreshold,
+        attributeResistPercentages: [...attributeResistPercentages],
         queuedEnemySkills: Math.max(
           0,
           (this.enemySkillQueues[index]?.records.length || 0) - (this.enemySkillQueues[index]?.position || 0),

@@ -297,6 +297,11 @@ function drawEnemy(ctx, enemy, index, target, time) {
   if (Number(enemy.damageVoidTurns || 0) > 0) {
     enemyStatus.push(`VOID ≥${Number(enemy.damageVoidThreshold || 0).toLocaleString()} ${enemy.damageVoidTurns}T`);
   }
+  const passiveResists = (enemy.attributeResistPercentages || [])
+    .map((percent, attributeIndex) => ({ percent: Number(percent), attributeIndex }))
+    .filter(({ percent }) => percent !== 100)
+    .map(({ percent, attributeIndex }) => `${ORB_TYPES[attributeIndex]?.code || '?'}${percent}%`);
+  if (passiveResists.length > 0) enemyStatus.push(`RES ${passiveResists.join('/')}`);
   if (enemyStatus.length > 0) {
     ctx.fillStyle = '#bfe9ff';
     ctx.font = '800 9px "Barlow Condensed", sans-serif';

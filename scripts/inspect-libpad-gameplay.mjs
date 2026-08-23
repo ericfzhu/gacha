@@ -106,6 +106,10 @@ const DAMAGE_VOID_ENEMY_SKILL_TYPE = 71;
 const DAMAGE_VOID_HANDLER = 0x629a48;
 const DAMAGE_VOID_SETUP_HANDLER = 0x6217a8;
 const DAMAGE_VOID_CONDITION_HANDLER = 0x61b774;
+const ATTRIBUTE_RESIST_ENEMY_SKILL_TYPE = 72;
+const ATTRIBUTE_RESIST_HANDLER = 0x62be50;
+const ATTRIBUTE_RESIST_SETUP_HANDLER = 0x621c94;
+const ATTRIBUTE_RESIST_CONDITION_HANDLER = 0x61c01c;
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -312,6 +316,8 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['enemy-ai', 'isValidCardNumber', '_ZN9cSAVEDATA17isValidCardNumberEib', 0x74393c],
   ['combat', 'checkMonsterAbsorb', '_ZN9cGAMEMAIN18_checkMonterAbsorbEv', 0x6239dc],
   ['combat', 'calcFinalDamage', '_ZN9cGAMEMAIN16_calcFinalDamageEbPK5sCARDPNS0_7sATKINFExRiP8sMONSTERiRbS8_S8_', 0x623b40],
+  ['combat', 'checkPassiveSkills', '_ZN9cGAMEMAIN19_checkPassiveSkillsEP8sMONSTER', 0x62d984],
+  ['combat', 'checkDamageRatioForDisplay', '_ZNK9cGAMEMAIN28_chcekDamageRatio4DamageDispEiPK8sMONSTERPK5sCARDPNS_12sMONSDEFFLAGE', 0x684274],
   ['combat', 'monsterEndOfAttack', '_ZN9cGAMEMAIN19_monsterEndOfAttackEP8sMONSTER', 0x622364],
   ['combat', 'initTurn', '_ZN9cGAMEMAIN9_initTurnEv', 0x679a64],
   ['combat', 'drawAndCountMonsIcons', '_ZN9cGAMEMAIN22_drawAndCountMonsIconsEPiP8sMONSTERR6IS_V2D8IS_RGBA8', 0x6a36fc],
@@ -735,6 +741,21 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : damageVoidSetupTarget === DAMAGE_VOID_SETUP_HANDLER;
   const damageVoidConditionMatches = damageVoidConditionTarget === null
     ? null : damageVoidConditionTarget === DAMAGE_VOID_CONDITION_HANDLER;
+  const attributeResistDispatchTarget = resolveEnemySkillTarget(
+    ATTRIBUTE_RESIST_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const attributeResistSetupTarget = resolveEnemySkillTarget(
+    ATTRIBUTE_RESIST_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const attributeResistConditionTarget = resolveEnemySkillTarget(
+    ATTRIBUTE_RESIST_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const attributeResistDispatchMatches = attributeResistDispatchTarget === null
+    ? null : attributeResistDispatchTarget === ATTRIBUTE_RESIST_HANDLER;
+  const attributeResistSetupMatches = attributeResistSetupTarget === null
+    ? null : attributeResistSetupTarget === ATTRIBUTE_RESIST_SETUP_HANDLER;
+  const attributeResistConditionMatches = attributeResistConditionTarget === null
+    ? null : attributeResistConditionTarget === ATTRIBUTE_RESIST_CONDITION_HANDLER;
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1681,6 +1702,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       damageVoidDispatchMatches21_9: damageVoidDispatchMatches,
       damageVoidSetupMatches21_9: damageVoidSetupMatches,
       damageVoidConditionMatches21_9: damageVoidConditionMatches,
+      attributeResistDispatchMatches21_9: attributeResistDispatchMatches,
+      attributeResistSetupMatches21_9: attributeResistSetupMatches,
+      attributeResistConditionMatches21_9: attributeResistConditionMatches,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -2019,6 +2043,18 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       damageVoidConditionMatches21_9: damageVoidConditionMatches,
       damageVoidSemantics:
         'type 71: setup copies +0x10/+0x14/+0x18 to runtime +0x678/+0x67c/+0x680; the handler installs the void presentation, fixed duration, and mode while resolving the +0x1c damage threshold through the selected definition; condition admits only while the +0x8d0 void controller is inactive',
+      attributeResistType: ATTRIBUTE_RESIST_ENEMY_SKILL_TYPE,
+      attributeResistDispatchTarget: attributeResistDispatchTarget === null
+        ? null : hex(attributeResistDispatchTarget),
+      attributeResistDispatchMatches21_9: attributeResistDispatchMatches,
+      attributeResistSetupTarget: attributeResistSetupTarget === null
+        ? null : hex(attributeResistSetupTarget),
+      attributeResistSetupMatches21_9: attributeResistSetupMatches,
+      attributeResistConditionTarget: attributeResistConditionTarget === null
+        ? null : hex(attributeResistConditionTarget),
+      attributeResistConditionMatches21_9: attributeResistConditionMatches,
+      attributeResistSemantics:
+        'type 72 is an initialization-time passive: ordinary dispatch/setup/condition are inert; checkPassiveSkills scans all 64 slots, maps +0x10 bits 0..4 to sMONSTER+0xb16..+0xb1e, and stores low16(+0x14); the damage-ratio helper returns 1.0 for sentinel 100 or binary32((100-value)/100) before calcAttackPow rounds the post-defense product upward',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -2471,6 +2507,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || damageVoidDispatchMatches === false
     || damageVoidSetupMatches === false
     || damageVoidConditionMatches === false
+    || attributeResistDispatchMatches === false
+    || attributeResistSetupMatches === false
+    || attributeResistConditionMatches === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

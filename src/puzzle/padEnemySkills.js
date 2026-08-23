@@ -40,6 +40,7 @@ export const PAD_ENEMY_SKILL_SKYFALL_RATE = 68;
 export const PAD_ENEMY_SKILL_DEATH_CRY = 69;
 export const PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION = 70;
 export const PAD_ENEMY_SKILL_DAMAGE_VOID = 71;
+export const PAD_ENEMY_SKILL_ATTRIBUTE_RESIST = 72;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES_4 = 76;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES = 77;
 export const PAD_ENEMY_SKILL_HORIZONTAL_LINES_4 = 78;
@@ -295,6 +296,18 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       durationTurns: definition.getInt32(0x14, true),
       nativeMode: definition.getInt32(0x18, true),
       damageThreshold: Math.max(0, definition.getInt32(0x1c, true)),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_ATTRIBUTE_RESIST) {
+    requireLength(definitionBytes, 0x18, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'attributeResist',
+      supported: true,
+      passive: true,
+      attributeMask: definition.getInt32(0x10, true) & 0x1f,
+      shieldPercent: definition.getInt32(0x14, true) & 0xffff,
       attackWithSkillValue,
     });
   }
@@ -1055,6 +1068,22 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_ATTRIBUTE_RESIST) {
+    requireLength(definitionBytes, 0x18, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'attributeResist',
+      supported: true,
+      passive: true,
+      attributeMask: definition.getInt32(0x10, true) & 0x1f,
+      shieldPercent: definition.getInt32(0x14, true) & 0xffff,
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (
     type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST
     || type === PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST
@@ -1520,6 +1549,20 @@ export function normalizePadEnemySkillRecord(record) {
       durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)),
       nativeMode: Math.trunc(Number(record?.nativeMode) || 0),
       damageThreshold: Math.max(0, Math.trunc(Number(record?.damageThreshold) || 0)),
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_ATTRIBUTE_RESIST || record?.kind === 'attributeResist') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_ATTRIBUTE_RESIST,
+      kind: 'attributeResist',
+      supported: record?.supported !== false,
+      passive: true,
+      attributeMask: Math.trunc(Number(record?.attributeMask) || 0) & 0x1f,
+      shieldPercent: Math.trunc(Number(record?.shieldPercent) || 0) & 0xffff,
       setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null

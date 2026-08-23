@@ -1358,6 +1358,20 @@ export function padDamageAfterDefense(
   return Math.max(Math.max(0, Math.trunc(Number(minimumDamage) || 0)), defended);
 }
 
+// _chcekDamageRatio4DamageDisp (0x684274) reads the type-72 passive lane for
+// the attacking attribute. 100 is the native no-resist sentinel; other values
+// are interpreted as percentage reduction in binary32 before _calcAttackPow
+// widens the ratio, multiplies the post-defense integer, and rounds upward.
+export function padEnemyAttributeResistDamage(damage, shieldPercent) {
+  const incoming = Math.max(0, Math.trunc(Number(damage) || 0));
+  const nativePercent = Math.trunc(Number(shieldPercent) || 0) & 0xffff;
+  if (nativePercent === 100) return incoming;
+  const ratio = Math.fround(
+    Math.fround(100 - nativePercent) / Math.fround(100),
+  );
+  return Math.max(0, Math.ceil(incoming * ratio));
+}
+
 // _calcCharge (0x64f220) runs izMathCeiling for every poison combo before it
 // adds that combo to the deferred HP-damage accumulator at game-work+0x8aacc.
 export function padPoisonDamage(maxHp, poisonMatchSizes = [], mortalPoisonMatchSizes = []) {
