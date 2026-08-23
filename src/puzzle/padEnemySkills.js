@@ -6,6 +6,8 @@ export const PAD_ENEMY_SKILL_DEFENSE_BOOST = 9;
 export const PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY = 10;
 export const PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY = 11;
 export const PAD_ENEMY_SKILL_SOURCE_TO_JAMMER = 12;
+export const PAD_ENEMY_SKILL_RANDOM_PARTY_BIND = 13;
+export const PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL = 14;
 export const PAD_ENEMY_SKILL_LONE_ATTACK_BOOST = 17;
 export const PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST = 18;
 export const PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST = 19;
@@ -172,6 +174,29 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       supported: true,
       sourceType: definition.getInt32(0x10, true),
       destinationType: 6,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_RANDOM_PARTY_BIND) {
+    return Object.freeze({
+      type,
+      kind: 'randomPartyBind',
+      supported: true,
+      targetCount: definition.getInt32(0x10, true),
+      nativeParameter1: definition.getInt32(0x14, true),
+      durationTurns: 6,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL) {
+    const durationMin = definition.getInt32(0x10, true);
+    const durationMax = definition.getInt32(0x14, true);
+    return Object.freeze({
+      type,
+      kind: 'activeSkillSeal',
+      supported: durationMax >= durationMin,
+      durationMin,
+      durationMax,
       attackWithSkillValue,
     });
   }
@@ -753,6 +778,35 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_RANDOM_PARTY_BIND) {
+    return Object.freeze({
+      type,
+      kind: 'randomPartyBind',
+      supported: true,
+      targetCount: monster.getInt32(0x678, true),
+      nativeParameter1: monster.getInt32(0x67c, true),
+      durationTurns: 6,
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL) {
+    return Object.freeze({
+      type,
+      kind: 'activeSkillSeal',
+      supported: true,
+      durationTurns: monster.getInt32(0x678, true),
+      targetMask: monster.getUint16(0x674, true) & 0x3f,
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (
     type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST
     || type === PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST
@@ -1017,6 +1071,40 @@ export function normalizePadEnemySkillRecord(record) {
         ? { boostPercent: Math.trunc(Number(record.boostPercent) || 0) }
         : { percentMin, percentMax }),
       setupMaterialized: Boolean(record?.setupMaterialized || percentPresent),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_RANDOM_PARTY_BIND || record?.kind === 'randomPartyBind') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
+      kind: 'randomPartyBind',
+      supported: true,
+      targetCount: Math.trunc(Number(record?.targetCount) || 0),
+      nativeParameter1: Math.trunc(Number(record?.nativeParameter1) || 0),
+      durationTurns: 6,
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL || record?.kind === 'activeSkillSeal') {
+    const durationPresent = record?.durationTurns !== undefined && record?.durationTurns !== null;
+    const durationMin = Math.trunc(Number(record?.durationMin) || 0);
+    const durationMax = Math.trunc(Number(record?.durationMax) || 0);
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
+      kind: 'activeSkillSeal',
+      supported: durationPresent || durationMax >= durationMin,
+      ...(durationPresent
+        ? { durationTurns: Math.trunc(Number(record.durationTurns) || 0) }
+        : { durationMin, durationMax }),
+      ...(record?.targetMask === undefined
+        ? {}
+        : { targetMask: Math.trunc(Number(record.targetMask) || 0) & 0x3f }),
+      setupMaterialized: Boolean(record?.setupMaterialized || durationPresent),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

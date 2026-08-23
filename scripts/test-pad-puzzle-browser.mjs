@@ -28,6 +28,7 @@ const renderAttackBoostState = process.argv.includes('--attack-boost-render');
 const renderClearPlayerBuffsState = process.argv.includes('--clear-player-buffs-render');
 const renderEarlyHealAttackState = process.argv.includes('--early-heal-attack-render');
 const renderEarlyDefenseShieldsState = process.argv.includes('--early-defense-shields-render');
+const renderEarlyPartyControlState = process.argv.includes('--early-party-control-render');
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 980, height: 900 } });
 const consoleMessages = [];
@@ -2312,6 +2313,51 @@ try {
     || earlyDefenseShieldsRenderState.nullifyState?.enemies?.[0]?.hp !== 50_000
   )) throw new Error(`Early defense/shield render-state mismatch: ${JSON.stringify(earlyDefenseShieldsRenderState)}`);
   if (earlyDefenseShieldsRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
+  const earlyPartyControlRenderState = renderEarlyPartyControlState ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    const makeSkill = (skillId, type, parameter0, parameter1) => {
+      const bytes = new Uint8Array(0x48);
+      const view = new DataView(bytes.buffer);
+      view.setUint32(0x00, skillId, true);
+      view.setInt16(0x04, type, true);
+      view.setInt32(0x10, parameter0, true);
+      view.setInt32(0x14, parameter1, true);
+      view.setInt32(0x44, 0, true);
+      return bytes;
+    };
+    engine.reset();
+    engine.start();
+    engine.setRngState(21_900);
+    const randomBindApplied = engine.applyEnemySkillDefinition(makeSkill(9_041, 13, 2, 99));
+    const randomBindState = engine.snapshot();
+    engine.reset();
+    engine.start();
+    engine.setRngState(21_900);
+    engine.setEnemySkillQueue(0, [makeSkill(9_042, 14, 2, 4)]);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const skillUseResult = engine.useSkill();
+    return {
+      randomBindApplied,
+      randomBindState,
+      skillUseResult,
+      skillSealState: engine.snapshot(),
+    };
+  }) : null;
+  if (earlyPartyControlRenderState && (
+    earlyPartyControlRenderState.randomBindApplied !== true
+    || earlyPartyControlRenderState.randomBindState?.lastEnemySkill?.type !== 13
+    || earlyPartyControlRenderState.randomBindState?.lastEnemySkill?.targetMask !== 0x03
+    || earlyPartyControlRenderState.randomBindState?.party?.[0]?.bindTurns !== 6
+    || earlyPartyControlRenderState.randomBindState?.party?.[1]?.bindTurns !== 6
+    || earlyPartyControlRenderState.skillUseResult !== false
+    || earlyPartyControlRenderState.skillSealState?.lastEnemySkill?.type !== 14
+    || earlyPartyControlRenderState.skillSealState?.skillSealTurns !== 1
+    || earlyPartyControlRenderState.skillSealState?.skill?.sealed !== true
+    || earlyPartyControlRenderState.skillSealState?.skill?.ready !== false
+  )) throw new Error(`Early party-control render-state mismatch: ${JSON.stringify(earlyPartyControlRenderState)}`);
+  if (earlyPartyControlRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   const attackBoostRenderState = renderAttackBoostState ? await page.evaluate(() => {
     const engine = window.__puzzleGame;
     engine.reset();
@@ -2337,9 +2383,9 @@ try {
   )) throw new Error(`Attack-boost render-state mismatch: ${JSON.stringify(attackBoostRenderState)}`);
   if (attackBoostRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, attackBoostRenderState, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, earlyPartyControlRenderState, attackBoostRenderState, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, attackBoostRenderState, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, earlyPartyControlRenderState, attackBoostRenderState, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

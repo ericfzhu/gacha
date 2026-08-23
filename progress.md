@@ -2,6 +2,27 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 random party bind and active-skill seal
+
+- Recovered early live enemy skill type `13` as a separate random-party bind:
+  dispatch `0x629430`, setup `0x61fee4`, and count gate `0x61ac50`. Definition
+  `+0x10` is the requested number of currently unbound cards. Execution uses
+  two shared LCG advances, a private-state Fisher-Yates shuffle, and the native
+  hardcoded six-turn per-card bind operand.
+- Recovered type `14` as global active-skill seal: dispatch `0x629524` into
+  `_doVoidActSkill` (`0x616924`), one-LCG inclusive-duration setup `0x621300`,
+  and signed low-ten-bit `<= 63` condition `0x61aca4`. Resistance is 20% per
+  awakening plus badge resistance and consumes RNG only when positive.
+- Ported type-13/14 definition/runtime records, normalizers, new-AI gates,
+  exact target shuffle and resistance ordering, protected ten-bit seal
+  extension/wrap, `_doOnPostEnemyAttack` decrement/skip behavior, skill-input
+  blocking, snapshots, and sealed-button rendering.
+- Exact restored-table inspection, pure/data rules, production build, focused
+  browser state, generic gameplay client, screenshot inspection, and the full
+  browser regression matrix pass without console errors.
+- Next: resolve the neighboring type `15/16` records without assuming the
+  shared no-effect dispatch means they are user-visible actions.
+
 ## 2026-08-23 enemy defense and attribute-nullification shields
 
 - Recovered early live enemy skill type `9` as a timed additive defense boost:

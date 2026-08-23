@@ -8,6 +8,8 @@ import {
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
   PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY,
   PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
+  PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
+  PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -144,6 +146,8 @@ function isStaticallyEligible(definition, state) {
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
     PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY,
     PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
+    PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
+    PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
     PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
     PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
     PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -227,6 +231,20 @@ function evaluateCondition(definition, state, rngState) {
     // Types 9-11 all map to 0x61bb98, which returns the incoming float32
     // probability scale unchanged and consumes no RNG.
     return { eligible: true, probabilityScale: 1, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_RANDOM_PARTY_BIND) {
+    const bindableCount = state.party.filter((member) => (
+      member?.present !== false && Number(member?.bindTurns || 0) <= 0
+    )).length;
+    const eligible = bindableCount >= definition.effect.targetCount;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL) {
+    // 0x61aca4 sign-extends the protected low-ten-bit counter and rejects
+    // only values greater than 63. Existing ordinary seals therefore remain
+    // eligible and _doVoidActSkill extends them.
+    const eligible = state.skillSealTurns <= 63;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   if (
     definition.effect.type === PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION
@@ -403,6 +421,7 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     enemyTransientDebuffActive: Boolean(state.enemyTransientDebuffActive),
     enemyStatusShieldTurns: Math.max(0, Math.trunc(Number(state.enemyStatusShieldTurns) || 0)),
     moveTimeReductionTurns: Math.max(0, Math.trunc(Number(state.moveTimeReductionTurns) || 0)),
+    skillSealTurns: Math.trunc(Number(state.skillSealTurns) || 0),
     enemyAttribute: Math.trunc(Number(state.enemyAttribute)),
     enemies: Array.isArray(state.enemies) ? state.enemies : [],
     party: Array.isArray(state.party) ? state.party : [],

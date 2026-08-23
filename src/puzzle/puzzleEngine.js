@@ -17,6 +17,7 @@ import {
   padNativeBaseAttackPower,
   padNativeRecoveryPower,
   padNailDamage,
+  padLcgStep,
   padPoisonDamage,
   padResolveBlackFall,
   padResolveBlockSwapPassive,
@@ -41,6 +42,8 @@ import {
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
   PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY,
   PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
+  PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
+  PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -184,6 +187,8 @@ export class PuzzleEngine {
     enemyAiPools = [],
     playerAuxiliaryBuffTurns = 0,
     playerAttackBoostTurns = 0,
+    skillSealResistAwakenings = 0,
+    skillSealBadgeResistance = 0,
   } = {}) {
     if (![columns, rows].every(Number.isInteger) || columns < 1 || columns > 15 || rows < 1 || rows > 15) {
       throw new Error('PAD board dimensions must be integers from 1 through 15.');
@@ -231,6 +236,14 @@ export class PuzzleEngine {
       0,
       Math.trunc(Number(playerAttackBoostTurns) || 0),
     );
+    this.skillSealResistAwakenings = Math.max(
+      0,
+      Math.trunc(Number(skillSealResistAwakenings) || 0),
+    );
+    this.skillSealBadgeResistance = Math.max(
+      0,
+      Math.trunc(Number(skillSealBadgeResistance) || 0),
+    );
     this.rng = createPadRng(seed);
     this.orbSerial = 0;
     this.visualTime = 0;
@@ -261,6 +274,8 @@ export class PuzzleEngine {
     this.moveTimeReduction = null;
     this.playerAuxiliaryBuffTurns = this.initialPlayerAuxiliaryBuffTurns;
     this.playerAttackBoostTurns = this.initialPlayerAttackBoostTurns;
+    this.skillSealTurns = 0;
+    this.skillSealSkipPostEnemyCountdown = false;
     this.enemySkillQueues.forEach((queue) => { queue.position = 0; });
     this.enemyAiPools.forEach((pool) => {
       if (pool) pool.aiBudget = pool.monster.budgetCap;
@@ -495,7 +510,13 @@ export class PuzzleEngine {
   }
 
   useSkill() {
-    if (this.mode !== 'playing' || this.phase !== 'input' || this.drag || this.skill.cooldown > 0) return false;
+    if (
+      this.mode !== 'playing'
+      || this.phase !== 'input'
+      || this.drag
+      || this.skill.cooldown > 0
+      || this.skillSealTurns > 0
+    ) return false;
     const candidates = [];
     for (let row = 0; row < this.rows; row += 1) {
       for (let column = 0; column < this.columns; column += 1) {
@@ -969,6 +990,10 @@ export class PuzzleEngine {
       this.player.hp = Math.max(0, this.player.hp - total);
       this.message = `Enemies attacked for ${total.toLocaleString()} damage.`;
     }
+    // _doOnPostEnemyAttack owns the protected low-ten-bit active-skill-seal
+    // countdown. A reapplication sets bit 0x400 and skips this one decrement;
+    // a newly applied seal does not, so its authored count drops immediately.
+    this.advanceSkillSealTurnsPostEnemyAttack();
   }
 
   takeEnemySkill(enemyIndex) {
@@ -1001,6 +1026,7 @@ export class PuzzleEngine {
       playerAttackBoostTurns: this.playerAttackBoostTurns,
       enemyStatusShieldTurns: enemy.statusShieldTurns,
       moveTimeReductionTurns: this.moveTimeReduction?.turnsRemaining || 0,
+      skillSealTurns: this.skillSealTurns,
       enemyAttribute: PAD_ATTRIBUTE_INDEX[enemy.attribute] ?? -1,
       playerCurrentHp: this.player.hp,
       playerMaxHp: this.player.maxHp,
@@ -1199,6 +1225,13 @@ export class PuzzleEngine {
         setupMaterialized: true,
       });
     }
+    if (skill.supported && skill.kind === 'activeSkillSeal' && !skill.setupMaterialized) {
+      return Object.freeze({
+        ...record,
+        durationTurns: this.rollEnemySkillDuration(skill.durationMin, skill.durationMax),
+        setupMaterialized: true,
+      });
+    }
     if (!skill.supported || skill.kind !== 'bindLeaderHelper' || skill.setupMaterialized) {
       return record;
     }
@@ -1222,13 +1255,46 @@ export class PuzzleEngine {
     });
   }
 
-  doBind(targetMask, durationTurns, teamBadgeResistance = 0) {
+  selectRandomBindablePartyTargets(targetCount) {
+    const eligible = this.party
+      .map((member, index) => ({ member, index }))
+      .filter(({ member }) => (
+        member?.present !== false && Number(member?.bindTurns || 0) <= 0
+      ))
+      .map(({ index }) => index);
+    if (eligible.length === 0) return Object.freeze([]);
+
+    // Type 13 advances the shared LCG twice, stores that second state, then
+    // shuffles with a private state made from step one's low half and step
+    // two's high half. The private Fisher-Yates steps do not escape back into
+    // sGAMEWORK+0x66a10.
+    const first = padLcgStep(this.rng.state);
+    const second = padLcgStep(first.state);
+    this.rng.setState(second.state);
+    let localState = ((first.state & 0xffff) | (second.state & 0xffff0000)) >>> 0;
+    for (let index = 1; index < eligible.length; index += 1) {
+      localState = padLcgStep(localState).state;
+      const swapIndex = Math.imul(localState >>> 16, index + 1) >>> 16;
+      [eligible[index], eligible[swapIndex]] = [eligible[swapIndex], eligible[index]];
+    }
+    return Object.freeze(eligible.slice(0, Math.max(
+      0,
+      Math.min(eligible.length, Math.trunc(Number(targetCount) || 0)),
+    )));
+  }
+
+  doBind(
+    targetMask,
+    durationTurns,
+    teamBadgeResistance = 0,
+    targetOrder = [0, 5, 1, 2, 3, 4],
+  ) {
     const mask = Math.trunc(Number(targetMask) || 0) & 0x3f;
     const duration = Math.trunc(Number(durationTurns) || 0);
     const badgeResistance = Math.max(0, Math.trunc(Number(teamBadgeResistance) || 0));
     let boundMask = 0;
     let resistedMask = 0;
-    for (const index of [0, 5, 1, 2, 3, 4]) {
+    for (const index of targetOrder) {
       const bit = 1 << index;
       const member = this.party[index];
       if ((mask & bit) === 0 || !member || member.present === false) continue;
@@ -1254,6 +1320,31 @@ export class PuzzleEngine {
       boundMask |= bit;
     }
     return Object.freeze({ boundMask, resistedMask, durationTurns: duration });
+  }
+
+  applyActiveSkillSeal(durationTurns) {
+    const resistance = (
+      this.skillSealResistAwakenings * 20
+      + this.skillSealBadgeResistance
+    );
+    if (resistance >= 1) {
+      const resistanceRoll = Math.imul(this.rng.nextUint16(), 100) >>> 16;
+      if (resistance >= resistanceRoll) {
+        return Object.freeze({ resisted: true, durationTurns: 0 });
+      }
+    }
+    const current = Math.trunc(Number(this.skillSealTurns) || 0);
+    this.skillSealSkipPostEnemyCountdown = current > 0;
+    const packed = (current + Math.trunc(Number(durationTurns) || 0)) & 0x3ff;
+    this.skillSealTurns = (packed << 22) >> 22;
+    return Object.freeze({ resisted: false, durationTurns: this.skillSealTurns });
+  }
+
+  advanceSkillSealTurnsPostEnemyAttack() {
+    if (!this.skillSealSkipPostEnemyCountdown && this.skillSealTurns >= 1) {
+      this.skillSealTurns -= 1;
+    }
+    this.skillSealSkipPostEnemyCountdown = false;
   }
 
   advancePartyBindTurns() {
@@ -1491,6 +1582,24 @@ export class PuzzleEngine {
       enemy.attributeNullifyTurns = Math.max(0, (skill.durationTurns << 16) >> 16);
       enemy.attributeNullifyMask = padEnemySkillAttributeNullifyMask(skill.attributes);
       this.message = `${enemy.name} nullifies selected attributes for ${enemy.attributeNullifyTurns} turn${enemy.attributeNullifyTurns === 1 ? '' : 's'}.`;
+      return true;
+    }
+    if (skill.supported && skill.kind === 'randomPartyBind') {
+      const targetOrder = this.selectRandomBindablePartyTargets(skill.targetCount);
+      const targetMask = targetOrder.reduce((mask, index) => mask | (1 << index), 0);
+      const result = this.doBind(targetMask, 6, 0, targetOrder);
+      this.lastEnemySkill = Object.freeze({ ...skill, targetMask, targetOrder, ...result });
+      const boundCount = result.boundMask.toString(2).replaceAll('0', '').length;
+      const resistedCount = result.resistedMask.toString(2).replaceAll('0', '').length;
+      this.message = `${boundCount} random party member${boundCount === 1 ? '' : 's'} bound for 6 turns${resistedCount ? ` · ${resistedCount} resisted` : ''}.`;
+      return true;
+    }
+    if (skill.supported && skill.kind === 'activeSkillSeal') {
+      const result = this.applyActiveSkillSeal(skill.durationTurns);
+      this.lastEnemySkill = Object.freeze({ ...skill, ...result });
+      this.message = result.resisted
+        ? 'The party resisted the active-skill seal.'
+        : `Active skills sealed for ${this.skillSealTurns} turn${this.skillSealTurns === 1 ? '' : 's'}.`;
       return true;
     }
     if (skill.supported && [
@@ -1753,6 +1862,8 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
         PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY,
         PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
+        PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
+        PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
         PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
         PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -2382,7 +2493,12 @@ export class PuzzleEngine {
         enemyAiBudget: this.enemyAiPools[index]?.aiBudget ?? null,
         enemyAiSkillSlots: this.enemyAiPools[index]?.monster.slots.length ?? 0,
       })),
-      skill: { ...this.skill, ready: this.skill.cooldown === 0 },
+      skillSealTurns: this.skillSealTurns,
+      skill: {
+        ...this.skill,
+        sealed: this.skillSealTurns > 0,
+        ready: this.skill.cooldown === 0 && this.skillSealTurns <= 0,
+      },
       message: this.message,
     };
   }

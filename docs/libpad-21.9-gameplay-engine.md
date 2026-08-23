@@ -750,6 +750,41 @@ when no source orb exists and otherwise returns binary32
 native numeric board and lock semantics rather than implementing jammer as a
 separate visual-only effect.
 
+Enemy skill type `13` is the general random-party bind, distinct from the
+leader/helper-only type `54`. Its dispatch, setup, and AI condition targets are
+`0x629430`, `0x61fee4`, and `0x61ac50`. Setup copies definition target count
+`+0x10` to runtime `sMONSTER+0x678` and preserves `+0x14` at `+0x67c`; the
+latter is not consumed by the recovered execution path. The condition counts
+present party cards whose signed-byte bind timer is zero and admits only when
+that count is at least the requested target count.
+
+Execution gathers those bindable card indices, advances the global LCG twice,
+stores the second state, and performs a Fisher-Yates shuffle with a private
+state composed from the first step's low 16 bits and second step's high 16
+bits. Private shuffle steps do not update the global RNG. It selects the first
+requested indices and calls the per-card bind path with the hardcoded operand
+`6`. The port reproduces this shuffle, per-target bind resistance rolls,
+six-turn timers, target order, mask, and bind-driven leader/attack/recovery
+suppression.
+
+Type `14` is the global active-skill seal. Its dispatch entry `0x629524` calls
+`_doVoidActSkill` (`0x616924`); setup `0x621300` spends one LCG step selecting
+an inclusive duration from definition `+0x10..+0x14` into runtime `+0x678`.
+Condition `0x61aca4` sign-extends the protected low-ten-bit status at
+`sGAMEWORK+0x87250` and rejects only values greater than 63, so an ordinary
+active seal may be selected again and extended.
+
+`_doVoidActSkill` grants 20 percentage points of resistance per recovered
+resistance awakening, adds badge resistance, and consumes one `roll100` only
+when total resistance is positive. On success it adds the duration into the
+protected ten-bit counter. Reapplication while the old counter is positive
+sets bit `0x400`. `_doOnPostEnemyAttack` (`0x678980`) normally decrements a
+positive counter and clears that bit, but skips the decrement when bit `0x400`
+was set. Consequently a newly applied seal loses one count after that enemy
+action, while an extension does not. The browser exposes this counter, disables
+active-skill input while it is positive, renders the sealed state, and retains
+the exact ten-bit wrap and resistance RNG boundary.
+
 Enemy skill type `17` is the lone-enemy attack boost. Its late dispatch entry
 targets shared boost handler `0x629064`, setup targets `0x61ffdc`, and AI
 condition targets `0x61acdc`. Setup copies definition duration `+0x14` to

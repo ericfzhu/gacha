@@ -459,8 +459,15 @@ function render(ctx, engine) {
   // Keep the live HP readout clear of the 48px reset hit target below the bar.
   ctx.fillText(`HP ${engine.player.hp.toLocaleString()} / ${engine.player.maxHp.toLocaleString()}`, 72, 376);
   drawButton(ctx, RESET_RECT, '↻', '', true, false);
-  const skillReady = engine.skill.cooldown === 0 && engine.mode === 'playing' && engine.phase === 'input' && !engine.drag;
-  drawButton(ctx, SKILL_RECT, engine.skill.name.toUpperCase(), skillReady ? 'READY · no turn cost' : `${engine.skill.cooldown} turn cooldown`, skillReady, skillReady);
+  const skillSealed = Number(engine.skillSealTurns || 0) > 0;
+  const skillReady = engine.skill.cooldown === 0 && !skillSealed
+    && engine.mode === 'playing' && engine.phase === 'input' && !engine.drag;
+  const skillStatus = skillSealed
+    ? `SEALED · ${engine.skillSealTurns} turn${engine.skillSealTurns === 1 ? '' : 's'}`
+    : skillReady
+      ? 'READY · no turn cost'
+      : `${engine.skill.cooldown} turn cooldown`;
+  drawButton(ctx, SKILL_RECT, engine.skill.name.toUpperCase(), skillStatus, skillReady, skillReady);
 
   if (engine.drag) {
     const ratio = engine.drag.remaining / engine.moveTime;

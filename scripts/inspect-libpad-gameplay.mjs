@@ -42,6 +42,22 @@ const SOURCE_TO_JAMMER_ENEMY_SKILL_TYPE = 12;
 const SOURCE_TO_JAMMER_HANDLER = 0x6293f8;
 const SOURCE_TO_JAMMER_SETUP_HANDLER = 0x61ff08;
 const SOURCE_TO_JAMMER_CONDITION_HANDLER = 0x61a63c;
+const EARLY_PARTY_CONTROL_SKILLS = Object.freeze([
+  Object.freeze({
+    type: 13,
+    kind: 'randomPartyBind',
+    dispatch: 0x629430,
+    setup: 0x61fee4,
+    condition: 0x61ac50,
+  }),
+  Object.freeze({
+    type: 14,
+    kind: 'activeSkillSeal',
+    dispatch: 0x629524,
+    setup: 0x621300,
+    condition: 0x61aca4,
+  }),
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -235,6 +251,10 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['enemy-ai', 'playerMaxHp', '_ZNK7sPLAYER3mhpEv', 0x66b840],
   ['enemy-ai', 'playerAddHp', '_ZN7sPLAYER5addHpEib', 0x678838],
   ['enemy-ai', 'doBind', '_ZN9cGAMEMAIN7_doBindEPK8sMONSTERjib', 0x616de4],
+  ['enemy-ai', 'doSelectBindTargets', '_ZN9cGAMEMAIN19_doSelectBindTargesEbii', 0x61652c],
+  ['enemy-ai', 'canBindCard', '_ZNK9cGAMEMAIN12_canBindCardEi', 0x6168b8],
+  ['enemy-ai', 'doVoidActSkill', '_ZN9cGAMEMAIN15_doVoidActSkillEPK8sMONSTER', 0x616924],
+  ['enemy-ai', 'doOnPostEnemyAttack', '_ZN9cGAMEMAIN20_doOnPostEnemyAttackEv', 0x678980],
   ['enemy-ai', 'hasPassiveSkillsCard', '_ZNK9cGAMEMAIN17_hasPassiveSkillsEPK5sCARDi', 0x640a90],
   ['enemy-ai', 'isValidCardNumber', '_ZN9cSAVEDATA17isValidCardNumberEib', 0x74393c],
   ['combat', 'checkMonsterAbsorb', '_ZN9cGAMEMAIN18_checkMonterAbsorbEv', 0x6239dc],
@@ -437,6 +457,30 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : sourceToJammerSetupTarget === SOURCE_TO_JAMMER_SETUP_HANDLER;
   const sourceToJammerConditionMatches = sourceToJammerConditionTarget === null
     ? null : sourceToJammerConditionTarget === SOURCE_TO_JAMMER_CONDITION_HANDLER;
+  const earlyPartyControlTargets = EARLY_PARTY_CONTROL_SKILLS.map((entry) => {
+    const dispatchTarget = resolveEnemySkillTarget(
+      entry.type, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+    );
+    const setupTarget = resolveEnemySkillTarget(
+      entry.type, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+    );
+    const conditionTarget = resolveEnemySkillTarget(
+      entry.type, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+    );
+    return Object.freeze({
+      ...entry,
+      dispatchTarget,
+      setupTarget,
+      conditionTarget,
+      matches21_9: dispatchTarget === null ? null : (
+        dispatchTarget === entry.dispatch
+        && setupTarget === entry.setup
+        && conditionTarget === entry.condition
+      ),
+    });
+  });
+  const earlyPartyControlEntriesMatch = restoredElf === null
+    ? null : earlyPartyControlTargets.every((entry) => entry.matches21_9);
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1346,9 +1390,22 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       additionalAttackSetupMatches21_9: additionalAttackSetupMatches,
       additionalAttackConditionMatches21_9: additionalAttackConditionMatches,
       earlyDefenseShieldEntriesMatch21_9: earlyDefenseShieldEntriesMatch,
+      earlyPartyControlEntriesMatch21_9: earlyPartyControlEntriesMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
+      earlyPartyControlSkills: earlyPartyControlTargets.map((entry) => ({
+        type: entry.type,
+        kind: entry.kind,
+        dispatchTarget: entry.dispatchTarget === null ? null : hex(entry.dispatchTarget),
+        setupTarget: entry.setupTarget === null ? null : hex(entry.setupTarget),
+        conditionTarget: entry.conditionTarget === null ? null : hex(entry.conditionTarget),
+        matches21_9: entry.matches21_9,
+      })),
+      randomPartyBindSemantics:
+        'type 13: +0x10 target count; choose currently unbound party cards with the native two-step/private-state shuffle, then bind each for the hardcoded six-turn operand',
+      activeSkillSealSemantics:
+        'type 14: one-LCG inclusive +0x10..+0x14 duration; 20% per resistance awakening plus badge; add into protected low-ten-bit sGAMEWORK+0x87250 and count down in _doOnPostEnemyAttack',
       healPlayerDispatchMatches21_9: healPlayerDispatchMatches,
       healPlayerSetupMatches21_9: healPlayerSetupMatches,
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
@@ -1947,6 +2004,7 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || additionalAttackSetupMatches === false
     || additionalAttackConditionMatches === false
     || earlyDefenseShieldEntriesMatch === false
+    || earlyPartyControlEntriesMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false
