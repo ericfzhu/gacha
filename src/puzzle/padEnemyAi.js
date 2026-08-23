@@ -20,6 +20,7 @@ import {
   PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM,
   PAD_ENEMY_SKILL_STICKY_BLIND_FIXED,
   PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS,
+  PAD_ENEMY_SKILL_ORB_SEAL_ROWS,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -185,6 +186,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM,
     PAD_ENEMY_SKILL_STICKY_BLIND_FIXED,
     PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS,
+    PAD_ENEMY_SKILL_ORB_SEAL_ROWS,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
     PAD_ENEMY_SKILL_DEFENSE_BOOST,
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -564,7 +566,8 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
   if (definition.effect.type === PAD_ENEMY_SKILL_STICKY_BLIND_FIXED) {
     return { eligible: true, probabilityScale: 1, rngState };
   }
-  if (definition.effect.type === PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS) {
+  if ([PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS, PAD_ENEMY_SKILL_ORB_SEAL_ROWS]
+    .includes(definition.effect.type)) {
     // Types 99 and 100 share 0x61a678. The protected row and column status
     // lanes are mutually exclusive, so either active tape rejects this skill.
     const eligible = !state.orbSealActive;

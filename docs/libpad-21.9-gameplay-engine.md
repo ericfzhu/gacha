@@ -1280,6 +1280,21 @@ fixture seals columns 1 and 3 for three turns, consumes only the ordinary AI
 selection draw, blocks both start and crossing, clears after three advances,
 and renders translucent vertical `TAPE · 3` bands.
 
+Enemy skill type `100` is the paired row-tape form. It resolves to dispatch
+`0x629fbc`, the same generic setup `0x6217c0`, and the same condition
+`0x61a678`; the independent parser calls it `ESOrbSealRow`. Its handler sends
+definition `+0x10` through the row-position helper at `0x309740`, stores the
+returned low-eight-bit mask at protected `sGAMEWORK+0x8750c`, and joins type
+99's common duration tail to install `+0x14` at `+0x8751c` with fresh bit
+`0x400` set and transition bit `0x800` clear. It likewise consumes no RNG.
+
+The port applies the low five bits to board rows, includes row state in the
+shared type-99/100 admission gate, counts it down alongside column tape, and
+uses the same pointer-origin collision rule in the vertical direction. A
+fixture seals rows 1 and 3 for two turns, blocks starting within or crossing
+into those rows, and resumes the exact traced movement after expiry. Horizontal
+magenta tape bands make the affected rows and remaining turns explicit.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

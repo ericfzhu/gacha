@@ -595,6 +595,34 @@ function render(ctx, engine) {
     }
   }
 
+  if (engine.orbSealRowTurns > 0) {
+    for (let row = 0; row < engine.rows; row += 1) {
+      if ((engine.orbSealRowMask & (1 << row)) === 0) continue;
+      const y = board.y + row * board.cell;
+      const gradient = ctx.createLinearGradient(0, y, 0, y + board.cell);
+      gradient.addColorStop(0, 'rgba(236, 91, 176, .52)');
+      gradient.addColorStop(.5, 'rgba(255, 192, 230, .28)');
+      gradient.addColorStop(1, 'rgba(236, 91, 176, .52)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(board.x, y + 4, board.cell * engine.columns, board.cell - 8);
+      ctx.strokeStyle = 'rgba(255, 218, 241, .85)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(board.x + 1, y + 5, board.cell * engine.columns - 2, board.cell - 10);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = '900 15px "Barlow Condensed", sans-serif';
+      ctx.fillStyle = '#fff0f8';
+      ctx.shadowColor = '#4e1237';
+      ctx.shadowBlur = 5;
+      ctx.fillText(
+        `TAPE · ${engine.orbSealRowTurns}`,
+        board.x + board.cell * engine.columns / 2,
+        y + board.cell / 2,
+      );
+      ctx.shadowColor = 'transparent';
+    }
+  }
+
   if (engine.drag) {
     const held = engine.board[engine.drag.row][engine.drag.column];
     drawOrb(ctx, held, engine.drag.pointerX, engine.drag.pointerY, 34, 0.9, true);

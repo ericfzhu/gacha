@@ -2,6 +2,23 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 type-100 row orb seal
+
+- Recovered type `100` at dispatch/setup/condition `0x629fbc`, `0x6217c0`, and
+  `0x61a678`; the independent parser corroborates `ESOrbSealRow` with the same
+  position/duration parameter order as the column form.
+- Execution converts `+0x10` through the native row helper, stores its low-eight
+  bits at protected `sGAMEWORK+0x8750c`, and installs low-ten-bit duration
+  `+0x14` at `+0x8751c` using the shared fresh/transition-bit tail. It owns no
+  RNG and shares type 99's mutual-exclusion condition.
+- Ported decode/runtime/normalization, AI selection, countdown/reset/snapshot,
+  horizontal tape rendering, and row-aware start/crossing barriers. The focused
+  rows-1-and-3 fixture expires after two advances and then permits the exact
+  previously blocked trace.
+- Pure rules, exact tables plus thirteen instruction anchors, focused Chromium,
+  screenshot inspection, generic browser client, full native inspector, and
+  production build pass. Next: continue to type `101`.
+
 ## 2026-08-24 type-99 column orb seal
 
 - Recovered type `99` at dispatch/setup/condition `0x629f7c`, `0x6217c0`, and

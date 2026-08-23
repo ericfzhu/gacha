@@ -56,6 +56,7 @@ import {
   PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM,
   PAD_ENEMY_SKILL_STICKY_BLIND_FIXED,
   PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS,
+  PAD_ENEMY_SKILL_ORB_SEAL_ROWS,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -326,6 +327,8 @@ export class PuzzleEngine {
     this.awakeningBindSkipPostEnemyCountdown = false;
     this.orbSealColumnMask = 0;
     this.orbSealColumnTurns = 0;
+    this.orbSealRowMask = 0;
+    this.orbSealRowTurns = 0;
     this.leaderSwapTurns = 0;
     this.leaderSwapIndex = null;
     this.enemySkillQueues.forEach((queue) => { queue.position = 0; });
@@ -1247,7 +1250,7 @@ export class PuzzleEngine {
       moveTimeReductionTurns: this.moveTimeReduction?.turnsRemaining || 0,
       skillSealTurns: this.skillSealTurns,
       awakeningBindTurns: this.awakeningBindTurns,
-      orbSealActive: this.orbSealColumnTurns > 0,
+      orbSealActive: this.orbSealColumnTurns > 0 || this.orbSealRowTurns > 0,
       enemyAttribute: PAD_ATTRIBUTE_INDEX[enemy.attribute] ?? -1,
       playerCurrentHp: this.player.hp,
       playerMaxHp: this.player.maxHp,
@@ -2216,6 +2219,19 @@ export class PuzzleEngine {
       this.message = `${count} column${count === 1 ? '' : 's'} sealed for ${this.orbSealColumnTurns} turn${this.orbSealColumnTurns === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'orbSealRows') {
+      this.orbSealRowMask = skill.positionMask & ((1 << this.rows) - 1);
+      this.orbSealRowTurns = Math.max(0, skill.durationTurns) & 0x3ff;
+      this.lastEnemySkill = Object.freeze({
+        ...skill,
+        positionMask: this.orbSealRowMask,
+        durationTurns: this.orbSealRowTurns,
+      });
+      let count = 0;
+      for (let bits = this.orbSealRowMask; bits !== 0; bits >>>= 1) count += bits & 1;
+      this.message = `${count} row${count === 1 ? '' : 's'} sealed for ${this.orbSealRowTurns} turn${this.orbSealRowTurns === 1 ? '' : 's'}.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'clearPlayerBuffs') {
       // _doItetukuHadou clears both recovered sGAMEWORK positive-status lanes,
       // then type 6 invokes _applyLeaderSkill(false). Leader effects in this
@@ -2750,6 +2766,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM,
         PAD_ENEMY_SKILL_STICKY_BLIND_FIXED,
         PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS,
+        PAD_ENEMY_SKILL_ORB_SEAL_ROWS,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -3326,14 +3343,23 @@ export class PuzzleEngine {
 
   isOrbSealed(row, column) {
     return this.isCell(row, column)
-      && this.orbSealColumnTurns > 0
-      && (this.orbSealColumnMask & (1 << column)) !== 0;
+      && (
+        this.orbSealColumnTurns > 0
+          && (this.orbSealColumnMask & (1 << column)) !== 0
+        || this.orbSealRowTurns > 0
+          && (this.orbSealRowMask & (1 << row)) !== 0
+      );
   }
 
   advanceOrbSealTurns() {
-    if (this.orbSealColumnTurns <= 0) return;
-    this.orbSealColumnTurns = Math.max(0, this.orbSealColumnTurns - 1);
-    if (this.orbSealColumnTurns === 0) this.orbSealColumnMask = 0;
+    if (this.orbSealColumnTurns > 0) {
+      this.orbSealColumnTurns = Math.max(0, this.orbSealColumnTurns - 1);
+      if (this.orbSealColumnTurns === 0) this.orbSealColumnMask = 0;
+    }
+    if (this.orbSealRowTurns > 0) {
+      this.orbSealRowTurns = Math.max(0, this.orbSealRowTurns - 1);
+      if (this.orbSealRowTurns === 0) this.orbSealRowMask = 0;
+    }
   }
 
   snapshot() {
@@ -3373,6 +3399,10 @@ export class PuzzleEngine {
       orbSealColumns: {
         positionMask: this.orbSealColumnMask,
         turnsRemaining: this.orbSealColumnTurns,
+      },
+      orbSealRows: {
+        positionMask: this.orbSealRowMask,
+        turnsRemaining: this.orbSealRowTurns,
       },
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({

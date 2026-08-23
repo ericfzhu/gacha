@@ -67,6 +67,7 @@ export const PAD_ENEMY_SKILL_LOCKED_SKYFALL = 96;
 export const PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM = 97;
 export const PAD_ENEMY_SKILL_STICKY_BLIND_FIXED = 98;
 export const PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS = 99;
+export const PAD_ENEMY_SKILL_ORB_SEAL_ROWS = 100;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -343,6 +344,16 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       kind: 'orbSealColumns',
       supported: true,
       positionMask: definition.getUint32(0x10, true) & 0x3f,
+      durationTurns: definition.getInt32(0x14, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_ORB_SEAL_ROWS) {
+    return Object.freeze({
+      type,
+      kind: 'orbSealRows',
+      supported: true,
+      positionMask: definition.getUint32(0x10, true) & 0x1f,
       durationTurns: definition.getInt32(0x14, true),
       attackWithSkillValue,
     });
@@ -1296,6 +1307,9 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
     // definition; its execution handler reads +0x10 and +0x14 directly.
     return decodePadEnemySkillDefinition(definitionBytes);
   }
+  if (type === PAD_ENEMY_SKILL_ORB_SEAL_ROWS) {
+    return decodePadEnemySkillDefinition(definitionBytes);
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -2059,6 +2073,19 @@ export function normalizePadEnemySkillRecord(record) {
       kind: 'orbSealColumns',
       supported: record?.supported !== false,
       positionMask: Math.trunc(Number(record?.positionMask) || 0) & 0x3f,
+      durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)) & 0x3ff,
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_ORB_SEAL_ROWS || record?.kind === 'orbSealRows') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_ORB_SEAL_ROWS,
+      kind: 'orbSealRows',
+      supported: record?.supported !== false,
+      positionMask: Math.trunc(Number(record?.positionMask) || 0) & 0x1f,
       durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)) & 0x3ff,
       setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
