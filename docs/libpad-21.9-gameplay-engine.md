@@ -802,6 +802,23 @@ Reviving an enemy clears its resolved-death marker so a later death can fire
 again. DadGuide independently marks `ESDeathCry` as an on-death action and
 extracts it from the ordinary behavior list.
 
+Enemy skill type `70` is the third inactivity variant, but it has a distinct
+presentation implementation. Its dispatch, setup, and condition targets are
+`0x6299fc`, `0x621790`, and `0x61b558`. When the transient controller at
+`sMONSTER+0x920` is empty, setup copies definition `+0x10/+0x14/+0x18` to
+runtime `+0x678/+0x67c/+0x680`. Execution either installs those values into
+the related `+0x8f0..+0x930` presentation controllers or completes and clears
+an already-running controller, then reaches the common action tail. The AI
+condition returns 1.0 only while the controller at `+0x910` reports zero.
+
+No board, player, enemy-status, or damage state is changed by that specialized
+handler; DadGuide correspondingly classifies the record as `ESInactivity70`.
+The browser preserves the raw type and three staged values, applies the same
+no-gameplay action, and keeps its ordinary probability draw separate from the
+presentation controller. With a 100% immediate record, seed 21900 therefore
+ends at `394448415`, just like type 66, while snapshots still distinguish the
+two native paths.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

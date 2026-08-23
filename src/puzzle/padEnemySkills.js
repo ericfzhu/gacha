@@ -38,6 +38,7 @@ export const PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL = 66;
 export const PAD_ENEMY_SKILL_COMBO_ABSORB = 67;
 export const PAD_ENEMY_SKILL_SKYFALL_RATE = 68;
 export const PAD_ENEMY_SKILL_DEATH_CRY = 69;
+export const PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION = 70;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES_4 = 76;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES = 77;
 export const PAD_ENEMY_SKILL_HORIZONTAL_LINES_4 = 78;
@@ -267,6 +268,19 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       type,
       kind: 'inactivity',
       supported: true,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION) {
+    requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'inactivityPresentation',
+      supported: true,
+      presentationParameters: Object.freeze(Array.from(
+        { length: 3 },
+        (_, index) => definition.getInt32(0x10 + index * 4, true),
+      )),
       attackWithSkillValue,
     });
   }
@@ -992,6 +1006,23 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION) {
+    requireLength(monsterBytes, 0x684, 'PAD monster runtime');
+    return Object.freeze({
+      type,
+      kind: 'inactivityPresentation',
+      supported: true,
+      presentationParameters: Object.freeze(Array.from(
+        { length: 3 },
+        (_, index) => monster.getInt32(0x678 + index * 4, true),
+      )),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (
     type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST
     || type === PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST
@@ -1422,6 +1453,27 @@ export function normalizePadEnemySkillRecord(record) {
         : PAD_ENEMY_SKILL_INACTIVITY,
       kind: 'inactivity',
       supported: true,
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (
+    type === PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION
+    || record?.kind === 'inactivityPresentation'
+  ) {
+    const authored = Array.isArray(record?.presentationParameters)
+      ? record.presentationParameters
+      : [];
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION,
+      kind: 'inactivityPresentation',
+      supported: record?.supported !== false,
+      presentationParameters: Object.freeze(Array.from(
+        { length: 3 },
+        (_, index) => Math.trunc(Number(authored[index]) || 0),
+      )),
+      setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

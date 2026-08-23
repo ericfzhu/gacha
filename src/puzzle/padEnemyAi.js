@@ -19,6 +19,7 @@ import {
   PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL,
   PAD_ENEMY_SKILL_COMBO_ABSORB,
   PAD_ENEMY_SKILL_SKYFALL_RATE,
+  PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -166,6 +167,7 @@ function isStaticallyEligible(definition, state) {
     PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL,
     PAD_ENEMY_SKILL_COMBO_ABSORB,
     PAD_ENEMY_SKILL_SKYFALL_RATE,
+    PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION,
     PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
     PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
     PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -337,6 +339,13 @@ function evaluateCondition(definition, state, rngState) {
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL) {
     return { eligible: true, probabilityScale: 1, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION) {
+    // Type 70's 0x61b558 callback admits the record only while the transient
+    // presentation controller at sMONSTER+0x910 reports zero. That controller
+    // resolves inside the native enemy-action presentation phase.
+    const eligible = !state.enemyInactivityPresentationActive;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   if (
     definition.effect.type === PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION

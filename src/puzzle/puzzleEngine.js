@@ -54,6 +54,7 @@ import {
   PAD_ENEMY_SKILL_COMBO_ABSORB,
   PAD_ENEMY_SKILL_SKYFALL_RATE,
   PAD_ENEMY_SKILL_DEATH_CRY,
+  PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -1869,6 +1870,11 @@ export class PuzzleEngine {
       this.message = `${enemy?.name || 'Enemy'} does nothing.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'inactivityPresentation') {
+      const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
+      this.message = `${enemy?.name || 'Enemy'} pauses with effect ${skill.presentationParameters.join('/')}.`;
+      return true;
+    }
     if (skill.supported && [
       'loneAttackBoost',
       'statusTriggeredAttackBoost',
@@ -2172,6 +2178,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_COMBO_ABSORB,
         PAD_ENEMY_SKILL_SKYFALL_RATE,
         PAD_ENEMY_SKILL_DEATH_CRY,
+        PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION,
         PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
         PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,

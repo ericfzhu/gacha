@@ -2,6 +2,20 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 presentation-backed inactivity skill
+
+- Recovered type `70` at dispatch/setup/condition `0x6299fc`, `0x621790`, and
+  `0x61b558`. It is a no-gameplay inactivity action, but unlike types 16/66 it
+  stages definition `+0x10/+0x14/+0x18` through runtime `+0x678..+0x680` and
+  drives a transient per-enemy presentation controller.
+- Preserved the distinct type and three presentation integers through
+  definition/runtime decoding, normalization, new-AI admission, execution,
+  snapshots, and browser messaging. A 100% immediate record consumes only the
+  standard probability draw: seed 21900 ends at `394448415` with HP unchanged.
+- Pure, exact-table, focused browser, generic browser-client, and production
+  build checks pass without page errors. Next: recover type `71` after this
+  separate checkpoint.
+
 ## 2026-08-23 enemy death-cry phase
 
 - Recovered type `69` as a death-only record. Its ordinary dispatch/setup/
@@ -17,8 +31,8 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
   browser, generic browser-client, and production-build checks pass with no
   page errors; the focused render shows Verdant Shell's death effect before
   Umbra Eye's turn can continue.
-- Next: recover type `70` and keep type `95`'s actionable on-death skill-set as
-  a separate death-scheduler checkpoint.
+- Next: keep type `95`'s actionable on-death skill-set as a separate
+  death-scheduler checkpoint.
 
 ## 2026-08-23 enemy skyfall-rate skill
 

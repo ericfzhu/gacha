@@ -98,6 +98,10 @@ const DEATH_CRY_ENEMY_SKILL_TYPE = 69;
 const DEATH_CRY_HANDLER = 0x62be50;
 const DEATH_CRY_SETUP_HANDLER = 0x621c94;
 const DEATH_CRY_CONDITION_HANDLER = 0x61bb1c;
+const INACTIVITY_PRESENTATION_ENEMY_SKILL_TYPE = 70;
+const INACTIVITY_PRESENTATION_HANDLER = 0x6299fc;
+const INACTIVITY_PRESENTATION_SETUP_HANDLER = 0x621790;
+const INACTIVITY_PRESENTATION_CONDITION_HANDLER = 0x61b558;
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -691,6 +695,27 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : deathCrySetupTarget === DEATH_CRY_SETUP_HANDLER;
   const deathCryConditionMatches = deathCryConditionTarget === null
     ? null : deathCryConditionTarget === DEATH_CRY_CONDITION_HANDLER;
+  const inactivityPresentationDispatchTarget = resolveEnemySkillTarget(
+    INACTIVITY_PRESENTATION_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const inactivityPresentationSetupTarget = resolveEnemySkillTarget(
+    INACTIVITY_PRESENTATION_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const inactivityPresentationConditionTarget = resolveEnemySkillTarget(
+    INACTIVITY_PRESENTATION_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const inactivityPresentationDispatchMatches = inactivityPresentationDispatchTarget === null
+    ? null : inactivityPresentationDispatchTarget === INACTIVITY_PRESENTATION_HANDLER;
+  const inactivityPresentationSetupMatches = inactivityPresentationSetupTarget === null
+    ? null : inactivityPresentationSetupTarget === INACTIVITY_PRESENTATION_SETUP_HANDLER;
+  const inactivityPresentationConditionMatches = inactivityPresentationConditionTarget === null
+    ? null : inactivityPresentationConditionTarget === INACTIVITY_PRESENTATION_CONDITION_HANDLER;
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1631,6 +1656,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       deathCryDispatchMatches21_9: deathCryDispatchMatches,
       deathCrySetupMatches21_9: deathCrySetupMatches,
       deathCryConditionMatches21_9: deathCryConditionMatches,
+      inactivityPresentationDispatchMatches21_9: inactivityPresentationDispatchMatches,
+      inactivityPresentationSetupMatches21_9: inactivityPresentationSetupMatches,
+      inactivityPresentationConditionMatches21_9: inactivityPresentationConditionMatches,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -1945,6 +1973,18 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       deathCryConditionMatches21_9: deathCryConditionMatches,
       deathCrySemantics:
         'type 69 is rejected by the ordinary turn selector; setupDeadmanEffect scans the 64 monster skill slots at death, copies +0x10..+0x2c presentation fields into the dedicated +0x108 death record, and gamePhaseEnemyDead presents it before battle continuation',
+      inactivityPresentationType: INACTIVITY_PRESENTATION_ENEMY_SKILL_TYPE,
+      inactivityPresentationDispatchTarget: inactivityPresentationDispatchTarget === null
+        ? null : hex(inactivityPresentationDispatchTarget),
+      inactivityPresentationDispatchMatches21_9: inactivityPresentationDispatchMatches,
+      inactivityPresentationSetupTarget: inactivityPresentationSetupTarget === null
+        ? null : hex(inactivityPresentationSetupTarget),
+      inactivityPresentationSetupMatches21_9: inactivityPresentationSetupMatches,
+      inactivityPresentationConditionTarget: inactivityPresentationConditionTarget === null
+        ? null : hex(inactivityPresentationConditionTarget),
+      inactivityPresentationConditionMatches21_9: inactivityPresentationConditionMatches,
+      inactivityPresentationSemantics:
+        'type 70 is a no-gameplay inactivity action with a distinct transient presentation path: setup stages +0x10/+0x14/+0x18 at runtime +0x678/+0x67c/+0x680 when the controller is empty, condition admits only while sMONSTER+0x910 reports zero, and execution applies or clears the presentation controller before the common action tail',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -2391,6 +2431,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || deathCryDispatchMatches === false
     || deathCrySetupMatches === false
     || deathCryConditionMatches === false
+    || inactivityPresentationDispatchMatches === false
+    || inactivityPresentationSetupMatches === false
+    || inactivityPresentationConditionMatches === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

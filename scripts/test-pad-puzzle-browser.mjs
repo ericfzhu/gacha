@@ -2721,7 +2721,22 @@ try {
     engine.enemies[0].counter = 1;
     engine.enemies[1].counter = 99;
     engine.resolveEnemyTurn();
-    return { conditionalState, unconditionalState: engine.snapshot() };
+    const unconditionalState = engine.snapshot();
+    monsterView.setUint32(0xec, 9_049, true);
+    view.setUint32(0x00, 9_049, true);
+    view.setInt16(0x04, 70, true);
+    view.setInt32(0x10, 12, true);
+    view.setInt32(0x14, 34, true);
+    view.setInt32(0x18, 56, true);
+    engine.reset();
+    engine.start();
+    engine.setEnemySkillQueue(0, []);
+    engine.setEnemyAiDefinitionPool(0, monsterDefinition, [definition]);
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    return { conditionalState, unconditionalState, presentationState: engine.snapshot() };
   }) : null;
   if (inactivityRenderState && (
     inactivityRenderState.conditionalState?.lastEnemyActions?.[0]?.skill?.type !== 16
@@ -2735,6 +2750,12 @@ try {
     || inactivityRenderState.unconditionalState?.player?.hp !== 12_000
     || inactivityRenderState.unconditionalState?.rngState !== 394_448_415
     || inactivityRenderState.unconditionalState?.message !== 'Verdant Shell does nothing.'
+    || inactivityRenderState.presentationState?.lastEnemyActions?.[0]?.skill?.type !== 70
+    || inactivityRenderState.presentationState?.lastEnemyActions?.[0]?.damage !== undefined
+    || inactivityRenderState.presentationState?.lastEnemyActions?.[0]?.skill?.presentationParameters?.join('/') !== '12/34/56'
+    || inactivityRenderState.presentationState?.player?.hp !== 12_000
+    || inactivityRenderState.presentationState?.rngState !== 394_448_415
+    || inactivityRenderState.presentationState?.message !== 'Verdant Shell pauses with effect 12/34/56.'
   )) throw new Error(`Inactivity render-state mismatch: ${JSON.stringify(inactivityRenderState)}`);
   if (inactivityRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   const attackBoostRenderState = renderAttackBoostState ? await page.evaluate(() => {

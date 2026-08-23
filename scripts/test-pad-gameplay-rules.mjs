@@ -21,6 +21,7 @@ import {
   PAD_ENEMY_SKILL_COMBO_ABSORB,
   PAD_ENEMY_SKILL_SKYFALL_RATE,
   PAD_ENEMY_SKILL_DEATH_CRY,
+  PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -2039,6 +2040,42 @@ assert.equal(deathCryEngine.phase, 'death');
 deathCryEngine.advancePhase();
 assert.equal(deathCryEngine.mode, 'victory');
 assert.equal(deathCryEngine.phase, 'complete');
+const enemyAiInactivityPresentationDefinition = enemyAiInactivityDefinition.slice();
+const enemyAiInactivityPresentationView = new DataView(
+  enemyAiInactivityPresentationDefinition.buffer,
+);
+enemyAiInactivityPresentationView.setUint32(0x00, 9_049, true);
+enemyAiInactivityPresentationView.setInt16(
+  0x04,
+  PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION,
+  true,
+);
+enemyAiInactivityPresentationView.setInt32(0x10, 12, true);
+enemyAiInactivityPresentationView.setInt32(0x14, 34, true);
+enemyAiInactivityPresentationView.setInt32(0x18, 56, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiInactivityPresentationDefinition), {
+  type: 70,
+  kind: 'inactivityPresentation',
+  supported: true,
+  presentationParameters: [12, 34, 56],
+  attackWithSkillValue: 0,
+});
+const inactivityPresentationRuntime = new Uint8Array(0x684);
+const inactivityPresentationRuntimeView = new DataView(inactivityPresentationRuntime.buffer);
+inactivityPresentationRuntimeView.setInt32(0x678, 12, true);
+inactivityPresentationRuntimeView.setInt32(0x67c, 34, true);
+inactivityPresentationRuntimeView.setInt32(0x680, 56, true);
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiInactivityPresentationDefinition,
+  inactivityPresentationRuntime,
+), {
+  type: 70,
+  kind: 'inactivityPresentation',
+  supported: true,
+  presentationParameters: [12, 34, 56],
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
 const enemyAiAttributeAbsorbDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiAttributeAbsorbView = new DataView(enemyAiAttributeAbsorbDefinition.buffer);
 enemyAiAttributeAbsorbView.setUint32(0x00, 9_021, true);
@@ -4284,6 +4321,28 @@ assert.equal(selectedInactivityUnconditionalState.lastEnemyActions[0].damage, un
 assert.equal(selectedInactivityUnconditionalState.player.hp, 12_000);
 assert.equal(selectedInactivityUnconditionalState.message, 'Verdant Shell does nothing.');
 assert.equal(selectedInactivityUnconditionalState.rngState, padLcgStep(21_900).state);
+const inactivityPresentationMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(inactivityPresentationMonsterDefinition.buffer).setUint32(0xec, 9_049, true);
+const selectedInactivityPresentationEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: inactivityPresentationMonsterDefinition,
+    skillDefinitions: [enemyAiInactivityPresentationDefinition],
+  }],
+});
+selectedInactivityPresentationEngine.setRngState(21_900);
+selectedInactivityPresentationEngine.enemies[0].counter = 1;
+selectedInactivityPresentationEngine.enemies[1].counter = 99;
+selectedInactivityPresentationEngine.resolveEnemyTurn();
+const selectedInactivityPresentationState = selectedInactivityPresentationEngine.snapshot();
+assert.equal(selectedInactivityPresentationState.lastEnemyActions[0].skill.type, 70);
+assert.deepEqual(
+  selectedInactivityPresentationState.lastEnemyActions[0].skill.presentationParameters,
+  [12, 34, 56],
+);
+assert.equal(selectedInactivityPresentationState.lastEnemyActions[0].damage, undefined);
+assert.equal(selectedInactivityPresentationState.player.hp, 12_000);
+assert.equal(selectedInactivityPresentationState.rngState, padLcgStep(21_900).state);
 const comboAbsorbMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(comboAbsorbMonsterDefinition.buffer).setUint32(0xec, 9_046, true);
 const selectedComboAbsorbEngine = new PuzzleEngine({
