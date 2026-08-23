@@ -50,6 +50,7 @@ export const PAD_ENEMY_SKILL_HORIZONTAL_LINES_4 = 78;
 export const PAD_ENEMY_SKILL_HORIZONTAL_LINES = 79;
 export const PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT = 80;
 export const PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP = 81;
+export const PAD_ENEMY_SKILL_NORMAL_ATTACK = 82;
 export const PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT = 84;
 export const PAD_ENEMY_SKILL_POISON_MASK_SWAP = 85;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
@@ -344,6 +345,15 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       supported: true,
       durationTurns: Math.max(0, (definition.getInt32(0x10, true) << 16) >> 16),
       selectedPartyIndex: null,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_NORMAL_ATTACK) {
+    return Object.freeze({
+      type,
+      kind: 'normalAttack',
+      supported: true,
+      damagePercent: 100,
       attackWithSkillValue,
     });
   }
@@ -1165,6 +1175,20 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_NORMAL_ATTACK) {
+    requireLength(monsterBytes, 0x674, 'PAD monster runtime');
+    return Object.freeze({
+      type,
+      kind: 'normalAttack',
+      supported: true,
+      damagePercent: 100,
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (
     type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST
     || type === PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST
@@ -1687,6 +1711,18 @@ export function normalizePadEnemySkillRecord(record) {
       supported: record?.supported !== false,
       durationTurns: Math.max(0, (Math.trunc(Number(record?.durationTurns) || 0) << 16) >> 16),
       selectedPartyIndex: Number.isInteger(selectedPartyIndex) ? selectedPartyIndex : null,
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_NORMAL_ATTACK || record?.kind === 'normalAttack') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_NORMAL_ATTACK,
+      kind: 'normalAttack',
+      supported: record?.supported !== false,
+      damagePercent: 100,
       setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null

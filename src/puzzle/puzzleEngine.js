@@ -62,6 +62,7 @@ import {
   PAD_ENEMY_SKILL_RESOLVE,
   PAD_ENEMY_SKILL_DAMAGE_SHIELD,
   PAD_ENEMY_SKILL_LEADER_SWAP,
+  PAD_ENEMY_SKILL_NORMAL_ATTACK,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -1077,7 +1078,7 @@ export class PuzzleEngine {
             : 100;
           let damage = padEnemySkillBoostedAttack(
             enemy.attack,
-            skill.attackWithSkillValue,
+            skill.kind === 'normalAttack' ? 100 : skill.attackWithSkillValue,
             activeBoostPercent,
           );
           this.applyEnemySkillRecord(skill, index);
@@ -2012,6 +2013,10 @@ export class PuzzleEngine {
       this.message = `${this.party[0].name} was swapped into the leader slot for ${this.leaderSwapTurns} turn${this.leaderSwapTurns === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'normalAttack') {
+      this.message = 'Enemy performs a normal attack.';
+      return true;
+    }
     if (skill.supported && [
       'loneAttackBoost',
       'statusTriggeredAttackBoost',
@@ -2325,6 +2330,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_RESOLVE,
         PAD_ENEMY_SKILL_DAMAGE_SHIELD,
         PAD_ENEMY_SKILL_LEADER_SWAP,
+        PAD_ENEMY_SKILL_NORMAL_ATTACK,
         PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
         PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,

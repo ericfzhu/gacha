@@ -2,6 +2,23 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 explicit normal-attack enemy record
+
+- Closed the first remaining gap after the already-ported type-76–85 board
+  family: type `82` is an explicit one-hit, 100%-power normal attack. Its
+  dispatch/setup/condition entries are `0x62be50`, `0x621c94`, and `0x61a630`;
+  setup writes the `-1` sentinel to `sMONSTER+0x670`, and admission is
+  unconditional. The public pad-rikuu parser independently describes the same
+  record as one 1.0x hit.
+- Kept this attack distinct from generic definition `+0x44` composition, which
+  is zero in the focused fixture. Definition/runtime decoding, normalization,
+  new-AI admission, current attack-boost composition, action accounting, and
+  browser execution are covered.
+- Pure rules and exact table inspection pass. In Chromium, seed 21900 consumes
+  one probability draw, deals 1,850 damage, leaves 10,150/12,000 player HP,
+  and renders the damage event without page errors.
+- Next: recover type `83` choose-flow control as a separate checkpoint.
+
 ## 2026-08-24 enemy leader swap
 
 - Recovered live enemy skill type `75` (`ESLeaderSwap`) at dispatch/setup/
@@ -18,7 +35,8 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
   pass. Exact table inspection matches all three 21.9 addresses; the focused
   browser fixture selects Nyx at index 4 with seed 21900, reaches RNG state
   `3803934822`, and renders the swapped leader without page errors.
-- Next: recover type `76` as a separate checkpoint.
+- Types `76`–`81` and `84`–`85` were already ported and verified in the earlier
+  board-skill audit; continue at the uncovered type `82` checkpoint.
 
 ## 2026-08-24 enemy damage-reduction shield
 

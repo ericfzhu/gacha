@@ -23,6 +23,7 @@ import {
   PAD_ENEMY_SKILL_DAMAGE_VOID,
   PAD_ENEMY_SKILL_DAMAGE_SHIELD,
   PAD_ENEMY_SKILL_LEADER_SWAP,
+  PAD_ENEMY_SKILL_NORMAL_ATTACK,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -174,6 +175,7 @@ function isStaticallyEligible(definition, state) {
     PAD_ENEMY_SKILL_DAMAGE_VOID,
     PAD_ENEMY_SKILL_DAMAGE_SHIELD,
     PAD_ENEMY_SKILL_LEADER_SWAP,
+    PAD_ENEMY_SKILL_NORMAL_ATTACK,
     PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
     PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
     PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -366,6 +368,9 @@ function evaluateCondition(definition, state, rngState) {
     // it is positive. Target selection belongs to setup and consumes RNG later.
     const eligible = state.leaderSwapTurns <= 0 && state.leaderSwapCandidateCount > 0;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_NORMAL_ATTACK) {
+    return { eligible: true, probabilityScale: 1, rngState };
   }
   if (
     definition.effect.type === PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION

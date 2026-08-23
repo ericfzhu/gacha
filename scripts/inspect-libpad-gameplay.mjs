@@ -122,6 +122,10 @@ const LEADER_SWAP_ENEMY_SKILL_TYPE = 75;
 const LEADER_SWAP_HANDLER = 0x629ad8;
 const LEADER_SWAP_SETUP_HANDLER = 0x620444;
 const LEADER_SWAP_CONDITION_HANDLER = 0x61ab74;
+const NORMAL_ATTACK_ENEMY_SKILL_TYPE = 82;
+const NORMAL_ATTACK_HANDLER = 0x62be50;
+const NORMAL_ATTACK_SETUP_HANDLER = 0x621c94;
+const NORMAL_ATTACK_CONDITION_HANDLER = 0x61a630;
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -816,6 +820,21 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : leaderSwapSetupTarget === LEADER_SWAP_SETUP_HANDLER;
   const leaderSwapConditionMatches = leaderSwapConditionTarget === null
     ? null : leaderSwapConditionTarget === LEADER_SWAP_CONDITION_HANDLER;
+  const normalAttackDispatchTarget = resolveEnemySkillTarget(
+    NORMAL_ATTACK_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const normalAttackSetupTarget = resolveEnemySkillTarget(
+    NORMAL_ATTACK_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const normalAttackConditionTarget = resolveEnemySkillTarget(
+    NORMAL_ATTACK_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const normalAttackDispatchMatches = normalAttackDispatchTarget === null
+    ? null : normalAttackDispatchTarget === NORMAL_ATTACK_HANDLER;
+  const normalAttackSetupMatches = normalAttackSetupTarget === null
+    ? null : normalAttackSetupTarget === NORMAL_ATTACK_SETUP_HANDLER;
+  const normalAttackConditionMatches = normalAttackConditionTarget === null
+    ? null : normalAttackConditionTarget === NORMAL_ATTACK_CONDITION_HANDLER;
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1774,6 +1793,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       leaderSwapDispatchMatches21_9: leaderSwapDispatchMatches,
       leaderSwapSetupMatches21_9: leaderSwapSetupMatches,
       leaderSwapConditionMatches21_9: leaderSwapConditionMatches,
+      normalAttackDispatchMatches21_9: normalAttackDispatchMatches,
+      normalAttackSetupMatches21_9: normalAttackSetupMatches,
+      normalAttackConditionMatches21_9: normalAttackConditionMatches,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -2157,6 +2179,18 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       leaderSwapConditionMatches21_9: leaderSwapConditionMatches,
       leaderSwapSemantics:
         'type 75: condition checks that the native changeable-sub count is positive; setup copies signed-int16 +0x10 turns to runtime +0x678, consumes one LCG roll, selects one eligible party index 1..4 by rank, and stores it at +0x67c; execution installs the global leader-change duration and selected index, swaps that sub with slot 0 through _doLeaderChange, and restores the original order on expiry',
+      normalAttackType: NORMAL_ATTACK_ENEMY_SKILL_TYPE,
+      normalAttackDispatchTarget: normalAttackDispatchTarget === null
+        ? null : hex(normalAttackDispatchTarget),
+      normalAttackDispatchMatches21_9: normalAttackDispatchMatches,
+      normalAttackSetupTarget: normalAttackSetupTarget === null
+        ? null : hex(normalAttackSetupTarget),
+      normalAttackSetupMatches21_9: normalAttackSetupMatches,
+      normalAttackConditionTarget: normalAttackConditionTarget === null
+        ? null : hex(normalAttackConditionTarget),
+      normalAttackConditionMatches21_9: normalAttackConditionMatches,
+      normalAttackSemantics:
+        'type 82: unconditional AI condition, sentinel setup writes -1 to sMONSTER+0x670, and the shared no-special-effect dispatch performs one ordinary 100%-power hit independently of the generic +0x44 attack-with-skill field',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -2621,6 +2655,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || leaderSwapDispatchMatches === false
     || leaderSwapSetupMatches === false
     || leaderSwapConditionMatches === false
+    || normalAttackDispatchMatches === false
+    || normalAttackSetupMatches === false
+    || normalAttackConditionMatches === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

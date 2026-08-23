@@ -937,6 +937,22 @@ in snapshots, and marks the temporary leader with `SWAP nT`. With seed 21900,
 the standard 100% AI draw followed by setup selects party index 4 and ends at
 RNG state `3803934822`.
 
+Enemy skill type `82` is the explicit ordinary-attack record. The independent
+pad-rikuu parser likewise represents it as exactly one 100%-power hit. Its
+dispatch, setup, and condition entries target `0x62be50`, `0x621c94`, and
+`0x61a630`: the effect has no specialized dispatch body, setup writes the
+sentinel `-1` to `sMONSTER+0x670`, and the AI condition is unconditional.
+Unlike the generic attack composed onto many enemy skills through definition
+`+0x44`, type 82 supplies its own 100% hit even when `+0x44` is zero.
+
+The browser preserves that distinction with a dedicated record instead of
+rewriting the raw attack-with-skill field. It participates in ordinary new-AI
+probability and budget handling, applies the acting monster's current attack
+boost, and records one damage event. With seed 21900, a guaranteed type-82
+record consumes the single standard probability draw, deals Verdant Shell's
+1,850 base damage, leaves player HP at 10,150, and ends at RNG state
+`394448415`.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

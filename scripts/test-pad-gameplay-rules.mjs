@@ -27,6 +27,7 @@ import {
   PAD_ENEMY_SKILL_RESOLVE,
   PAD_ENEMY_SKILL_DAMAGE_SHIELD,
   PAD_ENEMY_SKILL_LEADER_SWAP,
+  PAD_ENEMY_SKILL_NORMAL_ATTACK,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -2276,6 +2277,28 @@ assert.equal(directLeaderSwapEngine.leaderSwapIndex, null);
 assert.deepEqual(directLeaderSwapEngine.party.slice(0, 2).map(({ id }) => id), [
   'ember', 'marina',
 ]);
+const enemyAiNormalAttackDefinition = enemyAiInactivityDefinition.slice();
+const enemyAiNormalAttackView = new DataView(enemyAiNormalAttackDefinition.buffer);
+enemyAiNormalAttackView.setUint32(0x00, 9_060, true);
+enemyAiNormalAttackView.setInt16(0x04, PAD_ENEMY_SKILL_NORMAL_ATTACK, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiNormalAttackDefinition), {
+  type: 82,
+  kind: 'normalAttack',
+  supported: true,
+  damagePercent: 100,
+  attackWithSkillValue: 0,
+});
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiNormalAttackDefinition,
+  new Uint8Array(0x680),
+), {
+  type: 82,
+  kind: 'normalAttack',
+  supported: true,
+  damagePercent: 100,
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
 const enemyAiAttributeAbsorbDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiAttributeAbsorbView = new DataView(enemyAiAttributeAbsorbDefinition.buffer);
 enemyAiAttributeAbsorbView.setUint32(0x00, 9_021, true);
@@ -4757,6 +4780,25 @@ assert.equal(selectedLeaderSwapEngine.leaderSwapIndex, null);
 assert.deepEqual(selectedLeaderSwapEngine.party.map(({ id }) => id), [
   'ember', 'marina', 'briar', 'sol', 'nyx', 'helper',
 ]);
+const normalAttackMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(normalAttackMonsterDefinition.buffer).setUint32(0xec, 9_060, true);
+const selectedNormalAttackEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: normalAttackMonsterDefinition,
+    skillDefinitions: [enemyAiNormalAttackDefinition],
+  }],
+});
+selectedNormalAttackEngine.setRngState(21_900);
+selectedNormalAttackEngine.enemies[0].counter = 1;
+selectedNormalAttackEngine.enemies[1].counter = 99;
+selectedNormalAttackEngine.resolveEnemyTurn();
+const selectedNormalAttackState = selectedNormalAttackEngine.snapshot();
+assert.equal(selectedNormalAttackState.lastEnemyActions[0].skill.type, 82);
+assert.equal(selectedNormalAttackState.lastEnemyActions[0].damage, 1_850);
+assert.equal(selectedNormalAttackState.player.hp, 10_150);
+assert.equal(selectedNormalAttackState.rngState, padLcgStep(21_900).state);
+assert.equal(selectedNormalAttackState.enemies[0].enemyAiBudget, 80);
 const comboAbsorbMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(comboAbsorbMonsterDefinition.buffer).setUint32(0xec, 9_046, true);
 const selectedComboAbsorbEngine = new PuzzleEngine({
