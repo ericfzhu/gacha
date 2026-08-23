@@ -71,6 +71,7 @@ import {
   PAD_ENEMY_SKILL_FIXED_TARGET,
   PAD_ENEMY_SKILL_BRANCH_COMBO,
   PAD_ENEMY_SKILL_BRANCH_ATTACK_ATTRIBUTES,
+  PAD_ENEMY_SKILL_BRANCH_SKILL_USE,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -328,6 +329,8 @@ export class PuzzleEngine {
     this.cascadeDepth = 0;
     this.lastComboCount = 0;
     this.lastAttackAttributeMask = 0;
+    this.currentTurnSkillUseCount = 0;
+    this.lastSkillUseCount = 0;
     this.lastDamage = 0;
     this.lastAbsorbedDamage = 0;
     this.lastVoidedDamage = 0;
@@ -681,6 +684,7 @@ export class PuzzleEngine {
       this.board[row][column] = { ...this.board[row][column], type: 'water' };
     });
     this.skill.cooldown = this.skill.maxCooldown;
+    this.currentTurnSkillUseCount += 1;
     this.message = 'Tide Shift changed four orbs to Water. Skills do not consume the turn.';
     return true;
   }
@@ -1001,6 +1005,8 @@ export class PuzzleEngine {
     this.lastLeaderMultiplier = leaderPair;
     this.lastComboCount = this.comboCount;
     this.lastAttackAttributeMask = 0;
+    this.lastSkillUseCount = this.currentTurnSkillUseCount;
+    this.currentTurnSkillUseCount = 0;
 
     const byType = new Map();
     this.turnMatches.forEach((match) => {
@@ -1504,6 +1510,13 @@ export class PuzzleEngine {
         }
         if (skill.kind === 'branchAttackAttributes') {
           queue.position = this.lastAttackAttributeMask === skill.attributeMask
+            ? skill.targetRound
+            : queue.position + 1;
+          controlFlowSteps += 1;
+          continue;
+        }
+        if (skill.kind === 'branchSkillUse') {
+          queue.position = this.lastSkillUseCount >= skill.branchValue
             ? skill.targetRound
             : queue.position + 1;
           controlFlowSteps += 1;
@@ -3105,6 +3118,7 @@ export class PuzzleEngine {
       if (![
         PAD_ENEMY_SKILL_BRANCH_COMBO,
         PAD_ENEMY_SKILL_BRANCH_ATTACK_ATTRIBUTES,
+        PAD_ENEMY_SKILL_BRANCH_SKILL_USE,
       ].includes(decoded.type)) return decoded;
       if (!reference) {
         throw new TypeError(`PAD type-${decoded.type} branches require a skill-reference record.`);
@@ -3119,7 +3133,10 @@ export class PuzzleEngine {
       }
       return normalizePadEnemySkillRecord({
         ...decoded,
-        ...(decoded.type === PAD_ENEMY_SKILL_BRANCH_COMBO
+        ...([
+          PAD_ENEMY_SKILL_BRANCH_COMBO,
+          PAD_ENEMY_SKILL_BRANCH_SKILL_USE,
+        ].includes(decoded.type)
           ? { branchValue: reference.enemyAi }
           : {}),
         targetRound: reference.enemyRnd,
@@ -3973,6 +3990,8 @@ export class PuzzleEngine {
       turnMatches: this.turnMatches.map((match) => ({ ...match })),
       lastComboCount: this.lastComboCount,
       lastAttackAttributeMask: this.lastAttackAttributeMask,
+      currentTurnSkillUseCount: this.currentTurnSkillUseCount,
+      lastSkillUseCount: this.lastSkillUseCount,
       lastDamage: this.lastDamage,
       lastAbsorbedDamage: this.lastAbsorbedDamage,
       lastVoidedDamage: this.lastVoidedDamage,

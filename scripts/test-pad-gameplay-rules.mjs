@@ -36,6 +36,7 @@ import {
   PAD_ENEMY_SKILL_FIXED_TARGET,
   PAD_ENEMY_SKILL_BRANCH_COMBO,
   PAD_ENEMY_SKILL_BRANCH_ATTACK_ATTRIBUTES,
+  PAD_ENEMY_SKILL_BRANCH_SKILL_USE,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1659,6 +1660,25 @@ assert.deepEqual(
     new Uint8Array(0x680),
   ),
   expectedBranchAttackAttributesDefinition,
+);
+const enemyAiBranchSkillUseDefinition = enemyAiBranchAttackAttributesDefinition.slice();
+const enemyAiBranchSkillUseView = new DataView(enemyAiBranchSkillUseDefinition.buffer);
+enemyAiBranchSkillUseView.setUint32(0x00, 9_095, true);
+enemyAiBranchSkillUseView.setInt16(0x04, PAD_ENEMY_SKILL_BRANCH_SKILL_USE, true);
+const expectedBranchSkillUseDefinition = {
+  type: 115,
+  kind: 'branchSkillUse',
+  supported: true,
+  controlFlow: true,
+  attackWithSkillValue: 0,
+};
+assert.deepEqual(
+  decodePadEnemySkillDefinition(enemyAiBranchSkillUseDefinition),
+  expectedBranchSkillUseDefinition,
+);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiBranchSkillUseDefinition, new Uint8Array(0x680)),
+  expectedBranchSkillUseDefinition,
 );
 assert.deepEqual(decodePadEnemySkillRuntime(
   enemyAiUnconditionalHealDefinition,
@@ -6309,6 +6329,38 @@ exactAttackAttributesBranchEngine.lastAttackAttributeMask = 0b00011;
 assert.equal(exactAttackAttributesBranchEngine.takeEnemySkill(0).kind, 'scaledAttack');
 assert.equal(exactAttackAttributesBranchEngine.enemySkillQueues[0].position, 3);
 assert.equal(exactAttackAttributesBranchEngine.snapshot().rngState, 21_900);
+
+const trackedSkillUseEngine = new PuzzleEngine({ seed: 21_900 });
+trackedSkillUseEngine.start();
+assert.equal(trackedSkillUseEngine.useSkill(), true);
+assert.equal(trackedSkillUseEngine.snapshot().currentTurnSkillUseCount, 1);
+trackedSkillUseEngine.resolvePlayerTurn();
+assert.equal(trackedSkillUseEngine.snapshot().currentTurnSkillUseCount, 0);
+assert.equal(trackedSkillUseEngine.snapshot().lastSkillUseCount, 1);
+
+const belowSkillUseBranchEngine = new PuzzleEngine({ seed: 21_900 });
+belowSkillUseBranchEngine.setRngState(21_900);
+belowSkillUseBranchEngine.setEnemySkillQueue(0, [
+  { definition: enemyAiBranchSkillUseDefinition, enemyAi: 1, enemyRnd: 2 },
+  enemyAiNormalAttackDefinition,
+  enemyAiScaledAttackDefinition,
+]);
+belowSkillUseBranchEngine.lastSkillUseCount = 0;
+assert.equal(belowSkillUseBranchEngine.takeEnemySkill(0).kind, 'normalAttack');
+assert.equal(belowSkillUseBranchEngine.enemySkillQueues[0].position, 2);
+assert.equal(belowSkillUseBranchEngine.snapshot().rngState, 21_900);
+
+const exactSkillUseBranchEngine = new PuzzleEngine({ seed: 21_900 });
+exactSkillUseBranchEngine.setRngState(21_900);
+exactSkillUseBranchEngine.setEnemySkillQueue(0, [
+  { definition: enemyAiBranchSkillUseDefinition, enemyAi: 1, enemyRnd: 2 },
+  enemyAiNormalAttackDefinition,
+  enemyAiScaledAttackDefinition,
+]);
+exactSkillUseBranchEngine.lastSkillUseCount = 1;
+assert.equal(exactSkillUseBranchEngine.takeEnemySkill(0).kind, 'scaledAttack');
+assert.equal(exactSkillUseBranchEngine.enemySkillQueues[0].position, 3);
+assert.equal(exactSkillUseBranchEngine.snapshot().rngState, 21_900);
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;

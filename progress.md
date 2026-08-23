@@ -2,6 +2,18 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 previous active-skill-use branch
+
+- Recovered type `115` as `ESBranchSkillUse`; ordinary dispatch/setup/condition
+  share the inert `0x62be50`, `0x621c94`, and `0x61c01c` control-record paths.
+- Reference-slot `enemy_ai` is the inclusive number of active skills used in
+  the previous player turn and `enemy_rnd` is the zero-based destination.
+- Successful no-turn active use now increments a per-turn accumulator; player
+  resolution publishes and clears it before enemy selection. The guarded queue
+  applies the `>=` branch without an action/RNG cost. Pure fixtures, six ARM64
+  anchors, focused Chromium with APK art, screenshot inspection, native
+  inspector, data checks, and production build pass. Next: type `116`.
+
 ## 2026-08-24 previous attack-attribute branch
 
 - Recovered type `114` as `ESBranchDamageAttribute`. Its ordinary

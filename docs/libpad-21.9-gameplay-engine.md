@@ -636,8 +636,8 @@ cap and the selected skill's cost is subtracted. For type 128,
 so an active copy cannot be selected again. `setEnemyAiDefinitionPool` wires
 this raw record path into enemy turns and reports the chosen skill ID, budget,
 and RNG state. Remaining condition callbacks, flow-control records other than
-types 113 and 114, and the rest of the legacy selector are rejected explicitly
-until decoded rather than approximated.
+types 113 through 115, and the rest of the legacy selector are rejected
+explicitly until decoded rather than approximated.
 
 The selector does not reduce every condition callback to a boolean. In the
 immediate path at `0x61d844`, `_chooseEnemyAiSub` returns a binary32 multiplier;
@@ -1592,6 +1592,22 @@ available through the following enemy turn and the text snapshot. As with type
 113, interpreting the branch consumes neither an enemy action nor RNG. A
 Fire+Water fixture records mask `0b00011`; Fire alone falls through while the
 exact two-color mask jumps to slot two.
+
+Enemy skill type `115` branches on how many player active skills were used in
+the previous turn. It shares types 113 and 114's inert ordinary dispatch,
+setup, and condition targets. The independent `ESBranchSkillUse` parser places
+the inclusive minimum in reference-slot byte `enemy_ai` and the zero-based
+destination in `enemy_rnd`; there are no authored definition operands. The
+predicate is `previousSkillUseCount >= enemy_ai`.
+
+The browser increments a current-player-turn accumulator only after an active
+skill succeeds. Because active skills do not themselves end the turn, multiple
+successful activations can accumulate before the orb move resolves. Player
+resolution publishes that value as the previous-turn count and clears the
+current accumulator before enemy selection. Both values are exposed in the
+text snapshot. The structural branch consumes no enemy action and no RNG; a
+zero-use fixture falls through, while one successful Tide Shift satisfies a
+minimum of one and jumps to slot two.
 
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
