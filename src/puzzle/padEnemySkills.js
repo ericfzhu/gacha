@@ -1,4 +1,5 @@
 export const PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION = 4;
+export const PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS = 6;
 export const PAD_ENEMY_SKILL_SOURCE_TO_JAMMER = 12;
 export const PAD_ENEMY_SKILL_LONE_ATTACK_BOOST = 17;
 export const PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST = 18;
@@ -103,6 +104,14 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       supported: true,
       sourceType: definition.getInt32(0x10, true),
       destinationType: definition.getInt32(0x14, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS) {
+    return Object.freeze({
+      type,
+      kind: 'clearPlayerBuffs',
+      supported: true,
       attackWithSkillValue,
     });
   }
@@ -583,6 +592,17 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS) {
+    return Object.freeze({
+      type,
+      kind: 'clearPlayerBuffs',
+      supported: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_SOURCE_TO_JAMMER) {
     return Object.freeze({
       type,
@@ -806,6 +826,16 @@ export function normalizePadEnemySkillRecord(record) {
       sourceType: Math.trunc(Number(record?.sourceType) || 0),
       destinationType: 6,
       setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS || record?.kind === 'clearPlayerBuffs') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
+      kind: 'clearPlayerBuffs',
+      supported: true,
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

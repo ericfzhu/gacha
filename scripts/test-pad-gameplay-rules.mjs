@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
   PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
+  PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
   PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
@@ -827,6 +828,46 @@ assert.equal(sourceOrbConversionEngine.applyEnemySkillDefinition(
 ), true);
 assert.equal(sourceOrbConversionEngine.board.flat().filter((orb) => orb.type === 'water').length, 0);
 assert.equal(sourceOrbConversionEngine.board.flat().filter((orb) => orb.type === 'dark').length, 12);
+const enemyAiClearPlayerBuffsDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiClearPlayerBuffsView = new DataView(enemyAiClearPlayerBuffsDefinition.buffer);
+enemyAiClearPlayerBuffsView.setUint32(0x00, 9_035, true);
+enemyAiClearPlayerBuffsView.setInt16(0x04, PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS, true);
+enemyAiClearPlayerBuffsView.setInt32(0x30, 5_000, true);
+enemyAiClearPlayerBuffsView.setInt32(0x34, 1_000, true);
+enemyAiClearPlayerBuffsView.setInt32(0x38, 100, true);
+enemyAiClearPlayerBuffsView.setInt32(0x40, 20, true);
+enemyAiClearPlayerBuffsView.setInt32(0x44, 0, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiClearPlayerBuffsDefinition), {
+  type: 6,
+  kind: 'clearPlayerBuffs',
+  supported: true,
+  attackWithSkillValue: 0,
+});
+assert.deepEqual(
+  decodePadEnemySkillRuntime(
+    enemyAiClearPlayerBuffsDefinition,
+    new Uint8Array(0x680),
+  ),
+  {
+    type: 6,
+    kind: 'clearPlayerBuffs',
+    supported: true,
+    attackWithSkillValue: 0,
+  },
+);
+const clearPlayerBuffsEngine = new PuzzleEngine({
+  seed: 21_900,
+  playerAuxiliaryBuffTurns: 4,
+  playerAttackBoostTurns: 2,
+});
+assert.equal(clearPlayerBuffsEngine.applyEnemySkillDefinition(
+  enemyAiClearPlayerBuffsDefinition,
+), true);
+assert.deepEqual(clearPlayerBuffsEngine.snapshot().nativePlayerBuffStatus, {
+  auxiliaryTurns: 0,
+  attackBoostTurns: 0,
+});
+assert.equal(clearPlayerBuffsEngine.lastEnemySkill.clearedBuffCount, 2);
 const randomSourceOrbConversionDefinition = enemyAiSourceOrbConversionDefinition.slice();
 const randomSourceOrbConversionView = new DataView(randomSourceOrbConversionDefinition.buffer);
 randomSourceOrbConversionView.setInt32(0x10, -1, true);
@@ -2773,6 +2814,54 @@ rejectedSourceToJammerEngine.setBoardFromCodes(Array(5).fill('RRRRRR'));
 rejectedSourceToJammerEngine.setRngState(21_900);
 assert.equal(rejectedSourceToJammerEngine.takeEnemySkill(0), null);
 assert.equal(rejectedSourceToJammerEngine.rng.state, 21_900);
+const clearPlayerBuffsMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(clearPlayerBuffsMonsterDefinition.buffer).setUint32(0xec, 9_035, true);
+const oneBuffClearPlayerBuffsEngine = new PuzzleEngine({
+  seed: 21_900,
+  playerAttackBoostTurns: 2,
+  enemyAiPools: [{
+    monsterDefinition: clearPlayerBuffsMonsterDefinition,
+    skillDefinitions: [enemyAiClearPlayerBuffsDefinition],
+  }],
+});
+oneBuffClearPlayerBuffsEngine.setRngState(21_900);
+assert.equal(oneBuffClearPlayerBuffsEngine.takeEnemySkill(0), null);
+assert.equal(oneBuffClearPlayerBuffsEngine.rng.state, padLcgStep(21_900).state);
+const selectedClearPlayerBuffsEngine = new PuzzleEngine({
+  seed: 21_900,
+  playerAuxiliaryBuffTurns: 4,
+  playerAttackBoostTurns: 2,
+  enemyAiPools: [{
+    monsterDefinition: clearPlayerBuffsMonsterDefinition,
+    skillDefinitions: [enemyAiClearPlayerBuffsDefinition],
+  }],
+});
+selectedClearPlayerBuffsEngine.setRngState(21_900);
+selectedClearPlayerBuffsEngine.enemies[0].counter = 1;
+selectedClearPlayerBuffsEngine.enemies[1].counter = 99;
+selectedClearPlayerBuffsEngine.resolveEnemyTurn();
+const selectedClearPlayerBuffsState = selectedClearPlayerBuffsEngine.snapshot();
+assert.equal(selectedClearPlayerBuffsState.lastEnemyActions[0].skill.type, 6);
+assert.equal(selectedClearPlayerBuffsState.lastEnemyActions[0].skill.skillId, 9_035);
+assert.equal(selectedClearPlayerBuffsState.lastEnemySkill.clearedBuffCount, 2);
+assert.deepEqual(selectedClearPlayerBuffsState.nativePlayerBuffStatus, {
+  auxiliaryTurns: 0,
+  attackBoostTurns: 0,
+});
+assert.equal(selectedClearPlayerBuffsEngine.rng.state, padLcgStep(21_900).state);
+const shieldedClearPlayerBuffsEngine = new PuzzleEngine({
+  seed: 21_900,
+  playerAuxiliaryBuffTurns: 4,
+  playerAttackBoostTurns: 2,
+  enemyAiPools: [{
+    monsterDefinition: clearPlayerBuffsMonsterDefinition,
+    skillDefinitions: [enemyAiClearPlayerBuffsDefinition],
+  }],
+});
+shieldedClearPlayerBuffsEngine.enemies[0].statusShieldTurns = 1;
+shieldedClearPlayerBuffsEngine.setRngState(21_900);
+assert.equal(shieldedClearPlayerBuffsEngine.takeEnemySkill(0), null);
+assert.equal(shieldedClearPlayerBuffsEngine.rng.state, 21_900);
 const statusTriggeredAttackBoostMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(statusTriggeredAttackBoostMonsterDefinition.buffer).setUint32(0xec, 9_031, true);
 const selectedStatusTriggeredAttackBoostEngine = new PuzzleEngine({

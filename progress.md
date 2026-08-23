@@ -2,6 +2,24 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 player-buff dispel enemy skill
+
+- Identified live enemy skill type `6`: dispatch `0x6292e8`, no-parameter setup
+  `0x6217c0`, and condition `0x61b404`. The exact symbol path is
+  `_doItetukuHadou` (`0x618d04`) followed by `_applyLeaderSkill(false)`
+  (`0x63a7e8`).
+- Recovered the non-boolean AI scale: `_getCountClearParams` (`0x618320`)
+  returns the number of clearable effects as a float32 probability multiplier.
+  The two already modeled positive player lanes at `sGAMEWORK+0x86bd4` and
+  `+0x86c3c` are skipped while acting-monster status shield `+0x870` is active.
+- Ported definition/runtime decoding, new-AI selection, direct and enemy-turn
+  execution, both modeled status clears, snapshots, exact address inspection,
+  and probability-boundary pure/browser fixtures. The condition consumes no
+  RNG; a seeded test proves one buff can fail where two buffs select.
+- Next: continue the remaining live early enemy-action table, extending the
+  set of clearable player status lanes only as their native semantics are
+  independently recovered.
+
 ## 2026-08-23 protected-startup speed and touched-frame fidelity
 
 - Profiled the exact APK bootstrap at 151,900,682 guest instructions. The

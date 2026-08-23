@@ -34,6 +34,7 @@ import {
 } from './padCoreRules.js';
 import {
   PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
+  PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
   PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
@@ -1374,6 +1375,19 @@ export class PuzzleEngine {
     const materialized = this.materializeEnemySkillRecord(record, enemyIndex);
     const skill = normalizePadEnemySkillRecord(materialized);
     this.lastEnemySkill = skill;
+    if (skill.supported && skill.kind === 'clearPlayerBuffs') {
+      // _doItetukuHadou clears both recovered sGAMEWORK positive-status lanes,
+      // then type 6 invokes _applyLeaderSkill(false). Leader effects in this
+      // reconstruction are calculated from current party state on use, so the
+      // observable equivalent is to clear the modeled transient lanes here.
+      const cleared = Number(this.playerAuxiliaryBuffTurns > 0)
+        + Number(this.playerAttackBoostTurns > 0);
+      this.playerAuxiliaryBuffTurns = 0;
+      this.playerAttackBoostTurns = 0;
+      this.lastEnemySkill = Object.freeze({ ...skill, clearedBuffCount: cleared });
+      this.message = `Enemy dispelled ${cleared} player buff${cleared === 1 ? '' : 's'}.`;
+      return true;
+    }
     if (skill.supported && [
       'loneAttackBoost',
       'statusTriggeredAttackBoost',
@@ -1627,6 +1641,7 @@ export class PuzzleEngine {
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
       if (![
         PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
+        PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
         PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
         PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,

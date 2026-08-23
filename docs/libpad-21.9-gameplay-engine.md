@@ -665,6 +665,25 @@ availability gate and execution spends the two persisted LCG advances of each
 random-color shuffle. The browser preserves these fixed/random paths, lock
 rejection, poison-family matching, accompanying-hit ordering, and selector RNG.
 
+Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
+targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
+condition targets `0x61b404`. The handler calls `_doItetukuHadou`
+(`0x618d04`), then calls `_applyLeaderSkill(false)` (`0x63a7e8`). The former
+clears the positive player-status storage that includes protected signed-int16
+lanes `sGAMEWORK+0x86bd4` and `sGAMEWORK+0x86c3c`; the browser currently exposes
+those recovered lanes as auxiliary-buff and attack-boost turn counters.
+
+The condition calls `_getCountClearParams(sMONSTER)` (`0x618320`) and converts
+the returned integer count directly to binary32. Consequently, it is not just
+a boolean gate: two clearable effects double the immediate probability before
+the selector's 10,000 cap, while fallback selection uses only whether the count
+is positive. When the acting monster's protected `sMONSTER+0x870` status-shield
+counter is positive, the native helper skips these two player lanes. The port
+preserves that admission rule, consumes no condition-owned RNG, clears both
+modeled lanes on execution, and leaves party leader multipliers derived from
+current party state as before. Other native clearable lanes remain outside the
+model until their state and lifetimes are recovered.
+
 Type `12` is the dedicated source-color-to-jammer variant. Its dispatch target
 is `0x6293f8`, setup is `0x61ff08`, and condition is `0x61a63c`. Setup copies
 definition source type `+0x10` to runtime `sMONSTER+0x678`; execution calls the

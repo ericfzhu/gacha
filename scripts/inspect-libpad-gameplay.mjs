@@ -21,6 +21,10 @@ const SOURCE_ORB_CONVERSION_ENEMY_SKILL_TYPE = 4;
 const SOURCE_ORB_CONVERSION_HANDLER = 0x6292b4;
 const SOURCE_ORB_CONVERSION_SETUP_HANDLER = 0x61fee4;
 const SOURCE_ORB_CONVERSION_CONDITION_HANDLER = 0x61b2d8;
+const CLEAR_PLAYER_BUFFS_ENEMY_SKILL_TYPE = 6;
+const CLEAR_PLAYER_BUFFS_HANDLER = 0x6292e8;
+const CLEAR_PLAYER_BUFFS_SETUP_HANDLER = 0x6217c0;
+const CLEAR_PLAYER_BUFFS_CONDITION_HANDLER = 0x61b404;
 const SOURCE_TO_JAMMER_ENEMY_SKILL_TYPE = 12;
 const SOURCE_TO_JAMMER_HANDLER = 0x6293f8;
 const SOURCE_TO_JAMMER_SETUP_HANDLER = 0x61ff08;
@@ -211,6 +215,9 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['enemy-ai', 'resetEnemyAtkLeft', '_ZN9cGAMEMAIN18_resetEnemyAtkLeftEP8sMONSTER', 0x6408f0],
   ['enemy-ai', 'resetMonsterStatus', '_ZN8sMONSTER11resetStatusEv', 0x6b159c],
   ['enemy-ai', 'clearMonsterStatus', '_ZN9cGAMEMAIN16_monsStatusClearEb', 0x691bcc],
+  ['enemy-ai', 'doItetukuHadou', '_ZN9cGAMEMAIN15_doItetukuHadouEv', 0x618d04],
+  ['enemy-ai', 'getCountClearParams', '_ZNK9cGAMEMAIN20_getCountClearParamsEP8sMONSTER', 0x618320],
+  ['enemy-ai', 'applyLeaderSkill', '_ZN9cGAMEMAIN17_applyLeaderSkillEb', 0x63a7e8],
   ['enemy-ai', 'playerMaxHp', '_ZNK7sPLAYER3mhpEv', 0x66b840],
   ['enemy-ai', 'playerAddHp', '_ZN7sPLAYER5addHpEib', 0x678838],
   ['enemy-ai', 'doBind', '_ZN9cGAMEMAIN7_doBindEPK8sMONSTERjib', 0x616de4],
@@ -330,6 +337,21 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : sourceOrbConversionSetupTarget === SOURCE_ORB_CONVERSION_SETUP_HANDLER;
   const sourceOrbConversionConditionMatches = sourceOrbConversionConditionTarget === null
     ? null : sourceOrbConversionConditionTarget === SOURCE_ORB_CONVERSION_CONDITION_HANDLER;
+  const clearPlayerBuffsDispatchTarget = resolveEnemySkillTarget(
+    CLEAR_PLAYER_BUFFS_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const clearPlayerBuffsSetupTarget = resolveEnemySkillTarget(
+    CLEAR_PLAYER_BUFFS_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const clearPlayerBuffsConditionTarget = resolveEnemySkillTarget(
+    CLEAR_PLAYER_BUFFS_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const clearPlayerBuffsDispatchMatches = clearPlayerBuffsDispatchTarget === null
+    ? null : clearPlayerBuffsDispatchTarget === CLEAR_PLAYER_BUFFS_HANDLER;
+  const clearPlayerBuffsSetupMatches = clearPlayerBuffsSetupTarget === null
+    ? null : clearPlayerBuffsSetupTarget === CLEAR_PLAYER_BUFFS_SETUP_HANDLER;
+  const clearPlayerBuffsConditionMatches = clearPlayerBuffsConditionTarget === null
+    ? null : clearPlayerBuffsConditionTarget === CLEAR_PLAYER_BUFFS_CONDITION_HANDLER;
   const sourceToJammerDispatchTarget = resolveEnemySkillTarget(
     SOURCE_TO_JAMMER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1244,6 +1266,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       sourceOrbConversionDispatchMatches21_9: sourceOrbConversionDispatchMatches,
       sourceOrbConversionSetupMatches21_9: sourceOrbConversionSetupMatches,
       sourceOrbConversionConditionMatches21_9: sourceOrbConversionConditionMatches,
+      clearPlayerBuffsDispatchMatches21_9: clearPlayerBuffsDispatchMatches,
+      clearPlayerBuffsSetupMatches21_9: clearPlayerBuffsSetupMatches,
+      clearPlayerBuffsConditionMatches21_9: clearPlayerBuffsConditionMatches,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -1393,6 +1418,20 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       sourceOrbConversionConditionMatches21_9: sourceOrbConversionConditionMatches,
       sourceOrbConversionParameters:
         'definition +0x10/+0x14 -> sMONSTER+0x678/+0x67c source/destination; negative selects native random mode',
+      clearPlayerBuffsType: CLEAR_PLAYER_BUFFS_ENEMY_SKILL_TYPE,
+      clearPlayerBuffsDispatchTarget: clearPlayerBuffsDispatchTarget === null
+        ? null : hex(clearPlayerBuffsDispatchTarget),
+      clearPlayerBuffsDispatchMatches21_9: clearPlayerBuffsDispatchMatches,
+      clearPlayerBuffsSetupTarget: clearPlayerBuffsSetupTarget === null
+        ? null : hex(clearPlayerBuffsSetupTarget),
+      clearPlayerBuffsSetupMatches21_9: clearPlayerBuffsSetupMatches,
+      clearPlayerBuffsConditionTarget: clearPlayerBuffsConditionTarget === null
+        ? null : hex(clearPlayerBuffsConditionTarget),
+      clearPlayerBuffsConditionMatches21_9: clearPlayerBuffsConditionMatches,
+      clearPlayerBuffsCondition:
+        '_getCountClearParams(sMONSTER) as float32; modeled sGAMEWORK+0x86bd4/+0x86c3c lanes are skipped while sMONSTER+0x870 is active',
+      clearPlayerBuffsExecution:
+        '_doItetukuHadou(); _applyLeaderSkill(false)',
       sourceToJammerType: SOURCE_TO_JAMMER_ENEMY_SKILL_TYPE,
       sourceToJammerDispatchTarget: sourceToJammerDispatchTarget === null
         ? null : hex(sourceToJammerDispatchTarget),
@@ -1786,6 +1825,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || sourceOrbConversionDispatchMatches === false
     || sourceOrbConversionSetupMatches === false
     || sourceOrbConversionConditionMatches === false
+    || clearPlayerBuffsDispatchMatches === false
+    || clearPlayerBuffsSetupMatches === false
+    || clearPlayerBuffsConditionMatches === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

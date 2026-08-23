@@ -25,6 +25,7 @@ const renderSelfDestructState = process.argv.includes('--self-destruct-render');
 const renderMoveTimeState = process.argv.includes('--move-time-render');
 const renderStatusShieldState = process.argv.includes('--status-shield-render');
 const renderAttackBoostState = process.argv.includes('--attack-boost-render');
+const renderClearPlayerBuffsState = process.argv.includes('--clear-player-buffs-render');
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 980, height: 900 } });
 const consoleMessages = [];
@@ -2169,6 +2170,32 @@ try {
     || statusShieldRenderState.enemy?.statusShieldTurns !== 3
   )) throw new Error(`Status-shield render-state mismatch: ${JSON.stringify(statusShieldRenderState)}`);
   if (statusShieldRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
+  const clearPlayerBuffsRenderState = renderClearPlayerBuffsState ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    engine.reset();
+    engine.start();
+    engine.playerAuxiliaryBuffTurns = 4;
+    engine.playerAttackBoostTurns = 2;
+    const applied = engine.applyEnemySkillRecord({
+      type: 6,
+      kind: 'clearPlayerBuffs',
+      supported: true,
+      attackWithSkillValue: 0,
+    }, 0);
+    return {
+      applied,
+      state: engine.snapshot(),
+      message: engine.message,
+    };
+  }) : null;
+  if (clearPlayerBuffsRenderState && (
+    clearPlayerBuffsRenderState.applied !== true
+    || clearPlayerBuffsRenderState.state?.nativePlayerBuffStatus?.auxiliaryTurns !== 0
+    || clearPlayerBuffsRenderState.state?.nativePlayerBuffStatus?.attackBoostTurns !== 0
+    || clearPlayerBuffsRenderState.state?.lastEnemySkill?.type !== 6
+    || clearPlayerBuffsRenderState.state?.lastEnemySkill?.clearedBuffCount !== 2
+  )) throw new Error(`Player-buff dispel render-state mismatch: ${JSON.stringify(clearPlayerBuffsRenderState)}`);
+  if (clearPlayerBuffsRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   const attackBoostRenderState = renderAttackBoostState ? await page.evaluate(() => {
     const engine = window.__puzzleGame;
     engine.reset();
@@ -2194,9 +2221,9 @@ try {
   )) throw new Error(`Attack-boost render-state mismatch: ${JSON.stringify(attackBoostRenderState)}`);
   if (attackBoostRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, attackBoostRenderState, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, attackBoostRenderState, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, attackBoostRenderState, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, attackBoostRenderState, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }
