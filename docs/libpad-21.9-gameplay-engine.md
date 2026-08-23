@@ -636,7 +636,7 @@ cap and the selected skill's cost is subtracted. For type 128,
 so an active copy cannot be selected again. `setEnemyAiDefinitionPool` wires
 this raw record path into enemy turns and reports the chosen skill ID, budget,
 and RNG state. Remaining condition callbacks, flow-control records other than
-types 113 through 116, and the rest of the legacy selector are rejected
+types 113 through 117, and the rest of the legacy selector are rejected
 explicitly until decoded rather than approximated.
 
 The selector does not reduce every condition callback to a boolean. In the
@@ -1622,6 +1622,21 @@ player-attack resolution. `lastDamage >= threshold` jumps; a lower total falls
 through. Selection does not re-run combat calculation and consumes neither an
 enemy action nor RNG. Boundary coverage uses 1,659 and exactly 1,660 against a
 1,660 threshold.
+
+Enemy skill type `117` branches on the exact orb-attribute mask erased in the
+previous player turn. Its native ordinary tables remain the same inert control
+paths, and the independent `ESBranchEraseAttr` parser identifies signed
+definition `+0x14` as the mask and reference-slot `enemy_rnd` as the zero-based
+destination. As with type 114, equality is exact rather than an overlap test.
+
+The browser derives this separate erased mask from every resolved match group
+across the completed cascade. It uses the nine native orb-type bit positions,
+so Heart, poison, mortal poison, and bomb can be represented even though they
+do not form ordinary attack attributes. The value is reset and republished on
+each player resolution, exposed in the text snapshot, and read without an
+action/RNG cost during the following enemy selection. A Fire+Heart turn records
+erased mask `0b100001` but attack mask `0b000001`; only the former exact mask
+takes the fixture's branch.
 
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI

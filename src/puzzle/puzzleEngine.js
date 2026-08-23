@@ -73,6 +73,7 @@ import {
   PAD_ENEMY_SKILL_BRANCH_ATTACK_ATTRIBUTES,
   PAD_ENEMY_SKILL_BRANCH_SKILL_USE,
   PAD_ENEMY_SKILL_BRANCH_DAMAGE,
+  PAD_ENEMY_SKILL_BRANCH_ERASED_ATTRIBUTES,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -330,6 +331,7 @@ export class PuzzleEngine {
     this.cascadeDepth = 0;
     this.lastComboCount = 0;
     this.lastAttackAttributeMask = 0;
+    this.lastErasedAttributeMask = 0;
     this.currentTurnSkillUseCount = 0;
     this.lastSkillUseCount = 0;
     this.lastDamage = 0;
@@ -1006,11 +1008,16 @@ export class PuzzleEngine {
     this.lastLeaderMultiplier = leaderPair;
     this.lastComboCount = this.comboCount;
     this.lastAttackAttributeMask = 0;
+    this.lastErasedAttributeMask = 0;
     this.lastSkillUseCount = this.currentTurnSkillUseCount;
     this.currentTurnSkillUseCount = 0;
 
     const byType = new Map();
     this.turnMatches.forEach((match) => {
+      const erasedAttributeIndex = ORB_TYPES.findIndex((orb) => orb.id === match.type);
+      if (erasedAttributeIndex >= 0 && erasedAttributeIndex < 9) {
+        this.lastErasedAttributeMask |= 1 << erasedAttributeIndex;
+      }
       if (!byType.has(match.type)) byType.set(match.type, []);
       byType.get(match.type).push(match);
     });
@@ -1525,6 +1532,13 @@ export class PuzzleEngine {
         }
         if (skill.kind === 'branchDamage') {
           queue.position = this.lastDamage >= skill.damageThreshold
+            ? skill.targetRound
+            : queue.position + 1;
+          controlFlowSteps += 1;
+          continue;
+        }
+        if (skill.kind === 'branchErasedAttributes') {
+          queue.position = this.lastErasedAttributeMask === skill.attributeMask
             ? skill.targetRound
             : queue.position + 1;
           controlFlowSteps += 1;
@@ -3128,6 +3142,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_BRANCH_ATTACK_ATTRIBUTES,
         PAD_ENEMY_SKILL_BRANCH_SKILL_USE,
         PAD_ENEMY_SKILL_BRANCH_DAMAGE,
+        PAD_ENEMY_SKILL_BRANCH_ERASED_ATTRIBUTES,
       ].includes(decoded.type)) return decoded;
       if (!reference) {
         throw new TypeError(`PAD type-${decoded.type} branches require a skill-reference record.`);
@@ -3999,6 +4014,7 @@ export class PuzzleEngine {
       turnMatches: this.turnMatches.map((match) => ({ ...match })),
       lastComboCount: this.lastComboCount,
       lastAttackAttributeMask: this.lastAttackAttributeMask,
+      lastErasedAttributeMask: this.lastErasedAttributeMask,
       currentTurnSkillUseCount: this.currentTurnSkillUseCount,
       lastSkillUseCount: this.lastSkillUseCount,
       lastDamage: this.lastDamage,

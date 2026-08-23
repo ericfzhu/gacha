@@ -84,6 +84,7 @@ export const PAD_ENEMY_SKILL_BRANCH_COMBO = 113;
 export const PAD_ENEMY_SKILL_BRANCH_ATTACK_ATTRIBUTES = 114;
 export const PAD_ENEMY_SKILL_BRANCH_SKILL_USE = 115;
 export const PAD_ENEMY_SKILL_BRANCH_DAMAGE = 116;
+export const PAD_ENEMY_SKILL_BRANCH_ERASED_ATTRIBUTES = 117;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -567,6 +568,17 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       supported: true,
       controlFlow: true,
       damageThreshold: definition.getInt32(0x14, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_BRANCH_ERASED_ATTRIBUTES) {
+    requireLength(definitionBytes, 0x18, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'branchErasedAttributes',
+      supported: true,
+      controlFlow: true,
+      attributeMask: definition.getInt32(0x14, true),
       attackWithSkillValue,
     });
   }
@@ -1662,6 +1674,9 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
   if (type === PAD_ENEMY_SKILL_BRANCH_DAMAGE) {
     return decodePadEnemySkillDefinition(definitionBytes);
   }
+  if (type === PAD_ENEMY_SKILL_BRANCH_ERASED_ATTRIBUTES) {
+    return decodePadEnemySkillDefinition(definitionBytes);
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -2680,6 +2695,22 @@ export function normalizePadEnemySkillRecord(record) {
       supported: record?.supported !== false,
       controlFlow: true,
       damageThreshold: Math.trunc(Number(record?.damageThreshold) || 0) | 0,
+      targetRound: Math.trunc(Number(record?.targetRound) || 0) & 0xff,
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (
+    type === PAD_ENEMY_SKILL_BRANCH_ERASED_ATTRIBUTES
+    || record?.kind === 'branchErasedAttributes'
+  ) {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_BRANCH_ERASED_ATTRIBUTES,
+      kind: 'branchErasedAttributes',
+      supported: record?.supported !== false,
+      controlFlow: true,
+      attributeMask: Math.trunc(Number(record?.attributeMask) || 0) | 0,
       targetRound: Math.trunc(Number(record?.targetRound) || 0) & 0xff,
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null

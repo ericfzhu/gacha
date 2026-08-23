@@ -2,6 +2,18 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 previous-erased-attribute branch
+
+- Recovered type `117` as `ESBranchEraseAttr`; ordinary dispatch/setup/
+  condition share inert `0x62be50`, `0x621c94`, and `0x61c01c` paths.
+- Signed definition `+0x14` is compared exactly with the previous-turn erased
+  orb mask; reference-slot `enemy_rnd` is the zero-based destination.
+- The browser now derives a separate nine-type erased mask from all resolved
+  cascade groups. A Fire+Heart fixture records erased mask 33 versus attack
+  mask 1, and only exact 33 branches. Pure fixtures, six ARM64 anchors, focused
+  Chromium with APK art, screenshot inspection, and native inspector pass.
+  Next: identify types `118` and `119`, then type `120` remaining-enemy branch.
+
 ## 2026-08-24 previous-damage branch
 
 - Recovered type `116` as `ESBranchDamage`; ordinary dispatch/setup/condition

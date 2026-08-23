@@ -786,6 +786,18 @@ const DAMAGE_BRANCH_INSTRUCTION_ANCHORS = Object.freeze([
   [0x61a5c0, 0xb9000fff], // condition callback initializes return scale to zero
   [0x61c01c, 0xbd400fe0], // type 116 returns that zero ordinary-AI scale
 ]);
+const ERASED_ATTRIBUTE_BRANCH_ENEMY_SKILL_TYPE = 117;
+const ERASED_ATTRIBUTE_BRANCH_HANDLER = 0x62be50;
+const ERASED_ATTRIBUTE_BRANCH_SETUP_HANDLER = 0x621c94;
+const ERASED_ATTRIBUTE_BRANCH_CONDITION_HANDLER = 0x61c01c;
+const ERASED_ATTRIBUTE_BRANCH_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x621c94, 0x12800008], // setup writes selected-skill sentinel -1
+  [0x621c98, 0xb9067268], // persist sentinel at sMONSTER+0x670
+  [0x621c9c, 0x1e3e1000], // return setup scale -1.0 for the control record
+  [0x62be50, 0x900045e9], // ordinary execution enters the generic inert tail
+  [0x61a5c0, 0xb9000fff], // condition callback initializes return scale to zero
+  [0x61c01c, 0xbd400fe0], // type 117 returns that zero ordinary-AI scale
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -2182,6 +2194,31 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     : DAMAGE_BRANCH_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
+  const erasedAttributeBranchDispatchTarget = resolveEnemySkillTarget(
+    ERASED_ATTRIBUTE_BRANCH_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const erasedAttributeBranchSetupTarget = resolveEnemySkillTarget(
+    ERASED_ATTRIBUTE_BRANCH_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const erasedAttributeBranchConditionTarget = resolveEnemySkillTarget(
+    ERASED_ATTRIBUTE_BRANCH_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const erasedAttributeBranchDispatchMatches = erasedAttributeBranchDispatchTarget === null
+    ? null : erasedAttributeBranchDispatchTarget === ERASED_ATTRIBUTE_BRANCH_HANDLER;
+  const erasedAttributeBranchSetupMatches = erasedAttributeBranchSetupTarget === null
+    ? null : erasedAttributeBranchSetupTarget === ERASED_ATTRIBUTE_BRANCH_SETUP_HANDLER;
+  const erasedAttributeBranchConditionMatches = erasedAttributeBranchConditionTarget === null
+    ? null : erasedAttributeBranchConditionTarget === ERASED_ATTRIBUTE_BRANCH_CONDITION_HANDLER;
+  const erasedAttributeBranchInstructionAnchorsMatch = restoredElf === null ? null
+    : ERASED_ATTRIBUTE_BRANCH_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -3269,6 +3306,11 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       damageBranchSetupMatches21_9: damageBranchSetupMatches,
       damageBranchConditionMatches21_9: damageBranchConditionMatches,
       damageBranchInstructionAnchorsMatch21_9: damageBranchInstructionAnchorsMatch,
+      erasedAttributeBranchDispatchMatches21_9: erasedAttributeBranchDispatchMatches,
+      erasedAttributeBranchSetupMatches21_9: erasedAttributeBranchSetupMatches,
+      erasedAttributeBranchConditionMatches21_9: erasedAttributeBranchConditionMatches,
+      erasedAttributeBranchInstructionAnchorsMatch21_9:
+        erasedAttributeBranchInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -4065,6 +4107,20 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       damageBranchInstructionAnchorsMatch21_9: damageBranchInstructionAnchorsMatch,
       damageBranchSemantics:
         'type 116 is an enemy-skill-list control record: ordinary dispatch/setup/condition are inert; signed definition +0x14 is the inclusive previous-turn total-damage threshold and reference-slot enemy_rnd is the zero-based destination; >= branches without consuming an enemy action or RNG',
+      erasedAttributeBranchType: ERASED_ATTRIBUTE_BRANCH_ENEMY_SKILL_TYPE,
+      erasedAttributeBranchDispatchTarget: erasedAttributeBranchDispatchTarget === null
+        ? null : hex(erasedAttributeBranchDispatchTarget),
+      erasedAttributeBranchDispatchMatches21_9: erasedAttributeBranchDispatchMatches,
+      erasedAttributeBranchSetupTarget: erasedAttributeBranchSetupTarget === null
+        ? null : hex(erasedAttributeBranchSetupTarget),
+      erasedAttributeBranchSetupMatches21_9: erasedAttributeBranchSetupMatches,
+      erasedAttributeBranchConditionTarget: erasedAttributeBranchConditionTarget === null
+        ? null : hex(erasedAttributeBranchConditionTarget),
+      erasedAttributeBranchConditionMatches21_9: erasedAttributeBranchConditionMatches,
+      erasedAttributeBranchInstructionAnchorsMatch21_9:
+        erasedAttributeBranchInstructionAnchorsMatch,
+      erasedAttributeBranchSemantics:
+        'type 117 is an enemy-skill-list control record: ordinary dispatch/setup/condition are inert; signed definition +0x14 is compared for exact equality with the previous-turn erased-orb attribute mask and reference-slot enemy_rnd is the zero-based destination; the branch consumes no action or RNG',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -4655,6 +4711,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || damageBranchSetupMatches === false
     || damageBranchConditionMatches === false
     || damageBranchInstructionAnchorsMatch === false
+    || erasedAttributeBranchDispatchMatches === false
+    || erasedAttributeBranchSetupMatches === false
+    || erasedAttributeBranchConditionMatches === false
+    || erasedAttributeBranchInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

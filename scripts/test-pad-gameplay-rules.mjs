@@ -38,6 +38,7 @@ import {
   PAD_ENEMY_SKILL_BRANCH_ATTACK_ATTRIBUTES,
   PAD_ENEMY_SKILL_BRANCH_SKILL_USE,
   PAD_ENEMY_SKILL_BRANCH_DAMAGE,
+  PAD_ENEMY_SKILL_BRANCH_ERASED_ATTRIBUTES,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1701,6 +1702,36 @@ assert.deepEqual(
 assert.deepEqual(
   decodePadEnemySkillRuntime(enemyAiBranchDamageDefinition, new Uint8Array(0x680)),
   expectedBranchDamageDefinition,
+);
+const enemyAiBranchErasedAttributesDefinition = enemyAiBranchDamageDefinition.slice();
+const enemyAiBranchErasedAttributesView = new DataView(
+  enemyAiBranchErasedAttributesDefinition.buffer,
+);
+enemyAiBranchErasedAttributesView.setUint32(0x00, 9_097, true);
+enemyAiBranchErasedAttributesView.setInt16(
+  0x04,
+  PAD_ENEMY_SKILL_BRANCH_ERASED_ATTRIBUTES,
+  true,
+);
+enemyAiBranchErasedAttributesView.setInt32(0x14, 0b100001, true);
+const expectedBranchErasedAttributesDefinition = {
+  type: 117,
+  kind: 'branchErasedAttributes',
+  supported: true,
+  controlFlow: true,
+  attributeMask: 0b100001,
+  attackWithSkillValue: 0,
+};
+assert.deepEqual(
+  decodePadEnemySkillDefinition(enemyAiBranchErasedAttributesDefinition),
+  expectedBranchErasedAttributesDefinition,
+);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(
+    enemyAiBranchErasedAttributesDefinition,
+    new Uint8Array(0x680),
+  ),
+  expectedBranchErasedAttributesDefinition,
 );
 assert.deepEqual(decodePadEnemySkillRuntime(
   enemyAiUnconditionalHealDefinition,
@@ -6407,6 +6438,48 @@ exactDamageBranchEngine.lastDamage = 1_660;
 assert.equal(exactDamageBranchEngine.takeEnemySkill(0).kind, 'scaledAttack');
 assert.equal(exactDamageBranchEngine.enemySkillQueues[0].position, 3);
 assert.equal(exactDamageBranchEngine.snapshot().rngState, 21_900);
+
+const trackedErasedAttributesEngine = new PuzzleEngine({ seed: 21_900 });
+trackedErasedAttributesEngine.comboCount = 2;
+trackedErasedAttributesEngine.turnMatches = [
+  { type: 'fire', size: 3, enhancedCount: 0 },
+  { type: 'heart', size: 3, enhancedCount: 0 },
+];
+trackedErasedAttributesEngine.resolvePlayerTurn();
+assert.equal(trackedErasedAttributesEngine.snapshot().lastErasedAttributeMask, 0b100001);
+assert.equal(trackedErasedAttributesEngine.snapshot().lastAttackAttributeMask, 0b000001);
+
+const belowErasedAttributesBranchEngine = new PuzzleEngine({ seed: 21_900 });
+belowErasedAttributesBranchEngine.setRngState(21_900);
+belowErasedAttributesBranchEngine.setEnemySkillQueue(0, [
+  {
+    definition: enemyAiBranchErasedAttributesDefinition,
+    enemyAi: 0,
+    enemyRnd: 2,
+  },
+  enemyAiNormalAttackDefinition,
+  enemyAiScaledAttackDefinition,
+]);
+belowErasedAttributesBranchEngine.lastErasedAttributeMask = 0b000001;
+assert.equal(belowErasedAttributesBranchEngine.takeEnemySkill(0).kind, 'normalAttack');
+assert.equal(belowErasedAttributesBranchEngine.enemySkillQueues[0].position, 2);
+assert.equal(belowErasedAttributesBranchEngine.snapshot().rngState, 21_900);
+
+const exactErasedAttributesBranchEngine = new PuzzleEngine({ seed: 21_900 });
+exactErasedAttributesBranchEngine.setRngState(21_900);
+exactErasedAttributesBranchEngine.setEnemySkillQueue(0, [
+  {
+    definition: enemyAiBranchErasedAttributesDefinition,
+    enemyAi: 0,
+    enemyRnd: 2,
+  },
+  enemyAiNormalAttackDefinition,
+  enemyAiScaledAttackDefinition,
+]);
+exactErasedAttributesBranchEngine.lastErasedAttributeMask = 0b100001;
+assert.equal(exactErasedAttributesBranchEngine.takeEnemySkill(0).kind, 'scaledAttack');
+assert.equal(exactErasedAttributesBranchEngine.enemySkillQueues[0].position, 3);
+assert.equal(exactErasedAttributesBranchEngine.snapshot().rngState, 21_900);
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;
