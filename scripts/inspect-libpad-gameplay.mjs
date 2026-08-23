@@ -424,6 +424,46 @@ const FIXED_BOMBS_INSTRUCTION_ANCHORS = Object.freeze([
   [0x6280e8, 0xf87b7917], // resolve the selected board cell
   [0x628114, 0x36000233], // successful conversion optionally enters lock handling
 ]);
+const CLOUD_ENEMY_SKILL_TYPE = 104;
+const CLOUD_HANDLER = 0x62a178;
+const CLOUD_SETUP_HANDLER = 0x621950;
+const CLOUD_CONDITION_HANDLER = 0x61ba48;
+const CLOUD_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x621950, 0xb9401ea8], // positive +0x1c origin-Y enters fixed setup
+  [0x621960, 0xb94022a8], // positive +0x20 origin-X is also required
+  [0x621978, 0xb9067a68], // store prepared fixed Y at runtime +0x678
+  [0x621994, 0xb9067e68], // store prepared fixed right-origin X at +0x67c
+  [0x621998, 0x2942b2ab], // load +0x14/+0x18 rectangle extents
+  [0x6219a4, 0xb9467a6d], // reload prepared Y for fit clamping
+  [0x6219cc, 0xb9000349], // clamp Y when the rectangle exceeds the board edge
+  [0x6219ec, 0xb9067e68], // likewise clamp the prepared right-origin X
+  [0x621d90, 0xb94016a1], // random mode starts from the +0x14 row extent
+  [0x621d94, 0x3941c094], // load the native board row count
+  [0x621da4, 0xb9401aa1], // load the +0x18 column extent
+  [0x621db0, 0x3941c516], // load the native board column count
+  [0x621dd8, 0xb86a690b], // load shared LCG state for random row placement
+  [0x621de8, 0x1b0d396b], // advance the first shared draw
+  [0x621dec, 0xb82a690b], // persist its shared state
+  [0x621df8, 0x1b0c7d6b], // scale high16 into the fitting row range
+  [0x621e10, 0x1b0d398c], // advance the second shared draw for X
+  [0x621e14, 0xb82a690c], // persist the second shared state
+  [0x621e24, 0xb9067a6b], // store random Y at runtime +0x678
+  [0x621e28, 0xb9067e68], // store random right-origin X at runtime +0x67c
+  [0x62a180, 0x97f3fdb4], // clear/register the preceding cloud presentation
+  [0x62a190, 0x794022ab], // load authored +0x10 duration
+  [0x62a19c, 0x3300256a], // replace protected duration's low ten bits
+  [0x62a1a0, 0x3216014a], // set the native fresh edge
+  [0x62a1bc, 0xb9467a61], // load prepared Y at runtime +0x678
+  [0x62a1d0, 0xb94016a1], // materialize the +0x14 row extent
+  [0x62a1f4, 0xb9401aa1], // materialize the +0x18 column extent
+  [0x62a220, 0xb9467e76], // load prepared right-origin X at +0x67c
+  [0x62a22c, 0x4b1602a8], // mirror X against the board width
+  [0x62a234, 0x4b208108], // subtract the materialized column extent
+  [0x62a238, 0x0aa87d01], // clamp the resulting left-origin X to nonnegative
+  [0x61ba48, 0x79400108], // condition loads protected cloud duration
+  [0x61ba4c, 0x7200251f], // inspect its low ten active bits
+  [0x61ba50, 0x54000981], // active cloud rejects reapplication
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -1501,6 +1541,25 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     : FIXED_BOMBS_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
+  const cloudDispatchTarget = resolveEnemySkillTarget(
+    CLOUD_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const cloudSetupTarget = resolveEnemySkillTarget(
+    CLOUD_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const cloudConditionTarget = resolveEnemySkillTarget(
+    CLOUD_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const cloudDispatchMatches = cloudDispatchTarget === null
+    ? null : cloudDispatchTarget === CLOUD_HANDLER;
+  const cloudSetupMatches = cloudSetupTarget === null
+    ? null : cloudSetupTarget === CLOUD_SETUP_HANDLER;
+  const cloudConditionMatches = cloudConditionTarget === null
+    ? null : cloudConditionTarget === CLOUD_CONDITION_HANDLER;
+  const cloudInstructionAnchorsMatch = restoredElf === null ? null
+    : CLOUD_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -2535,6 +2594,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       fixedBombsSetupMatches21_9: fixedBombsSetupMatches,
       fixedBombsConditionMatches21_9: fixedBombsConditionMatches,
       fixedBombsInstructionAnchorsMatch21_9: fixedBombsInstructionAnchorsMatch,
+      cloudDispatchMatches21_9: cloudDispatchMatches,
+      cloudSetupMatches21_9: cloudSetupMatches,
+      cloudConditionMatches21_9: cloudConditionMatches,
+      cloudInstructionAnchorsMatch21_9: cloudInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -3164,6 +3227,16 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       fixedBombsInstructionAnchorsMatch21_9: fixedBombsInstructionAnchorsMatch,
       fixedBombsSemantics:
         'type 103 consumes no RNG; execution reverses the five six-bit authored row maps at +0x14..+0x24 into top-origin order, passes them to the shared fixed-position bomb path, leaves already locked cells unchanged, converts successful cells to type 9, and applies lock flag 0x800 when +0x2c is nonzero; its AI condition is unconditional',
+      cloudType: CLOUD_ENEMY_SKILL_TYPE,
+      cloudDispatchTarget: cloudDispatchTarget === null ? null : hex(cloudDispatchTarget),
+      cloudDispatchMatches21_9: cloudDispatchMatches,
+      cloudSetupTarget: cloudSetupTarget === null ? null : hex(cloudSetupTarget),
+      cloudSetupMatches21_9: cloudSetupMatches,
+      cloudConditionTarget: cloudConditionTarget === null ? null : hex(cloudConditionTarget),
+      cloudConditionMatches21_9: cloudConditionMatches,
+      cloudInstructionAnchorsMatch21_9: cloudInstructionAnchorsMatch,
+      cloudSemantics:
+        'type 104 uses +0x10 duration, +0x14/+0x18 row/column extents, and one-based +0x1c/+0x20 Y/right-origin-X coordinates; positive origins clamp without RNG, otherwise setup spends two shared-LCG draws over fitting positions at runtime +0x678/+0x67c; execution mirrors X into left-origin browser space and installs protected low-ten-bit duration at +0x875b8, while condition rejects an active cloud',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -3702,6 +3775,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || fixedBombsSetupMatches === false
     || fixedBombsConditionMatches === false
     || fixedBombsInstructionAnchorsMatch === false
+    || cloudDispatchMatches === false
+    || cloudSetupMatches === false
+    || cloudConditionMatches === false
+    || cloudInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

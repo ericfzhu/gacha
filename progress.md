@@ -2,6 +2,21 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 type-104 cloud
+
+- Recovered type `104` at dispatch/setup/condition `0x62a178`, `0x621950`, and
+  `0x61ba48`; the independent parser corroborates `ESCloud`.
+- Authored `+0x10` is duration, `+0x14/+0x18` are row/column extents, and
+  `+0x1c/+0x20` are one-based Y/right-origin X. Positive origins clamp without
+  RNG; otherwise setup spends two shared draws over fitting positions.
+- Execution mirrors X into browser left-origin space and installs protected
+  duration at `sGAMEWORK+0x875b8`; its condition rejects an active cloud.
+- Ported definition/runtime decoding, exact fixed/random materialization,
+  AI admission, lifetime/reset/snapshot state, nonblocking cloud input, and an
+  opaque smoke overlay. Pure fixtures, thirty-four ARM64 anchors, focused
+  Chromium, screenshot inspection, generic browser client, full native
+  inspector, PAD data checks, and production build pass. Next: type `105`.
+
 ## 2026-08-24 type-103 fixed bomb spawn
 
 - Recovered type `103` at dispatch/setup/condition `0x62a114`, `0x6217c0`, and

@@ -60,6 +60,7 @@ import {
   PAD_ENEMY_SKILL_FIXED_START,
   PAD_ENEMY_SKILL_RANDOM_BOMBS,
   PAD_ENEMY_SKILL_FIXED_BOMBS,
+  PAD_ENEMY_SKILL_CLOUD,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -333,6 +334,7 @@ export class PuzzleEngine {
     this.orbSealRowMask = 0;
     this.orbSealRowTurns = 0;
     this.forcedStart = null;
+    this.cloud = null;
     this.leaderSwapTurns = 0;
     this.leaderSwapIndex = null;
     this.enemySkillQueues.forEach((queue) => { queue.position = 0; });
@@ -1133,6 +1135,7 @@ export class PuzzleEngine {
     this.advanceMoveTimeReductionTurns();
     this.advanceBlackOrbCountdowns();
     this.advanceOrbSealTurns();
+    this.advanceCloudTurns();
     if (this.blackFallRule?.active && this.blackFallRule.turnsRemaining !== null) {
       this.blackFallRule.turnsRemaining = Math.max(0, this.blackFallRule.turnsRemaining - 1);
       if (this.blackFallRule.turnsRemaining === 0) this.blackFallRule.active = false;
@@ -1260,6 +1263,7 @@ export class PuzzleEngine {
       awakeningBindTurns: this.awakeningBindTurns,
       orbSealActive: this.orbSealColumnTurns > 0 || this.orbSealRowTurns > 0,
       forcedStartActive: Boolean(this.forcedStart),
+      cloudActive: Boolean(this.cloud?.turnsRemaining > 0),
       enemyAttribute: PAD_ATTRIBUTE_INDEX[enemy.attribute] ?? -1,
       playerCurrentHp: this.player.hp,
       playerMaxHp: this.player.maxHp,
@@ -1679,6 +1683,32 @@ export class PuzzleEngine {
       return Object.freeze({
         ...record,
         selectionSeed: this.rng.nextUint16(),
+        setupMaterialized: true,
+      });
+    }
+    if (skill.supported && skill.kind === 'cloud' && !skill.setupMaterialized) {
+      const height = Math.max(0, Math.min(this.rows, skill.cloudHeightRows));
+      const width = Math.max(0, Math.min(this.columns, skill.cloudWidthColumns));
+      let originRow;
+      let originColumnFromRight;
+      if (skill.authoredOriginY >= 1 && skill.authoredOriginX >= 1) {
+        originRow = Math.max(0, Math.min(this.rows - height, skill.authoredOriginY - 1));
+        originColumnFromRight = Math.max(
+          0,
+          Math.min(this.columns - width, skill.authoredOriginX - 1),
+        );
+      } else {
+        const rowPositions = Math.max(1, this.rows - height + 1);
+        const columnPositions = Math.max(1, this.columns - width + 1);
+        originRow = Math.imul(this.rng.nextUint16(), rowPositions) >>> 16;
+        originColumnFromRight = Math.imul(this.rng.nextUint16(), columnPositions) >>> 16;
+      }
+      return Object.freeze({
+        ...record,
+        cloudHeightRows: height,
+        cloudWidthColumns: width,
+        originRow,
+        originColumnFromRight,
         setupMaterialized: true,
       });
     }
@@ -2334,6 +2364,32 @@ export class PuzzleEngine {
       this.message = `${changedOrbCount} ${skill.lockedBombs ? 'locked ' : ''}bomb${changedOrbCount === 1 ? '' : 's'} appeared.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'cloud') {
+      const height = Math.max(0, Math.min(this.rows, skill.cloudHeightRows));
+      const width = Math.max(0, Math.min(this.columns, skill.cloudWidthColumns));
+      const row = Math.max(0, Math.min(this.rows - height, skill.originRow));
+      const columnFromRight = Math.max(
+        0,
+        Math.min(this.columns - width, skill.originColumnFromRight),
+      );
+      const column = this.columns - width - columnFromRight;
+      this.cloud = {
+        row,
+        column,
+        heightRows: height,
+        widthColumns: width,
+        turnsRemaining: Math.max(0, skill.durationTurns) & 0x3ff,
+      };
+      this.lastEnemySkill = Object.freeze({
+        ...skill,
+        cloudRow: row,
+        cloudColumn: column,
+        cloudHeightRows: height,
+        cloudWidthColumns: width,
+      });
+      this.message = `Clouds obscured a ${width} × ${height} area for ${this.cloud.turnsRemaining} turn${this.cloud.turnsRemaining === 1 ? '' : 's'}.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'clearPlayerBuffs') {
       // _doItetukuHadou clears both recovered sGAMEWORK positive-status lanes,
       // then type 6 invokes _applyLeaderSkill(false). Leader effects in this
@@ -2872,6 +2928,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_FIXED_START,
         PAD_ENEMY_SKILL_RANDOM_BOMBS,
         PAD_ENEMY_SKILL_FIXED_BOMBS,
+        PAD_ENEMY_SKILL_CLOUD,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -3467,6 +3524,12 @@ export class PuzzleEngine {
     }
   }
 
+  advanceCloudTurns() {
+    if (!this.cloud || this.cloud.turnsRemaining <= 0) return;
+    this.cloud.turnsRemaining = Math.max(0, this.cloud.turnsRemaining - 1);
+    if (this.cloud.turnsRemaining === 0) this.cloud = null;
+  }
+
   snapshot() {
     return {
       coordinateSystem: `board origin top-left; rows 0-${this.rows - 1} downward; columns 0-${this.columns - 1} rightward`,
@@ -3510,6 +3573,7 @@ export class PuzzleEngine {
         turnsRemaining: this.orbSealRowTurns,
       },
       forcedStart: this.forcedStart ? { ...this.forcedStart } : null,
+      cloud: this.cloud ? { ...this.cloud } : null,
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({
         code: ORB_BY_ID[orb.type].code,

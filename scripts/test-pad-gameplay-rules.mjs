@@ -25,6 +25,7 @@ import {
   PAD_ENEMY_SKILL_FIXED_START,
   PAD_ENEMY_SKILL_RANDOM_BOMBS,
   PAD_ENEMY_SKILL_FIXED_BOMBS,
+  PAD_ENEMY_SKILL_CLOUD,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1353,6 +1354,44 @@ assert.deepEqual(
   decodePadEnemySkillRuntime(enemyAiFixedBombsDefinition, new Uint8Array(0x680)),
   expectedFixedBombsDefinition,
 );
+const enemyAiCloudDefinition = enemyAiFixedBombsDefinition.slice();
+const enemyAiCloudView = new DataView(enemyAiCloudDefinition.buffer);
+enemyAiCloudView.setUint32(0x00, 9_084, true);
+enemyAiCloudView.setInt16(0x04, PAD_ENEMY_SKILL_CLOUD, true);
+enemyAiCloudView.setInt32(0x10, 3, true);
+enemyAiCloudView.setInt32(0x14, 2, true);
+enemyAiCloudView.setInt32(0x18, 3, true);
+enemyAiCloudView.setInt32(0x1c, 0, true);
+enemyAiCloudView.setInt32(0x20, 0, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiCloudDefinition), {
+  type: 104,
+  kind: 'cloud',
+  supported: true,
+  durationTurns: 3,
+  cloudHeightRows: 2,
+  cloudWidthColumns: 3,
+  authoredOriginY: 0,
+  authoredOriginX: 0,
+  attackWithSkillValue: 0,
+});
+const cloudRuntime = new Uint8Array(0x680);
+const cloudRuntimeView = new DataView(cloudRuntime.buffer);
+cloudRuntimeView.setUint32(0x678, 0, true);
+cloudRuntimeView.setUint32(0x67c, 3, true);
+assert.deepEqual(decodePadEnemySkillRuntime(enemyAiCloudDefinition, cloudRuntime), {
+  type: 104,
+  kind: 'cloud',
+  supported: true,
+  durationTurns: 3,
+  cloudHeightRows: 2,
+  cloudWidthColumns: 3,
+  authoredOriginY: 0,
+  authoredOriginX: 0,
+  originRow: 0,
+  originColumnFromRight: 3,
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
 assert.deepEqual(decodePadEnemySkillRuntime(
   enemyAiUnconditionalHealDefinition,
   healEnemyMonsterRuntime,
@@ -5342,6 +5381,88 @@ assert.deepEqual(
 );
 assert.equal(selectedFixedBombsState.player.hp, 12_000);
 assert.equal(selectedFixedBombsState.message, '6 locked bombs appeared.');
+
+const directCloudEngine = new PuzzleEngine({ seed: 21_900 });
+directCloudEngine.setRngState(21_900);
+assert.equal(directCloudEngine.applyEnemySkillDefinition(enemyAiCloudDefinition), true);
+assert.deepEqual(directCloudEngine.snapshot().cloud, {
+  row: 0,
+  column: 0,
+  heightRows: 2,
+  widthColumns: 3,
+  turnsRemaining: 3,
+});
+assert.equal(directCloudEngine.rng.state, 3_803_934_822);
+directCloudEngine.start();
+assert.equal(directCloudEngine.startDrag(0, 0), true);
+assert.equal(directCloudEngine.snapshot().drag.row, 0);
+directCloudEngine.drag = null;
+directCloudEngine.advanceCloudTurns();
+directCloudEngine.advanceCloudTurns();
+assert.equal(directCloudEngine.snapshot().cloud.turnsRemaining, 1);
+directCloudEngine.advanceCloudTurns();
+assert.equal(directCloudEngine.snapshot().cloud, null);
+
+const fixedCloudDefinition = enemyAiCloudDefinition.slice();
+const fixedCloudView = new DataView(fixedCloudDefinition.buffer);
+fixedCloudView.setInt32(0x1c, 2, true);
+fixedCloudView.setInt32(0x20, 2, true);
+const fixedCloudEngine = new PuzzleEngine({ seed: 21_900 });
+fixedCloudEngine.setRngState(21_900);
+assert.equal(fixedCloudEngine.applyEnemySkillDefinition(fixedCloudDefinition), true);
+assert.deepEqual(fixedCloudEngine.snapshot().cloud, {
+  row: 1,
+  column: 2,
+  heightRows: 2,
+  widthColumns: 3,
+  turnsRemaining: 3,
+});
+assert.equal(fixedCloudEngine.rng.state, 21_900);
+
+const cloudMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(cloudMonsterDefinition.buffer).setUint32(0xec, 9_084, true);
+const selectedCloudEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: cloudMonsterDefinition,
+    skillDefinitions: [enemyAiCloudDefinition],
+  }],
+});
+selectedCloudEngine.enemies[0].counter = 1;
+selectedCloudEngine.enemies[1].counter = 99;
+selectedCloudEngine.setRngState(21_900);
+selectedCloudEngine.resolveEnemyTurn();
+const selectedCloudState = selectedCloudEngine.snapshot();
+assert.equal(selectedCloudState.lastEnemyActions[0].skill.type, 104);
+assert.deepEqual(selectedCloudState.cloud, {
+  row: 3,
+  column: 2,
+  heightRows: 2,
+  widthColumns: 3,
+  turnsRemaining: 3,
+});
+assert.equal(selectedCloudState.rngState, 1_929_471_377);
+assert.equal(selectedCloudState.player.hp, 12_000);
+assert.equal(selectedCloudState.message, 'Clouds obscured a 3 × 2 area for 3 turns.');
+
+const rejectedCloudEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: cloudMonsterDefinition,
+    skillDefinitions: [enemyAiCloudDefinition],
+  }],
+});
+rejectedCloudEngine.cloud = {
+  row: 0, column: 0, heightRows: 1, widthColumns: 1, turnsRemaining: 2,
+};
+rejectedCloudEngine.enemies[0].counter = 1;
+rejectedCloudEngine.enemies[1].counter = 99;
+rejectedCloudEngine.setRngState(21_900);
+rejectedCloudEngine.resolveEnemyTurn();
+const rejectedCloudState = rejectedCloudEngine.snapshot();
+assert.equal(rejectedCloudState.lastEnemyActions[0].kind, 'attack');
+assert.equal(rejectedCloudState.rngState, 21_900);
+assert.equal(rejectedCloudState.cloud.turnsRemaining, 1);
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;

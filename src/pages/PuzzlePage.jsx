@@ -633,6 +633,56 @@ function render(ctx, engine) {
     }
   }
 
+  if (engine.cloud?.turnsRemaining > 0) {
+    const x = board.x + engine.cloud.column * board.cell;
+    const y = board.y + engine.cloud.row * board.cell;
+    const width = engine.cloud.widthColumns * board.cell;
+    const height = engine.cloud.heightRows * board.cell;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, width, height);
+    ctx.clip();
+    const veil = ctx.createLinearGradient(x, y, x + width, y + height);
+    veil.addColorStop(0, 'rgba(20, 29, 43, .93)');
+    veil.addColorStop(.45, 'rgba(104, 118, 137, .88)');
+    veil.addColorStop(1, 'rgba(27, 36, 51, .94)');
+    ctx.fillStyle = veil;
+    ctx.fillRect(x, y, width, height);
+    const cloudPuffs = [
+      [.08, .28, .28], [.28, .58, .34], [.47, .25, .32],
+      [.67, .58, .38], [.88, .3, .3], [.49, .82, .3],
+    ];
+    cloudPuffs.forEach(([px, py, radius], index) => {
+      const puff = ctx.createRadialGradient(
+        x + width * px,
+        y + height * py,
+        0,
+        x + width * px,
+        y + height * py,
+        Math.max(width, height) * radius,
+      );
+      puff.addColorStop(0, `rgba(210, 220, 230, ${index % 2 ? '.31' : '.38'})`);
+      puff.addColorStop(1, 'rgba(60, 72, 88, 0)');
+      ctx.fillStyle = puff;
+      ctx.fillRect(x, y, width, height);
+    });
+    ctx.strokeStyle = 'rgba(224, 235, 245, .68)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, width - 2, height - 2);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '900 14px "Barlow Condensed", sans-serif';
+    ctx.fillStyle = '#f1f5f9';
+    ctx.shadowColor = '#101826';
+    ctx.shadowBlur = 6;
+    ctx.fillText(
+      `CLOUD · ${engine.cloud.turnsRemaining}`,
+      x + width / 2,
+      y + height / 2,
+    );
+    ctx.restore();
+  }
+
   if (engine.forcedStart) {
     const x = board.x + (engine.forcedStart.column + 0.5) * board.cell;
     const y = board.y + (engine.forcedStart.row + 0.5) * board.cell;

@@ -71,6 +71,7 @@ export const PAD_ENEMY_SKILL_ORB_SEAL_ROWS = 100;
 export const PAD_ENEMY_SKILL_FIXED_START = 101;
 export const PAD_ENEMY_SKILL_RANDOM_BOMBS = 102;
 export const PAD_ENEMY_SKILL_FIXED_BOMBS = 103;
+export const PAD_ENEMY_SKILL_CLOUD = 104;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -400,6 +401,20 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
         definition.getUint32(0x14, true) & 0x3f,
       ]),
       lockedBombs: definition.getInt32(0x2c, true) !== 0,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_CLOUD) {
+    requireLength(definitionBytes, 0x24, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'cloud',
+      supported: true,
+      durationTurns: definition.getInt32(0x10, true),
+      cloudHeightRows: definition.getInt32(0x14, true),
+      cloudWidthColumns: definition.getInt32(0x18, true),
+      authoredOriginY: definition.getInt32(0x1c, true),
+      authoredOriginX: definition.getInt32(0x20, true),
       attackWithSkillValue,
     });
   }
@@ -1391,6 +1406,16 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
     // handler reads and reverses the five authored bitmaps directly.
     return decodePadEnemySkillDefinition(definitionBytes);
   }
+  if (type === PAD_ENEMY_SKILL_CLOUD) {
+    requireLength(monsterBytes, 0x680, 'PAD monster runtime');
+    const definitionRecord = decodePadEnemySkillDefinition(definitionBytes);
+    return Object.freeze({
+      ...definitionRecord,
+      originRow: monster.getUint32(0x678, true) & 0xff,
+      originColumnFromRight: monster.getUint32(0x67c, true) & 0xff,
+      setupMaterialized: true,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -2222,6 +2247,28 @@ export function normalizePadEnemySkillRecord(record) {
         Math.trunc(Number(rowMasks[index]) || 0) & 0x3f
       ))),
       lockedBombs: Boolean(record?.lockedBombs),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_CLOUD || record?.kind === 'cloud') {
+    const positionPresent = record?.originRow != null && record?.originColumnFromRight != null;
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_CLOUD,
+      kind: 'cloud',
+      supported: record?.supported !== false,
+      durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)),
+      cloudHeightRows: Math.max(0, Math.trunc(Number(record?.cloudHeightRows) || 0)),
+      cloudWidthColumns: Math.max(0, Math.trunc(Number(record?.cloudWidthColumns) || 0)),
+      authoredOriginY: Math.trunc(Number(record?.authoredOriginY) || 0),
+      authoredOriginX: Math.trunc(Number(record?.authoredOriginX) || 0),
+      ...(positionPresent ? {
+        originRow: Math.max(0, Math.trunc(Number(record.originRow) || 0)) & 0xff,
+        originColumnFromRight:
+          Math.max(0, Math.trunc(Number(record.originColumnFromRight) || 0)) & 0xff,
+      } : {}),
+      setupMaterialized: Boolean(record?.setupMaterialized || positionPresent),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

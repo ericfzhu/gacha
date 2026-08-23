@@ -1356,6 +1356,30 @@ fixture authored as `[1,2,4,8,48]` becomes top-origin `[48,8,4,2,1]`; with its
 center candidate pre-locked, the visible bombs appear at `(0,4)`, `(0,5)`,
 `(1,3)`, `(3,1)`, and `(4,0)` while shared state remains 21900.
 
+Enemy skill type `104` installs a timed cloud rectangle. Its dispatch, setup,
+and condition targets are `0x62a178`, `0x621950`, and `0x61ba48`; the independent
+parser identifies `ESCloud`. Definition `+0x10` is duration, `+0x14/+0x18` are
+the native row and column extents, and `+0x1c/+0x20` are one-based Y and
+right-origin X positions.
+
+When both authored origins are positive, setup converts them to zero-based
+coordinates and clamps the rectangle to the board without consuming RNG. If
+either is nonpositive, it spends two shared-LCG draws over the inclusive fitting
+row and right-origin-column ranges, storing the prepared coordinates at runtime
+`+0x678/+0x67c`. Execution mirrors the native right-origin X into browser
+left-origin space, installs the low ten duration bits at protected
+`sGAMEWORK+0x875b8`, sets its fresh edge, and populates the associated origin
+and extent lanes. Condition `0x61ba48` rejects reapplication while that duration
+is active.
+
+The browser renders an opaque smoke rectangle over the covered cells without
+blocking drag input, snapshots and counts down its exact geometry, and clears it
+at expiry. On a 6×5 board with a 3-column by 2-row cloud, direct seed 21900 uses
+private coordinates row 0/right-column 3, displays at top-left `(0,0)`, and ends
+at shared state 3803934822. After the ordinary AI-selection draw, it displays at
+`(3,2)` and ends at 1929471377. Positive authored origins `(2,2)` instead place
+it at `(1,2)` without changing shared state.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`
