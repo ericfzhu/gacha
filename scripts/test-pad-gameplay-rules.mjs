@@ -34,6 +34,7 @@ import {
   PAD_ENEMY_SKILL_FIXED_SPINNERS,
   PAD_ENEMY_SKILL_MAX_HP_CHANGE,
   PAD_ENEMY_SKILL_FIXED_TARGET,
+  PAD_ENEMY_SKILL_BRANCH_COMBO,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1608,6 +1609,25 @@ assert.deepEqual(
 assert.deepEqual(
   decodePadEnemySkillRuntime(enemyAiFixedTargetDefinition, new Uint8Array(0x680)),
   expectedFixedTargetDefinition,
+);
+const enemyAiBranchComboDefinition = enemyAiFixedTargetDefinition.slice();
+const enemyAiBranchComboView = new DataView(enemyAiBranchComboDefinition.buffer);
+enemyAiBranchComboView.setUint32(0x00, 9_093, true);
+enemyAiBranchComboView.setInt16(0x04, PAD_ENEMY_SKILL_BRANCH_COMBO, true);
+const expectedBranchComboDefinition = {
+  type: 113,
+  kind: 'branchCombo',
+  supported: true,
+  controlFlow: true,
+  attackWithSkillValue: 0,
+};
+assert.deepEqual(
+  decodePadEnemySkillDefinition(enemyAiBranchComboDefinition),
+  expectedBranchComboDefinition,
+);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiBranchComboDefinition, new Uint8Array(0x680)),
+  expectedBranchComboDefinition,
 );
 assert.deepEqual(decodePadEnemySkillRuntime(
   enemyAiUnconditionalHealDefinition,
@@ -6172,6 +6192,51 @@ assert.deepEqual(selectedFixedTargetState.fixedTarget, { turnsRemaining: 3, enem
 assert.equal(selectedFixedTargetState.lastEnemyActions[0].skill.type, 112);
 assert.equal(selectedFixedTargetState.lastEnemyActions[1].skill.type, 112);
 assert.equal(selectedFixedTargetState.rngState, 3_803_934_822);
+
+const belowComboBranchEngine = new PuzzleEngine({ seed: 21_900 });
+belowComboBranchEngine.setRngState(21_900);
+belowComboBranchEngine.setEnemySkillQueue(0, [
+  { definition: enemyAiBranchComboDefinition, enemyAi: 5, enemyRnd: 2 },
+  enemyAiNormalAttackDefinition,
+  enemyAiScaledAttackDefinition,
+]);
+belowComboBranchEngine.lastComboCount = 4;
+assert.equal(belowComboBranchEngine.takeEnemySkill(0).kind, 'normalAttack');
+assert.equal(belowComboBranchEngine.enemySkillQueues[0].position, 2);
+assert.equal(belowComboBranchEngine.snapshot().rngState, 21_900);
+
+const exactComboBranchEngine = new PuzzleEngine({ seed: 21_900 });
+exactComboBranchEngine.setRngState(21_900);
+exactComboBranchEngine.setEnemySkillQueue(0, [
+  { skillDefinition: enemyAiBranchComboDefinition, enemyAi: 5, enemyRnd: 2 },
+  enemyAiNormalAttackDefinition,
+  enemyAiScaledAttackDefinition,
+]);
+exactComboBranchEngine.lastComboCount = 5;
+assert.equal(exactComboBranchEngine.takeEnemySkill(0).kind, 'scaledAttack');
+assert.equal(exactComboBranchEngine.enemySkillQueues[0].position, 3);
+assert.equal(exactComboBranchEngine.snapshot().rngState, 21_900);
+assert.throws(
+  () => exactComboBranchEngine.setEnemySkillQueue(0, [enemyAiBranchComboDefinition]),
+  /require a skill-reference record/,
+);
+assert.throws(
+  () => exactComboBranchEngine.setEnemySkillQueue(0, [{
+    definition: enemyAiBranchComboDefinition,
+    enemyAi: 5,
+  }]),
+  /require enemyAi and enemyRnd operands/,
+);
+
+const cyclicComboBranchEngine = new PuzzleEngine({ seed: 21_900 });
+cyclicComboBranchEngine.setRngState(21_900);
+cyclicComboBranchEngine.setEnemySkillQueue(0, [
+  { definition: enemyAiBranchComboDefinition, enemyAi: 0, enemyRnd: 0 },
+]);
+assert.throws(
+  () => cyclicComboBranchEngine.takeEnemySkill(0),
+  /exceeded 1000 control-flow steps/,
+);
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;

@@ -635,8 +635,9 @@ cap and the selected skill's cost is subtracted. For type 128,
 `_chooseEnemyAiSub` (`0x61a58c`) returns one only while black-fall is inactive,
 so an active copy cannot be selected again. `setEnemyAiDefinitionPool` wires
 this raw record path into enemy turns and reports the chosen skill ID, budget,
-and RNG state. Remaining condition callbacks, flow-control records, and the
-legacy selector are rejected explicitly until decoded rather than approximated.
+and RNG state. Remaining condition callbacks, flow-control records other than
+type 113, and the rest of the legacy selector are rejected explicitly until
+decoded rather than approximated.
 
 The selector does not reduce every condition callback to a boolean. In the
 immediate path at `0x61d844`, `_chooseEnemyAiSub` returns a binary32 multiplier;
@@ -1550,6 +1551,29 @@ target, so another enemy can replace the lock. The browser preserves this
 replacement rule, disables manual retargeting while active, clears a dead
 target, renders the persistent target ring/status, and snapshots the remaining
 lifetime and enemy index.
+
+Enemy skill type `113` is a combo-dependent branch in a monster's enemy-skill
+list, not an executable attack. Its ordinary dispatch, setup, and condition
+table entries resolve to `0x62be50`, `0x621c94`, and `0x61c01c`. Those paths
+are deliberately inert: setup writes selected-skill sentinel `-1` to
+`sMONSTER+0x670` and returns `-1.0`, while the ordinary new-AI condition scale
+is zero. This agrees with the independent `ESBranchCombo` classification: the
+record must be interpreted by the legacy skill-list controller instead of
+being offered as an ordinary new-AI action.
+
+Unlike types 109 through 112, type 113 has no operands in its `sENESKILLS`
+definition. Its monster skill-reference slot supplies unsigned byte `+4`
+(`enemy_ai`) as the combo threshold and unsigned byte `+5` (`enemy_rnd`) as a
+zero-based target index in the behavior list. The controller compares the
+previous player turn's combo count with the threshold. A value greater than or
+equal to the threshold moves directly to the target index; otherwise selection
+continues at the following record. It keeps interpreting control records until
+it reaches an action, so the branch itself consumes neither an enemy action nor
+RNG. The browser accepts this native split through queue entries shaped as
+`{ definition, enemyAi, enemyRnd }`, follows chains with a 1,000-step malformed
+cycle guard, and requires the wrapper for type 113 so missing slot operands
+cannot silently become zeroes. Boundary fixtures confirm four combos fall
+through at threshold five, while exactly five jumps to authored slot two.
 
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI

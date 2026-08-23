@@ -2,6 +2,23 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 previous-turn combo branch
+
+- Recovered type `113` as a legacy skill-list control record. Its ordinary
+  dispatch/setup/condition targets are the inert `0x62be50`, `0x621c94`, and
+  `0x61c01c`; setup writes selected-skill sentinel `-1` and returns `-1.0`,
+  while the ordinary new-AI condition returns zero.
+- The independent `ESBranchCombo` parser corroborates that the monster's
+  unsigned reference-slot `enemy_ai` byte is the previous-turn combo threshold
+  and `enemy_rnd` is a zero-based behavior destination. `>=` jumps there;
+  failure advances one record. The control record itself consumes no action or
+  RNG.
+- The browser queue now accepts `{ definition, enemyAi, enemyRnd }` references,
+  interprets chained type-113 records before materializing an action, rejects a
+  missing reference wrapper, and guards malformed cycles at 1,000 steps. Pure
+  threshold/cycle fixtures, six ARM64 anchors, focused Chromium with APK art,
+  screenshot inspection, and the native inspector pass. Next: type `114`.
+
 ## 2026-08-24 forced enemy target
 
 - Recovered type `112` at dispatch/setup/condition `0x62a5c4`, `0x6217c0`, and

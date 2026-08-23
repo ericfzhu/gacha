@@ -80,6 +80,7 @@ export const PAD_ENEMY_SKILL_RANDOM_SPINNERS = 109;
 export const PAD_ENEMY_SKILL_FIXED_SPINNERS = 110;
 export const PAD_ENEMY_SKILL_MAX_HP_CHANGE = 111;
 export const PAD_ENEMY_SKILL_FIXED_TARGET = 112;
+export const PAD_ENEMY_SKILL_BRANCH_COMBO = 113;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -523,6 +524,15 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       kind: 'fixedTarget',
       supported: true,
       durationTurns: definition.getInt32(0x10, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_BRANCH_COMBO) {
+    return Object.freeze({
+      type,
+      kind: 'branchCombo',
+      supported: true,
+      controlFlow: true,
       attackWithSkillValue,
     });
   }
@@ -1604,6 +1614,11 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
   if (type === PAD_ENEMY_SKILL_FIXED_TARGET) {
     return decodePadEnemySkillDefinition(definitionBytes);
   }
+  if (type === PAD_ENEMY_SKILL_BRANCH_COMBO) {
+    // The branch operands belong to the monster's eight-byte skill-reference
+    // slot, not the sENESKILLS definition or sMONSTER runtime scratch area.
+    return decodePadEnemySkillDefinition(definitionBytes);
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -2566,6 +2581,21 @@ export function normalizePadEnemySkillRecord(record) {
       kind: 'fixedTarget',
       supported: record?.supported !== false,
       durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)) & 0x3ff,
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_BRANCH_COMBO || record?.kind === 'branchCombo') {
+    const branchValue = Math.trunc(Number(record?.branchValue) || 0) & 0xff;
+    const targetRound = Math.trunc(Number(record?.targetRound) || 0) & 0xff;
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_BRANCH_COMBO,
+      kind: 'branchCombo',
+      supported: record?.supported !== false,
+      controlFlow: true,
+      branchValue,
+      targetRound,
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

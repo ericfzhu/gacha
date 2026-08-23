@@ -69,6 +69,7 @@ import {
   PAD_ENEMY_SKILL_FIXED_SPINNERS,
   PAD_ENEMY_SKILL_MAX_HP_CHANGE,
   PAD_ENEMY_SKILL_FIXED_TARGET,
+  PAD_ENEMY_SKILL_BRANCH_COMBO,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1479,13 +1480,26 @@ export class PuzzleEngine {
   takeEnemySkill(enemyIndex) {
     const queue = this.enemySkillQueues[enemyIndex];
     if (queue?.records.length) {
-      if (queue.position >= queue.records.length) {
-        if (queue.repeat) queue.position = 0;
-      }
-      if (queue.position < queue.records.length) {
+      let controlFlowSteps = 0;
+      while (controlFlowSteps <= 1_000) {
+        if (queue.position >= queue.records.length) {
+          if (queue.repeat) queue.position = 0;
+          else break;
+        }
+        if (queue.position < 0 || queue.position >= queue.records.length) break;
         const skill = queue.records[queue.position];
+        if (skill.kind === 'branchCombo') {
+          queue.position = this.lastComboCount >= skill.branchValue
+            ? skill.targetRound
+            : queue.position + 1;
+          controlFlowSteps += 1;
+          continue;
+        }
         queue.position += 1;
         return this.materializeEnemySkillRecord(skill, enemyIndex);
+      }
+      if (controlFlowSteps > 1_000) {
+        throw new Error('PAD enemy skill queue exceeded 1000 control-flow steps.');
       }
     }
     const pool = this.enemyAiPools[enemyIndex];
@@ -3064,7 +3078,34 @@ export class PuzzleEngine {
       throw new RangeError(`PAD enemy index must be between 0 and ${ENEMY_TEMPLATE.length - 1}.`);
     }
     if (!Array.isArray(skillDefinitions)) throw new TypeError('PAD enemy skill queue must be an array of definition records.');
-    const records = skillDefinitions.map((definition) => decodePadEnemySkillDefinition(definition));
+    const records = skillDefinitions.map((entry) => {
+      const reference = entry
+        && typeof entry === 'object'
+        && !(entry instanceof ArrayBuffer)
+        && !ArrayBuffer.isView(entry)
+        && ('definition' in entry || 'skillDefinition' in entry)
+        ? entry
+        : null;
+      const definition = reference?.definition ?? reference?.skillDefinition ?? entry;
+      const decoded = decodePadEnemySkillDefinition(definition);
+      if (decoded.type !== PAD_ENEMY_SKILL_BRANCH_COMBO) return decoded;
+      if (!reference) {
+        throw new TypeError('PAD type-113 combo branches require a skill-reference record.');
+      }
+      if (
+        reference.enemyAi === undefined
+        || reference.enemyRnd === undefined
+        || !Number.isFinite(Number(reference.enemyAi))
+        || !Number.isFinite(Number(reference.enemyRnd))
+      ) {
+        throw new TypeError('PAD type-113 skill references require enemyAi and enemyRnd operands.');
+      }
+      return normalizePadEnemySkillRecord({
+        ...decoded,
+        branchValue: reference.enemyAi,
+        targetRound: reference.enemyRnd,
+      });
+    });
     if (records.some((record) => !record.supported)) {
       throw new Error('PAD enemy skill queue contains a definition type that is not implemented.');
     }
@@ -3074,7 +3115,7 @@ export class PuzzleEngine {
     if (records.some((record) => record.passive)) {
       throw new Error('PAD passive enemy skills must be installed through monster skill slots.');
     }
-    if (records.some((record) => record.attackWithSkillValue === null)) {
+    if (records.some((record) => !record.controlFlow && record.attackWithSkillValue === null)) {
       throw new RangeError('PAD scheduled enemy-skill definitions require the native +0x44 attack-with-skill field.');
     }
     this.enemySkillQueues[index] = { records, position: 0, repeat: Boolean(repeat) };

@@ -738,6 +738,18 @@ const FIXED_TARGET_INSTRUCTION_ANCHORS = Object.freeze([
   [0x654620, 0x528ee809], // address the status when its target disappears
   [0x654630, 0x3216014a], // clear duration and mark the transition fresh
 ]);
+const COMBO_BRANCH_ENEMY_SKILL_TYPE = 113;
+const COMBO_BRANCH_HANDLER = 0x62be50;
+const COMBO_BRANCH_SETUP_HANDLER = 0x621c94;
+const COMBO_BRANCH_CONDITION_HANDLER = 0x61c01c;
+const COMBO_BRANCH_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x621c94, 0x12800008], // setup writes selected-skill sentinel -1
+  [0x621c98, 0xb9067268], // persist sentinel at sMONSTER+0x670
+  [0x621c9c, 0x1e3e1000], // return setup scale -1.0 for the control record
+  [0x62be50, 0x900045e9], // ordinary execution enters the generic inert tail
+  [0x61a5c0, 0xb9000fff], // condition callback initializes return scale to zero
+  [0x61c01c, 0xbd400fe0], // type 113 returns that zero ordinary-AI scale
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -2034,6 +2046,31 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     : FIXED_TARGET_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
+  const comboBranchDispatchTarget = resolveEnemySkillTarget(
+    COMBO_BRANCH_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const comboBranchSetupTarget = resolveEnemySkillTarget(
+    COMBO_BRANCH_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const comboBranchConditionTarget = resolveEnemySkillTarget(
+    COMBO_BRANCH_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const comboBranchDispatchMatches = comboBranchDispatchTarget === null
+    ? null : comboBranchDispatchTarget === COMBO_BRANCH_HANDLER;
+  const comboBranchSetupMatches = comboBranchSetupTarget === null
+    ? null : comboBranchSetupTarget === COMBO_BRANCH_SETUP_HANDLER;
+  const comboBranchConditionMatches = comboBranchConditionTarget === null
+    ? null : comboBranchConditionTarget === COMBO_BRANCH_CONDITION_HANDLER;
+  const comboBranchInstructionAnchorsMatch = restoredElf === null ? null
+    : COMBO_BRANCH_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -3104,6 +3141,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       fixedTargetSetupMatches21_9: fixedTargetSetupMatches,
       fixedTargetConditionMatches21_9: fixedTargetConditionMatches,
       fixedTargetInstructionAnchorsMatch21_9: fixedTargetInstructionAnchorsMatch,
+      comboBranchDispatchMatches21_9: comboBranchDispatchMatches,
+      comboBranchSetupMatches21_9: comboBranchSetupMatches,
+      comboBranchConditionMatches21_9: comboBranchConditionMatches,
+      comboBranchInstructionAnchorsMatch21_9: comboBranchInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -3847,6 +3888,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       fixedTargetInstructionAnchorsMatch21_9: fixedTargetInstructionAnchorsMatch,
       fixedTargetSemantics:
         'type 112 installs low-ten-bit +0x10 duration at +0x87740 and the acting monster index at +0x87744, forcing ordinary card attacks to that live enemy; condition rejects only the same active target and permits a different actor to replace it, _calcCards clears the status when the target disappears, and _incEneTurn clears the published index on expiry; no RNG is consumed',
+      comboBranchType: COMBO_BRANCH_ENEMY_SKILL_TYPE,
+      comboBranchDispatchTarget: comboBranchDispatchTarget === null
+        ? null : hex(comboBranchDispatchTarget),
+      comboBranchDispatchMatches21_9: comboBranchDispatchMatches,
+      comboBranchSetupTarget: comboBranchSetupTarget === null
+        ? null : hex(comboBranchSetupTarget),
+      comboBranchSetupMatches21_9: comboBranchSetupMatches,
+      comboBranchConditionTarget: comboBranchConditionTarget === null
+        ? null : hex(comboBranchConditionTarget),
+      comboBranchConditionMatches21_9: comboBranchConditionMatches,
+      comboBranchInstructionAnchorsMatch21_9: comboBranchInstructionAnchorsMatch,
+      comboBranchSemantics:
+        'type 113 is an enemy-skill-list control record rather than an action: ordinary dispatch is inert, setup stores selected-skill sentinel -1 and scale -1.0, and the ordinary new-AI condition is zero; the monster reference slot supplies unsigned enemy_ai as the previous-turn combo threshold and enemy_rnd as a zero-based destination, branching when combos >= threshold without spending a turn or RNG',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -4421,6 +4475,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || fixedTargetSetupMatches === false
     || fixedTargetConditionMatches === false
     || fixedTargetInstructionAnchorsMatch === false
+    || comboBranchDispatchMatches === false
+    || comboBranchSetupMatches === false
+    || comboBranchConditionMatches === false
+    || comboBranchInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false
