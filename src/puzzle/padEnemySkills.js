@@ -37,6 +37,7 @@ export const PAD_ENEMY_SKILL_RANDOM_SUB_BIND = 65;
 export const PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL = 66;
 export const PAD_ENEMY_SKILL_COMBO_ABSORB = 67;
 export const PAD_ENEMY_SKILL_SKYFALL_RATE = 68;
+export const PAD_ENEMY_SKILL_DEATH_CRY = 69;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES_4 = 76;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES = 77;
 export const PAD_ENEMY_SKILL_HORIZONTAL_LINES_4 = 78;
@@ -411,6 +412,20 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       durationMin,
       durationMax,
       chancePercent: definition.getInt32(0x1c, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_DEATH_CRY) {
+    requireLength(definitionBytes, 0x30, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'deathCry',
+      supported: true,
+      messageCode: definition.getInt32(0x10, true),
+      presentationParameters: Object.freeze(Array.from(
+        { length: 7 },
+        (_, index) => definition.getInt32(0x14 + index * 4, true),
+      )),
       attackWithSkillValue,
     });
   }
@@ -1152,6 +1167,9 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_DEATH_CRY) {
+    return decodePadEnemySkillDefinition(definitionBytes);
+  }
   if (type === PAD_ENEMY_SKILL_BIND_LEADER_HELPER) {
     requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
     const targetFlags = definition.getUint8(0x10) & 0x03;
@@ -1611,6 +1629,24 @@ export function normalizePadEnemySkillRecord(record) {
         : { durationMin, durationMax }),
       chancePercent: Math.trunc(Number(record?.chancePercent) || 0),
       setupMaterialized: Boolean(record?.setupMaterialized || durationPresent),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_DEATH_CRY || record?.kind === 'deathCry') {
+    const authored = Array.isArray(record?.presentationParameters)
+      ? record.presentationParameters
+      : [];
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_DEATH_CRY,
+      kind: 'deathCry',
+      supported: record?.supported !== false,
+      messageCode: Math.trunc(Number(record?.messageCode) || 0),
+      presentationParameters: Object.freeze(Array.from(
+        { length: 7 },
+        (_, index) => Math.trunc(Number(authored[index]) || 0),
+      )),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

@@ -2,6 +2,24 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 enemy death-cry phase
+
+- Recovered type `69` as a death-only record. Its ordinary dispatch/setup/
+  condition entries are `0x62be50`, `0x621c94`, and `0x61bb1c`, making it
+  ineligible during normal enemy turns.
+- Traced `_setupDeadmanEffect` at `0x62d4d8`: it scans the monster's 64 native
+  slots on death, copies definition `+0x10..+0x2c` and the skill id into the
+  dedicated death record, and hands presentation to `_gamePhaseEnemyDead` at
+  `0x64b9e4` without advancing gameplay RNG.
+- Ported type-69 definition/runtime normalization, slot-ordered one-shot death
+  discovery, the timed `death` phase, post-death continuation/victory, revival
+  rearming, snapshots, and visible death messaging. Pure, exact-table, focused
+  browser, generic browser-client, and production-build checks pass with no
+  page errors; the focused render shows Verdant Shell's death effect before
+  Umbra Eye's turn can continue.
+- Next: recover type `70` and keep type `95`'s actionable on-death skill-set as
+  a separate death-scheduler checkpoint.
+
 ## 2026-08-23 enemy skyfall-rate skill
 
 - Recovered type `68`: dispatch `0x629984`, setup `0x6200a4`, and condition

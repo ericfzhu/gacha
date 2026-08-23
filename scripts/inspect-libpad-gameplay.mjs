@@ -94,6 +94,10 @@ const SKYFALL_RATE_ENEMY_SKILL_TYPE = 68;
 const SKYFALL_RATE_HANDLER = 0x629984;
 const SKYFALL_RATE_SETUP_HANDLER = 0x6200a4;
 const SKYFALL_RATE_CONDITION_HANDLER = 0x61af40;
+const DEATH_CRY_ENEMY_SKILL_TYPE = 69;
+const DEATH_CRY_HANDLER = 0x62be50;
+const DEATH_CRY_SETUP_HANDLER = 0x621c94;
+const DEATH_CRY_CONDITION_HANDLER = 0x61bb1c;
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -247,6 +251,8 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['orb-state', 'clearBlackFall', '_ZN9cGAMEMAIN15_clearBlackFallEv', 0x6b57a0],
   ['orb-state', 'incEneTurn', '_ZN9cGAMEMAIN11_incEneTurnEb', 0x677978],
   ['orb-state', 'doEnemySkill', '_ZN9cGAMEMAIN13_doEnemySkillEP8sMONSTER', 0x6285a4],
+  ['enemy-death', 'setupDeadmanEffect', '_ZN9cGAMEMAIN19_setupDeadmanEffectEP8sMONSTER', 0x62d4d8],
+  ['enemy-death', 'gamePhaseEnemyDead', '_ZN9cGAMEMAIN19_gamePhaseEnemyDeadEv', 0x64b9e4],
   ['orb-state', 'addNailCounts', '_ZN9sGAMEWORK13addNailCountsEi', 0x422e60],
   ['orb-state', 'countPassiveSkills', '_ZNK9cGAMEMAIN19_countPassiveSkillsEiR8sSKILLBYbb', 0x63fa28],
   ['orb-state', 'hasBlockPowup', '_ZN9cGAMEMAIN14_hasBlockPowupEi', 0x6b0cc8],
@@ -670,6 +676,21 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : skyfallRateSetupTarget === SKYFALL_RATE_SETUP_HANDLER;
   const skyfallRateConditionMatches = skyfallRateConditionTarget === null
     ? null : skyfallRateConditionTarget === SKYFALL_RATE_CONDITION_HANDLER;
+  const deathCryDispatchTarget = resolveEnemySkillTarget(
+    DEATH_CRY_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const deathCrySetupTarget = resolveEnemySkillTarget(
+    DEATH_CRY_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const deathCryConditionTarget = resolveEnemySkillTarget(
+    DEATH_CRY_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const deathCryDispatchMatches = deathCryDispatchTarget === null
+    ? null : deathCryDispatchTarget === DEATH_CRY_HANDLER;
+  const deathCrySetupMatches = deathCrySetupTarget === null
+    ? null : deathCrySetupTarget === DEATH_CRY_SETUP_HANDLER;
+  const deathCryConditionMatches = deathCryConditionTarget === null
+    ? null : deathCryConditionTarget === DEATH_CRY_CONDITION_HANDLER;
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1607,6 +1628,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       skyfallRateDispatchMatches21_9: skyfallRateDispatchMatches,
       skyfallRateSetupMatches21_9: skyfallRateSetupMatches,
       skyfallRateConditionMatches21_9: skyfallRateConditionMatches,
+      deathCryDispatchMatches21_9: deathCryDispatchMatches,
+      deathCrySetupMatches21_9: deathCrySetupMatches,
+      deathCryConditionMatches21_9: deathCryConditionMatches,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -1909,6 +1933,18 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       skyfallRateConditionMatches21_9: skyfallRateConditionMatches,
       skyfallRateSemantics:
         'type 68: +0x10 nine-bit orb mask, one-LCG inclusive +0x14..+0x18 duration, and +0x1c chance are materialized at sMONSTER+0x678/+0x67c/+0x680; execution applies separate natural 0x03f and hazard 0x1c0 status categories; same active masks reject while different masks can replace them',
+      deathCryType: DEATH_CRY_ENEMY_SKILL_TYPE,
+      deathCryDispatchTarget: deathCryDispatchTarget === null
+        ? null : hex(deathCryDispatchTarget),
+      deathCryDispatchMatches21_9: deathCryDispatchMatches,
+      deathCrySetupTarget: deathCrySetupTarget === null
+        ? null : hex(deathCrySetupTarget),
+      deathCrySetupMatches21_9: deathCrySetupMatches,
+      deathCryConditionTarget: deathCryConditionTarget === null
+        ? null : hex(deathCryConditionTarget),
+      deathCryConditionMatches21_9: deathCryConditionMatches,
+      deathCrySemantics:
+        'type 69 is rejected by the ordinary turn selector; setupDeadmanEffect scans the 64 monster skill slots at death, copies +0x10..+0x2c presentation fields into the dedicated +0x108 death record, and gamePhaseEnemyDead presents it before battle continuation',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -2352,6 +2388,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || skyfallRateDispatchMatches === false
     || skyfallRateSetupMatches === false
     || skyfallRateConditionMatches === false
+    || deathCryDispatchMatches === false
+    || deathCrySetupMatches === false
+    || deathCryConditionMatches === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

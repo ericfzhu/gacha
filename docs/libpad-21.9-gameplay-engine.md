@@ -783,6 +783,25 @@ enemy-turn duration expires. Consequently the already-recovered
 AI probability plus setup draws and ends at `3803934822`. DadGuide identifies
 the same record as `ESSkyfall` type 68.
 
+Enemy skill type `69` is a death-only presentation record. Its ordinary
+dispatch, setup, and condition entries target `0x62be50`, `0x621c94`, and
+`0x61bb1c`, so it clears normal selection and returns a zero condition instead
+of acting during an enemy turn. On death, `_setupDeadmanEffect(sMONSTER*)` at
+`0x62d4d8` independently scans all 64 authored monster skill slots, recognizes
+type `0x45`, and copies definition `+0x10..+0x2c` plus the skill id into the
+dedicated death record at `sMONSTER+0x108..+0x110`. The later
+`_gamePhaseEnemyDead()` at `0x64b9e4` owns presentation before battle flow can
+continue. The first parameter is the death-message/effect code; the remaining
+seven integers configure presentation and do not consume gameplay RNG.
+
+The browser therefore keeps type 69 out of ordinary enemy-AI actions, detects
+newly dead enemies at the player-attack and post-enemy-action boundaries,
+scans their native slot order once, exposes the decoded death record in the
+snapshot, and inserts a timed `death` phase before the next enemy or victory.
+Reviving an enemy clears its resolved-death marker so a later death can fire
+again. DadGuide independently marks `ESDeathCry` as an on-death action and
+extracts it from the ordinary behavior list.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

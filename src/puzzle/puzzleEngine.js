@@ -53,6 +53,7 @@ import {
   PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL,
   PAD_ENEMY_SKILL_COMBO_ABSORB,
   PAD_ENEMY_SKILL_SKYFALL_RATE,
+  PAD_ENEMY_SKILL_DEATH_CRY,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -269,6 +270,7 @@ export class PuzzleEngine {
     this.mode = 'ready';
     this.phase = 'input';
     this.phaseTimer = 0;
+    this.phaseAfterDeath = null;
     this.turn = 0;
     this.comboCount = 0;
     this.cascadeDepth = 0;
@@ -281,6 +283,7 @@ export class PuzzleEngine {
     this.lastBombDamage = 0;
     this.lastThornDamage = 0;
     this.lastEnemySkill = null;
+    this.lastEnemyDeathAction = null;
     this.lastEnemyActions = [];
     this.moveTime = this.baseMoveTime;
     this.moveTimeReduction = null;
@@ -306,7 +309,7 @@ export class PuzzleEngine {
       maxHp: 12000,
       recovery: this.party.reduce((total, member) => total + member.recovery, 0),
     };
-    this.enemies = copyEnemies();
+    this.enemies = copyEnemies().map((enemy) => ({ ...enemy, deathResolved: false }));
     this.targetEnemy = 0;
     this.manualTarget = false;
     this.skill = { name: 'Tide Shift', cooldown: 0, maxCooldown: 5 };
@@ -676,35 +679,83 @@ export class PuzzleEngine {
       return;
     }
     if (this.phase === 'attack') {
-      if (this.enemies.every((enemy) => enemy.hp <= 0)) {
-        this.mode = 'victory';
-        this.phase = 'complete';
-        this.message = `Victory in ${this.turn} turn${this.turn === 1 ? '' : 's'}!`;
-        return;
-      }
+      if (this.enterEnemyDeathPhase('enemy')) return;
+      if (this.finishVictory()) return;
       this.phase = 'enemy';
       this.phaseTimer = 0.46;
       return;
     }
     if (this.phase === 'enemy') {
       this.resolveEnemyTurn();
-      if (this.enemies.every((enemy) => enemy.hp <= 0)) {
-        this.mode = 'victory';
-        this.phase = 'complete';
-        this.message = `Victory in ${this.turn} turn${this.turn === 1 ? '' : 's'}!`;
-        return;
-      }
-      if (this.player.hp <= 0) {
-        this.mode = 'defeat';
-        this.phase = 'complete';
-        this.message = 'Defeat — the party HP reached zero.';
-        return;
-      }
-      this.skill.cooldown = Math.max(0, this.skill.cooldown - 1);
-      this.phase = 'input';
-      this.phaseTimer = 0;
-      this.message = this.skill.cooldown === 0 ? 'Your move — Tide Shift is ready.' : 'Your move — plan the path before touching an orb.';
+      if (this.enterEnemyDeathPhase('postEnemy')) return;
+      this.finishEnemyTurn();
+      return;
     }
+    if (this.phase === 'death') {
+      if (this.enterEnemyDeathPhase(this.phaseAfterDeath)) return;
+      const destination = this.phaseAfterDeath;
+      this.phaseAfterDeath = null;
+      if (this.finishVictory()) return;
+      if (destination === 'enemy') {
+        this.phase = 'enemy';
+        this.phaseTimer = 0.46;
+        return;
+      }
+      this.finishEnemyTurn();
+    }
+  }
+
+  finishVictory() {
+    if (!this.enemies.every((enemy) => enemy.hp <= 0)) return false;
+    this.mode = 'victory';
+    this.phase = 'complete';
+    this.message = `Victory in ${this.turn} turn${this.turn === 1 ? '' : 's'}!`;
+    return true;
+  }
+
+  finishEnemyTurn() {
+    if (this.finishVictory()) return;
+    if (this.player.hp <= 0) {
+      this.mode = 'defeat';
+      this.phase = 'complete';
+      this.message = 'Defeat — the party HP reached zero.';
+      return;
+    }
+    this.skill.cooldown = Math.max(0, this.skill.cooldown - 1);
+    this.phase = 'input';
+    this.phaseTimer = 0;
+    this.message = this.skill.cooldown === 0 ? 'Your move — Tide Shift is ready.' : 'Your move — plan the path before touching an orb.';
+  }
+
+  enterEnemyDeathPhase(destination) {
+    const action = this.resolveNextEnemyDeathAction();
+    if (!action) return false;
+    this.phase = 'death';
+    this.phaseAfterDeath = destination;
+    this.phaseTimer = 0.65;
+    return true;
+  }
+
+  resolveNextEnemyDeathAction() {
+    for (let enemyIndex = 0; enemyIndex < this.enemies.length; enemyIndex += 1) {
+      const enemy = this.enemies[enemyIndex];
+      if (enemy.hp > 0 || enemy.deathResolved) continue;
+      enemy.deathResolved = true;
+      const pool = this.enemyAiPools[enemyIndex];
+      if (!pool) continue;
+      for (const slot of pool.monster.slots) {
+        const definition = pool.definitionsById.get(slot.skillId);
+        if (definition?.effect?.type !== PAD_ENEMY_SKILL_DEATH_CRY) continue;
+        const skill = normalizePadEnemySkillRecord(definition.effect);
+        const action = Object.freeze({ enemy: enemyIndex, skillId: slot.skillId, skill });
+        this.lastEnemyDeathAction = action;
+        this.message = skill.messageCode
+          ? `${enemy.name} used death message ${skill.messageCode}.`
+          : `${enemy.name} showed its death effect.`;
+        return action;
+      }
+    }
+    return null;
   }
 
   findMatches() {
@@ -1882,6 +1933,7 @@ export class PuzzleEngine {
       if (!target || target.hp > 0) return false;
       const revivedHp = padEnemySkillReviveHp(target.maxHp, skill.revivePercent);
       target.hp = revivedHp;
+      if (target.hp > 0) target.deathResolved = false;
       this.lastEnemySkill = Object.freeze({ ...skill, revivedHp: target.hp });
       if (target.hp > 0) {
         this.floatingText.push({
@@ -2119,6 +2171,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL,
         PAD_ENEMY_SKILL_COMBO_ABSORB,
         PAD_ENEMY_SKILL_SKYFALL_RATE,
+        PAD_ENEMY_SKILL_DEATH_CRY,
         PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
         PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -2157,6 +2210,7 @@ export class PuzzleEngine {
     this.enemyAiPools[index] = {
       monster,
       definitions,
+      definitionsById,
       aiBudget: monster.budgetCap,
     };
   }
@@ -2708,6 +2762,10 @@ export class PuzzleEngine {
       lastBombDamage: this.lastBombDamage,
       lastThornDamage: this.lastThornDamage,
       lastEnemySkill: this.lastEnemySkill ? { ...this.lastEnemySkill } : null,
+      lastEnemyDeathAction: this.lastEnemyDeathAction ? {
+        ...this.lastEnemyDeathAction,
+        skill: { ...this.lastEnemyDeathAction.skill },
+      } : null,
       lastEnemyActions: this.lastEnemyActions.map((action) => ({
         ...action,
         skill: action.skill ? { ...action.skill } : undefined,
@@ -2737,7 +2795,7 @@ export class PuzzleEngine {
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,
-      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0 }, index) => ({
+      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, deathResolved = false, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0 }, index) => ({
         id,
         name,
         attribute,
@@ -2745,6 +2803,7 @@ export class PuzzleEngine {
         maxHp,
         counter,
         maxCounter,
+        deathResolved,
         scaledAttackGate,
         attackBoostTurns,
         attackBoostPercent,

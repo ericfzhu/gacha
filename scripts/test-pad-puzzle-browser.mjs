@@ -21,6 +21,7 @@ const renderBindState = process.argv.includes('--bind-render');
 const renderAttributeAbsorbState = process.argv.includes('--attribute-absorb-render');
 const renderComboAbsorbState = process.argv.includes('--combo-absorb-render');
 const renderSkyfallRateState = process.argv.includes('--skyfall-rate-render');
+const renderDeathCryState = process.argv.includes('--death-cry-render');
 const renderReviveState = process.argv.includes('--revive-render');
 const renderAttributeChangeState = process.argv.includes('--attribute-change-render');
 const renderSelfDestructState = process.argv.includes('--self-destruct-render');
@@ -2153,6 +2154,46 @@ try {
     || skyfallRateRenderState.rngState !== 3_803_934_822
   )) throw new Error(`Skyfall-rate render-state mismatch: ${JSON.stringify(skyfallRateRenderState)}`);
   if (skyfallRateRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
+  const deathCryRenderState = renderDeathCryState ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    const monsterDefinition = new Uint8Array(0x2ec);
+    const monsterView = new DataView(monsterDefinition.buffer);
+    monsterView.setUint8(0xe0, 1);
+    monsterView.setInt16(0xe2, 100, true);
+    monsterView.setInt16(0xe4, 10, true);
+    monsterView.setUint32(0xec, 9_048, true);
+    monsterView.setUint8(0xf0, 100);
+    const definition = new Uint8Array(0x48);
+    const view = new DataView(definition.buffer);
+    view.setUint32(0x00, 9_048, true);
+    view.setInt16(0x04, 69, true);
+    view.setInt32(0x10, 41, true);
+    view.setInt32(0x14, 7, true);
+    view.setInt32(0x30, 10_000, true);
+    view.setInt32(0x34, 1_000, true);
+    view.setInt32(0x38, 100, true);
+    view.setInt32(0x40, 20, true);
+    view.setInt32(0x44, 0, true);
+    engine.reset();
+    engine.start();
+    engine.setEnemySkillQueue(0, []);
+    engine.setEnemyAiDefinitionPool(0, monsterDefinition, [definition]);
+    engine.enemies[0].hp = 0;
+    engine.phase = 'attack';
+    const rngBefore = engine.rng.state;
+    engine.advancePhase();
+    return { ...engine.snapshot(), rngBefore };
+  }) : null;
+  if (deathCryRenderState && (
+    deathCryRenderState.phase !== 'death'
+    || deathCryRenderState.enemies?.[0]?.deathResolved !== true
+    || deathCryRenderState.lastEnemyDeathAction?.enemy !== 0
+    || deathCryRenderState.lastEnemyDeathAction?.skillId !== 9_048
+    || deathCryRenderState.lastEnemyDeathAction?.skill?.type !== 69
+    || deathCryRenderState.lastEnemyDeathAction?.skill?.messageCode !== 41
+    || deathCryRenderState.rngState !== deathCryRenderState.rngBefore
+  )) throw new Error(`Death-cry render-state mismatch: ${JSON.stringify(deathCryRenderState)}`);
+  if (deathCryRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   const reviveRenderState = renderReviveState ? await page.evaluate(() => {
     const engine = window.__puzzleGame;
     engine.reset();
@@ -2721,9 +2762,9 @@ try {
   )) throw new Error(`Attack-boost render-state mismatch: ${JSON.stringify(attackBoostRenderState)}`);
   if (attackBoostRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, comboAbsorbRenderState, skyfallRateRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, earlyPartyControlRenderState, bindAttackRenderState, randomSubBindRenderState, repeatAttackRenderState, entireBlindRenderState, inactivityRenderState, attackBoostRenderState, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, comboAbsorbRenderState, skyfallRateRenderState, deathCryRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, earlyPartyControlRenderState, bindAttackRenderState, randomSubBindRenderState, repeatAttackRenderState, entireBlindRenderState, inactivityRenderState, attackBoostRenderState, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, comboAbsorbRenderState, skyfallRateRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, earlyPartyControlRenderState, bindAttackRenderState, randomSubBindRenderState, repeatAttackRenderState, entireBlindRenderState, inactivityRenderState, attackBoostRenderState, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, comboAbsorbRenderState, skyfallRateRenderState, deathCryRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, earlyPartyControlRenderState, bindAttackRenderState, randomSubBindRenderState, repeatAttackRenderState, entireBlindRenderState, inactivityRenderState, attackBoostRenderState, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }

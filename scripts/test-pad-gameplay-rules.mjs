@@ -20,6 +20,7 @@ import {
   PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL,
   PAD_ENEMY_SKILL_COMBO_ABSORB,
   PAD_ENEMY_SKILL_SKYFALL_RATE,
+  PAD_ENEMY_SKILL_DEATH_CRY,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -1973,6 +1974,71 @@ assert.deepEqual(directSkyfallRateEngine.skyfallRateRules, {
 assert.equal(directSkyfallRateEngine.dropRates[0], 0.25);
 assert.equal(directSkyfallRateEngine.dropRates[7], 0.25);
 assert.equal(directSkyfallRateEngine.rng.state, padLcgStep(21_900).state);
+const enemyAiDeathCryDefinition = enemyAiInactivityDefinition.slice();
+const enemyAiDeathCryView = new DataView(enemyAiDeathCryDefinition.buffer);
+enemyAiDeathCryView.setUint32(0x00, 9_048, true);
+enemyAiDeathCryView.setInt16(0x04, PAD_ENEMY_SKILL_DEATH_CRY, true);
+enemyAiDeathCryView.setInt32(0x10, 41, true);
+enemyAiDeathCryView.setInt32(0x14, 7, true);
+enemyAiDeathCryView.setInt32(0x18, 2, true);
+enemyAiDeathCryView.setInt32(0x1c, 3, true);
+enemyAiDeathCryView.setInt32(0x20, 1, true);
+enemyAiDeathCryView.setInt32(0x24, 5, true);
+enemyAiDeathCryView.setInt32(0x28, 11, true);
+enemyAiDeathCryView.setInt32(0x2c, 13, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiDeathCryDefinition), {
+  type: 69,
+  kind: 'deathCry',
+  supported: true,
+  messageCode: 41,
+  presentationParameters: [7, 2, 3, 1, 5, 11, 13],
+  attackWithSkillValue: 0,
+});
+const deathCryMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(deathCryMonsterDefinition.buffer).setUint32(0xec, 9_048, true);
+const deathCryEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: deathCryMonsterDefinition,
+    skillDefinitions: [enemyAiDeathCryDefinition],
+  }],
+});
+deathCryEngine.start();
+deathCryEngine.enemies[0].hp = 0;
+deathCryEngine.phase = 'attack';
+const deathCryRngBefore = deathCryEngine.rng.state;
+deathCryEngine.advancePhase();
+assert.equal(deathCryEngine.phase, 'death');
+assert.deepEqual(deathCryEngine.lastEnemyDeathAction, {
+  enemy: 0,
+  skillId: 9_048,
+  skill: decodePadEnemySkillDefinition(enemyAiDeathCryDefinition),
+});
+assert.equal(deathCryEngine.rng.state, deathCryRngBefore);
+deathCryEngine.advancePhase();
+assert.equal(deathCryEngine.phase, 'enemy');
+assert.equal(deathCryEngine.resolveNextEnemyDeathAction(), null);
+assert.equal(deathCryEngine.enemies[0].deathResolved, true);
+assert.equal(deathCryEngine.applyEnemySkillRecord({
+  type: PAD_ENEMY_SKILL_REVIVE_ENEMY,
+  kind: 'reviveEnemy',
+  supported: true,
+  targetEnemyIndex: 0,
+  revivePercent: 10,
+  setupMaterialized: true,
+}, 1), true);
+assert.equal(deathCryEngine.enemies[0].deathResolved, false);
+deathCryEngine.enemies[0].hp = 0;
+assert.equal(deathCryEngine.resolveNextEnemyDeathAction()?.skillId, 9_048);
+deathCryEngine.reset();
+deathCryEngine.start();
+deathCryEngine.enemies.forEach((enemy) => { enemy.hp = 0; });
+deathCryEngine.phase = 'attack';
+deathCryEngine.advancePhase();
+assert.equal(deathCryEngine.phase, 'death');
+deathCryEngine.advancePhase();
+assert.equal(deathCryEngine.mode, 'victory');
+assert.equal(deathCryEngine.phase, 'complete');
 const enemyAiAttributeAbsorbDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiAttributeAbsorbView = new DataView(enemyAiAttributeAbsorbDefinition.buffer);
 enemyAiAttributeAbsorbView.setUint32(0x00, 9_021, true);
