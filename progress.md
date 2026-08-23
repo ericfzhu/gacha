@@ -2,6 +2,35 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 protected-startup speed and touched-frame fidelity
+
+- Profiled the exact APK bootstrap at 151,900,682 guest instructions. The
+  protection wrapper accounts for 151,793,049 of those instructions, while
+  `libpad.so` itself accounts for only 107,633, so startup cost is dominated by
+  instruction dispatch through the protected wrapper rather than rendering.
+- Added a narrow integer fast-dispatch path for the wrapper's common move-wide,
+  address-generation, branch, add/sub-immediate, integer load/store, and
+  load/store-pair families. Diagnostic provenance recording is disabled only
+  during the verified wrapper phase and restored before `libpad.so` startup.
+  Local full-browser time fell from about 78.7 seconds to roughly 68-70 seconds
+  without changing the exact 151,900,682-instruction execution boundary.
+- Rejected a file-only restored-ELF cache after proving that the protected
+  constructor retains pointers into anonymous process mappings such as
+  `0x09058000`. A faithful shortcut requires a complete virtual-process
+  checkpoint or direct protection transform; no stale-pointer cache is shipped.
+- Extended the decoder for real frame/input instructions exposed after the
+  original `NEG.2S` repair: `USHL.2S`, conditional `CCMP/CCMN`, `LDPSW` pair
+  loads, and scalar `ADDP D,V.2D`. Every observed fault opcode is covered by an
+  exact Wasm regression fixture.
+- The full Chromium run now renders the authentic Japanese age/purchase notice
+  (93.1% non-black pixels in the game region), continues through two scripted
+  touches, 164 frames, and 18,068 GLES draw calls without a guest callback or
+  console error. After input the client reaches its black offline/data boundary
+  because private `data048.bin` / `data030.bin` state is absent.
+- Browser smoke testing now captures and measures the pre-input native frame,
+  so a black-canvas regression cannot pass merely because the lifecycle reports
+  `native game running`.
+
 ## 2026-08-23 native frame NEG.2S decoder repair
 
 - Reproduced the post-startup browser failure reported as CPU status `-1` at
