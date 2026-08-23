@@ -2,6 +2,22 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 fixed-position spinner orbs
+
+- Recovered type `110` at dispatch/setup/condition `0x62a504`, `0x6217c0`, and
+  `0x61a630`; the independent parser corroborates `ESSpinnersFixed`.
+- The handler reads duration/speed from `+0x10/+0x14`, narrows five authored
+  row maps from `+0x18..+0x28`, and reverses their bottom-origin order before
+  calling the type-109 roulette helper with a fixed map and zero random count.
+  Generic setup and unconditional admission consume no RNG.
+- The port shares spinner timing, orb-attached movement, natural-attribute
+  cycling, lifetime, snapshots, and presentation with type 109 while selecting
+  only the five mapped rows. The diagonal fixture decodes top-down masks
+  `16/8/4/2/1`, marks five exact cells for four turns at 0.5 seconds, and leaves
+  seed 21900 unchanged. Pure tests, seventeen ARM64 anchors, focused Chromium
+  with APK art, screenshot inspection, generic browser smoke, the full native
+  inspector, PAD data checks, and production build pass. Next: type `111`.
+
 ## 2026-08-24 random spinner orbs
 
 - Recovered type `109` at dispatch/setup/condition `0x62a4e8`, `0x61ffa8`, and

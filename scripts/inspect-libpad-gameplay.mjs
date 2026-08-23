@@ -638,6 +638,29 @@ const RANDOM_SPINNERS_INSTRUCTION_ANCHORS = Object.freeze([
   [0x62a55c, 0x2a1f03e7], // clear the helper's final control argument
   [0x62a560, 0x97f3d720], // install the random roulette orbs
 ]);
+const FIXED_SPINNERS_ENEMY_SKILL_TYPE = 110;
+const FIXED_SPINNERS_HANDLER = 0x62a504;
+const FIXED_SPINNERS_SETUP_HANDLER = 0x6217c0;
+const FIXED_SPINNERS_CONDITION_HANDLER = 0x61a630;
+const FIXED_SPINNERS_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x62a504, 0xb9401aa8], // load the bottom authored row bitmap at +0x18
+  [0x62a50c, 0x52800209], // construct a five-entry fixed map container
+  [0x62a510, 0x9100c3e2], // address its packed row-map scratch storage
+  [0x62a514, 0x790073e8], // narrow +0x18 into the fifth map entry
+  [0x62a518, 0x3cc1c2a0], // load authored row words +0x1c through +0x28
+  [0x62a528, 0x4ea00800], // reverse 32-bit rows within each 64-bit half
+  [0x62a52c, 0x6e004000], // swap halves to finish bottom-to-top reversal
+  [0x62a530, 0x0e612800], // narrow the reversed row words to halfwords
+  [0x62a53c, 0xfd001be0], // store the first four top-down row masks
+  [0x62a540, 0x97f3fddc], // construct the fixed-map vector
+  [0x62a544, 0xb9467a61], // load the otherwise ignored private seed lane
+  [0x62a548, 0x294216a4], // load +0x10 duration and +0x14 speed
+  [0x62a54c, 0x9100c3e3], // pass the fixed-position map
+  [0x62a550, 0x52800026], // enable roulette installation
+  [0x62a558, 0x2a1f03e2], // use zero random count/fixed-position mode
+  [0x62a55c, 0x2a1f03e7], // clear the helper's final control argument
+  [0x62a560, 0x97f3d720], // install the fixed roulette orbs
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -1859,6 +1882,31 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     : RANDOM_SPINNERS_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
+  const fixedSpinnersDispatchTarget = resolveEnemySkillTarget(
+    FIXED_SPINNERS_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const fixedSpinnersSetupTarget = resolveEnemySkillTarget(
+    FIXED_SPINNERS_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const fixedSpinnersConditionTarget = resolveEnemySkillTarget(
+    FIXED_SPINNERS_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const fixedSpinnersDispatchMatches = fixedSpinnersDispatchTarget === null
+    ? null : fixedSpinnersDispatchTarget === FIXED_SPINNERS_HANDLER;
+  const fixedSpinnersSetupMatches = fixedSpinnersSetupTarget === null
+    ? null : fixedSpinnersSetupTarget === FIXED_SPINNERS_SETUP_HANDLER;
+  const fixedSpinnersConditionMatches = fixedSpinnersConditionTarget === null
+    ? null : fixedSpinnersConditionTarget === FIXED_SPINNERS_CONDITION_HANDLER;
+  const fixedSpinnersInstructionAnchorsMatch = restoredElf === null ? null
+    : FIXED_SPINNERS_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -2917,6 +2965,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       randomSpinnersSetupMatches21_9: randomSpinnersSetupMatches,
       randomSpinnersConditionMatches21_9: randomSpinnersConditionMatches,
       randomSpinnersInstructionAnchorsMatch21_9: randomSpinnersInstructionAnchorsMatch,
+      fixedSpinnersDispatchMatches21_9: fixedSpinnersDispatchMatches,
+      fixedSpinnersSetupMatches21_9: fixedSpinnersSetupMatches,
+      fixedSpinnersConditionMatches21_9: fixedSpinnersConditionMatches,
+      fixedSpinnersInstructionAnchorsMatch21_9: fixedSpinnersInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -3621,6 +3673,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       randomSpinnersInstructionAnchorsMatch21_9: randomSpinnersInstructionAnchorsMatch,
       randomSpinnersSemantics:
         'type 109 uses +0x10 duration, +0x14 speed in centiseconds, and +0x18 random count; setup spends one shared-LCG draw and stores its high 16 bits at runtime +0x678 as a private placement seed; execution calls the common roulette helper in random-position mode with no fixed map, and its AI condition is unconditional',
+      fixedSpinnersType: FIXED_SPINNERS_ENEMY_SKILL_TYPE,
+      fixedSpinnersDispatchTarget: fixedSpinnersDispatchTarget === null
+        ? null : hex(fixedSpinnersDispatchTarget),
+      fixedSpinnersDispatchMatches21_9: fixedSpinnersDispatchMatches,
+      fixedSpinnersSetupTarget: fixedSpinnersSetupTarget === null
+        ? null : hex(fixedSpinnersSetupTarget),
+      fixedSpinnersSetupMatches21_9: fixedSpinnersSetupMatches,
+      fixedSpinnersConditionTarget: fixedSpinnersConditionTarget === null
+        ? null : hex(fixedSpinnersConditionTarget),
+      fixedSpinnersConditionMatches21_9: fixedSpinnersConditionMatches,
+      fixedSpinnersInstructionAnchorsMatch21_9: fixedSpinnersInstructionAnchorsMatch,
+      fixedSpinnersSemantics:
+        'type 110 uses +0x10 duration and +0x14 speed in centiseconds; execution narrows +0x18..+0x28 into five row masks, reverses their authored bottom-origin order, and calls the common roulette helper with a fixed map and zero random count; generic setup consumes no RNG and its AI condition is unconditional',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -4183,6 +4248,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || randomSpinnersSetupMatches === false
     || randomSpinnersConditionMatches === false
     || randomSpinnersInstructionAnchorsMatch === false
+    || fixedSpinnersDispatchMatches === false
+    || fixedSpinnersSetupMatches === false
+    || fixedSpinnersConditionMatches === false
+    || fixedSpinnersInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

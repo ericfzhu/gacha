@@ -1483,6 +1483,26 @@ state at 394448415, and selects row/column `(4,2)`, `(3,4)`, and `(2,3)`.
 Elapsed-time boundary fixtures verify that 0.99 seconds does not change a
 spinner while the next 0.02 seconds advances it exactly once.
 
+Enemy skill type `110` is the fixed-position sibling of type 109. Its dispatch,
+generic setup, and unconditional condition entries resolve to `0x62a504`,
+`0x6217c0`, and `0x61a630`; the independent parser identifies
+`ESSpinnersFixed`. Definition `+0x10/+0x14` retain the same enemy-turn duration
+and centisecond interval. The five words at `+0x18..+0x28` are authored from
+the bottom row upward. The handler loads the latter four together, reverses
+their 32-bit lanes, narrows all five to unsigned halfwords, and constructs a
+top-down fixed-map vector. It then calls the common roulette helper with that
+map, random count zero, and fixed-position mode. Generic setup does not advance
+the global LCG; the runtime seed lane passed to the helper is ignored in this
+mode.
+
+The browser decodes those five row masks directly into top-down board order and
+feeds the selected cells into the same orb-attached spinner lifecycle as type
+109. Thus fixed and random roulette effects have identical timing, drag, cycle,
+expiry, snapshot, and visual behavior after placement. A fixture authored as
+bottom-up masks `1/2/4/8/16` becomes top-down `16/8/4/2/1`, marks the exact
+diagonal `(0,4)` through `(4,0)` for four turns, advances every 0.5 seconds,
+and leaves direct seed 21900 unchanged.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

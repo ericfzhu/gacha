@@ -66,6 +66,7 @@ import {
   PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK,
   PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE,
   PAD_ENEMY_SKILL_RANDOM_SPINNERS,
+  PAD_ENEMY_SKILL_FIXED_SPINNERS,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -2505,21 +2506,17 @@ export class PuzzleEngine {
       }));
       const selected = padShuffleLockDropCandidates(skill.selectionSeed, candidates)
         .slice(0, Math.max(0, Math.min(candidates.length, skill.spinnerCount)));
-      const intervalSeconds = skill.speedCentiseconds / 100;
-      selected.forEach(({ row, column }) => {
-        const orb = this.board[row][column];
-        orb.spinner = true;
-        orb.spinnerTurnsRemaining = skill.durationTurns;
-        orb.spinnerIntervalSeconds = intervalSeconds;
-        orb.spinnerElapsedSeconds = 0;
-      });
-      this.lastEnemySkill = Object.freeze({
-        ...skill,
-        spinnerCount: selected.length,
-        selectedCells: Object.freeze(selected.map((cell) => Object.freeze({ ...cell }))),
-        intervalSeconds,
-      });
-      this.message = `${selected.length} orb${selected.length === 1 ? '' : 's'} began changing every ${intervalSeconds.toFixed(1)}s.`;
+      this.installSpinnerCells(skill, selected);
+      return true;
+    }
+    if (skill.supported && skill.kind === 'fixedSpinners') {
+      const selected = [];
+      this.board.forEach((row, rowIndex) => row.forEach((_orb, columnIndex) => {
+        if (((skill.rowMasks?.[rowIndex] || 0) & (1 << columnIndex)) !== 0) {
+          selected.push({ row: rowIndex, column: columnIndex });
+        }
+      }));
+      this.installSpinnerCells(skill, selected);
       return true;
     }
     if (skill.supported && skill.kind === 'clearPlayerBuffs') {
@@ -3066,6 +3063,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK,
         PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE,
         PAD_ENEMY_SKILL_RANDOM_SPINNERS,
+        PAD_ENEMY_SKILL_FIXED_SPINNERS,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -3714,6 +3712,26 @@ export class PuzzleEngine {
       const naturalIndex = current >= 0 && current < 6 ? current : 5;
       orb.type = NATURAL_ORB_TYPES[(naturalIndex + steps) % 6].id;
     }));
+  }
+
+  installSpinnerCells(skill, selectedCells) {
+    const intervalSeconds = skill.speedCentiseconds / 100;
+    selectedCells.forEach(({ row, column }) => {
+      const orb = this.board[row]?.[column];
+      if (!orb) return;
+      orb.spinner = true;
+      orb.spinnerTurnsRemaining = skill.durationTurns;
+      orb.spinnerIntervalSeconds = intervalSeconds;
+      orb.spinnerElapsedSeconds = 0;
+    });
+    const selected = selectedCells.filter(({ row, column }) => this.board[row]?.[column]);
+    this.lastEnemySkill = Object.freeze({
+      ...skill,
+      spinnerCount: selected.length,
+      selectedCells: Object.freeze(selected.map((cell) => Object.freeze({ ...cell }))),
+      intervalSeconds,
+    });
+    this.message = `${selected.length} orb${selected.length === 1 ? '' : 's'} began changing every ${intervalSeconds.toFixed(1)}s.`;
   }
 
   advanceSpinnerTurns() {

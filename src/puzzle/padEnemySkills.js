@@ -77,6 +77,7 @@ export const PAD_ENEMY_SKILL_TURN_CHANGE = 106;
 export const PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK = 107;
 export const PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE = 108;
 export const PAD_ENEMY_SKILL_RANDOM_SPINNERS = 109;
+export const PAD_ENEMY_SKILL_FIXED_SPINNERS = 110;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -478,6 +479,26 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       durationTurns: definition.getInt32(0x10, true),
       speedCentiseconds: definition.getInt32(0x14, true),
       spinnerCount: definition.getInt32(0x18, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_FIXED_SPINNERS) {
+    requireLength(definitionBytes, 0x2c, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'fixedSpinners',
+      supported: true,
+      durationTurns: definition.getInt32(0x10, true),
+      speedCentiseconds: definition.getInt32(0x14, true),
+      // The handler narrows and reverses five bottom-origin authored words
+      // before passing the fixed map to the common roulette helper.
+      rowMasks: Object.freeze([
+        definition.getUint32(0x28, true) & 0x3f,
+        definition.getUint32(0x24, true) & 0x3f,
+        definition.getUint32(0x20, true) & 0x3f,
+        definition.getUint32(0x1c, true) & 0x3f,
+        definition.getUint32(0x18, true) & 0x3f,
+      ]),
       attackWithSkillValue,
     });
   }
@@ -1529,6 +1550,10 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
       setupMaterialized: true,
     });
   }
+  if (type === PAD_ENEMY_SKILL_FIXED_SPINNERS) {
+    // Generic setup owns no private fields; execution reads the definition.
+    return decodePadEnemySkillDefinition(definitionBytes);
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -2451,6 +2476,22 @@ export function normalizePadEnemySkillRecord(record) {
         ? {}
         : { selectionSeed: Math.trunc(Number(record.selectionSeed) || 0) & 0xffff }),
       setupMaterialized: Boolean(record?.setupMaterialized || record?.selectionSeed != null),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_FIXED_SPINNERS || record?.kind === 'fixedSpinners') {
+    const rowMasks = Array.isArray(record?.rowMasks) ? record.rowMasks : [];
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_FIXED_SPINNERS,
+      kind: 'fixedSpinners',
+      supported: record?.supported !== false && rowMasks.length === 5,
+      durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)) & 0x3ff,
+      speedCentiseconds: Math.max(1, Math.trunc(Number(record?.speedCentiseconds) || 0)),
+      rowMasks: Object.freeze(Array.from({ length: 5 }, (_, index) => (
+        Math.trunc(Number(rowMasks[index]) || 0) & 0x3f
+      ))),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),
