@@ -17,6 +17,7 @@ import {
   PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
   PAD_ENEMY_SKILL_REPEAT_ATTACK,
   PAD_ENEMY_SKILL_INACTIVITY,
+  PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -1846,6 +1847,40 @@ const directInactivityEngine = new PuzzleEngine({ seed: 21_900 });
 assert.equal(directInactivityEngine.applyEnemySkillDefinition(enemyAiInactivityDefinition), true);
 assert.equal(directInactivityEngine.lastEnemySkill.kind, 'inactivity');
 assert.equal(directInactivityEngine.message, 'Verdant Shell does nothing.');
+const enemyAiInactivityUnconditionalDefinition = enemyAiInactivityDefinition.slice();
+const enemyAiInactivityUnconditionalView = new DataView(
+  enemyAiInactivityUnconditionalDefinition.buffer,
+);
+enemyAiInactivityUnconditionalView.setUint32(0x00, 9_045, true);
+enemyAiInactivityUnconditionalView.setInt16(
+  0x04,
+  PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL,
+  true,
+);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiInactivityUnconditionalDefinition), {
+  type: 66,
+  kind: 'inactivity',
+  supported: true,
+  attackWithSkillValue: 0,
+});
+assert.deepEqual(
+  decodePadEnemySkillRuntime(
+    enemyAiInactivityUnconditionalDefinition,
+    new Uint8Array(0x680),
+  ),
+  {
+    type: 66,
+    kind: 'inactivity',
+    supported: true,
+    attackWithSkillValue: 0,
+  },
+);
+const directInactivityUnconditionalEngine = new PuzzleEngine({ seed: 21_900 });
+assert.equal(directInactivityUnconditionalEngine.applyEnemySkillDefinition(
+  enemyAiInactivityUnconditionalDefinition,
+), true);
+assert.equal(directInactivityUnconditionalEngine.lastEnemySkill.type, 66);
+assert.equal(directInactivityUnconditionalEngine.message, 'Verdant Shell does nothing.');
 const enemyAiAttributeAbsorbDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiAttributeAbsorbView = new DataView(enemyAiAttributeAbsorbDefinition.buffer);
 enemyAiAttributeAbsorbView.setUint32(0x00, 9_021, true);
@@ -4071,6 +4106,26 @@ const rejectedInactivityEngine = new PuzzleEngine({
 rejectedInactivityEngine.setRngState(21_900);
 assert.equal(rejectedInactivityEngine.takeEnemySkill(0), null);
 assert.equal(rejectedInactivityEngine.rng.state, 21_900);
+const inactivityUnconditionalMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(inactivityUnconditionalMonsterDefinition.buffer).setUint32(0xec, 9_045, true);
+const selectedInactivityUnconditionalEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: inactivityUnconditionalMonsterDefinition,
+    skillDefinitions: [enemyAiInactivityUnconditionalDefinition],
+  }],
+});
+selectedInactivityUnconditionalEngine.setRngState(21_900);
+selectedInactivityUnconditionalEngine.enemies[0].counter = 1;
+selectedInactivityUnconditionalEngine.enemies[1].counter = 99;
+selectedInactivityUnconditionalEngine.resolveEnemyTurn();
+const selectedInactivityUnconditionalState = selectedInactivityUnconditionalEngine.snapshot();
+assert.equal(selectedInactivityUnconditionalState.enemies[0].attribute, 'wood');
+assert.equal(selectedInactivityUnconditionalState.lastEnemyActions[0].skill.type, 66);
+assert.equal(selectedInactivityUnconditionalState.lastEnemyActions[0].damage, undefined);
+assert.equal(selectedInactivityUnconditionalState.player.hp, 12_000);
+assert.equal(selectedInactivityUnconditionalState.message, 'Verdant Shell does nothing.');
+assert.equal(selectedInactivityUnconditionalState.rngState, padLcgStep(21_900).state);
 const bindLeaderHelperMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(bindLeaderHelperMonsterDefinition.buffer).setUint32(0xec, 9_020, true);
 const selectedBindLeaderHelperEngine = new PuzzleEngine({

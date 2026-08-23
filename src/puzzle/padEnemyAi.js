@@ -16,6 +16,7 @@ import {
   PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
   PAD_ENEMY_SKILL_REPEAT_ATTACK,
   PAD_ENEMY_SKILL_INACTIVITY,
+  PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -160,6 +161,7 @@ function isStaticallyEligible(definition, state) {
     PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
     PAD_ENEMY_SKILL_REPEAT_ATTACK,
     PAD_ENEMY_SKILL_INACTIVITY,
+    PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL,
     PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
     PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
     PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -328,6 +330,9 @@ function evaluateCondition(definition, state, rngState) {
       ? Math.fround(1)
       : Math.fround(Math.fround(1) - incomingScale);
     return { eligible: probabilityScale > 0, probabilityScale, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL) {
+    return { eligible: true, probabilityScale: 1, rngState };
   }
   if (
     definition.effect.type === PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION

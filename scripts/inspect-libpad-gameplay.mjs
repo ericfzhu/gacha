@@ -82,6 +82,10 @@ const INACTIVITY_ENEMY_SKILL_TYPE = 16;
 const INACTIVITY_HANDLER = 0x62be50;
 const INACTIVITY_SETUP_HANDLER = 0x6217c0;
 const INACTIVITY_CONDITION_HANDLER = 0x61acbc;
+const UNCONDITIONAL_INACTIVITY_ENEMY_SKILL_TYPE = 66;
+const UNCONDITIONAL_INACTIVITY_HANDLER = 0x62be50;
+const UNCONDITIONAL_INACTIVITY_SETUP_HANDLER = 0x6217c0;
+const UNCONDITIONAL_INACTIVITY_CONDITION_HANDLER = 0x61a630;
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -607,6 +611,27 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : inactivitySetupTarget === INACTIVITY_SETUP_HANDLER;
   const inactivityConditionMatches = inactivityConditionTarget === null
     ? null : inactivityConditionTarget === INACTIVITY_CONDITION_HANDLER;
+  const unconditionalInactivityDispatchTarget = resolveEnemySkillTarget(
+    UNCONDITIONAL_INACTIVITY_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const unconditionalInactivitySetupTarget = resolveEnemySkillTarget(
+    UNCONDITIONAL_INACTIVITY_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const unconditionalInactivityConditionTarget = resolveEnemySkillTarget(
+    UNCONDITIONAL_INACTIVITY_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const unconditionalInactivityDispatchMatches = unconditionalInactivityDispatchTarget === null
+    ? null : unconditionalInactivityDispatchTarget === UNCONDITIONAL_INACTIVITY_HANDLER;
+  const unconditionalInactivitySetupMatches = unconditionalInactivitySetupTarget === null
+    ? null : unconditionalInactivitySetupTarget === UNCONDITIONAL_INACTIVITY_SETUP_HANDLER;
+  const unconditionalInactivityConditionMatches = unconditionalInactivityConditionTarget === null
+    ? null : unconditionalInactivityConditionTarget === UNCONDITIONAL_INACTIVITY_CONDITION_HANDLER;
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1535,6 +1560,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       inactivityDispatchMatches21_9: inactivityDispatchMatches,
       inactivitySetupMatches21_9: inactivitySetupMatches,
       inactivityConditionMatches21_9: inactivityConditionMatches,
+      unconditionalInactivityDispatchMatches21_9: unconditionalInactivityDispatchMatches,
+      unconditionalInactivitySetupMatches21_9: unconditionalInactivitySetupMatches,
+      unconditionalInactivityConditionMatches21_9: unconditionalInactivityConditionMatches,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -1801,6 +1829,18 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       inactivityConditionTarget: inactivityConditionTarget === null
         ? null : hex(inactivityConditionTarget),
       inactivityConditionMatches21_9: inactivityConditionMatches,
+      unconditionalInactivityType: UNCONDITIONAL_INACTIVITY_ENEMY_SKILL_TYPE,
+      unconditionalInactivityDispatchTarget: unconditionalInactivityDispatchTarget === null
+        ? null : hex(unconditionalInactivityDispatchTarget),
+      unconditionalInactivityDispatchMatches21_9: unconditionalInactivityDispatchMatches,
+      unconditionalInactivitySetupTarget: unconditionalInactivitySetupTarget === null
+        ? null : hex(unconditionalInactivitySetupTarget),
+      unconditionalInactivitySetupMatches21_9: unconditionalInactivitySetupMatches,
+      unconditionalInactivityConditionTarget: unconditionalInactivityConditionTarget === null
+        ? null : hex(unconditionalInactivityConditionTarget),
+      unconditionalInactivityConditionMatches21_9: unconditionalInactivityConditionMatches,
+      unconditionalInactivitySemantics:
+        'type 66: generic no-parameter setup, no-effect dispatch, and unconditional 1.0 AI condition; selected records consume only the ordinary probability draw and then end the enemy action',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -2235,6 +2275,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || inactivityDispatchMatches === false
     || inactivitySetupMatches === false
     || inactivityConditionMatches === false
+    || unconditionalInactivityDispatchMatches === false
+    || unconditionalInactivitySetupMatches === false
+    || unconditionalInactivityConditionMatches === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

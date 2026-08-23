@@ -2584,14 +2584,32 @@ try {
     engine.enemies[0].counter = 1;
     engine.enemies[1].counter = 99;
     engine.resolveEnemyTurn();
-    return engine.snapshot();
+    const conditionalState = engine.snapshot();
+    monsterView.setUint32(0xec, 9_045, true);
+    view.setUint32(0x00, 9_045, true);
+    view.setInt16(0x04, 66, true);
+    engine.reset();
+    engine.start();
+    engine.setEnemySkillQueue(0, []);
+    engine.setEnemyAiDefinitionPool(0, monsterDefinition, [definition]);
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    return { conditionalState, unconditionalState: engine.snapshot() };
   }) : null;
   if (inactivityRenderState && (
-    inactivityRenderState.lastEnemyActions?.[0]?.skill?.type !== 16
-    || inactivityRenderState.lastEnemyActions?.[0]?.damage !== undefined
-    || inactivityRenderState.player?.hp !== 12_000
-    || inactivityRenderState.rngState !== 394_448_415
-    || inactivityRenderState.message !== 'Verdant Shell does nothing.'
+    inactivityRenderState.conditionalState?.lastEnemyActions?.[0]?.skill?.type !== 16
+    || inactivityRenderState.conditionalState?.lastEnemyActions?.[0]?.damage !== undefined
+    || inactivityRenderState.conditionalState?.player?.hp !== 12_000
+    || inactivityRenderState.conditionalState?.rngState !== 394_448_415
+    || inactivityRenderState.conditionalState?.message !== 'Verdant Shell does nothing.'
+    || inactivityRenderState.unconditionalState?.enemies?.[0]?.attribute !== 'wood'
+    || inactivityRenderState.unconditionalState?.lastEnemyActions?.[0]?.skill?.type !== 66
+    || inactivityRenderState.unconditionalState?.lastEnemyActions?.[0]?.damage !== undefined
+    || inactivityRenderState.unconditionalState?.player?.hp !== 12_000
+    || inactivityRenderState.unconditionalState?.rngState !== 394_448_415
+    || inactivityRenderState.unconditionalState?.message !== 'Verdant Shell does nothing.'
   )) throw new Error(`Inactivity render-state mismatch: ${JSON.stringify(inactivityRenderState)}`);
   if (inactivityRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   const attackBoostRenderState = renderAttackBoostState ? await page.evaluate(() => {

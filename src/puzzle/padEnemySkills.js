@@ -34,6 +34,7 @@ export const PAD_ENEMY_SKILL_POISON_BLOCK_N_COUNTED = 60;
 export const PAD_ENEMY_SKILL_MORTAL_POISON_BLOCK_N_COUNTED = 61;
 export const PAD_ENEMY_SKILL_POISON_BLOCK_N = 64;
 export const PAD_ENEMY_SKILL_RANDOM_SUB_BIND = 65;
+export const PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL = 66;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES_4 = 76;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES = 77;
 export const PAD_ENEMY_SKILL_HORIZONTAL_LINES_4 = 78;
@@ -258,7 +259,7 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       attackWithSkillValue,
     });
   }
-  if (type === PAD_ENEMY_SKILL_INACTIVITY) {
+  if ([PAD_ENEMY_SKILL_INACTIVITY, PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL].includes(type)) {
     return Object.freeze({
       type,
       kind: 'inactivity',
@@ -934,7 +935,7 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
-  if (type === PAD_ENEMY_SKILL_INACTIVITY) {
+  if ([PAD_ENEMY_SKILL_INACTIVITY, PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL].includes(type)) {
     return Object.freeze({
       type,
       kind: 'inactivity',
@@ -1329,9 +1330,14 @@ export function normalizePadEnemySkillRecord(record) {
         : Math.trunc(Number(record.attackWithSkillValue)),
     });
   }
-  if (type === PAD_ENEMY_SKILL_INACTIVITY || record?.kind === 'inactivity') {
+  if (
+    [PAD_ENEMY_SKILL_INACTIVITY, PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL].includes(type)
+    || record?.kind === 'inactivity'
+  ) {
     return Object.freeze({
-      type: PAD_ENEMY_SKILL_INACTIVITY,
+      type: type === PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL
+        ? PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL
+        : PAD_ENEMY_SKILL_INACTIVITY,
       kind: 'inactivity',
       supported: true,
       attackWithSkillValue: record?.attackWithSkillValue == null

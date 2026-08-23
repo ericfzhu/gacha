@@ -736,6 +736,16 @@ range 2–4, it selects mask `0x12`, materializes 2 turns, executes 3 turns, and
 ends at RNG state `1848838291`. The independent raw-data parser corroborates
 the record as `ESBindRandomSub` type 65.
 
+Enemy skill type `66` is a second inactivity record. Its late dispatch, setup,
+and condition entries target `0x62be50`, `0x6217c0`, and `0x61a630`: the common
+no-effect tail, the common no-parameter setup, and the unconditional binary32
+1.0 condition. This differs materially from type 16, whose condition only
+admits a water-attribute acting monster at the recovered new-AI boundary. Type
+66 is eligible regardless of attribute, consumes no condition RNG, and ends
+the selected enemy action without a special effect. With a 100% immediate
+record, seed 21900 advances only once to `394448415`. The independent parser
+likewise distinguishes `ESInactivity66` from `ESInactivity16`.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

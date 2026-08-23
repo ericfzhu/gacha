@@ -2,6 +2,20 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 unconditional inactivity enemy skill
+
+- Recovered type `66`: late dispatch `0x62be50`, no-parameter setup `0x6217c0`,
+  and unconditional condition `0x61a630`. Unlike type 16's water-gated route,
+  type 66 admits any acting-monster attribute and ends the action with no
+  special effect.
+- Preserved raw type identity through definition/runtime decoding and
+  normalization. A selected immediate record consumes only its ordinary
+  probability draw; seed 21900 ends at `394448415` with unchanged player HP.
+- Pure direct/scheduled fixtures, exact native-table checks, and paired
+  type-16/type-66 focused browser coverage are in place.
+- Production build plus generic and full browser regressions pass.
+- Next: continue with type 67's distinct live action after this checkpoint.
+
 ## 2026-08-23 player-damage presentation
 
 - Corrected enemy attacks' floating-text target: damage to the player is now
