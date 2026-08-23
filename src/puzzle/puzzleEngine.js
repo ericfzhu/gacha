@@ -70,6 +70,7 @@ import {
   PAD_ENEMY_SKILL_MAX_HP_CHANGE,
   PAD_ENEMY_SKILL_FIXED_TARGET,
   PAD_ENEMY_SKILL_BRANCH_COMBO,
+  PAD_ENEMY_SKILL_BRANCH_ATTACK_ATTRIBUTES,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -326,6 +327,7 @@ export class PuzzleEngine {
     this.comboCount = 0;
     this.cascadeDepth = 0;
     this.lastComboCount = 0;
+    this.lastAttackAttributeMask = 0;
     this.lastDamage = 0;
     this.lastAbsorbedDamage = 0;
     this.lastVoidedDamage = 0;
@@ -998,6 +1000,7 @@ export class PuzzleEngine {
     const leaderPair = leader * helper;
     this.lastLeaderMultiplier = leaderPair;
     this.lastComboCount = this.comboCount;
+    this.lastAttackAttributeMask = 0;
 
     const byType = new Map();
     this.turnMatches.forEach((match) => {
@@ -1056,6 +1059,10 @@ export class PuzzleEngine {
         const lane = getLane(member);
         const matches = byType.get(lane.attribute) || [];
         if (!lane.attack || !matches.length) return;
+        const attackAttributeIndex = PAD_ATTRIBUTE_INDEX[lane.attribute];
+        if (Number.isInteger(attackAttributeIndex) && attackAttributeIndex <= 4) {
+          this.lastAttackAttributeMask |= 1 << attackAttributeIndex;
+        }
         const matchAttack = padNativeBaseAttackPower(lane.attack, matches, this.comboCount, extraComboBonus);
         const raw = padApplyAttackMultipliers(matchAttack, [leader, helper]);
         const isMassAttack = matches.some((match) => match.size >= 5);
@@ -1490,6 +1497,13 @@ export class PuzzleEngine {
         const skill = queue.records[queue.position];
         if (skill.kind === 'branchCombo') {
           queue.position = this.lastComboCount >= skill.branchValue
+            ? skill.targetRound
+            : queue.position + 1;
+          controlFlowSteps += 1;
+          continue;
+        }
+        if (skill.kind === 'branchAttackAttributes') {
+          queue.position = this.lastAttackAttributeMask === skill.attributeMask
             ? skill.targetRound
             : queue.position + 1;
           controlFlowSteps += 1;
@@ -3088,9 +3102,12 @@ export class PuzzleEngine {
         : null;
       const definition = reference?.definition ?? reference?.skillDefinition ?? entry;
       const decoded = decodePadEnemySkillDefinition(definition);
-      if (decoded.type !== PAD_ENEMY_SKILL_BRANCH_COMBO) return decoded;
+      if (![
+        PAD_ENEMY_SKILL_BRANCH_COMBO,
+        PAD_ENEMY_SKILL_BRANCH_ATTACK_ATTRIBUTES,
+      ].includes(decoded.type)) return decoded;
       if (!reference) {
-        throw new TypeError('PAD type-113 combo branches require a skill-reference record.');
+        throw new TypeError(`PAD type-${decoded.type} branches require a skill-reference record.`);
       }
       if (
         reference.enemyAi === undefined
@@ -3098,11 +3115,13 @@ export class PuzzleEngine {
         || !Number.isFinite(Number(reference.enemyAi))
         || !Number.isFinite(Number(reference.enemyRnd))
       ) {
-        throw new TypeError('PAD type-113 skill references require enemyAi and enemyRnd operands.');
+        throw new TypeError(`PAD type-${decoded.type} skill references require enemyAi and enemyRnd operands.`);
       }
       return normalizePadEnemySkillRecord({
         ...decoded,
-        branchValue: reference.enemyAi,
+        ...(decoded.type === PAD_ENEMY_SKILL_BRANCH_COMBO
+          ? { branchValue: reference.enemyAi }
+          : {}),
         targetRound: reference.enemyRnd,
       });
     });
@@ -3953,6 +3972,7 @@ export class PuzzleEngine {
       comboCount: this.comboCount,
       turnMatches: this.turnMatches.map((match) => ({ ...match })),
       lastComboCount: this.lastComboCount,
+      lastAttackAttributeMask: this.lastAttackAttributeMask,
       lastDamage: this.lastDamage,
       lastAbsorbedDamage: this.lastAbsorbedDamage,
       lastVoidedDamage: this.lastVoidedDamage,

@@ -636,8 +636,8 @@ cap and the selected skill's cost is subtracted. For type 128,
 so an active copy cannot be selected again. `setEnemyAiDefinitionPool` wires
 this raw record path into enemy turns and reports the chosen skill ID, budget,
 and RNG state. Remaining condition callbacks, flow-control records other than
-type 113, and the rest of the legacy selector are rejected explicitly until
-decoded rather than approximated.
+types 113 and 114, and the rest of the legacy selector are rejected explicitly
+until decoded rather than approximated.
 
 The selector does not reduce every condition callback to a boolean. In the
 immediate path at `0x61d844`, `_chooseEnemyAiSub` returns a binary32 multiplier;
@@ -1574,6 +1574,24 @@ RNG. The browser accepts this native split through queue entries shaped as
 cycle guard, and requires the wrapper for type 113 so missing slot operands
 cannot silently become zeroes. Boundary fixtures confirm four combos fall
 through at threshold five, while exactly five jumps to authored slot two.
+
+Enemy skill type `114` is the adjacent attacked-attribute branch. Its ordinary
+dispatch/setup/condition entries share type 113's inert `0x62be50`, `0x621c94`,
+and `0x61c01c` targets. The independent `ESBranchDamageAttribute` parser
+identifies definition parameter 1, native offset `+0x14`, as the authored
+attribute bitmask and the reference-slot `enemy_rnd` byte as the zero-based
+destination. The predicate is exact equality, not overlap or containment.
+
+The browser builds the previous-turn mask from attack lanes that had both a
+live, unbound party attacker and at least one matching orb group. Primary,
+tertiary, and secondary lanes contribute their natural attribute bit before
+damage absorption, voiding, defense, or nullification, because the branch asks
+which colors attacked rather than which dealt damage. Duplicate lanes collapse
+to one bit, Heart and hazard matches never contribute, and the result remains
+available through the following enemy turn and the text snapshot. As with type
+113, interpreting the branch consumes neither an enemy action nor RNG. A
+Fire+Water fixture records mask `0b00011`; Fire alone falls through while the
+exact two-color mask jumps to slot two.
 
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI

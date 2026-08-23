@@ -81,6 +81,7 @@ export const PAD_ENEMY_SKILL_FIXED_SPINNERS = 110;
 export const PAD_ENEMY_SKILL_MAX_HP_CHANGE = 111;
 export const PAD_ENEMY_SKILL_FIXED_TARGET = 112;
 export const PAD_ENEMY_SKILL_BRANCH_COMBO = 113;
+export const PAD_ENEMY_SKILL_BRANCH_ATTACK_ATTRIBUTES = 114;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -533,6 +534,17 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       kind: 'branchCombo',
       supported: true,
       controlFlow: true,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_BRANCH_ATTACK_ATTRIBUTES) {
+    requireLength(definitionBytes, 0x18, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'branchAttackAttributes',
+      supported: true,
+      controlFlow: true,
+      attributeMask: definition.getInt32(0x14, true),
       attackWithSkillValue,
     });
   }
@@ -1619,6 +1631,9 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
     // slot, not the sENESKILLS definition or sMONSTER runtime scratch area.
     return decodePadEnemySkillDefinition(definitionBytes);
   }
+  if (type === PAD_ENEMY_SKILL_BRANCH_ATTACK_ATTRIBUTES) {
+    return decodePadEnemySkillDefinition(definitionBytes);
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -2596,6 +2611,22 @@ export function normalizePadEnemySkillRecord(record) {
       controlFlow: true,
       branchValue,
       targetRound,
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (
+    type === PAD_ENEMY_SKILL_BRANCH_ATTACK_ATTRIBUTES
+    || record?.kind === 'branchAttackAttributes'
+  ) {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_BRANCH_ATTACK_ATTRIBUTES,
+      kind: 'branchAttackAttributes',
+      supported: record?.supported !== false,
+      controlFlow: true,
+      attributeMask: Math.trunc(Number(record?.attributeMask) || 0) | 0,
+      targetRound: Math.trunc(Number(record?.targetRound) || 0) & 0xff,
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

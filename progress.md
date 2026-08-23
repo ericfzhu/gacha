@@ -2,6 +2,21 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 previous attack-attribute branch
+
+- Recovered type `114` as `ESBranchDamageAttribute`. Its ordinary
+  dispatch/setup/condition entries share type 113's inert `0x62be50`,
+  `0x621c94`, and `0x61c01c` paths.
+- Authored definition `+0x14` is compared for exact equality with the natural
+  attribute bitmask the party attacked with last player turn. Reference-slot
+  `enemy_rnd` is the zero-based destination; the branch spends no action/RNG.
+- The browser now derives that mask from live, unbound primary/tertiary/
+  secondary attack lanes with matching groups, snapshots it, and interprets
+  type 114 in the shared guarded queue controller. Pure exact/non-exact and
+  real-lane fixtures, six ARM64 anchors, focused Chromium with APK art,
+  screenshot inspection, native inspector, and production build pass. Next:
+  type `115`.
+
 ## 2026-08-24 previous-turn combo branch
 
 - Recovered type `113` as a legacy skill-list control record. Its ordinary
