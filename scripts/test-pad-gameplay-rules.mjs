@@ -27,6 +27,7 @@ import {
   PAD_ENEMY_SKILL_FIXED_BOMBS,
   PAD_ENEMY_SKILL_CLOUD,
   PAD_ENEMY_SKILL_RECOVERY_DEBUFF,
+  PAD_ENEMY_SKILL_TURN_CHANGE,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -93,6 +94,7 @@ import {
   padEnemySkillPlayerHeal,
   padEnemySkillPlayerHpCondition,
   padEnemySkillReviveHp,
+  padEnemyTurnChangeTriggered,
 } from '../src/puzzle/padEnemySkills.js';
 import {
   decodePadEnemyAiMonsterDefinition,
@@ -1415,6 +1417,32 @@ assert.deepEqual(
   decodePadEnemySkillRuntime(enemyAiRecoveryDebuffDefinition, new Uint8Array(0x680)),
   expectedRecoveryDebuffDefinition,
 );
+const enemyAiTurnChangeDefinition = enemyAiRecoveryDebuffDefinition.slice();
+const enemyAiTurnChangeView = new DataView(enemyAiTurnChangeDefinition.buffer);
+enemyAiTurnChangeView.setUint32(0x00, 9_086, true);
+enemyAiTurnChangeView.setInt16(0x04, PAD_ENEMY_SKILL_TURN_CHANGE, true);
+enemyAiTurnChangeView.setInt32(0x10, 50, true);
+enemyAiTurnChangeView.setInt32(0x14, 1, true);
+const expectedTurnChangeDefinition = {
+  type: 106,
+  kind: 'turnChangePassive',
+  supported: true,
+  passive: true,
+  hpThresholdPercent: 50,
+  turnCounter: 1,
+  attackWithSkillValue: 0,
+};
+assert.deepEqual(
+  decodePadEnemySkillDefinition(enemyAiTurnChangeDefinition),
+  expectedTurnChangeDefinition,
+);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiTurnChangeDefinition, new Uint8Array(0x680)),
+  { ...expectedTurnChangeDefinition, setupMaterialized: true },
+);
+assert.equal(padEnemyTurnChangeTriggered(46_340, 92_000, 50), true);
+assert.equal(padEnemyTurnChangeTriggered(46_461, 92_000, 50), false);
+assert.equal(padEnemyTurnChangeTriggered(1, 92_000, 0), false);
 assert.deepEqual(decodePadEnemySkillRuntime(
   enemyAiUnconditionalHealDefinition,
   healEnemyMonsterRuntime,
@@ -5553,6 +5581,52 @@ const rejectedRecoveryDebuffState = rejectedRecoveryDebuffEngine.snapshot();
 assert.equal(rejectedRecoveryDebuffState.lastEnemyActions[0].kind, 'attack');
 assert.equal(rejectedRecoveryDebuffState.rngState, 21_900);
 assert.equal(rejectedRecoveryDebuffState.recoveryDebuff.turnsRemaining, 1);
+
+assert.equal(new PuzzleEngine({ seed: 21_900 }).applyEnemySkillDefinition(
+  enemyAiTurnChangeDefinition,
+), false);
+assert.throws(
+  () => new PuzzleEngine({ enemySkillQueues: [[enemyAiTurnChangeDefinition]] }),
+  /passive enemy skills must be installed through monster skill slots/,
+);
+const turnChangeMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(turnChangeMonsterDefinition.buffer).setUint32(0xec, 9_086, true);
+const turnChangeEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: turnChangeMonsterDefinition,
+    skillDefinitions: [enemyAiTurnChangeDefinition],
+  }],
+});
+turnChangeEngine.enemies[0].hp = 48_000;
+turnChangeEngine.enemies[1].hp = 0;
+turnChangeEngine.party.forEach((member, index) => {
+  member.bindTurns = index === 0 ? 0 : 1;
+});
+turnChangeEngine.comboCount = 1;
+turnChangeEngine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+turnChangeEngine.setRngState(21_900);
+turnChangeEngine.resolvePlayerTurn();
+const triggeredTurnChangeState = turnChangeEngine.snapshot();
+assert.equal(triggeredTurnChangeState.lastDamage, 1_660);
+assert.equal(triggeredTurnChangeState.enemies[0].hp, 46_340);
+assert.equal(triggeredTurnChangeState.enemies[0].baseMaxCounter, 2);
+assert.equal(triggeredTurnChangeState.enemies[0].maxCounter, 1);
+assert.equal(triggeredTurnChangeState.enemies[0].counter, 1);
+assert.equal(triggeredTurnChangeState.enemies[0].turnChangeThresholdPercent, 50);
+assert.equal(triggeredTurnChangeState.enemies[0].turnChangeCounter, 1);
+assert.equal(triggeredTurnChangeState.enemies[0].turnChangeActive, true);
+assert.equal(triggeredTurnChangeState.rngState, 21_900);
+turnChangeEngine.enemies[0].hp = turnChangeEngine.enemies[0].maxHp;
+assert.equal(turnChangeEngine.updateEnemyTurnChangePassive(turnChangeEngine.enemies[0]), false);
+assert.equal(turnChangeEngine.enemies[0].turnChangeActive, true);
+turnChangeEngine.resolveEnemyTurn();
+const activeTurnChangeState = turnChangeEngine.snapshot();
+assert.equal(activeTurnChangeState.lastEnemyActions[0].kind, 'attack');
+assert.equal(activeTurnChangeState.lastEnemyActions[0].damage, 1_850);
+assert.equal(activeTurnChangeState.enemies[0].counter, 1);
+assert.equal(activeTurnChangeState.enemies[0].turnChangeActive, true);
+assert.equal(activeTurnChangeState.rngState, 21_900);
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;

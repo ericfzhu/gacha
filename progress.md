@@ -2,6 +2,23 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 type-106 HP-triggered turn change
+
+- Recovered passive type `106` at dispatch/setup/condition `0x62be50`,
+  `0x621c94`, and `0x61c01c`; the independent parser corroborates
+  `ESTurnChangePassive`.
+- `_checkPassiveSkills` stores the slot id, signed-low-half `+0x10` HP
+  threshold, and unsigned-low-half `+0x14` replacement interval at
+  `sMONSTER+0xb12/+0xb10/+0xb14`. The ordinary AI condition is always false.
+- `_checkAnger` narrows binary64 `currentHP / maxHP * 100` to binary32, rounds
+  it with `izMathRound`, and permanently latches the passive when that value is
+  at most a positive threshold. Later counter resets use the replacement
+  interval. Ported passive decoding/installation, rounded activation, permanent
+  state, counter reset, snapshot fields, and passive exclusion from attack AI.
+  Pure fixtures, twenty-six ARM64 anchors, focused Chromium, screenshot
+  inspection, and the generic browser client pass, along with the full native
+  inspector, PAD data checks, and production build. Next: type `107`.
+
 ## 2026-08-24 type-105 recovery debuff
 
 - Recovered type `105` at dispatch/setup/condition `0x62a298`, `0x6217c0`, and

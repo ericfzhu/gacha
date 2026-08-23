@@ -1398,6 +1398,27 @@ under a 50% record heals 410 and leaves seed 21900 untouched. Condition
 admits an inactive lane or a current value at least 1.0; the scheduled fixture
 therefore falls back to its ordinary attack when a 50% debuff is already live.
 
+Enemy skill type `106` is an HP-triggered attack-interval passive. Its ordinary
+dispatch, passive setup, and always-false action-condition entries resolve to
+`0x62be50`, `0x621c94`, and `0x61c01c`; the independent parser identifies
+`ESTurnChangePassive`. In `_checkPassiveSkills`, the handler stores the monster
+slot's skill id at `sMONSTER+0xb12`, truncates signed definition `+0x10` into
+the HP threshold at `+0xb10`, and truncates unsigned `+0x14` into the replacement
+turn interval at `+0xb14`. It consumes no RNG and cannot be selected as an
+ordinary enemy action.
+
+`_checkAnger` ignores thresholds below one and already latched monsters. For a
+live monster, it computes `currentHP / maxHP * 100` in binary64, narrows the
+result to binary32, rounds it with `izMathRound`, and latches status bit zero
+when the rounded percentage is at most the signed threshold. The latch is
+permanent even if the monster later heals. `_resetEnemyAtkLeft` first installs
+the monster's ordinary unsigned interval and then replaces it with `+0xb14`
+while that bit is active. The browser preserves the base and effective interval
+separately, changes the visible countdown immediately on activation, and uses
+the replacement for later attacks. In the focused boundary fixture, 46,340 of
+92,000 HP is about 50.37%, narrows and rounds to 50, and therefore changes the
+enemy from a two-turn interval to one without advancing seed 21900.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

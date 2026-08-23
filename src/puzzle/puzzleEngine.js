@@ -62,6 +62,7 @@ import {
   PAD_ENEMY_SKILL_FIXED_BOMBS,
   PAD_ENEMY_SKILL_CLOUD,
   PAD_ENEMY_SKILL_RECOVERY_DEBUFF,
+  PAD_ENEMY_SKILL_TURN_CHANGE,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -127,6 +128,7 @@ import {
   padEnemySkillDefenseBoost,
   padEnemySkillPlayerHeal,
   padEnemySkillReviveHp,
+  padEnemyTurnChangeTriggered,
 } from './padEnemySkills.js';
 import {
   decodePadEnemyAiMonsterDefinition,
@@ -204,8 +206,12 @@ function copyEnemies() {
     ...enemy,
     hp: enemy.maxHp,
     counter: enemy.maxCounter,
+    baseMaxCounter: enemy.maxCounter,
     attributeResistPercentages: Array(5).fill(100),
     resolveThresholdPercent: 0,
+    turnChangeThresholdPercent: 0,
+    turnChangeCounter: 0,
+    turnChangeActive: false,
   }));
 }
 
@@ -1100,6 +1106,7 @@ export class PuzzleEngine {
       const enemy = this.enemies[enemyIndex];
       if (enemy) enemy.damagedTurnCount = (Math.trunc(Number(enemy.damagedTurnCount) || 0) + 1) & 0xffff;
     });
+    this.enemies.forEach((enemy) => this.updateEnemyTurnChangePassive(enemy));
     this.advancePartyBindTurns();
     this.message = `${this.comboCount} combo${this.comboCount === 1 ? '' : 's'} · ${this.lastDamage.toLocaleString()} total damage${this.lastAbsorbedDamage ? ` · ${this.lastAbsorbedDamage.toLocaleString()} absorbed` : ''}${this.lastVoidedDamage ? ` · ${this.lastVoidedDamage.toLocaleString()} voided` : ''}${this.lastNailDamage ? ` · ${this.lastNailDamage.toLocaleString()} nails` : ''}${this.lastHealing ? ` · +${this.lastHealing.toLocaleString()} HP` : ''}${this.lastPoisonDamage ? ` · -${this.lastPoisonDamage.toLocaleString()} poison` : ''}${this.lastBombDamage ? ` · -${this.lastBombDamage.toLocaleString()} bombs` : ''}${this.lastThornDamage ? ` · -${this.lastThornDamage.toLocaleString()} thorns` : ''}`;
   }
@@ -2952,6 +2959,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_FIXED_BOMBS,
         PAD_ENEMY_SKILL_CLOUD,
         PAD_ENEMY_SKILL_RECOVERY_DEBUFF,
+        PAD_ENEMY_SKILL_TURN_CHANGE,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -3024,6 +3032,10 @@ export class PuzzleEngine {
     if (!enemy) return;
     enemy.attributeResistPercentages = Array(5).fill(100);
     enemy.resolveThresholdPercent = 0;
+    enemy.maxCounter = enemy.baseMaxCounter;
+    enemy.turnChangeThresholdPercent = 0;
+    enemy.turnChangeCounter = 0;
+    enemy.turnChangeActive = false;
     const pool = this.enemyAiPools?.[index];
     if (!pool) return;
     for (const slot of pool.monster.slots) {
@@ -3038,7 +3050,24 @@ export class PuzzleEngine {
       if (effect?.type === PAD_ENEMY_SKILL_RESOLVE) {
         enemy.resolveThresholdPercent = effect.hpThresholdPercent & 0xffff;
       }
+      if (effect?.type === PAD_ENEMY_SKILL_TURN_CHANGE) {
+        enemy.turnChangeThresholdPercent = effect.hpThresholdPercent;
+        enemy.turnChangeCounter = effect.turnCounter;
+      }
     }
+    this.updateEnemyTurnChangePassive(enemy);
+  }
+
+  updateEnemyTurnChangePassive(enemy) {
+    if (!enemy || enemy.turnChangeActive || !padEnemyTurnChangeTriggered(
+      enemy.hp,
+      enemy.maxHp,
+      enemy.turnChangeThresholdPercent,
+    )) return false;
+    enemy.turnChangeActive = true;
+    enemy.maxCounter = enemy.turnChangeCounter;
+    enemy.counter = enemy.turnChangeCounter;
+    return true;
   }
 
   setEnhancedFallAwakenings(counts) {
@@ -3673,7 +3702,7 @@ export class PuzzleEngine {
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,
-      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, deathResolved = false, escaped = false, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0, damageAbsorbTurns = 0, damageAbsorbThreshold = 0, damageVoidTurns = 0, damageVoidThreshold = 0, damageShieldTurns = 0, damageShieldPercent = 0, attributeResistPercentages = [100, 100, 100, 100, 100], resolveThresholdPercent = 0 }, index) => ({
+      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, baseMaxCounter = maxCounter, deathResolved = false, escaped = false, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0, damageAbsorbTurns = 0, damageAbsorbThreshold = 0, damageVoidTurns = 0, damageVoidThreshold = 0, damageShieldTurns = 0, damageShieldPercent = 0, attributeResistPercentages = [100, 100, 100, 100, 100], resolveThresholdPercent = 0, turnChangeThresholdPercent = 0, turnChangeCounter = 0, turnChangeActive = false }, index) => ({
         id,
         name,
         attribute,
@@ -3681,6 +3710,7 @@ export class PuzzleEngine {
         maxHp,
         counter,
         maxCounter,
+        baseMaxCounter,
         deathResolved,
         escaped,
         scaledAttackGate,
@@ -3705,6 +3735,9 @@ export class PuzzleEngine {
         damageShieldPercent,
         attributeResistPercentages: [...attributeResistPercentages],
         resolveThresholdPercent,
+        turnChangeThresholdPercent,
+        turnChangeCounter,
+        turnChangeActive,
         queuedEnemySkills: Math.max(
           0,
           (this.enemySkillQueues[index]?.records.length || 0) - (this.enemySkillQueues[index]?.position || 0),

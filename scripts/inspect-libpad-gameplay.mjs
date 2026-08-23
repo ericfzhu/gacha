@@ -495,6 +495,38 @@ const RECOVERY_DEBUFF_INSTRUCTION_ANCHORS = Object.freeze([
   [0x6504a0, 0x97f2fe1c], // load it as binary32
   [0x6504a4, 0x1e200908], // multiply native recovery charge by the debuff
 ]);
+const TURN_CHANGE_ENEMY_SKILL_TYPE = 106;
+const TURN_CHANGE_HANDLER = 0x62be50;
+const TURN_CHANGE_SETUP_HANDLER = 0x621c94;
+const TURN_CHANGE_CONDITION_HANDLER = 0x61c01c;
+const TURN_CHANGE_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x62da8c, 0xb9400348], // passive scanner loads the monster slot's skill id
+  [0x62da90, 0x79162668], // preserve that id at sMONSTER+0xb12
+  [0x62da94, 0xb94012e8], // load authored +0x10 HP threshold
+  [0x62da98, 0x79162268], // truncate/store the signed threshold at +0xb10
+  [0x62da9c, 0xb94016e8], // load authored +0x14 replacement counter
+  [0x62daa0, 0x79162a68], // truncate/store its unsigned low half at +0xb14
+  [0x624824, 0x91268033], // _checkAnger addresses status bits at +0x9a0
+  [0x624834, 0x97f39f33], // read the current latched-status word
+  [0x624878, 0x79d622a8], // reject a signed threshold below one
+  [0x6248c8, 0xd2e80b28], // materialize binary64 100.0
+  [0x6248cc, 0x1e601900], // divide current HP by maximum HP
+  [0x6248d4, 0x1e610800], // scale the ratio by 100
+  [0x6248d8, 0x1e624000], // narrow the percentage to binary32
+  [0x6248dc, 0x97f40529], // round the binary32 percentage with izMathRound
+  [0x6248e0, 0x79d622a8], // reload the signed threshold
+  [0x6248e4, 0x6b08001f], // activate when rounded HP percentage is at most it
+  [0x6248f4, 0x32000001], // latch turn-change status bit zero
+  [0x6248fc, 0x97f40f75], // persist the latched status
+  [0x64091c, 0xf9410668], // reset begins from the monster definition
+  [0x640924, 0x7940c901], // load its ordinary unsigned attack interval
+  [0x640928, 0x97f35592], // install the ordinary interval first
+  [0x640954, 0x79d62268], // check whether a type-106 threshold was installed
+  [0x640960, 0x91268260], // address the latched passive-status word
+  [0x640968, 0x72001c1f], // require active bit zero
+  [0x640970, 0x79562a61], // load the unsigned replacement interval
+  [0x640978, 0x97f3557e], // replace the live enemy attack counter
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -1616,6 +1648,31 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     : RECOVERY_DEBUFF_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
+  const turnChangeDispatchTarget = resolveEnemySkillTarget(
+    TURN_CHANGE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const turnChangeSetupTarget = resolveEnemySkillTarget(
+    TURN_CHANGE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const turnChangeConditionTarget = resolveEnemySkillTarget(
+    TURN_CHANGE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const turnChangeDispatchMatches = turnChangeDispatchTarget === null
+    ? null : turnChangeDispatchTarget === TURN_CHANGE_HANDLER;
+  const turnChangeSetupMatches = turnChangeSetupTarget === null
+    ? null : turnChangeSetupTarget === TURN_CHANGE_SETUP_HANDLER;
+  const turnChangeConditionMatches = turnChangeConditionTarget === null
+    ? null : turnChangeConditionTarget === TURN_CHANGE_CONDITION_HANDLER;
+  const turnChangeInstructionAnchorsMatch = restoredElf === null ? null
+    : TURN_CHANGE_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -2658,6 +2715,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       recoveryDebuffSetupMatches21_9: recoveryDebuffSetupMatches,
       recoveryDebuffConditionMatches21_9: recoveryDebuffConditionMatches,
       recoveryDebuffInstructionAnchorsMatch21_9: recoveryDebuffInstructionAnchorsMatch,
+      turnChangeDispatchMatches21_9: turnChangeDispatchMatches,
+      turnChangeSetupMatches21_9: turnChangeSetupMatches,
+      turnChangeConditionMatches21_9: turnChangeConditionMatches,
+      turnChangeInstructionAnchorsMatch21_9: turnChangeInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -3310,6 +3371,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       recoveryDebuffInstructionAnchorsMatch21_9: recoveryDebuffInstructionAnchorsMatch,
       recoveryDebuffSemantics:
         'type 105 owns no setup RNG; execution installs +0x10 duration at protected +0x86e48 and binary32(+0x14)/100 at +0x86e38, whose active value multiplies the native recovery charge; condition admits an inactive lane or a multiplier at least 1.0 but rejects overwriting a current sub-1.0 recovery debuff',
+      turnChangeType: TURN_CHANGE_ENEMY_SKILL_TYPE,
+      turnChangeDispatchTarget: turnChangeDispatchTarget === null
+        ? null : hex(turnChangeDispatchTarget),
+      turnChangeDispatchMatches21_9: turnChangeDispatchMatches,
+      turnChangeSetupTarget: turnChangeSetupTarget === null
+        ? null : hex(turnChangeSetupTarget),
+      turnChangeSetupMatches21_9: turnChangeSetupMatches,
+      turnChangeConditionTarget: turnChangeConditionTarget === null
+        ? null : hex(turnChangeConditionTarget),
+      turnChangeConditionMatches21_9: turnChangeConditionMatches,
+      turnChangeInstructionAnchorsMatch21_9: turnChangeInstructionAnchorsMatch,
+      turnChangeSemantics:
+        'type 106 is a passive with no setup/execution RNG; the passive scanner truncates signed +0x10 HP threshold and unsigned +0x14 attack interval into sMONSTER+0xb10/+0xb14; _checkAnger rounds binary32(currentHp/maxHp*100), latches the passive once that value is at most a positive threshold, and resetEnemyAtkLeft then replaces the ordinary interval with +0xb14 permanently',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -3856,6 +3930,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || recoveryDebuffSetupMatches === false
     || recoveryDebuffConditionMatches === false
     || recoveryDebuffInstructionAnchorsMatch === false
+    || turnChangeDispatchMatches === false
+    || turnChangeSetupMatches === false
+    || turnChangeConditionMatches === false
+    || turnChangeInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

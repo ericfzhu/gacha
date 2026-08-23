@@ -26,6 +26,7 @@ import {
   PAD_ENEMY_SKILL_FIXED_BOMBS,
   PAD_ENEMY_SKILL_CLOUD,
   PAD_ENEMY_SKILL_RECOVERY_DEBUFF,
+  PAD_ENEMY_SKILL_TURN_CHANGE,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -197,6 +198,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_FIXED_BOMBS,
     PAD_ENEMY_SKILL_CLOUD,
     PAD_ENEMY_SKILL_RECOVERY_DEBUFF,
+    PAD_ENEMY_SKILL_TURN_CHANGE,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
     PAD_ENEMY_SKILL_DEFENSE_BOOST,
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -264,6 +266,11 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
   if (!(applyStaticEligibility
     ? isStaticallyEligible(definition, state)
     : isSupportedDefinition(definition))) {
+    return { eligible: false, probabilityScale: 0, rngState };
+  }
+  // Passive records are installed by _checkPassiveSkills and share the native
+  // always-false 0x61c01c action condition; they never enter the attack picker.
+  if (definition.effect.passive) {
     return { eligible: false, probabilityScale: 0, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_BLACK_FALL) {

@@ -73,6 +73,7 @@ export const PAD_ENEMY_SKILL_RANDOM_BOMBS = 102;
 export const PAD_ENEMY_SKILL_FIXED_BOMBS = 103;
 export const PAD_ENEMY_SKILL_CLOUD = 104;
 export const PAD_ENEMY_SKILL_RECOVERY_DEBUFF = 105;
+export const PAD_ENEMY_SKILL_TURN_CHANGE = 106;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -427,6 +428,18 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       supported: true,
       durationTurns: definition.getInt32(0x10, true),
       recoveryPercent: definition.getInt32(0x14, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_TURN_CHANGE) {
+    requireLength(definitionBytes, 0x18, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'turnChangePassive',
+      supported: true,
+      passive: true,
+      hpThresholdPercent: (definition.getInt32(0x10, true) << 16) >> 16,
+      turnCounter: definition.getInt32(0x14, true) & 0xffff,
       attackWithSkillValue,
     });
   }
@@ -1027,6 +1040,19 @@ export function padEnemySkillPlayerHpCondition(currentHp, maxHp, thresholdPercen
   return rounded <= Math.trunc(Number(thresholdPercent) || 0);
 }
 
+// _checkAnger converts current/max HP through binary64, multiplies by 100,
+// narrows that ratio to binary32, then uses izMathRound before comparing the
+// signed type-106 threshold. The status is only armed for thresholds >= 1.
+export function padEnemyTurnChangeTriggered(currentHp, maxHp, thresholdPercent) {
+  const current = Math.max(0, Math.trunc(Number(currentHp) || 0));
+  const maximum = Math.max(0, Math.trunc(Number(maxHp) || 0));
+  const threshold = (Math.trunc(Number(thresholdPercent) || 0) << 16) >> 16;
+  if (maximum <= 0 || current <= 0 || threshold < 1) return false;
+  const percentage = Math.fround(current / maximum * 100);
+  const rounded = Math.trunc(percentage + 0.5);
+  return rounded <= threshold;
+}
+
 // Type 52's late handler reconstructs the target monster's protected int64
 // max HP, multiplies it by the signed +0x10 percentage in binary64, divides by
 // 100, and calls izMathRoundD (halves away from zero) before writing current HP.
@@ -1431,6 +1457,12 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
   if (type === PAD_ENEMY_SKILL_RECOVERY_DEBUFF) {
     // Type 105 uses generic setup and reads both authored operands directly.
     return decodePadEnemySkillDefinition(definitionBytes);
+  }
+  if (type === PAD_ENEMY_SKILL_TURN_CHANGE) {
+    return Object.freeze({
+      ...decodePadEnemySkillDefinition(definitionBytes),
+      setupMaterialized: true,
+    });
   }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
@@ -2297,6 +2329,20 @@ export function normalizePadEnemySkillRecord(record) {
       supported: record?.supported !== false,
       durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)),
       recoveryPercent: Math.trunc(Number(record?.recoveryPercent) || 0),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_TURN_CHANGE || record?.kind === 'turnChangePassive') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_TURN_CHANGE,
+      kind: 'turnChangePassive',
+      supported: record?.supported !== false,
+      passive: true,
+      hpThresholdPercent: (Math.trunc(Number(record?.hpThresholdPercent) || 0) << 16) >> 16,
+      turnCounter: Math.trunc(Number(record?.turnCounter) || 0) & 0xffff,
+      setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),
