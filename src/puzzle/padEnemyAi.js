@@ -9,6 +9,7 @@ import {
   PAD_ENEMY_SKILL_HEAL_ENEMY,
   PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL,
   PAD_ENEMY_SKILL_DAMAGE_ABSORB,
+  PAD_ENEMY_SKILL_AWAKENING_BIND,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -163,6 +164,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_HEAL_ENEMY,
     PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL,
     PAD_ENEMY_SKILL_DAMAGE_ABSORB,
+    PAD_ENEMY_SKILL_AWAKENING_BIND,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
     PAD_ENEMY_SKILL_DEFENSE_BOOST,
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -309,6 +311,13 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
   if (definition.effect.type === PAD_ENEMY_SKILL_DAMAGE_ABSORB) {
     // 0x61af94 admits only while protected signed-int16 sMONSTER+0x960 is < 1.
     const eligible = state.enemyDamageAbsorbTurns <= 0;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_AWAKENING_BIND) {
+    // 0x61b56c shifts the packed low-ten-bit counter by six, sign-extends it,
+    // and admits only values below 0x40. Ordinary durations are therefore
+    // eligible only while the awakening-bind counter is zero.
+    const eligible = state.awakeningBindTurns <= 0;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_ADDITIONAL_ATTACK) {
@@ -627,6 +636,7 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     enemyStatusShieldTurns: Math.max(0, Math.trunc(Number(state.enemyStatusShieldTurns) || 0)),
     moveTimeReductionTurns: Math.max(0, Math.trunc(Number(state.moveTimeReductionTurns) || 0)),
     skillSealTurns: Math.trunc(Number(state.skillSealTurns) || 0),
+    awakeningBindTurns: Math.trunc(Number(state.awakeningBindTurns) || 0),
     enemyAttribute: Math.trunc(Number(state.enemyAttribute)),
     enemies: Array.isArray(state.enemies) ? state.enemies : [],
     party: Array.isArray(state.party) ? state.party : [],

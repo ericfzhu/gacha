@@ -56,6 +56,7 @@ export const PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT = 84;
 export const PAD_ENEMY_SKILL_POISON_MASK_SWAP = 85;
 export const PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL = 86;
 export const PAD_ENEMY_SKILL_DAMAGE_ABSORB = 87;
+export const PAD_ENEMY_SKILL_AWAKENING_BIND = 88;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -204,6 +205,15 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       supported: true,
       durationTurns: Math.max(0, (definition.getInt32(0x10, true) << 16) >> 16),
       damageThreshold: definition.getInt32(0x14, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_AWAKENING_BIND) {
+    return Object.freeze({
+      type,
+      kind: 'awakeningBind',
+      supported: true,
+      durationTurns: definition.getInt32(0x10, true),
       attackWithSkillValue,
     });
   }
@@ -1030,6 +1040,20 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_AWAKENING_BIND) {
+    return Object.freeze({
+      type,
+      kind: 'awakeningBind',
+      supported: true,
+      durationTurns: monster.getInt32(0x678, true),
+      nativeSetupValue: monster.getUint16(0x674, true) & 0xff,
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -1613,6 +1637,21 @@ export function normalizePadEnemySkillRecord(record) {
       supported: record?.supported !== false,
       durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)),
       damageThreshold: Math.trunc(Number(record?.damageThreshold) || 0),
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_AWAKENING_BIND || record?.kind === 'awakeningBind') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_AWAKENING_BIND,
+      kind: 'awakeningBind',
+      supported: record?.supported !== false,
+      durationTurns: Math.trunc(Number(record?.durationTurns) || 0),
+      ...(record?.nativeSetupValue === undefined
+        ? {}
+        : { nativeSetupValue: Math.trunc(Number(record.nativeSetupValue) || 0) & 0xff }),
       setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null

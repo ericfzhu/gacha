@@ -2,6 +2,27 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 enemy awakening bind
+
+- Recovered type `88` at dispatch/setup/condition `0x629dc0`, `0x6218a4`, and
+  `0x61b56c`. Definition `+0x10` is staged at runtime `sMONSTER+0x678`, then
+  added into the protected low-ten-bit counter at `sGAMEWORK+0x874d4`.
+  Reapplication while active sets continuation bit `0x400`, which skips exactly
+  one `_doOnPostEnemyAttack` decrement before the bit is cleared.
+- Mapped the counter's native consumers across passive counting, card-parameter
+  recalculation, damage, recovery, skill-seal resistance, bind resistance,
+  orb-enhance skyfall, and combo-drop awakenings. The browser now suppresses
+  every awakening-derived effect represented by its compact party model while
+  leaving leader skills, badges, and enemy floor modifiers active.
+- Ported definition/runtime decoding, normalization, new-AI admission and
+  active-status rejection, stacking/countdown, reset/snapshot state, and the
+  visible `AWKN BIND · nT` marker. Differential fixtures cover resistance loss,
+  combo-drop removal, enhance-skyfall removal, reapplication, and expiry.
+- Pure rules, the production build, exact type tables plus ten instruction
+  anchors, focused Chromium rendering, and the generic web-game client pass
+  without page errors. Next: recover enemy skill type `89` as a separate
+  checkpoint.
+
 ## 2026-08-24 enemy damage absorption
 
 - Recovered type `87` at dispatch/setup/condition `0x629d9c`, `0x61fee4`, and

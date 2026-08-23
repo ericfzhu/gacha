@@ -10,6 +10,7 @@ import {
   PAD_ENEMY_SKILL_HEAL_ENEMY,
   PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL,
   PAD_ENEMY_SKILL_DAMAGE_ABSORB,
+  PAD_ENEMY_SKILL_AWAKENING_BIND,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1008,6 +1009,34 @@ assert.equal(
   decodePadEnemySkillDefinition(signedDamageAbsorbDefinition).damageThreshold,
   -1,
 );
+const enemyAiAwakeningBindDefinition = enemyAiDamageAbsorbDefinition.slice();
+const enemyAiAwakeningBindView = new DataView(enemyAiAwakeningBindDefinition.buffer);
+enemyAiAwakeningBindView.setUint32(0x00, 9_069, true);
+enemyAiAwakeningBindView.setInt16(0x04, PAD_ENEMY_SKILL_AWAKENING_BIND, true);
+enemyAiAwakeningBindView.setInt32(0x10, 4, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiAwakeningBindDefinition), {
+  type: 88,
+  kind: 'awakeningBind',
+  supported: true,
+  durationTurns: 4,
+  attackWithSkillValue: 0,
+});
+const awakeningBindRuntime = new Uint8Array(0x680);
+const awakeningBindRuntimeView = new DataView(awakeningBindRuntime.buffer);
+awakeningBindRuntimeView.setUint16(0x674, 0x12ab, true);
+awakeningBindRuntimeView.setInt32(0x678, 4, true);
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiAwakeningBindDefinition,
+  awakeningBindRuntime,
+), {
+  type: 88,
+  kind: 'awakeningBind',
+  supported: true,
+  durationTurns: 4,
+  nativeSetupValue: 0xab,
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
 const enemyAiAdditionalAttackDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiAdditionalAttackView = new DataView(enemyAiAdditionalAttackDefinition.buffer);
 enemyAiAdditionalAttackView.setUint32(0x00, 9_037, true);
@@ -2999,6 +3028,24 @@ assert.equal(comboDropAwakeningEngine.pendingMatches[0].size, 10);
 assert.equal(comboDropAwakeningEngine.comboCount, 3);
 assert.equal(comboDropAwakeningEngine.comboDropBonusCount, 2);
 assert.equal(comboDropAwakeningEngine.pendingComboDrops, 2);
+const awakeningBoundComboDropEngine = new PuzzleEngine({
+  seed: 21_900,
+  comboDropAwakenings: [2, 0, 0, 0, 0],
+});
+awakeningBoundComboDropEngine.setBoardFromCodes([
+  'RRRRRR',
+  'RRRRBG',
+  'BGLHDB',
+  'GLHDBG',
+  'LHDBGL',
+]);
+awakeningBoundComboDropEngine.awakeningBindTurns = 3;
+awakeningBoundComboDropEngine.start();
+awakeningBoundComboDropEngine.phase = 'detect';
+awakeningBoundComboDropEngine.advancePhase();
+assert.equal(awakeningBoundComboDropEngine.comboCount, 1);
+assert.equal(awakeningBoundComboDropEngine.comboDropBonusCount, 0);
+assert.equal(awakeningBoundComboDropEngine.pendingComboDrops, 0);
 const lockFallEngine = new PuzzleEngine({
   seed: 21_900,
   lockFallSeed: 21_900,
@@ -3086,6 +3133,20 @@ assert.deepEqual(enhancedFallEngine.snapshot().enhancedFallModifier, {
   chancePercent: 30,
   weakeningPowerPercent: 50,
 });
+const awakeningBoundEnhancedFallEngine = new PuzzleEngine({
+  seed: 21_900,
+  lockFallSeed: 21_900,
+  enhancedFallAwakenings: [5, 0, 0, 0, 0, 0],
+});
+awakeningBoundEnhancedFallEngine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+awakeningBoundEnhancedFallEngine.setRngState(21_900);
+awakeningBoundEnhancedFallEngine.setLockFallRngState(21_900);
+awakeningBoundEnhancedFallEngine.awakeningBindTurns = 3;
+awakeningBoundEnhancedFallEngine.board[0][0] = null;
+awakeningBoundEnhancedFallEngine.collapseAndRefill();
+assert.equal(awakeningBoundEnhancedFallEngine.board[0][0].type, 'fire');
+assert.equal(awakeningBoundEnhancedFallEngine.board[0][0].enhancementPower, 0);
+assert.equal(awakeningBoundEnhancedFallEngine.lockFallRng.state, 394_448_415);
 const blackFallEngine = new PuzzleEngine({
   seed: 21_900,
   lockFallSeed: 21_900,
@@ -4071,6 +4132,56 @@ assert.equal(selectedDamageAbsorbEngine.rng.state, selectedDamageAbsorbState.rng
 selectedDamageAbsorbEngine.enemies[0].counter = 99;
 selectedDamageAbsorbEngine.resolveEnemyTurn();
 assert.equal(selectedDamageAbsorbEngine.enemies[0].damageAbsorbTurns, 2);
+
+const awakeningBindMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(awakeningBindMonsterDefinition.buffer).setUint32(0xec, 9_069, true);
+const selectedAwakeningBindEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: awakeningBindMonsterDefinition,
+    skillDefinitions: [enemyAiAwakeningBindDefinition],
+  }],
+});
+selectedAwakeningBindEngine.enemies[0].counter = 1;
+selectedAwakeningBindEngine.enemies[1].counter = 99;
+selectedAwakeningBindEngine.setRngState(21_900);
+selectedAwakeningBindEngine.resolveEnemyTurn();
+const selectedAwakeningBindState = selectedAwakeningBindEngine.snapshot();
+assert.equal(selectedAwakeningBindState.lastEnemyActions[0].skill.type, 88);
+assert.equal(selectedAwakeningBindState.awakeningBindTurns, 3);
+assert.equal(selectedAwakeningBindState.player.hp, 12_000);
+assert.equal(selectedAwakeningBindState.rngState, padLcgStep(21_900).state);
+assert.equal(selectedAwakeningBindEngine.takeEnemySkill(0), null);
+assert.equal(selectedAwakeningBindEngine.rng.state, selectedAwakeningBindState.rngState);
+assert.equal(selectedAwakeningBindEngine.applyEnemySkillRuntime(
+  enemyAiAwakeningBindDefinition,
+  awakeningBindRuntime,
+), true);
+assert.equal(selectedAwakeningBindEngine.awakeningBindTurns, 7);
+selectedAwakeningBindEngine.enemies[0].counter = 99;
+selectedAwakeningBindEngine.resolveEnemyTurn();
+assert.equal(selectedAwakeningBindEngine.awakeningBindTurns, 7);
+selectedAwakeningBindEngine.resolveEnemyTurn();
+assert.equal(selectedAwakeningBindEngine.awakeningBindTurns, 6);
+
+const awakeningBoundResistanceEngine = new PuzzleEngine({
+  seed: 21_900,
+  skillSealResistAwakenings: 5,
+});
+awakeningBoundResistanceEngine.awakeningBindTurns = 3;
+awakeningBoundResistanceEngine.setRngState(21_900);
+assert.equal(awakeningBoundResistanceEngine.applyEnemySkillRuntime(
+  enemyAiActiveSkillSealDefinition,
+  activeSkillSealMonsterRuntime,
+), true);
+assert.equal(awakeningBoundResistanceEngine.lastEnemySkill.resisted, false);
+assert.equal(awakeningBoundResistanceEngine.skillSealTurns, 4);
+assert.equal(awakeningBoundResistanceEngine.rng.state, 21_900);
+awakeningBoundResistanceEngine.party[0].superBindResist = true;
+const awakeningBoundCardBind = awakeningBoundResistanceEngine.doBind(1, 3);
+assert.equal(awakeningBoundCardBind.boundMask, 1);
+assert.equal(awakeningBoundCardBind.resistedMask, 0);
+assert.equal(awakeningBoundResistanceEngine.party[0].bindTurns, 3);
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;

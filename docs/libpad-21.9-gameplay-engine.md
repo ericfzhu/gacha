@@ -1031,6 +1031,38 @@ Raising the threshold to 1,661 lets the same lane deal 1,660 damage instead.
 The installed status is exposed as `ABS >=1,660 3T` and counts down at the next
 enemy-turn boundary with the other native monster statuses.
 
+Enemy skill type `88` binds the player's awakenings. Its dispatch, setup, and
+condition entries target `0x629dc0`, `0x6218a4`, and `0x61b56c`. Setup copies
+definition `+0x10` to runtime `sMONSTER+0x678`; execution reads its low 16 bits,
+adds them to the low ten bits of the protected packed counter at
+`sGAMEWORK+0x874d4`, and invokes the native awakening recalculation path.
+
+Bit `0x400` is a continuation marker rather than part of the duration. When the
+old low-ten-bit counter is positive, reapplication sets that bit. The later
+`_doOnPostEnemyAttack` path skips one decrement when the marker is set, always
+clears it, and recalculates awakenings again when the ordinary counter expires.
+The type-specific condition shifts and sign-extends the same packed value and
+returns 1.0 only below `0x40`; for ordinary durations this means a new-AI record
+is selectable only while the awakening bind is inactive.
+
+The counter is read throughout native passive counting and card recalculation,
+including bind resistance, active-skill-seal resistance, enhanced-orb skyfall,
+combo-drop awakenings, attack/recovery passives, and awakening-derived damage
+behavior. The compact browser party model now gates every represented member of
+that set: bind and skill-seal resistance awakenings, combo-drop counts,
+orb-enhance skyfall counts, and attribute-change awakening lanes. Badge
+resistance, leader skills, and enemy floor modifiers remain active because they
+are not awakenings. Snapshot state and the canvas expose the remaining counter
+as `AWKN BIND · nT`.
+
+With a four-turn immediate record, seed 21900 consumes the ordinary selection
+draw, applies the status, and the first post-enemy-attack boundary reduces it to
+three turns. Reapplying four turns while active produces seven, sets the skip
+marker, and preserves seven across that boundary before normal countdown
+resumes. Differential fixtures also prove that a five-awakening skill-seal
+resistance and a super-bind resistance stop working during the bind while the
+shared RNG does not advance for those disabled checks.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

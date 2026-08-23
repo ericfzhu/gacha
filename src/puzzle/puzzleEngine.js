@@ -45,6 +45,7 @@ import {
   PAD_ENEMY_SKILL_HEAL_ENEMY,
   PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL,
   PAD_ENEMY_SKILL_DAMAGE_ABSORB,
+  PAD_ENEMY_SKILL_AWAKENING_BIND,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -311,6 +312,8 @@ export class PuzzleEngine {
     this.playerAttackBoostTurns = this.initialPlayerAttackBoostTurns;
     this.skillSealTurns = 0;
     this.skillSealSkipPostEnemyCountdown = false;
+    this.awakeningBindTurns = 0;
+    this.awakeningBindSkipPostEnemyCountdown = false;
     this.leaderSwapTurns = 0;
     this.leaderSwapIndex = null;
     this.enemySkillQueues.forEach((queue) => { queue.position = 0; });
@@ -656,7 +659,10 @@ export class PuzzleEngine {
             cascadeDepth: this.cascadeDepth + 1,
           };
         }));
-        const comboDropAwakening = padResolveComboDropAwakenings(matches, this.comboDropAwakenings);
+        const comboDropAwakening = padResolveComboDropAwakenings(
+          matches,
+          this.awakeningBindTurns > 0 ? [] : this.comboDropAwakenings,
+        );
         this.turnNailCount += matches.reduce((total, match) => total + match.cells.reduce((count, { row, column }) => (
           count + (((Number(this.board[row][column]?.blockFlags) >>> 0) & PAD_BLOCK_NAIL_FLAG) !== 0 ? 1 : 0)
         ), 0), 0);
@@ -862,7 +868,7 @@ export class PuzzleEngine {
       const enhancementFall = padResolveEnhancementFall(
         this.lockFallRng.state,
         entry.type,
-        this.enhancedFallAwakenings,
+        this.awakeningBindTurns > 0 ? [] : this.enhancedFallAwakenings,
         this.enhancedFallModifier,
         this.passiveEnhancementFallsEnabled,
       );
@@ -927,13 +933,17 @@ export class PuzzleEngine {
         attack: padTertiaryAttributeAttack(member.attack, member.tertiaryAttribute),
       }),
       (member) => ({
-        attribute: member.secondaryAttribute,
-        attack: padSecondaryAttributeAttack(
-          member.attack,
-          member.attribute,
-          member.secondaryAttribute,
-          member.secondaryAttributeChanged,
-        ),
+        attribute: this.awakeningBindTurns > 0 && member.secondaryAttributeChanged
+          ? null
+          : member.secondaryAttribute,
+        attack: this.awakeningBindTurns > 0 && member.secondaryAttributeChanged
+          ? 0
+          : padSecondaryAttributeAttack(
+            member.attack,
+            member.attribute,
+            member.secondaryAttribute,
+            member.secondaryAttributeChanged,
+          ),
       }),
     ];
     attackRounds.forEach((getLane) => {
@@ -1162,10 +1172,11 @@ export class PuzzleEngine {
     if (total) {
       this.message = `Enemies attacked for ${total.toLocaleString()} damage.`;
     }
-    // _doOnPostEnemyAttack owns the protected low-ten-bit active-skill-seal
-    // countdown. A reapplication sets bit 0x400 and skips this one decrement;
-    // a newly applied seal does not, so its authored count drops immediately.
+    // _doOnPostEnemyAttack owns both protected low-ten-bit player-status
+    // counters. Reapplication sets bit 0x400 and skips this one decrement; a
+    // newly applied status does not, so its authored count drops immediately.
     this.advanceSkillSealTurnsPostEnemyAttack();
+    this.advanceAwakeningBindTurnsPostEnemyAttack();
   }
 
   enemyAiState(enemyIndex, pool = this.enemyAiPools[enemyIndex]) {
@@ -1196,6 +1207,7 @@ export class PuzzleEngine {
       enemyStatusShieldTurns: enemy.statusShieldTurns,
       moveTimeReductionTurns: this.moveTimeReduction?.turnsRemaining || 0,
       skillSealTurns: this.skillSealTurns,
+      awakeningBindTurns: this.awakeningBindTurns,
       enemyAttribute: PAD_ATTRIBUTE_INDEX[enemy.attribute] ?? -1,
       playerCurrentHp: this.player.hp,
       playerMaxHp: this.player.maxHp,
@@ -1651,8 +1663,8 @@ export class PuzzleEngine {
         continue;
       }
       const resistance = (
-        (member.bindResist ? 50 : 0)
-        + (member.superBindResist ? 100 : 0)
+        (this.awakeningBindTurns > 0 ? 0 : (member.bindResist ? 50 : 0))
+        + (this.awakeningBindTurns > 0 ? 0 : (member.superBindResist ? 100 : 0))
         + badgeResistance
       );
       if (resistance >= 1) {
@@ -1670,7 +1682,7 @@ export class PuzzleEngine {
 
   applyActiveSkillSeal(durationTurns) {
     const resistance = (
-      this.skillSealResistAwakenings * 20
+      (this.awakeningBindTurns > 0 ? 0 : this.skillSealResistAwakenings * 20)
       + this.skillSealBadgeResistance
     );
     if (resistance >= 1) {
@@ -1691,6 +1703,21 @@ export class PuzzleEngine {
       this.skillSealTurns -= 1;
     }
     this.skillSealSkipPostEnemyCountdown = false;
+  }
+
+  applyAwakeningBind(durationTurns) {
+    const current = Math.trunc(Number(this.awakeningBindTurns) || 0);
+    this.awakeningBindSkipPostEnemyCountdown = current > 0;
+    const packed = (current + Math.trunc(Number(durationTurns) || 0)) & 0x3ff;
+    this.awakeningBindTurns = (packed << 22) >> 22;
+    return Object.freeze({ durationTurns: this.awakeningBindTurns });
+  }
+
+  advanceAwakeningBindTurnsPostEnemyAttack() {
+    if (!this.awakeningBindSkipPostEnemyCountdown && this.awakeningBindTurns >= 1) {
+      this.awakeningBindTurns -= 1;
+    }
+    this.awakeningBindSkipPostEnemyCountdown = false;
   }
 
   advancePartyBindTurns() {
@@ -2117,6 +2144,12 @@ export class PuzzleEngine {
       this.message = `${enemy.name} absorbs damage of ${skill.damageThreshold.toLocaleString()} or more for ${skill.durationTurns} turn${skill.durationTurns === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'awakeningBind') {
+      const result = this.applyAwakeningBind(skill.durationTurns);
+      this.lastEnemySkill = Object.freeze({ ...skill, ...result });
+      this.message = `Awakenings bound for ${this.awakeningBindTurns} turn${this.awakeningBindTurns === 1 ? '' : 's'}.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'damageShield') {
       const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
       if (!enemy) return false;
@@ -2447,6 +2480,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_HEAL_ENEMY,
         PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL,
         PAD_ENEMY_SKILL_DAMAGE_ABSORB,
+        PAD_ENEMY_SKILL_AWAKENING_BIND,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -3158,6 +3192,7 @@ export class PuzzleEngine {
         enemyAiSkillSlots: this.enemyAiPools[index]?.monster.slots.length ?? 0,
       })),
       skillSealTurns: this.skillSealTurns,
+      awakeningBindTurns: this.awakeningBindTurns,
       skill: {
         ...this.skill,
         sealed: this.skillSealTurns > 0,

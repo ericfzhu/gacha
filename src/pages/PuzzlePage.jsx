@@ -466,14 +466,16 @@ function render(ctx, engine) {
   ctx.fillStyle = '#8996ab';
   ctx.font = '600 9px "Noto Sans", sans-serif';
   ctx.fillText(engine.phase.toUpperCase(), 434, 43);
+  let playerStatusY = 57;
   if (engine.moveTimeReduction) {
     ctx.fillStyle = '#f6b9ff';
     ctx.font = '700 9px "Barlow Condensed", sans-serif';
     ctx.fillText(
       `MOVE ${engine.moveTime.toFixed(2)}s · ${engine.moveTimeReduction.turnsRemaining}T`,
       434,
-      57,
+      playerStatusY,
     );
+    playerStatusY += 12;
   }
   const activeSkyfallRules = Object.values(engine.skyfallRateRules || {}).filter(Boolean);
   if (activeSkyfallRules.length > 0) {
@@ -486,7 +488,13 @@ function render(ctx, engine) {
     }).join(' · ');
     ctx.fillStyle = '#bfe9ff';
     ctx.font = '700 9px "Barlow Condensed", sans-serif';
-    ctx.fillText(`SKY ${skyfallText}`, 434, engine.moveTimeReduction ? 69 : 57);
+    ctx.fillText(`SKY ${skyfallText}`, 434, playerStatusY);
+    playerStatusY += 12;
+  }
+  if (Number(engine.awakeningBindTurns || 0) > 0) {
+    ctx.fillStyle = '#ffd2f1';
+    ctx.font = '700 9px "Barlow Condensed", sans-serif';
+    ctx.fillText(`AWKN BIND · ${engine.awakeningBindTurns}T`, 434, playerStatusY);
   }
 
   const visibleTarget = engine.manualTarget ? engine.targetEnemy : -1;

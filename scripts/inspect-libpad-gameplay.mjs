@@ -159,6 +159,22 @@ const DAMAGE_ABSORB_INSTRUCTION_ANCHORS = Object.freeze([
   [0x62446c, 0x9125c280], // combat reads damage threshold
   [0x6244e0, 0xeb08033f], // compare resolved damage against threshold
 ]);
+const AWAKENING_BIND_ENEMY_SKILL_TYPE = 88;
+const AWAKENING_BIND_HANDLER = 0x629dc0;
+const AWAKENING_BIND_SETUP_HANDLER = 0x6218a4;
+const AWAKENING_BIND_CONDITION_HANDLER = 0x61b56c;
+const AWAKENING_BIND_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x6218a4, 0xb94012a8], // definition +0x10 duration
+  [0x6218b0, 0xb9067a68], // runtime +0x678 duration
+  [0x629df8, 0x794cf26b], // execution reads duration as unsigned low 16 bits
+  [0x629e10, 0x3300256a], // replace the packed counter's low ten bits
+  [0x629e14, 0x3216014b], // set bit 0x400 for an already-active bind
+  [0x629e20, 0x7829690a], // store the packed global awakening-bind timer
+  [0x61b56c, 0x797e5f28], // condition reads the packed global timer
+  [0x61b57c, 0x7101011f], // eligible only below shifted value 0x40
+  [0x678acc, 0x375000aa], // active continuation bit skips one decrement
+  [0x678ae0, 0x12157948], // clear continuation bit after enemy attack
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -937,6 +953,25 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : damageAbsorbConditionTarget === DAMAGE_ABSORB_CONDITION_HANDLER;
   const damageAbsorbInstructionAnchorsMatch = restoredElf === null ? null
     : DAMAGE_ABSORB_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
+  const awakeningBindDispatchTarget = resolveEnemySkillTarget(
+    AWAKENING_BIND_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const awakeningBindSetupTarget = resolveEnemySkillTarget(
+    AWAKENING_BIND_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const awakeningBindConditionTarget = resolveEnemySkillTarget(
+    AWAKENING_BIND_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const awakeningBindDispatchMatches = awakeningBindDispatchTarget === null
+    ? null : awakeningBindDispatchTarget === AWAKENING_BIND_HANDLER;
+  const awakeningBindSetupMatches = awakeningBindSetupTarget === null
+    ? null : awakeningBindSetupTarget === AWAKENING_BIND_SETUP_HANDLER;
+  const awakeningBindConditionMatches = awakeningBindConditionTarget === null
+    ? null : awakeningBindConditionTarget === AWAKENING_BIND_CONDITION_HANDLER;
+  const awakeningBindInstructionAnchorsMatch = restoredElf === null ? null
+    : AWAKENING_BIND_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
@@ -1911,6 +1946,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       damageAbsorbSetupMatches21_9: damageAbsorbSetupMatches,
       damageAbsorbConditionMatches21_9: damageAbsorbConditionMatches,
       damageAbsorbInstructionAnchorsMatch21_9: damageAbsorbInstructionAnchorsMatch,
+      awakeningBindDispatchMatches21_9: awakeningBindDispatchMatches,
+      awakeningBindSetupMatches21_9: awakeningBindSetupMatches,
+      awakeningBindConditionMatches21_9: awakeningBindConditionMatches,
+      awakeningBindInstructionAnchorsMatch21_9: awakeningBindInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -2344,6 +2383,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       damageAbsorbInstructionAnchorsMatch21_9: damageAbsorbInstructionAnchorsMatch,
       damageAbsorbSemantics:
         'type 87: generic +0x10/+0x14 setup stores duration/threshold at runtime +0x678/+0x67c; execution installs protected signed-int16 duration at sMONSTER+0x960 and signed-int32 threshold at +0x970; condition admits only while duration < 1; _calcFinalDamage absorbs each positive post-shield lane whose damage is >= threshold before the later damage-void check',
+      awakeningBindType: AWAKENING_BIND_ENEMY_SKILL_TYPE,
+      awakeningBindDispatchTarget: awakeningBindDispatchTarget === null
+        ? null : hex(awakeningBindDispatchTarget),
+      awakeningBindDispatchMatches21_9: awakeningBindDispatchMatches,
+      awakeningBindSetupTarget: awakeningBindSetupTarget === null
+        ? null : hex(awakeningBindSetupTarget),
+      awakeningBindSetupMatches21_9: awakeningBindSetupMatches,
+      awakeningBindConditionTarget: awakeningBindConditionTarget === null
+        ? null : hex(awakeningBindConditionTarget),
+      awakeningBindConditionMatches21_9: awakeningBindConditionMatches,
+      awakeningBindInstructionAnchorsMatch21_9: awakeningBindInstructionAnchorsMatch,
+      awakeningBindSemantics:
+        'type 88: +0x10 duration is added into the protected low-ten-bit sGAMEWORK+0x874d4 counter; an already-active bind sets continuation bit 0x400 to skip one post-enemy-attack decrement; the condition admits only while the ordinary counter is zero; active reads suppress awakening-derived passives and the handler recalculates card awakenings both on application and expiry',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -2822,6 +2874,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || damageAbsorbSetupMatches === false
     || damageAbsorbConditionMatches === false
     || damageAbsorbInstructionAnchorsMatch === false
+    || awakeningBindDispatchMatches === false
+    || awakeningBindSetupMatches === false
+    || awakeningBindConditionMatches === false
+    || awakeningBindInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false
