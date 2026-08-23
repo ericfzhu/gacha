@@ -15,6 +15,7 @@ import {
   padCountNonPoisonBlocks,
   padDamageAfterDefense,
   padEnemyDamageAfterShields,
+  padEnemyTypeResistRatio,
   padEnemyResolveThresholdHp,
   padNativeBaseAttackPower,
   padNativeRecoveryPower,
@@ -74,6 +75,7 @@ import {
   PAD_ENEMY_SKILL_BRANCH_SKILL_USE,
   PAD_ENEMY_SKILL_BRANCH_DAMAGE,
   PAD_ENEMY_SKILL_BRANCH_ERASED_ATTRIBUTES,
+  PAD_ENEMY_SKILL_TYPE_RESIST,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -192,12 +194,12 @@ const DEMO_COMBO_LEADER = Object.freeze({
 });
 
 const PARTY = Object.freeze([
-  { id: 'ember', name: 'Ember', attribute: 'fire', secondaryAttribute: 'dark', attack: 890, recovery: 140, bindTurns: 0, bindResist: false, superBindResist: false, leaderSkill: DEMO_COMBO_LEADER },
-  { id: 'marina', name: 'Marina', attribute: 'water', secondaryAttribute: 'light', attack: 940, recovery: 155, bindTurns: 0, bindResist: false, superBindResist: false },
-  { id: 'briar', name: 'Briar', attribute: 'wood', secondaryAttribute: 'fire', attack: 850, recovery: 145, bindTurns: 0, bindResist: false, superBindResist: false },
-  { id: 'sol', name: 'Sol', attribute: 'light', secondaryAttribute: 'light', attack: 910, recovery: 130, bindTurns: 0, bindResist: false, superBindResist: false },
-  { id: 'nyx', name: 'Nyx', attribute: 'dark', secondaryAttribute: 'water', attack: 900, recovery: 120, bindTurns: 0, bindResist: false, superBindResist: false },
-  { id: 'helper', name: 'Helper', attribute: 'fire', secondaryAttribute: 'wood', tertiaryAttribute: 'light', attack: 980, recovery: 130, bindTurns: 0, bindResist: false, superBindResist: false, helper: true, leaderSkill: DEMO_COMBO_LEADER },
+  { id: 'ember', name: 'Ember', attribute: 'fire', secondaryAttribute: 'dark', monsterTypes: [6], addedMonsterTypeMask: 0, attack: 890, recovery: 140, bindTurns: 0, bindResist: false, superBindResist: false, leaderSkill: DEMO_COMBO_LEADER },
+  { id: 'marina', name: 'Marina', attribute: 'water', secondaryAttribute: 'light', monsterTypes: [3], addedMonsterTypeMask: 0, attack: 940, recovery: 155, bindTurns: 0, bindResist: false, superBindResist: false },
+  { id: 'briar', name: 'Briar', attribute: 'wood', secondaryAttribute: 'fire', monsterTypes: [4], addedMonsterTypeMask: 0, attack: 850, recovery: 145, bindTurns: 0, bindResist: false, superBindResist: false },
+  { id: 'sol', name: 'Sol', attribute: 'light', secondaryAttribute: 'light', monsterTypes: [5], addedMonsterTypeMask: 0, attack: 910, recovery: 130, bindTurns: 0, bindResist: false, superBindResist: false },
+  { id: 'nyx', name: 'Nyx', attribute: 'dark', secondaryAttribute: 'water', monsterTypes: [7], addedMonsterTypeMask: 0, attack: 900, recovery: 120, bindTurns: 0, bindResist: false, superBindResist: false },
+  { id: 'helper', name: 'Helper', attribute: 'fire', secondaryAttribute: 'wood', tertiaryAttribute: 'light', monsterTypes: [1], addedMonsterTypeMask: 0, attack: 980, recovery: 130, bindTurns: 0, bindResist: false, superBindResist: false, helper: true, leaderSkill: DEMO_COMBO_LEADER },
 ]);
 
 const ENEMY_TEMPLATE = Object.freeze([
@@ -221,6 +223,7 @@ function copyEnemies() {
     counter: enemy.maxCounter,
     baseMaxCounter: enemy.maxCounter,
     attributeResistPercentages: Array(5).fill(100),
+    typeDamagePercentages: Array(16).fill(100),
     resolveThresholdPercent: 0,
     turnChangeThresholdPercent: 0,
     turnChangeCounter: 0,
@@ -611,7 +614,13 @@ export class PuzzleEngine {
     this.manualTarget = true;
   }
 
-  chooseAttackTarget(attribute, attack, damageCap = PAD_INT32_MAX) {
+  chooseAttackTarget(
+    attribute,
+    attack,
+    damageCap = PAD_INT32_MAX,
+    monsterTypes = [],
+    addedMonsterTypeMask = 0,
+  ) {
     if (this.fixedTarget?.turnsRemaining > 0) {
       if (this.enemies[this.fixedTarget.enemyIndex]?.hp > 0) {
         this.targetEnemy = this.fixedTarget.enemyIndex;
@@ -641,6 +650,11 @@ export class PuzzleEngine {
           ? enemy.attributeResistPercentages?.[attributeIndex] ?? 100
           : 100,
         Number(enemy.damageShieldTurns || 0) > 0 ? enemy.damageShieldPercent : null,
+        padEnemyTypeResistRatio(
+          enemy.typeDamagePercentages,
+          monsterTypes,
+          addedMonsterTypeMask,
+        ),
       );
       return {
         index,
@@ -1080,7 +1094,13 @@ export class PuzzleEngine {
         const matchAttack = padNativeBaseAttackPower(lane.attack, matches, this.comboCount, extraComboBonus);
         const raw = padApplyAttackMultipliers(matchAttack, [leader, helper]);
         const isMassAttack = matches.some((match) => match.size >= 5);
-        const target = isMassAttack ? -1 : this.chooseAttackTarget(lane.attribute, raw, member.damageCap);
+        const target = isMassAttack ? -1 : this.chooseAttackTarget(
+          lane.attribute,
+          raw,
+          member.damageCap,
+          member.monsterTypes,
+          member.addedMonsterTypeMask,
+        );
         this.enemies.forEach((enemy, enemyIndex) => {
           if (enemy.hp <= 0 || (!isMassAttack && enemyIndex !== target)) return;
           const attributeIndex = PAD_ATTRIBUTE_INDEX[lane.attribute];
@@ -1103,6 +1123,11 @@ export class PuzzleEngine {
               ? enemy.attributeResistPercentages?.[attributeIndex] ?? 100
               : 100,
             Number(enemy.damageShieldTurns || 0) > 0 ? enemy.damageShieldPercent : null,
+            padEnemyTypeResistRatio(
+              enemy.typeDamagePercentages,
+              member.monsterTypes,
+              member.addedMonsterTypeMask,
+            ),
           );
           if (
             (Number(enemy.comboAbsorbTurns || 0) > 0
@@ -3249,6 +3274,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION,
         PAD_ENEMY_SKILL_DAMAGE_VOID,
         PAD_ENEMY_SKILL_ATTRIBUTE_RESIST,
+        PAD_ENEMY_SKILL_TYPE_RESIST,
         PAD_ENEMY_SKILL_RESOLVE,
         PAD_ENEMY_SKILL_DAMAGE_SHIELD,
         PAD_ENEMY_SKILL_LEADER_SWAP,
@@ -3304,6 +3330,7 @@ export class PuzzleEngine {
     const enemy = this.enemies?.[index];
     if (!enemy) return;
     enemy.attributeResistPercentages = Array(5).fill(100);
+    enemy.typeDamagePercentages = Array(16).fill(100);
     enemy.resolveThresholdPercent = 0;
     enemy.maxCounter = enemy.baseMaxCounter;
     enemy.turnChangeThresholdPercent = 0;
@@ -3317,6 +3344,13 @@ export class PuzzleEngine {
         for (let attributeIndex = 0; attributeIndex < 5; attributeIndex += 1) {
           if ((effect.attributeMask & (1 << attributeIndex)) !== 0) {
             enemy.attributeResistPercentages[attributeIndex] = effect.shieldPercent & 0xffff;
+          }
+        }
+      }
+      if (effect?.type === PAD_ENEMY_SKILL_TYPE_RESIST) {
+        for (let typeIndex = 0; typeIndex < 16; typeIndex += 1) {
+          if ((effect.monsterTypeMask & (1 << typeIndex)) !== 0) {
+            enemy.typeDamagePercentages[typeIndex] = effect.damagePercent & 0xffff;
           }
         }
       }
@@ -4042,13 +4076,15 @@ export class PuzzleEngine {
         attackBoostTurns: this.playerAttackBoostTurns,
       },
       player: { ...this.player },
-      party: this.party.map(({ id, name, attribute, secondaryAttribute, tertiaryAttribute, secondaryAttributeChanged = false, attack, recovery, damageCap, helper = false, leaderSkill = null, present = true, bindTurns = 0, bindResist = false, superBindResist = false }) => ({
+      party: this.party.map(({ id, name, attribute, secondaryAttribute, tertiaryAttribute, secondaryAttributeChanged = false, monsterTypes = [], addedMonsterTypeMask = 0, attack, recovery, damageCap, helper = false, leaderSkill = null, present = true, bindTurns = 0, bindResist = false, superBindResist = false }) => ({
         id,
         name,
         attribute,
         secondaryAttribute,
         tertiaryAttribute,
         secondaryAttributeChanged,
+        monsterTypes: [...monsterTypes],
+        addedMonsterTypeMask,
         attack,
         recovery,
         damageCap,
@@ -4061,7 +4097,7 @@ export class PuzzleEngine {
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,
-      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, baseMaxCounter = maxCounter, deathResolved = false, escaped = false, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0, damageAbsorbTurns = 0, damageAbsorbThreshold = 0, damageVoidTurns = 0, damageVoidThreshold = 0, damageShieldTurns = 0, damageShieldPercent = 0, attributeResistPercentages = [100, 100, 100, 100, 100], resolveThresholdPercent = 0, turnChangeThresholdPercent = 0, turnChangeCounter = 0, turnChangeActive = false }, index) => ({
+      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, baseMaxCounter = maxCounter, deathResolved = false, escaped = false, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0, damageAbsorbTurns = 0, damageAbsorbThreshold = 0, damageVoidTurns = 0, damageVoidThreshold = 0, damageShieldTurns = 0, damageShieldPercent = 0, attributeResistPercentages = [100, 100, 100, 100, 100], typeDamagePercentages = Array(16).fill(100), resolveThresholdPercent = 0, turnChangeThresholdPercent = 0, turnChangeCounter = 0, turnChangeActive = false }, index) => ({
         id,
         name,
         attribute,
@@ -4093,6 +4129,7 @@ export class PuzzleEngine {
         damageShieldTurns,
         damageShieldPercent,
         attributeResistPercentages: [...attributeResistPercentages],
+        typeDamagePercentages: [...typeDamagePercentages],
         resolveThresholdPercent,
         turnChangeThresholdPercent,
         turnChangeCounter,

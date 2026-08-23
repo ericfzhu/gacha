@@ -39,6 +39,7 @@ import {
   PAD_ENEMY_SKILL_BRANCH_SKILL_USE,
   PAD_ENEMY_SKILL_BRANCH_DAMAGE,
   PAD_ENEMY_SKILL_BRANCH_ERASED_ATTRIBUTES,
+  PAD_ENEMY_SKILL_TYPE_RESIST,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -130,6 +131,7 @@ import {
   padDamageAfterDefense,
   padEnemyAttributeResistDamage,
   padEnemyDamageAfterShields,
+  padEnemyTypeResistRatio,
   padEnemyResolveThresholdHp,
   padEnhancementPowerMultiplier,
   padEnhancedOrbMultiplier,
@@ -3059,6 +3061,51 @@ assert.equal(directAttributeResistEngine.applyEnemySkillDefinition(
 ), false);
 assert.throws(
   () => new PuzzleEngine({ enemySkillQueues: [[enemyAiAttributeResistDefinition]] }),
+  /passive enemy skills must be installed through monster skill slots/,
+);
+const enemyAiTypeResistDefinition = enemyAiInactivityDefinition.slice();
+const enemyAiTypeResistView = new DataView(enemyAiTypeResistDefinition.buffer);
+enemyAiTypeResistView.setUint32(0x00, 9_118, true);
+enemyAiTypeResistView.setInt16(0x04, PAD_ENEMY_SKILL_TYPE_RESIST, true);
+enemyAiTypeResistView.setInt32(0x10, (1 << 6) | (1 << 7), true);
+enemyAiTypeResistView.setInt32(0x14, 25, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiTypeResistDefinition), {
+  type: 118,
+  kind: 'typeResist',
+  supported: true,
+  passive: true,
+  monsterTypeMask: 0x00c0,
+  damagePercent: 25,
+  attackWithSkillValue: 0,
+});
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiTypeResistDefinition,
+  new Uint8Array(0x680),
+), {
+  type: 118,
+  kind: 'typeResist',
+  supported: true,
+  passive: true,
+  monsterTypeMask: 0x00c0,
+  damagePercent: 25,
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
+assert.equal(padEnemyTypeResistRatio(
+  [100, 100, 100, 100, 100, 100, 25, 40, ...Array(8).fill(100)],
+  [6, 7],
+), Math.fround(Math.fround(0.25) * Math.fround(0.4)));
+assert.equal(padEnemyTypeResistRatio(
+  [100, 100, 100, 100, 100, 100, 25, 40, ...Array(8).fill(100)],
+  [6],
+  1 << 7,
+), Math.fround(Math.fround(0.25) * Math.fround(0.4)));
+assert.equal(padEnemyDamageAfterShields(3_949, 50, 50, Math.fround(0.25)), 247);
+assert.equal(new PuzzleEngine({ seed: 21_900 }).applyEnemySkillDefinition(
+  enemyAiTypeResistDefinition,
+), false);
+assert.throws(
+  () => new PuzzleEngine({ enemySkillQueues: [[enemyAiTypeResistDefinition]] }),
   /passive enemy skills must be installed through monster skill slots/,
 );
 const enemyAiResolveDefinition = enemyAiInactivityDefinition.slice();
@@ -7268,6 +7315,44 @@ passiveAttributeResistEngine.setEnemyAiDefinitionPool(0, null, []);
 assert.deepEqual(
   passiveAttributeResistEngine.enemies[0].attributeResistPercentages,
   [100, 100, 100, 100, 100],
+);
+const typeResistMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(typeResistMonsterDefinition.buffer).setUint32(0xec, 9_118, true);
+const passiveTypeResistEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: typeResistMonsterDefinition,
+    skillDefinitions: [enemyAiTypeResistDefinition],
+  }],
+});
+assert.deepEqual(
+  passiveTypeResistEngine.enemies[0].typeDamagePercentages,
+  [...Array(6).fill(100), 25, 25, ...Array(8).fill(100)],
+);
+passiveTypeResistEngine.setRngState(21_900);
+assert.equal(passiveTypeResistEngine.takeEnemySkill(0), null);
+assert.equal(passiveTypeResistEngine.rng.state, 21_900);
+passiveTypeResistEngine.enemies[1].hp = 0;
+passiveTypeResistEngine.party.forEach((member, index) => {
+  member.bindTurns = index === 0 ? 0 : 1;
+});
+passiveTypeResistEngine.party[0].monsterTypes = [6, 7];
+passiveTypeResistEngine.comboCount = 1;
+passiveTypeResistEngine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+passiveTypeResistEngine.resolvePlayerTurn();
+assert.equal(passiveTypeResistEngine.lastDamage, 104);
+assert.equal(
+  passiveTypeResistEngine.enemies[0].hp,
+  passiveTypeResistEngine.enemies[0].maxHp - 104,
+);
+assert.deepEqual(
+  passiveTypeResistEngine.snapshot().enemies[0].typeDamagePercentages,
+  [...Array(6).fill(100), 25, 25, ...Array(8).fill(100)],
+);
+passiveTypeResistEngine.setEnemyAiDefinitionPool(0, null, []);
+assert.deepEqual(
+  passiveTypeResistEngine.enemies[0].typeDamagePercentages,
+  Array(16).fill(100),
 );
 const resolveMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(resolveMonsterDefinition.buffer).setUint32(0xec, 9_052, true);

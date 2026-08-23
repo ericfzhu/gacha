@@ -1638,6 +1638,25 @@ action/RNG cost during the following enemy selection. A Fire+Heart turn records
 erased mask `0b100001` but attack mask `0b000001`; only the former exact mask
 takes the fixture's branch.
 
+Enemy skill type `118` is a permanent monster-type damage modifier. Its normal
+dispatch, setup, and AI-condition entries are inert (`0x62be50`, `0x621c94`,
+and `0x61c01c`), so it is installed only by `_checkPassiveSkills`. That scan
+visits all 64 enemy skill slots. For every bit 0 through 15 set in definition
+`+0x10`, it writes low16(definition `+0x14`) into the corresponding halfword at
+`sMONSTER+0xb20..+0xb3e`; an untouched lane has the native sentinel `100`.
+
+`_chcekDamageRatio4DamageDisp` visits those 16 lanes in ascending order after
+the attribute-resistance ratio and before the active all-damage shield. A lane
+matches any of the attacking card definition's three signed type bytes at
+`+0x50`, `+0x51`, and `+0xb2`, or the card runtime's added-type mask at
+`sCARD+0x4ec`. Every match multiplies the accumulated ratio by binary32
+`percentage/100`; it does not stop after the first match. Thus a dual-type card
+can receive two separate modifiers, with a binary32 rounding step after each.
+The browser preserves the 16 raw percentage lanes, base and added card types,
+their ascending composition order, and the single final upward damage round.
+Its 25%+25% dual-type fixture reduces the recovered 1,660 post-defense lane to
+104 damage without consuming an enemy action or RNG.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

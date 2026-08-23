@@ -2,6 +2,20 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 monster-type resistance passive
+
+- Recovered type `118` as the permanent `ESTypeResist` passive. Its ordinary
+  dispatch/setup/condition paths are inert; `_checkPassiveSkills` maps
+  definition `+0x10` bits 0..15 to low16 `+0x14` percentages at
+  `sMONSTER+0xb20..+0xb3e`.
+- `_chcekDamageRatio4DamageDisp` multiplies every matching native card type or
+  runtime-added type by binary32 `percentage/100`, in ascending type order,
+  between attribute resistance and the timed all-damage shield.
+- The browser now carries card type metadata, all 16 enemy type lanes, exact
+  multi-type composition, target projection, snapshots, raw/runtime decoders,
+  passive-slot installation, and pure/browser fixtures. Next: type `119`
+  timed damage immunity, then type `120` remaining-enemy branch.
+
 ## 2026-08-24 previous-erased-attribute branch
 
 - Recovered type `117` as `ESBranchEraseAttr`; ordinary dispatch/setup/

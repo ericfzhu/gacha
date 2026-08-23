@@ -85,6 +85,7 @@ export const PAD_ENEMY_SKILL_BRANCH_ATTACK_ATTRIBUTES = 114;
 export const PAD_ENEMY_SKILL_BRANCH_SKILL_USE = 115;
 export const PAD_ENEMY_SKILL_BRANCH_DAMAGE = 116;
 export const PAD_ENEMY_SKILL_BRANCH_ERASED_ATTRIBUTES = 117;
+export const PAD_ENEMY_SKILL_TYPE_RESIST = 118;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -705,6 +706,18 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       passive: true,
       attributeMask: definition.getInt32(0x10, true) & 0x1f,
       shieldPercent: definition.getInt32(0x14, true) & 0xffff,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_TYPE_RESIST) {
+    requireLength(definitionBytes, 0x18, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'typeResist',
+      supported: true,
+      passive: true,
+      monsterTypeMask: definition.getInt32(0x10, true) & 0xffff,
+      damagePercent: definition.getInt32(0x14, true) & 0xffff,
       attackWithSkillValue,
     });
   }
@@ -1831,6 +1844,22 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_TYPE_RESIST) {
+    requireLength(definitionBytes, 0x18, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'typeResist',
+      supported: true,
+      passive: true,
+      monsterTypeMask: definition.getInt32(0x10, true) & 0xffff,
+      damagePercent: definition.getInt32(0x14, true) & 0xffff,
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_RESOLVE) {
     requireLength(definitionBytes, 0x14, 'PAD enemy-skill definition');
     return Object.freeze({
@@ -2847,6 +2876,20 @@ export function normalizePadEnemySkillRecord(record) {
       passive: true,
       attributeMask: Math.trunc(Number(record?.attributeMask) || 0) & 0x1f,
       shieldPercent: Math.trunc(Number(record?.shieldPercent) || 0) & 0xffff,
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_TYPE_RESIST || record?.kind === 'typeResist') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_TYPE_RESIST,
+      kind: 'typeResist',
+      supported: record?.supported !== false,
+      passive: true,
+      monsterTypeMask: Math.trunc(Number(record?.monsterTypeMask) || 0) & 0xffff,
+      damagePercent: Math.trunc(Number(record?.damagePercent) || 0) & 0xffff,
       setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null

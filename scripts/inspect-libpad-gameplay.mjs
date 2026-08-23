@@ -798,6 +798,26 @@ const ERASED_ATTRIBUTE_BRANCH_INSTRUCTION_ANCHORS = Object.freeze([
   [0x61a5c0, 0xb9000fff], // condition callback initializes return scale to zero
   [0x61c01c, 0xbd400fe0], // type 117 returns that zero ordinary-AI scale
 ]);
+const TYPE_RESIST_ENEMY_SKILL_TYPE = 118;
+const TYPE_RESIST_HANDLER = 0x62be50;
+const TYPE_RESIST_SETUP_HANDLER = 0x621c94;
+const TYPE_RESIST_CONDITION_HANDLER = 0x61c01c;
+const TYPE_RESIST_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x62d9c0, 0x912c8039], // initialize the type-percentage lane at sMONSTER+0xb20
+  [0x62dabc, 0xb94012e9], // load definition +0x10 type mask
+  [0x62dac0, 0x1ac8238a], // form the current one-hot type bit
+  [0x62dacc, 0xb94016e9], // load definition +0x14 damage percentage
+  [0x62dad0, 0x78287b29], // store low16 percentage in the matching type lane
+  [0x68431c, 0x912c8289], // address the 16 type lanes in the damage helper
+  [0x684334, 0x7868792b], // read a low16 type percentage
+  [0x684340, 0xf9420eac], // load the attacking card definition
+  [0x684344, 0x3981418d], // compare the card's first native type
+  [0x684350, 0x3981458d], // compare the card's second native type
+  [0x68435c, 0x3982c98c], // compare the card's third native type
+  [0x684368, 0x7949daac], // load the runtime added-type bitmask
+  [0x684384, 0x1e211800], // divide the matching percentage by binary32 100
+  [0x684388, 0x1e200908], // multiply it into the accumulated damage ratio
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -2219,6 +2239,31 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     : ERASED_ATTRIBUTE_BRANCH_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
+  const typeResistDispatchTarget = resolveEnemySkillTarget(
+    TYPE_RESIST_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const typeResistSetupTarget = resolveEnemySkillTarget(
+    TYPE_RESIST_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const typeResistConditionTarget = resolveEnemySkillTarget(
+    TYPE_RESIST_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const typeResistDispatchMatches = typeResistDispatchTarget === null
+    ? null : typeResistDispatchTarget === TYPE_RESIST_HANDLER;
+  const typeResistSetupMatches = typeResistSetupTarget === null
+    ? null : typeResistSetupTarget === TYPE_RESIST_SETUP_HANDLER;
+  const typeResistConditionMatches = typeResistConditionTarget === null
+    ? null : typeResistConditionTarget === TYPE_RESIST_CONDITION_HANDLER;
+  const typeResistInstructionAnchorsMatch = restoredElf === null ? null
+    : TYPE_RESIST_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -3311,6 +3356,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       erasedAttributeBranchConditionMatches21_9: erasedAttributeBranchConditionMatches,
       erasedAttributeBranchInstructionAnchorsMatch21_9:
         erasedAttributeBranchInstructionAnchorsMatch,
+      typeResistDispatchMatches21_9: typeResistDispatchMatches,
+      typeResistSetupMatches21_9: typeResistSetupMatches,
+      typeResistConditionMatches21_9: typeResistConditionMatches,
+      typeResistInstructionAnchorsMatch21_9: typeResistInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -4121,6 +4170,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
         erasedAttributeBranchInstructionAnchorsMatch,
       erasedAttributeBranchSemantics:
         'type 117 is an enemy-skill-list control record: ordinary dispatch/setup/condition are inert; signed definition +0x14 is compared for exact equality with the previous-turn erased-orb attribute mask and reference-slot enemy_rnd is the zero-based destination; the branch consumes no action or RNG',
+      typeResistType: TYPE_RESIST_ENEMY_SKILL_TYPE,
+      typeResistDispatchTarget: typeResistDispatchTarget === null
+        ? null : hex(typeResistDispatchTarget),
+      typeResistDispatchMatches21_9: typeResistDispatchMatches,
+      typeResistSetupTarget: typeResistSetupTarget === null
+        ? null : hex(typeResistSetupTarget),
+      typeResistSetupMatches21_9: typeResistSetupMatches,
+      typeResistConditionTarget: typeResistConditionTarget === null
+        ? null : hex(typeResistConditionTarget),
+      typeResistConditionMatches21_9: typeResistConditionMatches,
+      typeResistInstructionAnchorsMatch21_9: typeResistInstructionAnchorsMatch,
+      typeResistSemantics:
+        'type 118 is an initialization-time passive: ordinary dispatch/setup/condition are inert; checkPassiveSkills maps definition +0x10 bits 0..15 to low16(+0x14) at sMONSTER+0xb20..+0xb3e; the damage helper visits every non-sentinel lane in ascending order and multiplies binary32(percent/100) for each lane matching any of the card three native types or its runtime added-type mask',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,

@@ -1374,12 +1374,14 @@ export function padEnemyDamageAfterShields(
   damage,
   attributeShieldPercent = 100,
   damageShieldPercent = null,
+  typeResistRatio = 1,
 ) {
   const incoming = Math.max(0, Math.trunc(Number(damage) || 0));
   const nativePercent = Math.trunc(Number(attributeShieldPercent) || 0) & 0xffff;
   let ratio = nativePercent === 100
     ? Math.fround(1)
     : Math.fround(Math.fround(100 - nativePercent) / Math.fround(100));
+  ratio = Math.fround(ratio * Math.fround(Number(typeResistRatio) || 0));
   if (damageShieldPercent !== null && damageShieldPercent !== undefined) {
     const clampedShield = Math.min(100, Math.max(
       0,
@@ -1391,6 +1393,29 @@ export function padEnemyDamageAfterShields(
     ratio = Math.fround(ratio * shieldRatio);
   }
   return Math.max(0, Math.ceil(incoming * ratio));
+}
+
+// Type 118 fills sMONSTER+0xb20..+0xb3e with low-16-bit damage percentages.
+// The native display/damage helper visits all 16 lanes in ascending order and
+// multiplies every lane matching one of the card's three types or its added
+// type mask. Each operation is rounded to binary32 before the next lane.
+export function padEnemyTypeResistRatio(
+  damagePercentages,
+  monsterTypes = [],
+  addedMonsterTypeMask = 0,
+) {
+  const authoredTypes = new Set((Array.isArray(monsterTypes) ? monsterTypes : [])
+    .map((value) => Math.trunc(Number(value)))
+    .filter((value) => value >= 0 && value < 16));
+  const addedMask = Math.trunc(Number(addedMonsterTypeMask) || 0) & 0xffff;
+  let ratio = Math.fround(1);
+  for (let typeIndex = 0; typeIndex < 16; typeIndex += 1) {
+    const nativePercent = Math.trunc(Number(damagePercentages?.[typeIndex]) || 0) & 0xffff;
+    if (nativePercent === 100) continue;
+    if (!authoredTypes.has(typeIndex) && (addedMask & (1 << typeIndex)) === 0) continue;
+    ratio = Math.fround(ratio * Math.fround(nativePercent / 100));
+  }
+  return ratio;
 }
 
 // Type 73 stores its low-16-bit threshold at sMONSTER+0xafc. attack2Enemy
