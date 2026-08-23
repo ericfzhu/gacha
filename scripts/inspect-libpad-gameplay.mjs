@@ -193,6 +193,15 @@ const SKILL_DELAY_INSTRUCTION_ANCHORS = Object.freeze([
   [0x629234, 0x4b1b0001], // subtract delay from current skill charge
   [0x6292ac, 0x2a1f03e1], // floor charge at zero when delay is larger
 ]);
+const PRESENCE_CHECK_ENEMY_SKILL_TYPE = 90;
+const PRESENCE_CHECK_HANDLER = 0x62be50;
+const PRESENCE_CHECK_SETUP_HANDLER = 0x621c94;
+const PRESENCE_CHECK_CONDITION_HANDLER = 0x61c01c;
+const PRESENCE_CHECK_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x621c94, 0x12800008], // generic setup selects no special runtime handler
+  [0x62be50, 0x900045e9], // common no-special-effect execution tail
+  [0x61c01c, 0xbd400fe0], // return the incoming float32 condition scale
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -1009,6 +1018,25 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : skillDelayConditionTarget === SKILL_DELAY_CONDITION_HANDLER;
   const skillDelayInstructionAnchorsMatch = restoredElf === null ? null
     : SKILL_DELAY_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
+  const presenceCheckDispatchTarget = resolveEnemySkillTarget(
+    PRESENCE_CHECK_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const presenceCheckSetupTarget = resolveEnemySkillTarget(
+    PRESENCE_CHECK_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const presenceCheckConditionTarget = resolveEnemySkillTarget(
+    PRESENCE_CHECK_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const presenceCheckDispatchMatches = presenceCheckDispatchTarget === null
+    ? null : presenceCheckDispatchTarget === PRESENCE_CHECK_HANDLER;
+  const presenceCheckSetupMatches = presenceCheckSetupTarget === null
+    ? null : presenceCheckSetupTarget === PRESENCE_CHECK_SETUP_HANDLER;
+  const presenceCheckConditionMatches = presenceCheckConditionTarget === null
+    ? null : presenceCheckConditionTarget === PRESENCE_CHECK_CONDITION_HANDLER;
+  const presenceCheckInstructionAnchorsMatch = restoredElf === null ? null
+    : PRESENCE_CHECK_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
@@ -1991,6 +2019,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       skillDelaySetupMatches21_9: skillDelaySetupMatches,
       skillDelayConditionMatches21_9: skillDelayConditionMatches,
       skillDelayInstructionAnchorsMatch21_9: skillDelayInstructionAnchorsMatch,
+      presenceCheckDispatchMatches21_9: presenceCheckDispatchMatches,
+      presenceCheckSetupMatches21_9: presenceCheckSetupMatches,
+      presenceCheckConditionMatches21_9: presenceCheckConditionMatches,
+      presenceCheckInstructionAnchorsMatch21_9: presenceCheckInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -2450,6 +2482,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       skillDelayInstructionAnchorsMatch21_9: skillDelayInstructionAnchorsMatch,
       skillDelaySemantics:
         'type 89: setup walks six present usable skill gauges, advances the shared LCG for each charged gauge, rolls inclusive +0x10..+0x14, subtracts applicable skill-delay-resist latent protection (disabled by the ordinary awakening-bind path), caps to current charge, and stores six int32 delays at runtime +0x678 plus target mask +0x674; execution subtracts each stored delay and floors charge at zero; condition is unconditional',
+      presenceCheckType: PRESENCE_CHECK_ENEMY_SKILL_TYPE,
+      presenceCheckDispatchTarget: presenceCheckDispatchTarget === null
+        ? null : hex(presenceCheckDispatchTarget),
+      presenceCheckDispatchMatches21_9: presenceCheckDispatchMatches,
+      presenceCheckSetupTarget: presenceCheckSetupTarget === null
+        ? null : hex(presenceCheckSetupTarget),
+      presenceCheckSetupMatches21_9: presenceCheckSetupMatches,
+      presenceCheckConditionTarget: presenceCheckConditionTarget === null
+        ? null : hex(presenceCheckConditionTarget),
+      presenceCheckConditionMatches21_9: presenceCheckConditionMatches,
+      presenceCheckInstructionAnchorsMatch21_9: presenceCheckInstructionAnchorsMatch,
+      presenceCheckSemantics:
+        'type 90 carries a zero-terminated list of up to eight card IDs, but the 21.9 new-AI tables route it to generic sentinel setup, the common no-special-effect dispatch tail, and the shared epilogue that returns the incoming float32 scale unchanged; it therefore consumes ordinary selection probability and performs no special gameplay action in this path',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -2936,6 +2981,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || skillDelaySetupMatches === false
     || skillDelayConditionMatches === false
     || skillDelayInstructionAnchorsMatch === false
+    || presenceCheckDispatchMatches === false
+    || presenceCheckSetupMatches === false
+    || presenceCheckConditionMatches === false
+    || presenceCheckInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

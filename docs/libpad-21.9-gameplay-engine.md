@@ -1096,6 +1096,27 @@ An all-zero gauge remains an admitted no-op, matching the unconditional native
 condition, while differential tests cover capping and awakening-bind removal of
 skill-delay-resist latent protection.
 
+Enemy skill type `90` stores a zero-terminated list of as many as eight positive
+card IDs at definition `+0x10..+0x2c`. Public data tooling describes the record
+as a random party-presence check. The exact 21.9 new-AI execution tables expose
+a narrower behavior: dispatch `0x62be50` is the common no-special-effect tail,
+setup `0x621c94` installs the ordinary `-1` sentinel without materializing the
+ID list, and condition target `0x61c01c` reloads and returns the incoming
+float32 condition scale unchanged.
+
+The browser therefore preserves the authored candidate IDs but does not invent
+a presence gate in the recovered new-AI path. Selection consumes the same
+ordinary probability draw as another unconditional record, performs no
+type-owned RNG or runtime mutation, and ends the special action without player
+damage when definition `+0x44` is zero. This does not claim that the list lacks
+meaning in every historical/legacy controller; it records the behavior reached
+by the 21.9 new-AI path implemented here.
+
+The focused fixture carries IDs 1234, 5678, and 9012 followed by zero. Seed
+21900 selects it with one LCG draw, preserves all three IDs in snapshots, leaves
+the player at 12,000 HP, and renders the action without changing the board or
+active skill.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

@@ -2,6 +2,24 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 type-90 presence-list marker
+
+- Recovered type `90` at dispatch/setup/condition `0x62be50`, `0x621c94`, and
+  `0x61c01c`. Its definition carries as many as eight positive card IDs at
+  `+0x10..+0x2c`, terminated by the first non-positive value.
+- The public parser labels this record as a party-presence check, but the exact
+  21.9 new-AI tables do not inspect that list: they select generic sentinel
+  setup, the common no-special-effect execution tail, and an epilogue that
+  returns the incoming float32 probability scale unchanged. This is distinct
+  from any legacy/control-flow interpretation of the authored IDs.
+- Ported lossless list decoding/runtime preservation, normalization,
+  unconditional new-AI admission, action accounting, and browser presentation
+  as a no-special-effect action. Seed 21900 consumes only the ordinary selection
+  draw, preserves 12,000 player HP, and performs no RNG-owned setup.
+- Pure rules, exact tables plus three instruction anchors, and focused Chromium
+  rendering pass without page errors. Next: continue at the first live type
+  after the absent type `91`, enemy skill type `92`.
+
 ## 2026-08-24 enemy active-skill delay
 
 - Recovered type `89` at dispatch/setup/condition `0x629208`, `0x62117c`, and

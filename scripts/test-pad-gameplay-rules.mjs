@@ -12,6 +12,7 @@ import {
   PAD_ENEMY_SKILL_DAMAGE_ABSORB,
   PAD_ENEMY_SKILL_AWAKENING_BIND,
   PAD_ENEMY_SKILL_SKILL_DELAY,
+  PAD_ENEMY_SKILL_PRESENCE_CHECK,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -961,6 +962,30 @@ assert.deepEqual(decodePadEnemySkillDefinition(enemyAiUnconditionalHealDefinitio
   supported: true,
   percentMin: 20,
   percentMax: 30,
+  attackWithSkillValue: 0,
+});
+const enemyAiPresenceCheckDefinition = enemyAiUnconditionalHealDefinition.slice();
+const enemyAiPresenceCheckView = new DataView(enemyAiPresenceCheckDefinition.buffer);
+enemyAiPresenceCheckView.setUint32(0x00, 9_071, true);
+enemyAiPresenceCheckView.setInt16(0x04, PAD_ENEMY_SKILL_PRESENCE_CHECK, true);
+[1_234, 5_678, 9_012, 0, 99, 0, 0, 0].forEach((cardId, index) => {
+  enemyAiPresenceCheckView.setInt32(0x10 + index * 4, cardId, true);
+});
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiPresenceCheckDefinition), {
+  type: 90,
+  kind: 'presenceCheck',
+  supported: true,
+  candidateCardIds: [1_234, 5_678, 9_012],
+  attackWithSkillValue: 0,
+});
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiPresenceCheckDefinition,
+  new Uint8Array(0x680),
+), {
+  type: 90,
+  kind: 'presenceCheck',
+  supported: true,
+  candidateCardIds: [1_234, 5_678, 9_012],
   attackWithSkillValue: 0,
 });
 assert.deepEqual(decodePadEnemySkillRuntime(
@@ -4269,6 +4294,33 @@ assert.equal(selectedSkillDelayState.player.hp, 12_000);
 assert.equal(
   selectedSkillDelayState.rngState,
   padLcgStep(padLcgStep(21_900).state).state,
+);
+
+const presenceCheckMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(presenceCheckMonsterDefinition.buffer).setUint32(0xec, 9_071, true);
+const selectedPresenceCheckEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: presenceCheckMonsterDefinition,
+    skillDefinitions: [enemyAiPresenceCheckDefinition],
+  }],
+});
+selectedPresenceCheckEngine.enemies[0].counter = 1;
+selectedPresenceCheckEngine.enemies[1].counter = 99;
+selectedPresenceCheckEngine.setRngState(21_900);
+selectedPresenceCheckEngine.resolveEnemyTurn();
+const selectedPresenceCheckState = selectedPresenceCheckEngine.snapshot();
+assert.equal(selectedPresenceCheckState.lastEnemyActions[0].skill.type, 90);
+assert.deepEqual(
+  selectedPresenceCheckState.lastEnemyActions[0].skill.candidateCardIds,
+  [1_234, 5_678, 9_012],
+);
+assert.equal(selectedPresenceCheckState.lastEnemyActions[0].damage, undefined);
+assert.equal(selectedPresenceCheckState.player.hp, 12_000);
+assert.equal(selectedPresenceCheckState.rngState, padLcgStep(21_900).state);
+assert.equal(
+  selectedPresenceCheckState.message,
+  'Verdant Shell checks the party and takes no action.',
 );
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });

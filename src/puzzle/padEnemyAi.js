@@ -11,6 +11,7 @@ import {
   PAD_ENEMY_SKILL_DAMAGE_ABSORB,
   PAD_ENEMY_SKILL_AWAKENING_BIND,
   PAD_ENEMY_SKILL_SKILL_DELAY,
+  PAD_ENEMY_SKILL_PRESENCE_CHECK,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -167,6 +168,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_DAMAGE_ABSORB,
     PAD_ENEMY_SKILL_AWAKENING_BIND,
     PAD_ENEMY_SKILL_SKILL_DELAY,
+    PAD_ENEMY_SKILL_PRESENCE_CHECK,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
     PAD_ENEMY_SKILL_DEFENSE_BOOST,
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -325,6 +327,11 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
   if (definition.effect.type === PAD_ENEMY_SKILL_SKILL_DELAY) {
     // Type 89 maps to the unconditional 0x61a630 callback. Setup can
     // materialize an all-zero target mask when no active skill has charge.
+    return { eligible: true, probabilityScale: 1, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_PRESENCE_CHECK) {
+    // In 21.9's new-AI tables type 90 points directly at the common epilogue,
+    // which returns the incoming float32 scale without inspecting the list.
     return { eligible: true, probabilityScale: 1, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_ADDITIONAL_ATTACK) {

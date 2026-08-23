@@ -58,6 +58,7 @@ export const PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL = 86;
 export const PAD_ENEMY_SKILL_DAMAGE_ABSORB = 87;
 export const PAD_ENEMY_SKILL_AWAKENING_BIND = 88;
 export const PAD_ENEMY_SKILL_SKILL_DELAY = 89;
+export const PAD_ENEMY_SKILL_PRESENCE_CHECK = 90;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -227,6 +228,22 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       supported: delayMax >= delayMin,
       delayMin,
       delayMax,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_PRESENCE_CHECK) {
+    requireLength(definitionBytes, 0x30, 'PAD enemy-skill definition');
+    const candidateCardIds = [];
+    for (let offset = 0x10; offset <= 0x2c; offset += 4) {
+      const cardId = definition.getInt32(offset, true);
+      if (cardId <= 0) break;
+      candidateCardIds.push(cardId);
+    }
+    return Object.freeze({
+      type,
+      kind: 'presenceCheck',
+      supported: true,
+      candidateCardIds: Object.freeze(candidateCardIds),
       attackWithSkillValue,
     });
   }
@@ -1085,6 +1102,10 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_PRESENCE_CHECK) {
+    requireLength(definitionBytes, 0x30, 'PAD enemy-skill definition');
+    return decodePadEnemySkillDefinition(definitionBytes);
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -1710,6 +1731,19 @@ export function normalizePadEnemySkillRecord(record) {
         }
         : { delayMin, delayMax }),
       setupMaterialized: Boolean(record?.setupMaterialized || delaysPresent),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_PRESENCE_CHECK || record?.kind === 'presenceCheck') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_PRESENCE_CHECK,
+      kind: 'presenceCheck',
+      supported: record?.supported !== false,
+      candidateCardIds: Object.freeze((Array.isArray(record?.candidateCardIds)
+        ? record.candidateCardIds
+        : []).slice(0, 8).map((cardId) => Math.trunc(Number(cardId) || 0))),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),
