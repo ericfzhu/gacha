@@ -2,6 +2,17 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 player-damage presentation
+
+- Corrected enemy attacks' floating-text target: damage to the player is now
+  tagged `playerDamage`, retains `sourceEnemy`, and renders at the HP bar rather
+  than over the attacking enemy. This covers ordinary attacks and authored
+  enemy skills with generic or specialized damage composition.
+- Added pure metadata and focused browser assertions; the type-65 screenshot
+  now shows `-925` beside the reduced HP bar instead of over Verdant Shell.
+- Production build plus generic and full browser regressions pass.
+- Next: continue native action recovery after this focused UI checkpoint.
+
 ## 2026-08-23 random-sub bind enemy skill
 
 - Recovered type `65`: shared late bind dispatch `0x628fe0`, setup `0x621108`,

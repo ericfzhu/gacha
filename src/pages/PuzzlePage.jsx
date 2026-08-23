@@ -520,13 +520,14 @@ function render(ctx, engine) {
 
   engine.floatingText.forEach((item, index) => {
     const t = item.age / 1.15;
-    const isPlayerHp = item.kind === 'heal' || item.kind === 'poison' || item.kind === 'bomb' || item.kind === 'thorn';
+    const isPlayerHp = item.kind === 'playerDamage' || item.kind === 'heal'
+      || item.kind === 'poison' || item.kind === 'bomb' || item.kind === 'thorn';
     const x = isPlayerHp ? 225 : item.enemy === 0 ? 132 : 318;
-    const y = isPlayerHp ? 322 - t * 30 : 122 - t * 44 - index * 2;
+    const y = isPlayerHp ? 366 - t * 30 : 122 - t * 44 - index * 2;
     ctx.globalAlpha = Math.max(0, 1 - t);
     ctx.textAlign = 'center';
     ctx.font = '900 22px "Barlow Condensed", sans-serif';
-    ctx.fillStyle = item.kind === 'heal' || item.kind === 'revive' ? '#83ef9d' : item.kind === 'poison' ? '#d995ef' : item.kind === 'bomb' ? '#ffb45f' : item.kind === 'thorn' || item.kind === 'nail' ? '#e4edf3' : item.kind === 'enemy' ? '#ff8b7f' : ORB_BY_ID[item.attribute]?.highlight || '#fff';
+    ctx.fillStyle = item.kind === 'heal' || item.kind === 'revive' ? '#83ef9d' : item.kind === 'poison' ? '#d995ef' : item.kind === 'bomb' ? '#ffb45f' : item.kind === 'thorn' || item.kind === 'nail' ? '#e4edf3' : item.kind === 'playerDamage' ? '#ff8b7f' : ORB_BY_ID[item.attribute]?.highlight || '#fff';
     ctx.fillText(`${item.kind === 'heal' || item.kind === 'absorb' || item.kind === 'revive' ? '+' : '-'}${item.value.toLocaleString()}`, x, y);
     ctx.globalAlpha = 1;
   });

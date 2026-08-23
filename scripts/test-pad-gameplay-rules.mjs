@@ -3926,6 +3926,13 @@ const selectedRandomSubBindState = selectedRandomSubBindEngine.snapshot();
 assert.equal(selectedRandomSubBindState.lastEnemyActions[0].skill.type, 65);
 assert.equal(selectedRandomSubBindState.lastEnemyActions[0].damage, 925);
 assert.equal(selectedRandomSubBindState.player.hp, 11_075);
+assert.deepEqual(selectedRandomSubBindEngine.floatingText, [{
+  kind: 'playerDamage',
+  value: 925,
+  enemy: -1,
+  sourceEnemy: 0,
+  age: 0,
+}]);
 assert.equal(selectedRandomSubBindState.lastEnemySkill.targetMask, 0x12);
 assert.equal(selectedRandomSubBindState.lastEnemySkill.setupDurationTurns, 2);
 assert.equal(selectedRandomSubBindState.lastEnemySkill.durationTurns, 3);

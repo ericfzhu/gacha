@@ -2394,7 +2394,10 @@ try {
     engine.enemies[0].counter = 1;
     engine.enemies[1].counter = 99;
     engine.resolveEnemyTurn();
-    return engine.snapshot();
+    return {
+      ...engine.snapshot(),
+      floatingText: engine.floatingText.map((item) => ({ ...item })),
+    };
   }) : null;
   if (bindAttackRenderState && (
     bindAttackRenderState.lastEnemyActions?.[0]?.skill?.type !== 63
@@ -2406,6 +2409,9 @@ try {
     || bindAttackRenderState.party?.[4]?.bindTurns !== 2
     || bindAttackRenderState.player?.hp !== 11_075
     || bindAttackRenderState.rngState !== 919_597_584
+    || bindAttackRenderState.floatingText?.[0]?.kind !== 'playerDamage'
+    || bindAttackRenderState.floatingText?.[0]?.enemy !== -1
+    || bindAttackRenderState.floatingText?.[0]?.sourceEnemy !== 0
   )) throw new Error(`Bind-attack render-state mismatch: ${JSON.stringify(bindAttackRenderState)}`);
   if (bindAttackRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   const randomSubBindRenderState = renderRandomSubBindState ? await page.evaluate(() => {
@@ -2437,7 +2443,10 @@ try {
     engine.enemies[0].counter = 1;
     engine.enemies[1].counter = 99;
     engine.resolveEnemyTurn();
-    return engine.snapshot();
+    return {
+      ...engine.snapshot(),
+      floatingText: engine.floatingText.map((item) => ({ ...item })),
+    };
   }) : null;
   if (randomSubBindRenderState && (
     randomSubBindRenderState.lastEnemyActions?.[0]?.skill?.type !== 65
@@ -2450,6 +2459,9 @@ try {
     || randomSubBindRenderState.party?.[4]?.bindTurns !== 3
     || randomSubBindRenderState.player?.hp !== 11_075
     || randomSubBindRenderState.rngState !== 1_848_838_291
+    || randomSubBindRenderState.floatingText?.[0]?.kind !== 'playerDamage'
+    || randomSubBindRenderState.floatingText?.[0]?.enemy !== -1
+    || randomSubBindRenderState.floatingText?.[0]?.sourceEnemy !== 0
   )) throw new Error(`Random-sub-bind render-state mismatch: ${JSON.stringify(randomSubBindRenderState)}`);
   if (randomSubBindRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   const repeatAttackRenderState = renderRepeatAttackState ? await page.evaluate(() => {

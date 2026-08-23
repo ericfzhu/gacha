@@ -999,7 +999,9 @@ export class PuzzleEngine {
             ...(damage > 0 ? { damage } : {}),
           });
           if (damage > 0) {
-            this.floatingText.push({ kind: 'enemy', value: damage, enemy: index, age: 0 });
+            this.floatingText.push({
+              kind: 'playerDamage', value: damage, enemy: -1, sourceEnemy: index, age: 0,
+            });
           }
           // monsterEndOfAttack clears sMONSTER+0x07 after the monster acts.
           enemy.transientDebuffActive = false;
@@ -1012,7 +1014,9 @@ export class PuzzleEngine {
         );
         total += damage;
         this.lastEnemyActions.push({ enemy: index, kind: 'attack', damage });
-        this.floatingText.push({ kind: 'enemy', value: damage, enemy: index, age: 0 });
+        this.floatingText.push({
+          kind: 'playerDamage', value: damage, enemy: -1, sourceEnemy: index, age: 0,
+        });
         enemy.transientDebuffActive = false;
       }
     });
