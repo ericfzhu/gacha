@@ -2,6 +2,19 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 type-103 fixed bomb spawn
+
+- Recovered type `103` at dispatch/setup/condition `0x62a114`, `0x6217c0`, and
+  `0x61a630`; the independent parser corroborates `ESBombFixedSpawn`.
+- Execution reverses the five bottom-origin six-bit maps at `+0x14..+0x24`
+  into top-origin halfwords and enters the shared fixed-position bomb helper.
+  Generic setup and execution consume no RNG; condition is unconditional.
+- Ported decoding/runtime normalization, AI admission, fixed bitmap placement,
+  existing-lock rejection, special-state clearing, and optional `0x800` bomb
+  locks. Pure fixtures, seventeen exact ARM64 anchors, focused Chromium,
+  screenshot inspection, generic browser client, full native inspector, PAD
+  data checks, and production build pass. Next: type `104`.
+
 ## 2026-08-24 type-102 random bomb spawn
 
 - Recovered type `102` at dispatch/setup/condition `0x62a0f0`, `0x61ffa8`, and

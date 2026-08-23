@@ -70,6 +70,7 @@ export const PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS = 99;
 export const PAD_ENEMY_SKILL_ORB_SEAL_ROWS = 100;
 export const PAD_ENEMY_SKILL_FIXED_START = 101;
 export const PAD_ENEMY_SKILL_RANDOM_BOMBS = 102;
+export const PAD_ENEMY_SKILL_FIXED_BOMBS = 103;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -379,6 +380,25 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       kind: 'randomBombs',
       supported: true,
       bombCount: definition.getInt32(0x14, true),
+      lockedBombs: definition.getInt32(0x2c, true) !== 0,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_FIXED_BOMBS) {
+    requireLength(definitionBytes, 0x30, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'fixedBombs',
+      supported: true,
+      // The handler reverses the five bottom-origin authored halfwords before
+      // passing them to doMakeBomb's row-major fixed-position path.
+      rowMasks: Object.freeze([
+        definition.getUint32(0x24, true) & 0x3f,
+        definition.getUint32(0x20, true) & 0x3f,
+        definition.getUint32(0x1c, true) & 0x3f,
+        definition.getUint32(0x18, true) & 0x3f,
+        definition.getUint32(0x14, true) & 0x3f,
+      ]),
       lockedBombs: definition.getInt32(0x2c, true) !== 0,
       attackWithSkillValue,
     });
@@ -1366,6 +1386,11 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_FIXED_BOMBS) {
+    // Type 103's generic setup owns no private runtime fields. Its execution
+    // handler reads and reverses the five authored bitmaps directly.
+    return decodePadEnemySkillDefinition(definitionBytes);
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -2182,6 +2207,21 @@ export function normalizePadEnemySkillRecord(record) {
         ? {}
         : { selectionSeed: Math.trunc(Number(record.selectionSeed) || 0) & 0xffff }),
       setupMaterialized: Boolean(record?.setupMaterialized || record?.selectionSeed != null),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_FIXED_BOMBS || record?.kind === 'fixedBombs') {
+    const rowMasks = Array.isArray(record?.rowMasks) ? record.rowMasks : [];
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_FIXED_BOMBS,
+      kind: 'fixedBombs',
+      supported: record?.supported !== false && rowMasks.length === 5,
+      rowMasks: Object.freeze(Array.from({ length: 5 }, (_, index) => (
+        Math.trunc(Number(rowMasks[index]) || 0) & 0x3f
+      ))),
+      lockedBombs: Boolean(record?.lockedBombs),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

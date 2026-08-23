@@ -401,6 +401,29 @@ const RANDOM_BOMBS_INSTRUCTION_ANCHORS = Object.freeze([
   [0x62a108, 0xaa1f03e5], // select random placement rather than a fixed position list
   [0x62a10c, 0x97f3ddd5], // call the native bomb-materialization helper
 ]);
+const FIXED_BOMBS_ENEMY_SKILL_TYPE = 103;
+const FIXED_BOMBS_HANDLER = 0x62a114;
+const FIXED_BOMBS_SETUP_HANDLER = 0x6217c0;
+const FIXED_BOMBS_CONDITION_HANDLER = 0x61a630;
+const FIXED_BOMBS_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x62a114, 0xb94016a8], // load the bottom authored row bitmap from +0x14
+  [0x62a124, 0x790073e8], // retain it as the fifth fixed-position halfword
+  [0x62a128, 0x3cc182a0], // load the remaining four authored row bitmaps
+  [0x62a138, 0x4ea00800], // begin reversing their 32-bit row order
+  [0x62a13c, 0x6e004000], // rotate the reversed vector into top-origin order
+  [0x62a140, 0x0e612800], // narrow the four row masks to native halfwords
+  [0x62a14c, 0xfd001be0], // store the reversed top four row masks
+  [0x62a154, 0xb9402ea8], // load distant +0x2c locked-bomb flag
+  [0x62a15c, 0x9100c3e5], // pass the fixed-position bitmap list
+  [0x62a168, 0x1a9f07e2], // normalize the authored lock flag to boolean
+  [0x62a16c, 0x2a1f03e4], // select fixed placement instead of random count
+  [0x62a170, 0x97f3ddbc], // call the shared native bomb helper
+  [0x6280d0, 0x78787ac8], // load the current fixed row's six-bit bitmap
+  [0x6280d4, 0x1adb2349], // form the current column bit
+  [0x6280d8, 0x6a08013f], // skip cells absent from the bitmap
+  [0x6280e8, 0xf87b7917], // resolve the selected board cell
+  [0x628114, 0x36000233], // successful conversion optionally enters lock handling
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -1459,6 +1482,25 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     : RANDOM_BOMBS_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
+  const fixedBombsDispatchTarget = resolveEnemySkillTarget(
+    FIXED_BOMBS_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const fixedBombsSetupTarget = resolveEnemySkillTarget(
+    FIXED_BOMBS_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const fixedBombsConditionTarget = resolveEnemySkillTarget(
+    FIXED_BOMBS_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const fixedBombsDispatchMatches = fixedBombsDispatchTarget === null
+    ? null : fixedBombsDispatchTarget === FIXED_BOMBS_HANDLER;
+  const fixedBombsSetupMatches = fixedBombsSetupTarget === null
+    ? null : fixedBombsSetupTarget === FIXED_BOMBS_SETUP_HANDLER;
+  const fixedBombsConditionMatches = fixedBombsConditionTarget === null
+    ? null : fixedBombsConditionTarget === FIXED_BOMBS_CONDITION_HANDLER;
+  const fixedBombsInstructionAnchorsMatch = restoredElf === null ? null
+    : FIXED_BOMBS_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -2489,6 +2531,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       randomBombsSetupMatches21_9: randomBombsSetupMatches,
       randomBombsConditionMatches21_9: randomBombsConditionMatches,
       randomBombsInstructionAnchorsMatch21_9: randomBombsInstructionAnchorsMatch,
+      fixedBombsDispatchMatches21_9: fixedBombsDispatchMatches,
+      fixedBombsSetupMatches21_9: fixedBombsSetupMatches,
+      fixedBombsConditionMatches21_9: fixedBombsConditionMatches,
+      fixedBombsInstructionAnchorsMatch21_9: fixedBombsInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -3105,6 +3151,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       randomBombsInstructionAnchorsMatch21_9: randomBombsInstructionAnchorsMatch,
       randomBombsSemantics:
         'type 102 spends one shared-LCG draw and stores its high 16 bits at runtime +0x678 as a private row-major board-shuffle seed; execution asks the native bomb helper for authored +0x14 candidates, leaves already locked cells unchanged, converts successful cells to bomb type 9, and applies lock flag 0x800 when distant authored +0x2c is nonzero; its AI condition is unconditional',
+      fixedBombsType: FIXED_BOMBS_ENEMY_SKILL_TYPE,
+      fixedBombsDispatchTarget: fixedBombsDispatchTarget === null
+        ? null : hex(fixedBombsDispatchTarget),
+      fixedBombsDispatchMatches21_9: fixedBombsDispatchMatches,
+      fixedBombsSetupTarget: fixedBombsSetupTarget === null
+        ? null : hex(fixedBombsSetupTarget),
+      fixedBombsSetupMatches21_9: fixedBombsSetupMatches,
+      fixedBombsConditionTarget: fixedBombsConditionTarget === null
+        ? null : hex(fixedBombsConditionTarget),
+      fixedBombsConditionMatches21_9: fixedBombsConditionMatches,
+      fixedBombsInstructionAnchorsMatch21_9: fixedBombsInstructionAnchorsMatch,
+      fixedBombsSemantics:
+        'type 103 consumes no RNG; execution reverses the five six-bit authored row maps at +0x14..+0x24 into top-origin order, passes them to the shared fixed-position bomb path, leaves already locked cells unchanged, converts successful cells to type 9, and applies lock flag 0x800 when +0x2c is nonzero; its AI condition is unconditional',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -3639,6 +3698,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || randomBombsSetupMatches === false
     || randomBombsConditionMatches === false
     || randomBombsInstructionAnchorsMatch === false
+    || fixedBombsDispatchMatches === false
+    || fixedBombsSetupMatches === false
+    || fixedBombsConditionMatches === false
+    || fixedBombsInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

@@ -1340,6 +1340,22 @@ creates three visibly locked bombs. After the ordinary AI-selection draw, the
 private seed is 58043, the four cells are `(2,2)`, `(1,5)`, `(2,3)`, and
 `(3,3)`, and shared state ends at 3803934822.
 
+Enemy skill type `103` is the fixed-position bomb partner. Its dispatch,
+generic setup, and unconditional condition targets are `0x62a114`, `0x6217c0`,
+and `0x61a630`; the independent parser identifies `ESBombFixedSpawn`.
+Definition `+0x14..+0x24` contains five six-bit row maps in bottom-origin order,
+and `+0x2c` is the same locked-bomb switch as type 102. The handler uses NEON
+row reversal and narrowing to build a top-origin halfword list before entering
+the shared native bomb helper with fixed-placement mode. It consumes no RNG;
+the otherwise loaded runtime `+0x678` operand is unused by that fixed path.
+
+The browser applies the resulting top-origin masks row by row, preserving
+already locked cells and using the same type-9 conversion, incompatible-state
+clear, enhancement reset, and optional lock flag `0x800` as the random form. A
+fixture authored as `[1,2,4,8,48]` becomes top-origin `[48,8,4,2,1]`; with its
+center candidate pre-locked, the visible bombs appear at `(0,4)`, `(0,5)`,
+`(1,3)`, `(3,1)`, and `(4,0)` while shared state remains 21900.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

@@ -59,6 +59,7 @@ import {
   PAD_ENEMY_SKILL_ORB_SEAL_ROWS,
   PAD_ENEMY_SKILL_FIXED_START,
   PAD_ENEMY_SKILL_RANDOM_BOMBS,
+  PAD_ENEMY_SKILL_FIXED_BOMBS,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -2315,6 +2316,24 @@ export class PuzzleEngine {
       this.message = `${changedOrbCount} ${skill.lockedBombs ? 'locked ' : ''}bomb${changedOrbCount === 1 ? '' : 's'} appeared.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'fixedBombs') {
+      let changedOrbCount = 0;
+      this.board.forEach((row, rowIndex) => row.forEach((orb, columnIndex) => {
+        if (((skill.rowMasks?.[rowIndex] || 0) & (1 << columnIndex)) === 0) return;
+        if (orb.locked) return;
+        orb.type = 'bomb';
+        orb.blockFlags = (Number(orb.blockFlags) >>> 0) & ~PAD_BLOCK_SPECIAL_LOCK_CLEAR_FLAGS;
+        orb.enhancementPower = 0;
+        orb.enhanced = false;
+        orb.nail = false;
+        orb.locked = skill.lockedBombs;
+        if (skill.lockedBombs) orb.blockFlags |= PAD_BLOCK_LOCKED_FLAG;
+        changedOrbCount += 1;
+      }));
+      this.lastEnemySkill = Object.freeze({ ...skill, changedOrbCount });
+      this.message = `${changedOrbCount} ${skill.lockedBombs ? 'locked ' : ''}bomb${changedOrbCount === 1 ? '' : 's'} appeared.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'clearPlayerBuffs') {
       // _doItetukuHadou clears both recovered sGAMEWORK positive-status lanes,
       // then type 6 invokes _applyLeaderSkill(false). Leader effects in this
@@ -2852,6 +2871,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_ORB_SEAL_ROWS,
         PAD_ENEMY_SKILL_FIXED_START,
         PAD_ENEMY_SKILL_RANDOM_BOMBS,
+        PAD_ENEMY_SKILL_FIXED_BOMBS,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
