@@ -2,6 +2,25 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 type-95 enemy escape
+
+- Recovered type `95` at dispatch/setup/condition `0x629e74`, `0x620598`, and
+  `0x61c01c`. Setup installs the distinct 3.0/0.95 presentation constants;
+  execution zeroes both protected and display HP mirrors, initializes its own
+  timeline, and sets monster-state bit `0x10` at `+0x38`.
+- This is an escape/removal path, not type-40 self-destruction: it does not use
+  the ordinary half-second HP-gauge transition or the terminal death flags at
+  `+0x204`. Its condition returns the incoming probability scale unchanged and
+  the type owns no RNG.
+- Ported the escaped state through decoding, normalization, AI eligibility,
+  execution, snapshots, and rendering. Escaped enemies are removed at zero HP,
+  do not run death-trigger actions, and are excluded from ordinary revive
+  targets while the other enemies and player remain unchanged.
+- Pure rules, exact tables plus twelve instruction anchors, focused Chromium
+  rendering, screenshot inspection, and the generic web-game client pass with
+  no page errors. Seed 21900 consumes only the selection draw and ends at state
+  394448415. Next: recover type `96`.
+
 ## 2026-08-24 type-94 random orb locking
 
 - Recovered type `94` at dispatch/setup/condition `0x629e5c`, `0x6215e4`, and

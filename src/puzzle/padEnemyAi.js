@@ -15,6 +15,7 @@ import {
   PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE,
   PAD_ENEMY_SKILL_NATIVE_NO_EFFECT,
   PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS,
+  PAD_ENEMY_SKILL_ENEMY_ESCAPE,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -175,6 +176,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE,
     PAD_ENEMY_SKILL_NATIVE_NO_EFFECT,
     PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS,
+    PAD_ENEMY_SKILL_ENEMY_ESCAPE,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
     PAD_ENEMY_SKILL_DEFENSE_BOOST,
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -345,6 +347,10 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
     // through to the epilogue that returns the incoming float32 scale.
     return { eligible: true, probabilityScale: 1, rngState };
   }
+  if (definition.effect.type === PAD_ENEMY_SKILL_ENEMY_ESCAPE) {
+    // Type 95 points at the common epilogue and preserves its incoming scale.
+    return { eligible: true, probabilityScale: 1, rngState };
+  }
   if (definition.effect.type === PAD_ENEMY_SKILL_ADDITIONAL_ATTACK) {
     // 0x61b450 performs this division and izMathClipF entirely in binary32.
     const ratio = state.enemyBaseAttack > 0
@@ -505,7 +511,9 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_REVIVE_ENEMY) {
-    const eligible = state.enemies.some((enemy) => Number(enemy?.hp) <= 0);
+    const eligible = state.enemies.some((enemy) => (
+      Number(enemy?.hp) <= 0 && !enemy?.escaped
+    ));
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB) {

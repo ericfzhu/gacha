@@ -1177,6 +1177,27 @@ selection draw plus one setup draw, stores seed 58043, and newly locks the other
 three cells while preserving 12,000 player HP and shared state 3803934822. A
 board with no matching type rejects the record before the probability roll.
 
+Enemy skill type `95` removes the acting enemy through the native escape path.
+Its exact dispatch, setup, and condition entries resolve to `0x629e74`,
+`0x620598`, and `0x61c01c`. Setup writes the packed presentation constants 3.0
+and 0.95 to `sMONSTER+0x79c/+0x7a0`. Execution clears both protected current-HP
+halves at `+0x3c/+0x4c` and their display mirrors at `+0xd4/+0xe4`, initializes
+a distinct timeline, then sets bit `0x10` in monster-state byte `+0x38`.
+
+Those details distinguish escape from type `40` self-destruction. The latter
+uses the ordinary half-second HP-gauge transition and terminal presentation
+flags at `+0x204`; type 95 follows neither route. Condition target `0x61c01c`
+returns the incoming float32 probability scale unchanged, and setup/execution
+consume no type-owned random values.
+
+The browser represents this native removal state as `escaped: true` alongside
+zero HP and a resolved terminal state. That prevents the normal death-trigger
+sequence from firing and excludes the removed enemy from later ordinary revive
+selection, while keeping it distinct in snapshots and presentation. In the
+focused two-enemy fixture, seed 21900 spends only the standard selection draw,
+ends at state 394448415, removes Verdant Shell, leaves Umbra and the 12,000-HP
+player untouched, and renders the message `Verdant Shell escaped.`
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

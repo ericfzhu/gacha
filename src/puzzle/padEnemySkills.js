@@ -62,6 +62,7 @@ export const PAD_ENEMY_SKILL_PRESENCE_CHECK = 90;
 export const PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE = 92;
 export const PAD_ENEMY_SKILL_NATIVE_NO_EFFECT = 93;
 export const PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS = 94;
+export const PAD_ENEMY_SKILL_ENEMY_ESCAPE = 95;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -278,6 +279,14 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       supported: true,
       typeMask: definition.getUint32(0x10, true),
       lockCount: definition.getInt32(0x14, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_ENEMY_ESCAPE) {
+    return Object.freeze({
+      type,
+      kind: 'enemyEscape',
+      supported: true,
       attackWithSkillValue,
     });
   }
@@ -1176,6 +1185,9 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_ENEMY_ESCAPE) {
+    return decodePadEnemySkillDefinition(definitionBytes);
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -1858,6 +1870,16 @@ export function normalizePadEnemySkillRecord(record) {
       lockCount: Math.trunc(Number(record?.lockCount) || 0),
       ...(seedPresent ? { selectionSeed: Number(record.selectionSeed) & 0xffff } : {}),
       setupMaterialized: Boolean(record?.setupMaterialized || seedPresent),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_ENEMY_ESCAPE || record?.kind === 'enemyEscape') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_ENEMY_ESCAPE,
+      kind: 'enemyEscape',
+      supported: record?.supported !== false,
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

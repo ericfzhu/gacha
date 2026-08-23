@@ -51,6 +51,7 @@ import {
   PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE,
   PAD_ENEMY_SKILL_NATIVE_NO_EFFECT,
   PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS,
+  PAD_ENEMY_SKILL_ENEMY_ESCAPE,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -342,7 +343,11 @@ export class PuzzleEngine {
       maxHp: 12000,
       recovery: this.party.reduce((total, member) => total + member.recovery, 0),
     };
-    this.enemies = copyEnemies().map((enemy) => ({ ...enemy, deathResolved: false }));
+    this.enemies = copyEnemies().map((enemy) => ({
+      ...enemy,
+      deathResolved: false,
+      escaped: false,
+    }));
     this.enemyAiPools.forEach((_, enemyIndex) => this.applyEnemyPassiveSkills(enemyIndex));
     this.targetEnemy = 0;
     this.manualTarget = false;
@@ -1225,7 +1230,10 @@ export class PuzzleEngine {
         present: member.present !== false,
         bindTurns: Math.max(0, Math.trunc(Number(member.bindTurns) || 0)),
       })),
-      enemies: this.enemies.map((candidate) => ({ hp: candidate.hp })),
+      enemies: this.enemies.map((candidate) => ({
+        hp: candidate.hp,
+        escaped: Boolean(candidate.escaped),
+      })),
       aiBudget: pool?.aiBudget ?? 0,
       blackFallActive: Boolean(this.blackFallRule?.active),
       boardCellCount: this.rows * this.columns,
@@ -1536,7 +1544,7 @@ export class PuzzleEngine {
     if (skill.supported && skill.kind === 'reviveEnemy' && !skill.setupMaterialized) {
       const candidates = this.enemies
         .map((enemy, index) => ({ enemy, index }))
-        .filter(({ enemy }) => Number(enemy.hp) <= 0);
+        .filter(({ enemy }) => Number(enemy.hp) <= 0 && !enemy.escaped);
       if (candidates.length === 0) {
         return Object.freeze({
           ...record,
@@ -2269,6 +2277,15 @@ export class PuzzleEngine {
       this.message = `${lockedOrbCount} orb${lockedOrbCount === 1 ? '' : 's'} locked.`;
       return applied;
     }
+    if (skill.supported && skill.kind === 'enemyEscape') {
+      const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
+      if (!enemy || enemy.hp <= 0) return false;
+      enemy.hp = 0;
+      enemy.escaped = true;
+      enemy.deathResolved = true;
+      this.message = `${enemy.name} escaped.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'damageShield') {
       const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
       if (!enemy) return false;
@@ -2364,7 +2381,10 @@ export class PuzzleEngine {
       if (!target || target.hp > 0) return false;
       const revivedHp = padEnemySkillReviveHp(target.maxHp, skill.revivePercent);
       target.hp = revivedHp;
-      if (target.hp > 0) target.deathResolved = false;
+      if (target.hp > 0) {
+        target.deathResolved = false;
+        target.escaped = false;
+      }
       this.lastEnemySkill = Object.freeze({ ...skill, revivedHp: target.hp });
       if (target.hp > 0) {
         this.floatingText.push({
@@ -2605,6 +2625,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE,
         PAD_ENEMY_SKILL_NATIVE_NO_EFFECT,
         PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS,
+        PAD_ENEMY_SKILL_ENEMY_ESCAPE,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -3278,7 +3299,7 @@ export class PuzzleEngine {
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,
-      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, deathResolved = false, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0, damageAbsorbTurns = 0, damageAbsorbThreshold = 0, damageVoidTurns = 0, damageVoidThreshold = 0, damageShieldTurns = 0, damageShieldPercent = 0, attributeResistPercentages = [100, 100, 100, 100, 100], resolveThresholdPercent = 0 }, index) => ({
+      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, deathResolved = false, escaped = false, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0, damageAbsorbTurns = 0, damageAbsorbThreshold = 0, damageVoidTurns = 0, damageVoidThreshold = 0, damageShieldTurns = 0, damageShieldPercent = 0, attributeResistPercentages = [100, 100, 100, 100, 100], resolveThresholdPercent = 0 }, index) => ({
         id,
         name,
         attribute,
@@ -3287,6 +3308,7 @@ export class PuzzleEngine {
         counter,
         maxCounter,
         deathResolved,
+        escaped,
         scaledAttackGate,
         attackBoostTurns,
         attackBoostPercent,

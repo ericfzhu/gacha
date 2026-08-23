@@ -249,6 +249,24 @@ const LOCK_RANDOM_ORBS_INSTRUCTION_ANCHORS = Object.freeze([
   [0x629e64, 0xb9468663], // execution loads the stored private seed
   [0x629e6c, 0x97f3e5f1], // call _doLockDropBits(mask, count, seed)
 ]);
+const ENEMY_ESCAPE_ENEMY_SKILL_TYPE = 95;
+const ENEMY_ESCAPE_HANDLER = 0x629e74;
+const ENEMY_ESCAPE_SETUP_HANDLER = 0x620598;
+const ENEMY_ESCAPE_CONDITION_HANDLER = 0x61c01c;
+const ENEMY_ESCAPE_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x62059c, 0xfd42e100], // load packed 3.0/0.95 escape presentation constants
+  [0x6205a0, 0xfd0002c0], // store them at runtime +0x79c/+0x7a0
+  [0x629e74, 0x9100f275], // address protected current-HP low half at +0x3c
+  [0x629e80, 0x97f3b7dc], // set protected current-HP low half to zero
+  [0x629ea4, 0x91035277], // address displayed-HP low half at +0xd4
+  [0x629eb0, 0x97f3b7d0], // set displayed-HP low half to zero
+  [0x629ef0, 0x9e220100], // convert the resulting int64 zero for presentation
+  [0x629ef8, 0x97f3aeba], // initialize the escape timeline with that value
+  [0x629efc, 0x3940e268], // load monster state byte +0x38
+  [0x629f00, 0x321c0108], // set escape/removal bit 0x10
+  [0x629f04, 0x3900e268], // persist the escape/removal state byte
+  [0x61c01c, 0xbd400fe0], // return incoming float32 condition scale unchanged
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -1147,6 +1165,25 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : lockRandomOrbsConditionTarget === LOCK_RANDOM_ORBS_CONDITION_HANDLER;
   const lockRandomOrbsInstructionAnchorsMatch = restoredElf === null ? null
     : LOCK_RANDOM_ORBS_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
+  const enemyEscapeDispatchTarget = resolveEnemySkillTarget(
+    ENEMY_ESCAPE_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const enemyEscapeSetupTarget = resolveEnemySkillTarget(
+    ENEMY_ESCAPE_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const enemyEscapeConditionTarget = resolveEnemySkillTarget(
+    ENEMY_ESCAPE_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const enemyEscapeDispatchMatches = enemyEscapeDispatchTarget === null
+    ? null : enemyEscapeDispatchTarget === ENEMY_ESCAPE_HANDLER;
+  const enemyEscapeSetupMatches = enemyEscapeSetupTarget === null
+    ? null : enemyEscapeSetupTarget === ENEMY_ESCAPE_SETUP_HANDLER;
+  const enemyEscapeConditionMatches = enemyEscapeConditionTarget === null
+    ? null : enemyEscapeConditionTarget === ENEMY_ESCAPE_CONDITION_HANDLER;
+  const enemyEscapeInstructionAnchorsMatch = restoredElf === null ? null
+    : ENEMY_ESCAPE_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
@@ -2146,6 +2183,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       lockRandomOrbsSetupMatches21_9: lockRandomOrbsSetupMatches,
       lockRandomOrbsConditionMatches21_9: lockRandomOrbsConditionMatches,
       lockRandomOrbsInstructionAnchorsMatch21_9: lockRandomOrbsInstructionAnchorsMatch,
+      enemyEscapeDispatchMatches21_9: enemyEscapeDispatchMatches,
+      enemyEscapeSetupMatches21_9: enemyEscapeSetupMatches,
+      enemyEscapeConditionMatches21_9: enemyEscapeConditionMatches,
+      enemyEscapeInstructionAnchorsMatch21_9: enemyEscapeInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -2658,6 +2699,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       lockRandomOrbsInstructionAnchorsMatch21_9: lockRandomOrbsInstructionAnchorsMatch,
       lockRandomOrbsSemantics:
         'type 94 copies +0x10 type mask and +0x14 count to runtime +0x678/+0x67c, advances the shared LCG once, and stores its high 16 bits at +0x684; condition admits when any matching board cell is unlocked; execution calls _doLockDropBits with the private seed, caps to available candidates, and does not advance the shared AI RNG',
+      enemyEscapeType: ENEMY_ESCAPE_ENEMY_SKILL_TYPE,
+      enemyEscapeDispatchTarget: enemyEscapeDispatchTarget === null
+        ? null : hex(enemyEscapeDispatchTarget),
+      enemyEscapeDispatchMatches21_9: enemyEscapeDispatchMatches,
+      enemyEscapeSetupTarget: enemyEscapeSetupTarget === null
+        ? null : hex(enemyEscapeSetupTarget),
+      enemyEscapeSetupMatches21_9: enemyEscapeSetupMatches,
+      enemyEscapeConditionTarget: enemyEscapeConditionTarget === null
+        ? null : hex(enemyEscapeConditionTarget),
+      enemyEscapeConditionMatches21_9: enemyEscapeConditionMatches,
+      enemyEscapeInstructionAnchorsMatch21_9: enemyEscapeInstructionAnchorsMatch,
+      enemyEscapeSemantics:
+        'type 95 initializes 3.0/0.95 presentation lanes at runtime +0x79c/+0x7a0, zeroes protected current and displayed HP, initializes a distinct escape timeline, and sets sMONSTER+0x38 bit 0x10 rather than type 40 terminal-death flags; its condition preserves incoming scale and it owns no RNG',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -3160,6 +3214,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || lockRandomOrbsSetupMatches === false
     || lockRandomOrbsConditionMatches === false
     || lockRandomOrbsInstructionAnchorsMatch === false
+    || enemyEscapeDispatchMatches === false
+    || enemyEscapeSetupMatches === false
+    || enemyEscapeConditionMatches === false
+    || enemyEscapeInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

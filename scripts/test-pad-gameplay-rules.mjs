@@ -16,6 +16,7 @@ import {
   PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE,
   PAD_ENEMY_SKILL_NATIVE_NO_EFFECT,
   PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS,
+  PAD_ENEMY_SKILL_ENEMY_ESCAPE,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1082,6 +1083,25 @@ assert.deepEqual(decodePadEnemySkillRuntime(
   lockCount: 4,
   selectionSeed: 6_018,
   setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
+const enemyAiEnemyEscapeDefinition = enemyAiLockRandomOrbsDefinition.slice();
+const enemyAiEnemyEscapeView = new DataView(enemyAiEnemyEscapeDefinition.buffer);
+enemyAiEnemyEscapeView.setUint32(0x00, 9_075, true);
+enemyAiEnemyEscapeView.setInt16(0x04, PAD_ENEMY_SKILL_ENEMY_ESCAPE, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiEnemyEscapeDefinition), {
+  type: 95,
+  kind: 'enemyEscape',
+  supported: true,
+  attackWithSkillValue: 0,
+});
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiEnemyEscapeDefinition,
+  new Uint8Array(0x680),
+), {
+  type: 95,
+  kind: 'enemyEscape',
+  supported: true,
   attackWithSkillValue: 0,
 });
 assert.deepEqual(decodePadEnemySkillRuntime(
@@ -4568,6 +4588,39 @@ const rejectedLockRandomOrbsState = rejectedLockRandomOrbsEngine.snapshot();
 assert.equal(rejectedLockRandomOrbsState.lastEnemyActions[0].kind, 'attack');
 assert.equal(rejectedLockRandomOrbsState.rngState, 21_900);
 assert.equal(rejectedLockRandomOrbsState.player.hp, 10_150);
+
+const directEnemyEscapeEngine = new PuzzleEngine({ seed: 21_900 });
+directEnemyEscapeEngine.setRngState(21_900);
+assert.equal(directEnemyEscapeEngine.applyEnemySkillDefinition(
+  enemyAiEnemyEscapeDefinition,
+), true);
+assert.equal(directEnemyEscapeEngine.enemies[0].hp, 0);
+assert.equal(directEnemyEscapeEngine.enemies[0].escaped, true);
+assert.equal(directEnemyEscapeEngine.enemies[0].deathResolved, true);
+assert.equal(directEnemyEscapeEngine.rng.state, 21_900);
+
+const enemyEscapeMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(enemyEscapeMonsterDefinition.buffer).setUint32(0xec, 9_075, true);
+const selectedEnemyEscapeEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: enemyEscapeMonsterDefinition,
+    skillDefinitions: [enemyAiEnemyEscapeDefinition],
+  }],
+});
+selectedEnemyEscapeEngine.enemies[0].counter = 1;
+selectedEnemyEscapeEngine.enemies[1].counter = 99;
+selectedEnemyEscapeEngine.setRngState(21_900);
+selectedEnemyEscapeEngine.resolveEnemyTurn();
+const selectedEnemyEscapeState = selectedEnemyEscapeEngine.snapshot();
+assert.equal(selectedEnemyEscapeState.lastEnemyActions[0].skill.type, 95);
+assert.equal(selectedEnemyEscapeState.enemies[0].hp, 0);
+assert.equal(selectedEnemyEscapeState.enemies[0].escaped, true);
+assert.equal(selectedEnemyEscapeState.enemies[0].deathResolved, true);
+assert.equal(selectedEnemyEscapeState.enemies[1].hp, 76_000);
+assert.equal(selectedEnemyEscapeState.player.hp, 12_000);
+assert.equal(selectedEnemyEscapeState.rngState, padLcgStep(21_900).state);
+assert.equal(selectedEnemyEscapeState.message, 'Verdant Shell escaped.');
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;
