@@ -66,6 +66,7 @@ export const PAD_ENEMY_SKILL_ENEMY_ESCAPE = 95;
 export const PAD_ENEMY_SKILL_LOCKED_SKYFALL = 96;
 export const PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM = 97;
 export const PAD_ENEMY_SKILL_STICKY_BLIND_FIXED = 98;
+export const PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS = 99;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -333,6 +334,16 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
         { length: 5 },
         (_, row) => definition.getUint32(0x14 + row * 4, true) & 0x3f,
       )),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS) {
+    return Object.freeze({
+      type,
+      kind: 'orbSealColumns',
+      supported: true,
+      positionMask: definition.getUint32(0x10, true) & 0x3f,
+      durationTurns: definition.getInt32(0x14, true),
       attackWithSkillValue,
     });
   }
@@ -1280,6 +1291,11 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
       setupMaterialized: true,
     });
   }
+  if (type === PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS) {
+    // Type 99's generic setup leaves both authored parameters in the skill
+    // definition; its execution handler reads +0x10 and +0x14 directly.
+    return decodePadEnemySkillDefinition(definitionBytes);
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -2031,6 +2047,19 @@ export function normalizePadEnemySkillRecord(record) {
       ...(record?.runtimeControl == null
         ? {}
         : { runtimeControl: Math.trunc(Number(record.runtimeControl) || 0) >>> 0 }),
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS || record?.kind === 'orbSealColumns') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS,
+      kind: 'orbSealColumns',
+      supported: record?.supported !== false,
+      positionMask: Math.trunc(Number(record?.positionMask) || 0) & 0x3f,
+      durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)) & 0x3ff,
       setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null

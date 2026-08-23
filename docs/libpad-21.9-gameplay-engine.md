@@ -1260,6 +1260,26 @@ sticky-blind flag/countdown state used by type 97. A fixture with maps
 `[1,2,4,8,48]` obscures `(0,0)`, `(1,1)`, `(2,2)`, `(3,3)`, `(4,4)`, and
 `(4,5)` for two turns, consumes no RNG, and visibly renders all six countdowns.
 
+Enemy skill type `99` applies timed column tape/orb seals. Its dispatch, generic
+setup, and condition targets are `0x629f7c`, `0x6217c0`, and `0x61a678`; the
+independent parser identifies the record as `ESOrbSealColumn`. Definition
+`+0x10` is the authored column-position bitmap and `+0x14` is duration. The
+handler converts the positions to a low-eight-bit mask, stores it in the
+protected `sGAMEWORK+0x87520` lane, and replaces the low ten duration bits at
+`+0x87530`. It then sets native fresh bit `0x400` and clears transition bit
+`0x800`. No setup or execution RNG is consumed.
+
+Condition `0x61a678` inspects both the row- and column-seal protected counters,
+so types 99 and 100 cannot stack over either active tape orientation. The
+browser models the same mutual-exclusion gate and advances existing tape before
+an enemy chooses its next action, preserving the newly installed authored
+duration. A sealed cell cannot begin a drag, and pointer tracing stops at the
+first sealed cell without moving its internal trace origin beyond the barrier;
+this prevents a later pointer event from jumping through tape. The focused
+fixture seals columns 1 and 3 for three turns, consumes only the ordinary AI
+selection draw, blocks both start and crossing, clears after three advances,
+and renders translucent vertical `TAPE · 3` bands.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

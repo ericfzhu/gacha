@@ -19,6 +19,7 @@ import {
   PAD_ENEMY_SKILL_LOCKED_SKYFALL,
   PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM,
   PAD_ENEMY_SKILL_STICKY_BLIND_FIXED,
+  PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -183,6 +184,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_LOCKED_SKYFALL,
     PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM,
     PAD_ENEMY_SKILL_STICKY_BLIND_FIXED,
+    PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
     PAD_ENEMY_SKILL_DEFENSE_BOOST,
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -562,6 +564,12 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
   if (definition.effect.type === PAD_ENEMY_SKILL_STICKY_BLIND_FIXED) {
     return { eligible: true, probabilityScale: 1, rngState };
   }
+  if (definition.effect.type === PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS) {
+    // Types 99 and 100 share 0x61a678. The protected row and column status
+    // lanes are mutually exclusive, so either active tape rejects this skill.
+    const eligible = !state.orbSealActive;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
   if (definition.effect.type === PAD_ENEMY_SKILL_BIND_LEADER_HELPER) {
     const party = Array.isArray(state.party) ? state.party : [];
     const eligible = (
@@ -683,6 +691,7 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
         ? null
         : Math.max(0, Math.trunc(Number(rule.turnsRemaining) || 0)),
     })),
+    orbSealActive: Boolean(state.orbSealActive),
     scaledAttackGate: Math.trunc(Number(state.scaledAttackGate) || 0),
     enemyAttackBoostTurns: Math.max(0, Math.trunc(Number(state.enemyAttackBoostTurns) || 0)),
     enemyBaseAttack: Math.max(0, Math.trunc(Number(state.enemyBaseAttack) || 0)),

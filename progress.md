@@ -2,6 +2,24 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 type-99 column orb seal
+
+- Recovered type `99` at dispatch/setup/condition `0x629f7c`, `0x6217c0`, and
+  `0x61a678`; the independent parser corroborates `ESOrbSealColumn` with
+  authored position bitmap `+0x10` and duration `+0x14`.
+- Execution stores a converted low-eight-bit column mask at protected
+  `sGAMEWORK+0x87520`, installs the low-ten-bit duration at `+0x87530`, sets
+  fresh bit `0x400`, clears transition bit `0x800`, and owns no RNG. The shared
+  type-99/100 condition rejects either orientation while any tape is active.
+- Ported decoding, AI admission, countdown/reset/snapshot state, and faithful
+  input barriers: taped cells reject drag start and traced movement stops at
+  tape without advancing the pointer origin past it. Vertical translucent tape
+  bands display the remaining turns in the browser.
+- Pure rules, exact table targets plus thirteen instruction anchors, focused
+  Chromium input/render checks, screenshot inspection, generic browser client,
+  full native inspector, and production build pass. Next: paired row tape type
+  `100`.
+
 ## 2026-08-24 type-98 fixed sticky blind
 
 - Recovered type `98` at dispatch/setup/condition `0x62be50`, `0x6205a8`, and

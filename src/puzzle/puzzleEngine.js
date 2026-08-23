@@ -55,6 +55,7 @@ import {
   PAD_ENEMY_SKILL_LOCKED_SKYFALL,
   PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM,
   PAD_ENEMY_SKILL_STICKY_BLIND_FIXED,
+  PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -323,6 +324,8 @@ export class PuzzleEngine {
     this.skillSealSkipPostEnemyCountdown = false;
     this.awakeningBindTurns = 0;
     this.awakeningBindSkipPostEnemyCountdown = false;
+    this.orbSealColumnMask = 0;
+    this.orbSealColumnTurns = 0;
     this.leaderSwapTurns = 0;
     this.leaderSwapIndex = null;
     this.enemySkillQueues.forEach((queue) => { queue.position = 0; });
@@ -462,7 +465,7 @@ export class PuzzleEngine {
 
   startDrag(row, column, pointerX = 0, pointerY = 0, gridColumn = column + 0.5, gridRow = row + 0.5) {
     if (this.mode !== 'playing' || this.phase !== 'input' || this.drag) return false;
-    if (!this.isCell(row, column)) return false;
+    if (!this.isCell(row, column) || this.isOrbSealed(row, column)) return false;
     this.lastThornDamage = 0;
     this.hpResolutionApplied = false;
     this.drag = { row, column, pointerX, pointerY, gridColumn, gridRow, remaining: this.moveTime, pathLength: 0 };
@@ -489,10 +492,20 @@ export class PuzzleEngine {
       this.columns,
       this.allowDiagonalMoves,
     );
-    this.drag.gridColumn = Math.max(0, Math.min(this.columns - Number.EPSILON * this.columns, gridColumn));
-    this.drag.gridRow = Math.max(0, Math.min(this.rows - Number.EPSILON * this.rows, gridRow));
     if (!path.length) return false;
+    let moved = false;
     for (const { row: nextRow, column: nextColumn } of path) {
+      if (this.isOrbSealed(nextRow, nextColumn)) {
+        // Keep the traced pointer origin on the last reachable cell. Advancing
+        // it to the physical pointer would let the next event jump past tape.
+        this.drag.gridColumn = fromColumn + 0.5;
+        this.drag.gridRow = fromRow + 0.5;
+        this.drag.pointerX = pointerX;
+        this.drag.pointerY = pointerY;
+        this.drag.row = fromRow;
+        this.drag.column = fromColumn;
+        return moved;
+      }
       const crossedOrb = this.board[nextRow][nextColumn];
       if (crossedOrb.thornActive && crossedOrb.thornPercent > 0) {
         const damage = padThornDamage(this.player.maxHp, crossedOrb.thornPercent);
@@ -504,10 +517,13 @@ export class PuzzleEngine {
       fromRow = nextRow;
       fromColumn = nextColumn;
       this.drag.pathLength += 1;
+      moved = true;
     }
+    this.drag.gridColumn = Math.max(0, Math.min(this.columns - Number.EPSILON * this.columns, gridColumn));
+    this.drag.gridRow = Math.max(0, Math.min(this.rows - Number.EPSILON * this.rows, gridRow));
     this.drag.row = fromRow;
     this.drag.column = fromColumn;
-    return true;
+    return moved;
   }
 
   endDrag() {
@@ -1105,6 +1121,7 @@ export class PuzzleEngine {
     this.advanceLockFallRules();
     this.advanceMoveTimeReductionTurns();
     this.advanceBlackOrbCountdowns();
+    this.advanceOrbSealTurns();
     if (this.blackFallRule?.active && this.blackFallRule.turnsRemaining !== null) {
       this.blackFallRule.turnsRemaining = Math.max(0, this.blackFallRule.turnsRemaining - 1);
       if (this.blackFallRule.turnsRemaining === 0) this.blackFallRule.active = false;
@@ -1230,6 +1247,7 @@ export class PuzzleEngine {
       moveTimeReductionTurns: this.moveTimeReduction?.turnsRemaining || 0,
       skillSealTurns: this.skillSealTurns,
       awakeningBindTurns: this.awakeningBindTurns,
+      orbSealActive: this.orbSealColumnTurns > 0,
       enemyAttribute: PAD_ATTRIBUTE_INDEX[enemy.attribute] ?? -1,
       playerCurrentHp: this.player.hp,
       playerMaxHp: this.player.maxHp,
@@ -2185,6 +2203,19 @@ export class PuzzleEngine {
       this.message = `${blindedOrbCount} orb${blindedOrbCount === 1 ? '' : 's'} were obscured.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'orbSealColumns') {
+      this.orbSealColumnMask = skill.positionMask & ((1 << this.columns) - 1);
+      this.orbSealColumnTurns = Math.max(0, skill.durationTurns) & 0x3ff;
+      this.lastEnemySkill = Object.freeze({
+        ...skill,
+        positionMask: this.orbSealColumnMask,
+        durationTurns: this.orbSealColumnTurns,
+      });
+      let count = 0;
+      for (let bits = this.orbSealColumnMask; bits !== 0; bits >>>= 1) count += bits & 1;
+      this.message = `${count} column${count === 1 ? '' : 's'} sealed for ${this.orbSealColumnTurns} turn${this.orbSealColumnTurns === 1 ? '' : 's'}.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'clearPlayerBuffs') {
       // _doItetukuHadou clears both recovered sGAMEWORK positive-status lanes,
       // then type 6 invokes _applyLeaderSkill(false). Leader effects in this
@@ -2718,6 +2749,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_LOCKED_SKYFALL,
         PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM,
         PAD_ENEMY_SKILL_STICKY_BLIND_FIXED,
+        PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -3292,6 +3324,18 @@ export class PuzzleEngine {
     return row >= 0 && row < this.rows && column >= 0 && column < this.columns;
   }
 
+  isOrbSealed(row, column) {
+    return this.isCell(row, column)
+      && this.orbSealColumnTurns > 0
+      && (this.orbSealColumnMask & (1 << column)) !== 0;
+  }
+
+  advanceOrbSealTurns() {
+    if (this.orbSealColumnTurns <= 0) return;
+    this.orbSealColumnTurns = Math.max(0, this.orbSealColumnTurns - 1);
+    if (this.orbSealColumnTurns === 0) this.orbSealColumnMask = 0;
+  }
+
   snapshot() {
     return {
       coordinateSystem: `board origin top-left; rows 0-${this.rows - 1} downward; columns 0-${this.columns - 1} rightward`,
@@ -3326,6 +3370,10 @@ export class PuzzleEngine {
       enhancedFallModifier: this.enhancedFallModifier ? { ...this.enhancedFallModifier } : null,
       passiveEnhancementFallsEnabled: this.passiveEnhancementFallsEnabled,
       lockFallRules: this.lockFallRules.map((rule) => ({ ...rule })),
+      orbSealColumns: {
+        positionMask: this.orbSealColumnMask,
+        turnsRemaining: this.orbSealColumnTurns,
+      },
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({
         code: ORB_BY_ID[orb.type].code,

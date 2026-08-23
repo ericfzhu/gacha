@@ -20,6 +20,7 @@ import {
   PAD_ENEMY_SKILL_LOCKED_SKYFALL,
   PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM,
   PAD_ENEMY_SKILL_STICKY_BLIND_FIXED,
+  PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1209,6 +1210,31 @@ assert.deepEqual(decodePadEnemySkillRuntime(
   rowMasks: [1, 2, 4, 8, 48],
   runtimeControl: 0,
   setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
+const enemyAiOrbSealColumnsDefinition = enemyAiStickyBlindFixedDefinition.slice();
+const enemyAiOrbSealColumnsView = new DataView(enemyAiOrbSealColumnsDefinition.buffer);
+enemyAiOrbSealColumnsView.setUint32(0x00, 9_079, true);
+enemyAiOrbSealColumnsView.setInt16(0x04, PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS, true);
+enemyAiOrbSealColumnsView.setUint32(0x10, 0b001010, true);
+enemyAiOrbSealColumnsView.setInt32(0x14, 3, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiOrbSealColumnsDefinition), {
+  type: 99,
+  kind: 'orbSealColumns',
+  supported: true,
+  positionMask: 0b001010,
+  durationTurns: 3,
+  attackWithSkillValue: 0,
+});
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiOrbSealColumnsDefinition,
+  new Uint8Array(0x680),
+), {
+  type: 99,
+  kind: 'orbSealColumns',
+  supported: true,
+  positionMask: 0b001010,
+  durationTurns: 3,
   attackWithSkillValue: 0,
 });
 assert.deepEqual(decodePadEnemySkillRuntime(
@@ -4847,6 +4873,82 @@ assert.deepEqual(selectedStickyBlindFixedState.boardState.flatMap((row, rowIndex
 ]);
 assert.equal(selectedStickyBlindFixedState.boardState[4][5].blindCountdown, 2);
 assert.equal(selectedStickyBlindFixedState.player.hp, 12_000);
+
+const directOrbSealColumnsEngine = new PuzzleEngine({ seed: 21_900 });
+directOrbSealColumnsEngine.setBoardFromCodes([
+  'RBGHLD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD',
+]);
+directOrbSealColumnsEngine.setRngState(21_900);
+assert.equal(directOrbSealColumnsEngine.applyEnemySkillDefinition(
+  enemyAiOrbSealColumnsDefinition,
+), true);
+assert.deepEqual(directOrbSealColumnsEngine.snapshot().orbSealColumns, {
+  positionMask: 0b001010,
+  turnsRemaining: 3,
+});
+assert.equal(directOrbSealColumnsEngine.rng.state, 21_900);
+directOrbSealColumnsEngine.start();
+assert.equal(directOrbSealColumnsEngine.startDrag(0, 1), false);
+const orbSealBoardBeforeBlockedMove = directOrbSealColumnsEngine.snapshot().board;
+assert.equal(directOrbSealColumnsEngine.startDrag(0, 0, 35, 447, 0.5, 0.5), true);
+assert.equal(directOrbSealColumnsEngine.moveDrag(0, 2, 175, 447, 2.5, 0.5), false);
+assert.equal(directOrbSealColumnsEngine.drag.column, 0);
+assert.equal(directOrbSealColumnsEngine.drag.pathLength, 0);
+assert.deepEqual(directOrbSealColumnsEngine.snapshot().board, orbSealBoardBeforeBlockedMove);
+directOrbSealColumnsEngine.advanceOrbSealTurns();
+directOrbSealColumnsEngine.advanceOrbSealTurns();
+directOrbSealColumnsEngine.advanceOrbSealTurns();
+assert.deepEqual(directOrbSealColumnsEngine.snapshot().orbSealColumns, {
+  positionMask: 0,
+  turnsRemaining: 0,
+});
+assert.equal(directOrbSealColumnsEngine.moveDrag(0, 2, 175, 447, 2.5, 0.5), true);
+assert.equal(directOrbSealColumnsEngine.drag.column, 2);
+assert.equal(directOrbSealColumnsEngine.drag.pathLength, 2);
+
+const orbSealColumnsMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(orbSealColumnsMonsterDefinition.buffer).setUint32(0xec, 9_079, true);
+const selectedOrbSealColumnsEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: orbSealColumnsMonsterDefinition,
+    skillDefinitions: [enemyAiOrbSealColumnsDefinition],
+  }],
+});
+selectedOrbSealColumnsEngine.enemies[0].counter = 1;
+selectedOrbSealColumnsEngine.enemies[1].counter = 99;
+selectedOrbSealColumnsEngine.setRngState(21_900);
+selectedOrbSealColumnsEngine.resolveEnemyTurn();
+const selectedOrbSealColumnsState = selectedOrbSealColumnsEngine.snapshot();
+assert.equal(selectedOrbSealColumnsState.lastEnemyActions[0].skill.type, 99);
+assert.deepEqual(selectedOrbSealColumnsState.orbSealColumns, {
+  positionMask: 0b001010,
+  turnsRemaining: 3,
+});
+assert.equal(selectedOrbSealColumnsState.rngState, padLcgStep(21_900).state);
+assert.equal(selectedOrbSealColumnsState.player.hp, 12_000);
+assert.equal(selectedOrbSealColumnsState.message, '2 columns sealed for 3 turns.');
+
+const rejectedOrbSealColumnsEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: orbSealColumnsMonsterDefinition,
+    skillDefinitions: [enemyAiOrbSealColumnsDefinition],
+  }],
+});
+rejectedOrbSealColumnsEngine.orbSealColumnMask = 1;
+rejectedOrbSealColumnsEngine.orbSealColumnTurns = 2;
+rejectedOrbSealColumnsEngine.enemies[0].counter = 1;
+rejectedOrbSealColumnsEngine.enemies[1].counter = 99;
+rejectedOrbSealColumnsEngine.setRngState(21_900);
+rejectedOrbSealColumnsEngine.resolveEnemyTurn();
+const rejectedOrbSealColumnsState = rejectedOrbSealColumnsEngine.snapshot();
+assert.equal(rejectedOrbSealColumnsState.lastEnemyActions[0].kind, 'attack');
+assert.equal(rejectedOrbSealColumnsState.rngState, 21_900);
+assert.deepEqual(rejectedOrbSealColumnsState.orbSealColumns, {
+  positionMask: 1,
+  turnsRemaining: 1,
+});
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;

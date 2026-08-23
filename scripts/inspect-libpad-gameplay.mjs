@@ -320,6 +320,25 @@ const STICKY_BLIND_FIXED_INSTRUCTION_ANCHORS = Object.freeze([
   [0x61a630, 0x52a7f008], // unconditional binary32 1.0 admission
   [0x62be50, 0x900045e9], // shared post-effect dispatch tail
 ]);
+const ORB_SEAL_COLUMNS_ENEMY_SKILL_TYPE = 99;
+const ORB_SEAL_COLUMNS_HANDLER = 0x629f7c;
+const ORB_SEAL_COLUMNS_SETUP_HANDLER = 0x6217c0;
+const ORB_SEAL_COLUMNS_CONDITION_HANDLER = 0x61a678;
+const ORB_SEAL_COLUMNS_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x629f88, 0xb94012a1], // load authored six-bit position bitmap from +0x10
+  [0x629f90, 0x97f39184], // materialize native column positions
+  [0x629fa0, 0x12001c01], // retain the returned low-eight-bit column mask
+  [0x629fa8, 0xaa0803e0], // address protected sGAMEWORK column-mask lane +0x87520
+  [0x629ffc, 0x7869690a], // load protected column duration lane +0x87530
+  [0x62a000, 0x79402aab], // load authored duration from +0x14
+  [0x62a008, 0x3300256a], // replace protected duration's low ten bits
+  [0x62a00c, 0x3216014a], // set fresh-status bit 0x400
+  [0x62a01c, 0x1214794a], // clear transition bit 0x800
+  [0x61a678, 0x797eef28], // inspect the paired row-seal status lane first
+  [0x61a698, 0x797f1728], // then inspect the column-seal status lane
+  [0x61bb68, 0x7200251f], // admit only when its low-ten-bit counter is empty
+  [0x61bb80, 0x375f5588], // transition bit 0x800 owns the native fresh edge
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -1300,6 +1319,25 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : stickyBlindFixedConditionTarget === STICKY_BLIND_FIXED_CONDITION_HANDLER;
   const stickyBlindFixedInstructionAnchorsMatch = restoredElf === null ? null
     : STICKY_BLIND_FIXED_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
+  const orbSealColumnsDispatchTarget = resolveEnemySkillTarget(
+    ORB_SEAL_COLUMNS_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const orbSealColumnsSetupTarget = resolveEnemySkillTarget(
+    ORB_SEAL_COLUMNS_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const orbSealColumnsConditionTarget = resolveEnemySkillTarget(
+    ORB_SEAL_COLUMNS_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const orbSealColumnsDispatchMatches = orbSealColumnsDispatchTarget === null
+    ? null : orbSealColumnsDispatchTarget === ORB_SEAL_COLUMNS_HANDLER;
+  const orbSealColumnsSetupMatches = orbSealColumnsSetupTarget === null
+    ? null : orbSealColumnsSetupTarget === ORB_SEAL_COLUMNS_SETUP_HANDLER;
+  const orbSealColumnsConditionMatches = orbSealColumnsConditionTarget === null
+    ? null : orbSealColumnsConditionTarget === ORB_SEAL_COLUMNS_CONDITION_HANDLER;
+  const orbSealColumnsInstructionAnchorsMatch = restoredElf === null ? null
+    : ORB_SEAL_COLUMNS_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
@@ -2316,6 +2354,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       stickyBlindFixedSetupMatches21_9: stickyBlindFixedSetupMatches,
       stickyBlindFixedConditionMatches21_9: stickyBlindFixedConditionMatches,
       stickyBlindFixedInstructionAnchorsMatch21_9: stickyBlindFixedInstructionAnchorsMatch,
+      orbSealColumnsDispatchMatches21_9: orbSealColumnsDispatchMatches,
+      orbSealColumnsSetupMatches21_9: orbSealColumnsSetupMatches,
+      orbSealColumnsConditionMatches21_9: orbSealColumnsConditionMatches,
+      orbSealColumnsInstructionAnchorsMatch21_9: orbSealColumnsInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -2880,6 +2922,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       stickyBlindFixedInstructionAnchorsMatch21_9: stickyBlindFixedInstructionAnchorsMatch,
       stickyBlindFixedSemantics:
         'type 98 copies +0x10 duration and the first +0x14 row bitmap to runtime +0x678/+0x67c, clears +0x684, owns no RNG, uses an unconditional condition, and preserves the remaining authored row bitmaps for its fixed 6x5 board positions',
+      orbSealColumnsType: ORB_SEAL_COLUMNS_ENEMY_SKILL_TYPE,
+      orbSealColumnsDispatchTarget: orbSealColumnsDispatchTarget === null
+        ? null : hex(orbSealColumnsDispatchTarget),
+      orbSealColumnsDispatchMatches21_9: orbSealColumnsDispatchMatches,
+      orbSealColumnsSetupTarget: orbSealColumnsSetupTarget === null
+        ? null : hex(orbSealColumnsSetupTarget),
+      orbSealColumnsSetupMatches21_9: orbSealColumnsSetupMatches,
+      orbSealColumnsConditionTarget: orbSealColumnsConditionTarget === null
+        ? null : hex(orbSealColumnsConditionTarget),
+      orbSealColumnsConditionMatches21_9: orbSealColumnsConditionMatches,
+      orbSealColumnsInstructionAnchorsMatch21_9: orbSealColumnsInstructionAnchorsMatch,
+      orbSealColumnsSemantics:
+        'type 99 reads the authored +0x10 position bitmap without setup RNG, converts it to a low-eight-bit native column mask at protected sGAMEWORK+0x87520, installs the +0x14 low-ten-bit duration at +0x87530 with the native fresh edge, and shares a condition with type 100 that prevents either row or column tape from stacking over an active seal',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -3398,6 +3453,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || stickyBlindFixedSetupMatches === false
     || stickyBlindFixedConditionMatches === false
     || stickyBlindFixedInstructionAnchorsMatch === false
+    || orbSealColumnsDispatchMatches === false
+    || orbSealColumnsSetupMatches === false
+    || orbSealColumnsConditionMatches === false
+    || orbSealColumnsInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false
