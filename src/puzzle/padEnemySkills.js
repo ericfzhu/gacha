@@ -69,6 +69,7 @@ export const PAD_ENEMY_SKILL_STICKY_BLIND_FIXED = 98;
 export const PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS = 99;
 export const PAD_ENEMY_SKILL_ORB_SEAL_ROWS = 100;
 export const PAD_ENEMY_SKILL_FIXED_START = 101;
+export const PAD_ENEMY_SKILL_RANDOM_BOMBS = 102;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -368,6 +369,17 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       randomPosition: definition.getInt32(0x10, true) !== 0,
       authoredColumn: definition.getInt32(0x14, true),
       authoredRowFromBottom: definition.getInt32(0x18, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_RANDOM_BOMBS) {
+    requireLength(definitionBytes, 0x30, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'randomBombs',
+      supported: true,
+      bombCount: definition.getInt32(0x14, true),
+      lockedBombs: definition.getInt32(0x2c, true) !== 0,
       attackWithSkillValue,
     });
   }
@@ -1338,6 +1350,22 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_RANDOM_BOMBS) {
+    requireLength(monsterBytes, 0x67c, 'PAD monster runtime');
+    return Object.freeze({
+      type,
+      kind: 'randomBombs',
+      supported: true,
+      bombCount: definition.getInt32(0x14, true),
+      lockedBombs: definition.getInt32(0x2c, true) !== 0,
+      selectionSeed: monster.getUint32(0x678, true) & 0xffff,
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -2138,6 +2166,22 @@ export function normalizePadEnemySkillRecord(record) {
           authoredRowFromBottom: Math.trunc(Number(record?.authoredRowFromBottom) || 0),
         }),
       setupMaterialized: Boolean(record?.setupMaterialized || positionPresent),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_RANDOM_BOMBS || record?.kind === 'randomBombs') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_RANDOM_BOMBS,
+      kind: 'randomBombs',
+      supported: record?.supported !== false,
+      bombCount: Math.max(0, Math.trunc(Number(record?.bombCount) || 0)),
+      lockedBombs: Boolean(record?.lockedBombs),
+      ...(record?.selectionSeed == null
+        ? {}
+        : { selectionSeed: Math.trunc(Number(record.selectionSeed) || 0) & 0xffff }),
+      setupMaterialized: Boolean(record?.setupMaterialized || record?.selectionSeed != null),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

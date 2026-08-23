@@ -23,6 +23,7 @@ import {
   PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS,
   PAD_ENEMY_SKILL_ORB_SEAL_ROWS,
   PAD_ENEMY_SKILL_FIXED_START,
+  PAD_ENEMY_SKILL_RANDOM_BOMBS,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1293,6 +1294,35 @@ assert.deepEqual(decodePadEnemySkillRuntime(
   supported: true,
   fixedColumn: 5,
   fixedRow: 2,
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
+const enemyAiRandomBombsDefinition = enemyAiFixedStartDefinition.slice();
+const enemyAiRandomBombsView = new DataView(enemyAiRandomBombsDefinition.buffer);
+enemyAiRandomBombsView.setUint32(0x00, 9_082, true);
+enemyAiRandomBombsView.setInt16(0x04, PAD_ENEMY_SKILL_RANDOM_BOMBS, true);
+enemyAiRandomBombsView.setInt32(0x14, 4, true);
+enemyAiRandomBombsView.setInt32(0x2c, 1, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiRandomBombsDefinition), {
+  type: 102,
+  kind: 'randomBombs',
+  supported: true,
+  bombCount: 4,
+  lockedBombs: true,
+  attackWithSkillValue: 0,
+});
+const randomBombsRuntime = new Uint8Array(0x680);
+new DataView(randomBombsRuntime.buffer).setUint32(0x678, 6_018, true);
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiRandomBombsDefinition,
+  randomBombsRuntime,
+), {
+  type: 102,
+  kind: 'randomBombs',
+  supported: true,
+  bombCount: 4,
+  lockedBombs: true,
+  selectionSeed: 6_018,
   setupMaterialized: true,
   attackWithSkillValue: 0,
 });
@@ -5154,6 +5184,76 @@ const rejectedFixedStartState = rejectedFixedStartEngine.snapshot();
 assert.equal(rejectedFixedStartState.lastEnemyActions[0].kind, 'attack');
 assert.equal(rejectedFixedStartState.rngState, 21_900);
 assert.deepEqual(rejectedFixedStartState.forcedStart, { row: 0, column: 0 });
+
+const directRandomBombsEngine = new PuzzleEngine({ seed: 21_900 });
+directRandomBombsEngine.setBoardFromCodes([
+  'RBGHLD', 'GLDBHR', 'BHRDGL', 'DLGRHB', 'HRBGLD',
+]);
+directRandomBombsEngine.board[3][4].locked = true;
+directRandomBombsEngine.board[3][4].blockFlags |= 0x800;
+const preservedLockedOrbType = directRandomBombsEngine.board[3][4].type;
+directRandomBombsEngine.setRngState(21_900);
+assert.equal(directRandomBombsEngine.applyEnemySkillDefinition(
+  enemyAiRandomBombsDefinition,
+), true);
+assert.equal(directRandomBombsEngine.lastEnemySkill.selectionSeed, 6_018);
+assert.equal(directRandomBombsEngine.lastEnemySkill.changedOrbCount, 3);
+assert.equal(directRandomBombsEngine.rng.state, 394_448_415);
+assert.equal(directRandomBombsEngine.board[3][4].type, preservedLockedOrbType);
+assert.deepEqual(
+  directRandomBombsEngine.board.flatMap((row, rowIndex) => row.flatMap(
+    (orb, columnIndex) => orb.type === 'bomb' ? [{ row: rowIndex, column: columnIndex }] : [],
+  )),
+  [{ row: 0, column: 5 }, { row: 2, column: 3 }, { row: 4, column: 2 }],
+);
+assert.equal(
+  directRandomBombsEngine.board.flat().filter((orb) => orb.type === 'bomb').every(
+    (orb) => orb.locked && (orb.blockFlags & 0x800) !== 0,
+  ),
+  true,
+);
+assert.equal(directRandomBombsEngine.snapshot().message, '3 locked bombs appeared.');
+
+const unlockedRandomBombsDefinition = enemyAiRandomBombsDefinition.slice();
+new DataView(unlockedRandomBombsDefinition.buffer).setInt32(0x2c, 0, true);
+const unlockedRandomBombsEngine = new PuzzleEngine({ seed: 21_900 });
+unlockedRandomBombsEngine.setRngState(21_900);
+assert.equal(unlockedRandomBombsEngine.applyEnemySkillDefinition(
+  unlockedRandomBombsDefinition,
+), true);
+assert.equal(
+  unlockedRandomBombsEngine.board.flat().filter((orb) => orb.type === 'bomb').every(
+    (orb) => !orb.locked && (orb.blockFlags & 0x800) === 0,
+  ),
+  true,
+);
+
+const randomBombsMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(randomBombsMonsterDefinition.buffer).setUint32(0xec, 9_082, true);
+const selectedRandomBombsEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: randomBombsMonsterDefinition,
+    skillDefinitions: [enemyAiRandomBombsDefinition],
+  }],
+});
+selectedRandomBombsEngine.enemies[0].counter = 1;
+selectedRandomBombsEngine.enemies[1].counter = 99;
+selectedRandomBombsEngine.setRngState(21_900);
+selectedRandomBombsEngine.resolveEnemyTurn();
+const selectedRandomBombsState = selectedRandomBombsEngine.snapshot();
+assert.equal(selectedRandomBombsState.lastEnemyActions[0].skill.type, 102);
+assert.equal(selectedRandomBombsState.lastEnemyActions[0].skill.selectionSeed, 58_043);
+assert.equal(selectedRandomBombsEngine.lastEnemySkill.changedOrbCount, 4);
+assert.equal(selectedRandomBombsState.rngState, 3_803_934_822);
+assert.deepEqual(
+  selectedRandomBombsEngine.board.flatMap((row, rowIndex) => row.flatMap(
+    (orb, columnIndex) => orb.type === 'bomb' ? [{ row: rowIndex, column: columnIndex }] : [],
+  )),
+  [{ row: 1, column: 5 }, { row: 2, column: 2 }, { row: 2, column: 3 }, { row: 3, column: 3 }],
+);
+assert.equal(selectedRandomBombsState.player.hp, 12_000);
+assert.equal(selectedRandomBombsState.message, '4 locked bombs appeared.');
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;

@@ -1320,6 +1320,26 @@ away from that cell, and release clears the restriction. From seed 21900 on a
 state 3803934822; after the ordinary AI-selection draw, the scheduled fixture
 selects `(2,5)` and ends at 1929471377.
 
+Enemy skill type `102` creates bombs at random board positions. Its dispatch,
+setup, and unconditional condition targets are `0x62a0f0`, `0x61ffa8`, and
+`0x61a630`; the independent parser identifies it as `ESBombRandomSpawn`.
+Definition `+0x14` supplies the requested count, while the distant `+0x2c`
+integer selects locked bombs. Setup advances the shared LCG once, persists that
+state, and stores its high 16 bits at runtime `+0x678` as a private board-
+selection seed.
+
+Execution calls the native bomb helper with random-placement mode. It builds
+all 30 coordinates in row-major order, applies the recovered forward private-
+seed shuffle, and processes only the first authored count. Already locked cells
+are left unchanged rather than replaced. Each successful candidate becomes
+native orb type 9, loses incompatible special-orb state and enhancement, and
+receives block flag `0x800` when `+0x2c` is nonzero. From seed 21900, direct
+setup produces private seed 6018 and chooses `(4,2)`, `(3,4)`, `(2,3)`, and
+`(0,5)` before ending at shared state 394448415. A locked `(3,4)` fixture thus
+creates three visibly locked bombs. After the ordinary AI-selection draw, the
+private seed is 58043, the four cells are `(2,2)`, `(1,5)`, `(2,3)`, and
+`(3,3)`, and shared state ends at 3803934822.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

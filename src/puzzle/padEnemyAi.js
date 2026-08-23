@@ -22,6 +22,7 @@ import {
   PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS,
   PAD_ENEMY_SKILL_ORB_SEAL_ROWS,
   PAD_ENEMY_SKILL_FIXED_START,
+  PAD_ENEMY_SKILL_RANDOM_BOMBS,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -189,6 +190,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS,
     PAD_ENEMY_SKILL_ORB_SEAL_ROWS,
     PAD_ENEMY_SKILL_FIXED_START,
+    PAD_ENEMY_SKILL_RANDOM_BOMBS,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
     PAD_ENEMY_SKILL_DEFENSE_BOOST,
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -579,6 +581,9 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
     // 0x61abac admits only while protected force-start column is signed -1.
     const eligible = !state.forcedStartActive;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_RANDOM_BOMBS) {
+    return { eligible: true, probabilityScale: 1, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_BIND_LEADER_HELPER) {
     const party = Array.isArray(state.party) ? state.party : [];

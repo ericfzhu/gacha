@@ -58,6 +58,7 @@ import {
   PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS,
   PAD_ENEMY_SKILL_ORB_SEAL_ROWS,
   PAD_ENEMY_SKILL_FIXED_START,
+  PAD_ENEMY_SKILL_RANDOM_BOMBS,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1673,6 +1674,13 @@ export class PuzzleEngine {
       }
       return Object.freeze({ ...record, fixedColumn, fixedRow, setupMaterialized: true });
     }
+    if (skill.supported && skill.kind === 'randomBombs' && !skill.setupMaterialized) {
+      return Object.freeze({
+        ...record,
+        selectionSeed: this.rng.nextUint16(),
+        setupMaterialized: true,
+      });
+    }
     if (skill.supported && skill.kind === 'activeSkillSeal' && !skill.setupMaterialized) {
       return Object.freeze({
         ...record,
@@ -2283,6 +2291,30 @@ export class PuzzleEngine {
       this.message = `Your next move must start at row ${row + 1}, column ${column + 1}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'randomBombs') {
+      const candidates = [];
+      this.board.forEach((row, rowIndex) => row.forEach((orb, columnIndex) => {
+        candidates.push({ row: rowIndex, column: columnIndex });
+      }));
+      const selected = padShuffleLockDropCandidates(skill.selectionSeed, candidates)
+        .slice(0, Math.max(0, Math.min(candidates.length, skill.bombCount)));
+      let changedOrbCount = 0;
+      selected.forEach(({ row, column }) => {
+        const orb = this.board[row][column];
+        if (orb.locked) return;
+        orb.type = 'bomb';
+        orb.blockFlags = (Number(orb.blockFlags) >>> 0) & ~PAD_BLOCK_SPECIAL_LOCK_CLEAR_FLAGS;
+        orb.enhancementPower = 0;
+        orb.enhanced = false;
+        orb.nail = false;
+        orb.locked = skill.lockedBombs;
+        if (skill.lockedBombs) orb.blockFlags |= PAD_BLOCK_LOCKED_FLAG;
+        changedOrbCount += 1;
+      });
+      this.lastEnemySkill = Object.freeze({ ...skill, changedOrbCount });
+      this.message = `${changedOrbCount} ${skill.lockedBombs ? 'locked ' : ''}bomb${changedOrbCount === 1 ? '' : 's'} appeared.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'clearPlayerBuffs') {
       // _doItetukuHadou clears both recovered sGAMEWORK positive-status lanes,
       // then type 6 invokes _applyLeaderSkill(false). Leader effects in this
@@ -2819,6 +2851,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS,
         PAD_ENEMY_SKILL_ORB_SEAL_ROWS,
         PAD_ENEMY_SKILL_FIXED_START,
+        PAD_ENEMY_SKILL_RANDOM_BOMBS,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,

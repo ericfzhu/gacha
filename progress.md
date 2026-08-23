@@ -2,6 +2,23 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 type-102 random bomb spawn
+
+- Recovered type `102` at dispatch/setup/condition `0x62a0f0`, `0x61ffa8`, and
+  `0x61a630`; the independent parser corroborates `ESBombRandomSpawn`.
+- Authored `+0x14` is count and distant `+0x2c` is the lock flag. Setup spends
+  one shared-LCG draw and places its high 16 bits at runtime `+0x678` as a
+  private seed for the row-major board shuffle; the condition is unconditional.
+- Execution leaves already locked candidates unchanged, converts successful
+  cells to bomb type 9, clears incompatible special/enhancement state, and sets
+  lock flag `0x800` when requested. Seed 21900 yields private seed 6018 and the
+  exact first four coordinates `(4,2)`, `(3,4)`, `(2,3)`, `(0,5)`.
+- Ported definition/runtime decoding, materialization, AI admission, native
+  private-shuffle selection, lock rejection, and locked/unlocked bomb state.
+  Pure fixtures, exact tables plus thirteen ARM64 anchors, focused Chromium,
+  screenshot inspection, generic browser client, full native inspector, PAD
+  data checks, and production build pass. Next: type `103`.
+
 ## 2026-08-24 type-101 fixed move start
 
 - Recovered type `101` at dispatch/setup/condition `0x62a030`, `0x6205c0`, and
