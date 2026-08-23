@@ -86,6 +86,7 @@ export const PAD_ENEMY_SKILL_BRANCH_SKILL_USE = 115;
 export const PAD_ENEMY_SKILL_BRANCH_DAMAGE = 116;
 export const PAD_ENEMY_SKILL_BRANCH_ERASED_ATTRIBUTES = 117;
 export const PAD_ENEMY_SKILL_TYPE_RESIST = 118;
+export const PAD_ENEMY_SKILL_DAMAGE_IMMUNITY = 119;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -718,6 +719,16 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       passive: true,
       monsterTypeMask: definition.getInt32(0x10, true) & 0xffff,
       damagePercent: definition.getInt32(0x14, true) & 0xffff,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_DAMAGE_IMMUNITY) {
+    requireLength(definitionBytes, 0x14, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'damageImmunity',
+      supported: true,
+      durationTurns: Math.max(0, (definition.getInt32(0x10, true) << 16) >> 16),
       attackWithSkillValue,
     });
   }
@@ -1860,6 +1871,20 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_DAMAGE_IMMUNITY) {
+    requireLength(definitionBytes, 0x14, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'damageImmunity',
+      supported: true,
+      durationTurns: Math.max(0, (definition.getInt32(0x10, true) << 16) >> 16),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_RESOLVE) {
     requireLength(definitionBytes, 0x14, 'PAD enemy-skill definition');
     return Object.freeze({
@@ -2890,6 +2915,21 @@ export function normalizePadEnemySkillRecord(record) {
       passive: true,
       monsterTypeMask: Math.trunc(Number(record?.monsterTypeMask) || 0) & 0xffff,
       damagePercent: Math.trunc(Number(record?.damagePercent) || 0) & 0xffff,
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_DAMAGE_IMMUNITY || record?.kind === 'damageImmunity') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_DAMAGE_IMMUNITY,
+      kind: 'damageImmunity',
+      supported: record?.supported !== false,
+      durationTurns: Math.max(
+        0,
+        (Math.trunc(Number(record?.durationTurns) || 0) << 16) >> 16,
+      ),
       setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null

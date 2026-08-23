@@ -1657,6 +1657,25 @@ their ascending composition order, and the single final upward damage round.
 Its 25%+25% dual-type fixture reduces the recovered 1,660 post-defense lane to
 104 damage without consuming an enemy action or RNG.
 
+Enemy skill type `119` is timed all-source damage immunity, named
+`ESInvulnerableOn` by the independent data parser. Its dispatch, setup, and
+condition table entries resolve to `0x62a65c`, `0x6217c0`, and `0x61a670`.
+Unlike the adjacent staged skills, execution loads signed-low16 definition
+`+0x10` directly into the protected controller at `sMONSTER+0x9c0`; it does
+not materialize the duration through `sMONSTER+0x678`.
+
+The condition reads that controller as signed int16 and rejects the record
+while it is positive, preventing the new-AI path from reapplying immunity.
+`_calcFinalDamage` reads the same controller before later absorb/void handling:
+when it is at least one, a conditional select replaces the signed damage lane
+with zero. The browser mirrors that placement in both automatic target
+projection and actual per-card damage, so an immune target cannot absorb or
+void a zeroed hit and does not increment its damaged-turn counter. All-source
+immunity also suppresses the recovered nail percentage-damage lane. Existing
+timers advance before enemy action selection; a newly installed three-turn
+immunity therefore remains at three through its activation action and reaches
+two at the next enemy boundary.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

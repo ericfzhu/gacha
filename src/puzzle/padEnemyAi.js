@@ -48,6 +48,7 @@ import {
   PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION,
   PAD_ENEMY_SKILL_DAMAGE_VOID,
   PAD_ENEMY_SKILL_DAMAGE_SHIELD,
+  PAD_ENEMY_SKILL_DAMAGE_IMMUNITY,
   PAD_ENEMY_SKILL_LEADER_SWAP,
   PAD_ENEMY_SKILL_NORMAL_ATTACK,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
@@ -227,6 +228,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION,
     PAD_ENEMY_SKILL_DAMAGE_VOID,
     PAD_ENEMY_SKILL_DAMAGE_SHIELD,
+    PAD_ENEMY_SKILL_DAMAGE_IMMUNITY,
     PAD_ENEMY_SKILL_LEADER_SWAP,
     PAD_ENEMY_SKILL_NORMAL_ATTACK,
     PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
@@ -466,6 +468,12 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_DAMAGE_SHIELD) {
     const eligible = state.enemyDamageShieldTurns <= 0;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_DAMAGE_IMMUNITY) {
+    // Type 119's 0x61a670 condition reads protected signed-int16
+    // sMONSTER+0x9c0 and admits the record only while it is below one.
+    const eligible = state.enemyDamageImmunityTurns <= 0;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_LEADER_SWAP) {
@@ -756,6 +764,10 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     enemyDamageShieldTurns: Math.max(
       0,
       Math.trunc(Number(state.enemyDamageShieldTurns) || 0),
+    ),
+    enemyDamageImmunityTurns: Math.max(
+      0,
+      Math.trunc(Number(state.enemyDamageImmunityTurns) || 0),
     ),
     leaderSwapTurns: Math.max(0, Math.trunc(Number(state.leaderSwapTurns) || 0)),
     leaderSwapCandidateCount: Math.max(

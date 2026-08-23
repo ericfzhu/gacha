@@ -76,6 +76,7 @@ import {
   PAD_ENEMY_SKILL_BRANCH_DAMAGE,
   PAD_ENEMY_SKILL_BRANCH_ERASED_ATTRIBUTES,
   PAD_ENEMY_SKILL_TYPE_RESIST,
+  PAD_ENEMY_SKILL_DAMAGE_IMMUNITY,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -203,8 +204,8 @@ const PARTY = Object.freeze([
 ]);
 
 const ENEMY_TEMPLATE = Object.freeze([
-  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0, damageAbsorbTurns: 0, damageAbsorbThreshold: 0, damageVoidTurns: 0, damageVoidThreshold: 0, damageShieldTurns: 0, damageShieldPercent: 0 },
-  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0, damageAbsorbTurns: 0, damageAbsorbThreshold: 0, damageVoidTurns: 0, damageVoidThreshold: 0, damageShieldTurns: 0, damageShieldPercent: 0 },
+  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0, damageAbsorbTurns: 0, damageAbsorbThreshold: 0, damageVoidTurns: 0, damageVoidThreshold: 0, damageShieldTurns: 0, damageShieldPercent: 0, damageImmunityTurns: 0 },
+  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0, damageAbsorbTurns: 0, damageAbsorbThreshold: 0, damageVoidTurns: 0, damageVoidThreshold: 0, damageShieldTurns: 0, damageShieldPercent: 0, damageImmunityTurns: 0 },
 ]);
 
 function clamp(value, min, max) {
@@ -644,7 +645,7 @@ export class PuzzleEngine {
       const defendedDamage = nullified ? 0 : padDamageAfterDefense(
         attack, attributeMultiplier, effectiveDefense, damageCap,
       );
-      const damage = padEnemyDamageAfterShields(
+      const damage = Number(enemy.damageImmunityTurns || 0) > 0 ? 0 : padEnemyDamageAfterShields(
         defendedDamage,
         Number.isInteger(attributeIndex) && attributeIndex <= 4
           ? enemy.attributeResistPercentages?.[attributeIndex] ?? 100
@@ -1117,7 +1118,7 @@ export class PuzzleEngine {
             raw, padAttributeMultiplier(lane.attribute, enemy.attribute), effectiveDefense,
             member.damageCap,
           );
-          const damage = padEnemyDamageAfterShields(
+          const damage = Number(enemy.damageImmunityTurns || 0) > 0 ? 0 : padEnemyDamageAfterShields(
             defendedDamage,
             Number.isInteger(attributeIndex) && attributeIndex <= 4
               ? enemy.attributeResistPercentages?.[attributeIndex] ?? 100
@@ -1173,10 +1174,14 @@ export class PuzzleEngine {
     if (this.turnNailCount > 0) {
       this.enemies.forEach((enemy, enemyIndex) => {
         if (enemy.hp <= 0) return;
-        const damage = padNailDamage(enemy.maxHp, this.turnNailCount);
+        const damage = Number(enemy.damageImmunityTurns || 0) > 0
+          ? 0
+          : padNailDamage(enemy.maxHp, this.turnNailCount);
         enemy.hp = Math.max(0, enemy.hp - damage);
         nailDamage += damage;
-        this.floatingText.push({ kind: 'nail', value: damage, enemy: enemyIndex, age: 0 });
+        if (damage > 0) {
+          this.floatingText.push({ kind: 'nail', value: damage, enemy: enemyIndex, age: 0 });
+        }
       });
     }
     if (this.manualTarget && this.enemies[this.targetEnemy]?.hp <= 0) {
@@ -1231,6 +1236,7 @@ export class PuzzleEngine {
     this.advanceEnemyDamageAbsorbTurns();
     this.advanceEnemyDamageVoidTurns();
     this.advanceEnemyDamageShieldTurns();
+    this.advanceEnemyDamageImmunityTurns();
     this.advanceLeaderSwapTurns();
     this.advanceSkyfallRateRules();
     this.advanceLockFallRules();
@@ -1355,6 +1361,7 @@ export class PuzzleEngine {
       enemyDamageAbsorbTurns: enemy.damageAbsorbTurns,
       enemyDamageVoidTurns: enemy.damageVoidTurns,
       enemyDamageShieldTurns: enemy.damageShieldTurns,
+      enemyDamageImmunityTurns: enemy.damageImmunityTurns,
       leaderSwapTurns: this.leaderSwapTurns,
       leaderSwapCandidateCount: this.leaderSwapCandidateIndices().length,
       skyfallNaturalTurns: this.skyfallRateRules.natural?.turnsRemaining || 0,
@@ -2158,6 +2165,15 @@ export class PuzzleEngine {
     });
   }
 
+  advanceEnemyDamageImmunityTurns() {
+    this.enemies.forEach((enemy) => {
+      enemy.damageImmunityTurns = Math.max(
+        0,
+        Math.trunc(Number(enemy.damageImmunityTurns) || 0) - 1,
+      );
+    });
+  }
+
   leaderSwapCandidateIndices() {
     return [1, 2, 3, 4].filter((index) => (
       Boolean(this.party[index]) && this.party[index].present !== false
@@ -2857,6 +2873,13 @@ export class PuzzleEngine {
       this.message = `${enemy.name} reduces damage by ${skill.shieldPercent}% for ${skill.durationTurns} turn${skill.durationTurns === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'damageImmunity') {
+      const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
+      if (!enemy) return false;
+      enemy.damageImmunityTurns = skill.durationTurns;
+      this.message = `${enemy.name} is immune to damage for ${skill.durationTurns} turn${skill.durationTurns === 1 ? '' : 's'}.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'leaderSwap') {
       const selectedPartyIndex = Math.trunc(Number(skill.selectedPartyIndex));
       if (
@@ -3275,6 +3298,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_DAMAGE_VOID,
         PAD_ENEMY_SKILL_ATTRIBUTE_RESIST,
         PAD_ENEMY_SKILL_TYPE_RESIST,
+        PAD_ENEMY_SKILL_DAMAGE_IMMUNITY,
         PAD_ENEMY_SKILL_RESOLVE,
         PAD_ENEMY_SKILL_DAMAGE_SHIELD,
         PAD_ENEMY_SKILL_LEADER_SWAP,
@@ -4097,7 +4121,7 @@ export class PuzzleEngine {
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,
-      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, baseMaxCounter = maxCounter, deathResolved = false, escaped = false, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0, damageAbsorbTurns = 0, damageAbsorbThreshold = 0, damageVoidTurns = 0, damageVoidThreshold = 0, damageShieldTurns = 0, damageShieldPercent = 0, attributeResistPercentages = [100, 100, 100, 100, 100], typeDamagePercentages = Array(16).fill(100), resolveThresholdPercent = 0, turnChangeThresholdPercent = 0, turnChangeCounter = 0, turnChangeActive = false }, index) => ({
+      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, baseMaxCounter = maxCounter, deathResolved = false, escaped = false, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0, damageAbsorbTurns = 0, damageAbsorbThreshold = 0, damageVoidTurns = 0, damageVoidThreshold = 0, damageShieldTurns = 0, damageShieldPercent = 0, damageImmunityTurns = 0, attributeResistPercentages = [100, 100, 100, 100, 100], typeDamagePercentages = Array(16).fill(100), resolveThresholdPercent = 0, turnChangeThresholdPercent = 0, turnChangeCounter = 0, turnChangeActive = false }, index) => ({
         id,
         name,
         attribute,
@@ -4128,6 +4152,7 @@ export class PuzzleEngine {
         damageVoidThreshold,
         damageShieldTurns,
         damageShieldPercent,
+        damageImmunityTurns,
         attributeResistPercentages: [...attributeResistPercentages],
         typeDamagePercentages: [...typeDamagePercentages],
         resolveThresholdPercent,

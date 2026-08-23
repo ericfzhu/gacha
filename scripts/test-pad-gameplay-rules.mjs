@@ -40,6 +40,7 @@ import {
   PAD_ENEMY_SKILL_BRANCH_DAMAGE,
   PAD_ENEMY_SKILL_BRANCH_ERASED_ATTRIBUTES,
   PAD_ENEMY_SKILL_TYPE_RESIST,
+  PAD_ENEMY_SKILL_DAMAGE_IMMUNITY,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -3108,6 +3109,42 @@ assert.throws(
   () => new PuzzleEngine({ enemySkillQueues: [[enemyAiTypeResistDefinition]] }),
   /passive enemy skills must be installed through monster skill slots/,
 );
+const enemyAiDamageImmunityDefinition = enemyAiInactivityDefinition.slice();
+const enemyAiDamageImmunityView = new DataView(enemyAiDamageImmunityDefinition.buffer);
+enemyAiDamageImmunityView.setUint32(0x00, 9_119, true);
+enemyAiDamageImmunityView.setInt16(0x04, PAD_ENEMY_SKILL_DAMAGE_IMMUNITY, true);
+enemyAiDamageImmunityView.setInt32(0x10, 3, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiDamageImmunityDefinition), {
+  type: 119,
+  kind: 'damageImmunity',
+  supported: true,
+  durationTurns: 3,
+  attackWithSkillValue: 0,
+});
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiDamageImmunityDefinition,
+  new Uint8Array(0x680),
+), {
+  type: 119,
+  kind: 'damageImmunity',
+  supported: true,
+  durationTurns: 3,
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
+const directDamageImmunityEngine = new PuzzleEngine({ seed: 21_900 });
+assert.equal(directDamageImmunityEngine.applyEnemySkillDefinition(
+  enemyAiDamageImmunityDefinition,
+), true);
+assert.equal(directDamageImmunityEngine.enemies[0].damageImmunityTurns, 3);
+assert.deepEqual(directDamageImmunityEngine.snapshot().lastEnemySkill, {
+  type: 119,
+  kind: 'damageImmunity',
+  supported: true,
+  durationTurns: 3,
+  setupMaterialized: false,
+  attackWithSkillValue: 0,
+});
 const enemyAiResolveDefinition = enemyAiInactivityDefinition.slice();
 const enemyAiResolveView = new DataView(enemyAiResolveDefinition.buffer);
 enemyAiResolveView.setUint32(0x00, 9_052, true);
@@ -7354,6 +7391,41 @@ assert.deepEqual(
   passiveTypeResistEngine.enemies[0].typeDamagePercentages,
   Array(16).fill(100),
 );
+const damageImmunityMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(damageImmunityMonsterDefinition.buffer).setUint32(0xec, 9_119, true);
+const selectedDamageImmunityEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: damageImmunityMonsterDefinition,
+    skillDefinitions: [enemyAiDamageImmunityDefinition],
+  }],
+});
+selectedDamageImmunityEngine.setRngState(21_900);
+selectedDamageImmunityEngine.enemies[0].counter = 1;
+selectedDamageImmunityEngine.enemies[1].counter = 99;
+selectedDamageImmunityEngine.resolveEnemyTurn();
+assert.equal(selectedDamageImmunityEngine.snapshot().lastEnemyActions[0].skill.type, 119);
+assert.equal(selectedDamageImmunityEngine.enemies[0].damageImmunityTurns, 3);
+assert.equal(selectedDamageImmunityEngine.rng.state, padLcgStep(21_900).state);
+const activeDamageImmunityRng = selectedDamageImmunityEngine.rng.state;
+assert.equal(selectedDamageImmunityEngine.takeEnemySkill(0), null);
+assert.equal(selectedDamageImmunityEngine.rng.state, activeDamageImmunityRng);
+selectedDamageImmunityEngine.enemies[0].counter = 99;
+selectedDamageImmunityEngine.resolveEnemyTurn();
+assert.equal(selectedDamageImmunityEngine.enemies[0].damageImmunityTurns, 2);
+const damageImmunityCombatEngine = new PuzzleEngine({ seed: 21_900 });
+damageImmunityCombatEngine.enemies[0].damageImmunityTurns = 3;
+damageImmunityCombatEngine.enemies[1].hp = 0;
+damageImmunityCombatEngine.comboCount = 1;
+damageImmunityCombatEngine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+damageImmunityCombatEngine.turnNailCount = 2;
+damageImmunityCombatEngine.resolvePlayerTurn();
+assert.equal(damageImmunityCombatEngine.lastDamage, 0);
+assert.equal(damageImmunityCombatEngine.lastNailDamage, 0);
+assert.equal(damageImmunityCombatEngine.lastAbsorbedDamage, 0);
+assert.equal(damageImmunityCombatEngine.lastVoidedDamage, 0);
+assert.equal(damageImmunityCombatEngine.enemies[0].hp, damageImmunityCombatEngine.enemies[0].maxHp);
+assert.equal(damageImmunityCombatEngine.enemies[0].damagedTurnCount, 0);
 const resolveMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(resolveMonsterDefinition.buffer).setUint32(0xec, 9_052, true);
 const passiveResolveEngine = new PuzzleEngine({

@@ -818,6 +818,25 @@ const TYPE_RESIST_INSTRUCTION_ANCHORS = Object.freeze([
   [0x684384, 0x1e211800], // divide the matching percentage by binary32 100
   [0x684388, 0x1e200908], // multiply it into the accumulated damage ratio
 ]);
+const DAMAGE_IMMUNITY_ENEMY_SKILL_TYPE = 119;
+const DAMAGE_IMMUNITY_HANDLER = 0x62a65c;
+const DAMAGE_IMMUNITY_SETUP_HANDLER = 0x6217c0;
+const DAMAGE_IMMUNITY_CONDITION_HANDLER = 0x61a670;
+const DAMAGE_IMMUNITY_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x62a65c, 0xb94012a1], // load definition +0x10 duration directly
+  [0x62a660, 0x91270260], // address protected immunity timer at sMONSTER+0x9c0
+  [0x62a668, 0x9126c260], // address the neighboring presentation controller
+  [0x62a66c, 0x2a1f03e1], // clear the presentation controller on activation
+  [0x61a670, 0x912702a0], // condition reads the same +0x9c0 controller
+  [0x61b4dc, 0x97f44521], // read its protected value
+  [0x61b4e0, 0x13003c08], // condition interprets it as signed int16
+  [0x61b4e4, 0x7100011f], // compare active turns with zero
+  [0x623c54, 0x91270280], // final damage addresses the immunity timer
+  [0x623c58, 0x97f42342], // read the protected timer
+  [0x623c5c, 0x13003c08], // final damage also sign-extends low16
+  [0x623c60, 0x7100051f], // compare timer with one
+  [0x623c64, 0x9a9fb33b], // keep damage below one; otherwise select zero
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -2264,6 +2283,31 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     : TYPE_RESIST_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
+  const damageImmunityDispatchTarget = resolveEnemySkillTarget(
+    DAMAGE_IMMUNITY_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const damageImmunitySetupTarget = resolveEnemySkillTarget(
+    DAMAGE_IMMUNITY_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const damageImmunityConditionTarget = resolveEnemySkillTarget(
+    DAMAGE_IMMUNITY_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const damageImmunityDispatchMatches = damageImmunityDispatchTarget === null
+    ? null : damageImmunityDispatchTarget === DAMAGE_IMMUNITY_HANDLER;
+  const damageImmunitySetupMatches = damageImmunitySetupTarget === null
+    ? null : damageImmunitySetupTarget === DAMAGE_IMMUNITY_SETUP_HANDLER;
+  const damageImmunityConditionMatches = damageImmunityConditionTarget === null
+    ? null : damageImmunityConditionTarget === DAMAGE_IMMUNITY_CONDITION_HANDLER;
+  const damageImmunityInstructionAnchorsMatch = restoredElf === null ? null
+    : DAMAGE_IMMUNITY_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -3360,6 +3404,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       typeResistSetupMatches21_9: typeResistSetupMatches,
       typeResistConditionMatches21_9: typeResistConditionMatches,
       typeResistInstructionAnchorsMatch21_9: typeResistInstructionAnchorsMatch,
+      damageImmunityDispatchMatches21_9: damageImmunityDispatchMatches,
+      damageImmunitySetupMatches21_9: damageImmunitySetupMatches,
+      damageImmunityConditionMatches21_9: damageImmunityConditionMatches,
+      damageImmunityInstructionAnchorsMatch21_9: damageImmunityInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -4183,6 +4231,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       typeResistInstructionAnchorsMatch21_9: typeResistInstructionAnchorsMatch,
       typeResistSemantics:
         'type 118 is an initialization-time passive: ordinary dispatch/setup/condition are inert; checkPassiveSkills maps definition +0x10 bits 0..15 to low16(+0x14) at sMONSTER+0xb20..+0xb3e; the damage helper visits every non-sentinel lane in ascending order and multiplies binary32(percent/100) for each lane matching any of the card three native types or its runtime added-type mask',
+      damageImmunityType: DAMAGE_IMMUNITY_ENEMY_SKILL_TYPE,
+      damageImmunityDispatchTarget: damageImmunityDispatchTarget === null
+        ? null : hex(damageImmunityDispatchTarget),
+      damageImmunityDispatchMatches21_9: damageImmunityDispatchMatches,
+      damageImmunitySetupTarget: damageImmunitySetupTarget === null
+        ? null : hex(damageImmunitySetupTarget),
+      damageImmunitySetupMatches21_9: damageImmunitySetupMatches,
+      damageImmunityConditionTarget: damageImmunityConditionTarget === null
+        ? null : hex(damageImmunityConditionTarget),
+      damageImmunityConditionMatches21_9: damageImmunityConditionMatches,
+      damageImmunityInstructionAnchorsMatch21_9: damageImmunityInstructionAnchorsMatch,
+      damageImmunitySemantics:
+        'type 119 installs signed-low16 definition +0x10 in protected sMONSTER+0x9c0; its AI condition rejects reapplication while that timer is positive, and calcFinalDamage replaces the final signed damage lane with zero whenever the timer is at least one',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,

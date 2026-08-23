@@ -2,6 +2,20 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 timed damage immunity
+
+- Recovered type `119` / `ESInvulnerableOn` at dispatch/setup/condition
+  `0x62a65c`, `0x6217c0`, and `0x61a670`. Definition `+0x10` installs directly
+  in the protected signed-int16 timer at `sMONSTER+0x9c0`; active immunity
+  rejects reapplication.
+- `_calcFinalDamage` selects zero damage whenever the timer is at least one,
+  before later absorb/void processing. The browser now mirrors that in target
+  projection and real attacks, exposes and advances the timer, and preserves
+  zero damage/absorb/void/damaged-turn results.
+- Raw/runtime decoders, direct and selected-AI fixtures, countdown and combat
+  assertions, 13 exact ARM64 anchors, and the native inspector pass. Next:
+  type `120` remaining-enemy branch, then type `121` immunity-off.
+
 ## 2026-08-24 monster-type resistance passive
 
 - Recovered type `118` as the permanent `ESTypeResist` passive. Its ordinary
