@@ -22,6 +22,7 @@ import {
   PAD_ENEMY_SKILL_SKYFALL_RATE,
   PAD_ENEMY_SKILL_DEATH_CRY,
   PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION,
+  PAD_ENEMY_SKILL_DAMAGE_VOID,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -2076,6 +2077,44 @@ assert.deepEqual(decodePadEnemySkillRuntime(
   setupMaterialized: true,
   attackWithSkillValue: 0,
 });
+const enemyAiDamageVoidDefinition = enemyAiInactivityDefinition.slice();
+const enemyAiDamageVoidView = new DataView(enemyAiDamageVoidDefinition.buffer);
+enemyAiDamageVoidView.setUint32(0x00, 9_050, true);
+enemyAiDamageVoidView.setInt16(0x04, PAD_ENEMY_SKILL_DAMAGE_VOID, true);
+enemyAiDamageVoidView.setInt32(0x10, 0, true);
+enemyAiDamageVoidView.setInt32(0x14, 3, true);
+enemyAiDamageVoidView.setInt32(0x18, 1_055, true);
+enemyAiDamageVoidView.setInt32(0x1c, 1_000, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiDamageVoidDefinition), {
+  type: 71,
+  kind: 'damageVoid',
+  supported: true,
+  nativePresentationParameter: 0,
+  durationTurns: 3,
+  nativeMode: 1_055,
+  damageThreshold: 1_000,
+  attackWithSkillValue: 0,
+});
+const damageVoidRuntime = new Uint8Array(0x684);
+const damageVoidRuntimeView = new DataView(damageVoidRuntime.buffer);
+damageVoidRuntimeView.setInt32(0x678, 0, true);
+damageVoidRuntimeView.setInt32(0x67c, 3, true);
+damageVoidRuntimeView.setInt32(0x680, 1_055, true);
+assert.deepEqual(decodePadEnemySkillRuntime(enemyAiDamageVoidDefinition, damageVoidRuntime), {
+  type: 71,
+  kind: 'damageVoid',
+  supported: true,
+  nativePresentationParameter: 0,
+  durationTurns: 3,
+  nativeMode: 1_055,
+  damageThreshold: 1_000,
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
+const directDamageVoidEngine = new PuzzleEngine({ seed: 21_900 });
+assert.equal(directDamageVoidEngine.applyEnemySkillDefinition(enemyAiDamageVoidDefinition), true);
+assert.equal(directDamageVoidEngine.enemies[0].damageVoidTurns, 3);
+assert.equal(directDamageVoidEngine.enemies[0].damageVoidThreshold, 1_000);
 const enemyAiAttributeAbsorbDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiAttributeAbsorbView = new DataView(enemyAiAttributeAbsorbDefinition.buffer);
 enemyAiAttributeAbsorbView.setUint32(0x00, 9_021, true);
@@ -4343,6 +4382,39 @@ assert.deepEqual(
 assert.equal(selectedInactivityPresentationState.lastEnemyActions[0].damage, undefined);
 assert.equal(selectedInactivityPresentationState.player.hp, 12_000);
 assert.equal(selectedInactivityPresentationState.rngState, padLcgStep(21_900).state);
+const damageVoidMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(damageVoidMonsterDefinition.buffer).setUint32(0xec, 9_050, true);
+const selectedDamageVoidEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: damageVoidMonsterDefinition,
+    skillDefinitions: [enemyAiDamageVoidDefinition],
+  }],
+});
+selectedDamageVoidEngine.setRngState(21_900);
+selectedDamageVoidEngine.enemies[0].counter = 1;
+selectedDamageVoidEngine.enemies[1].counter = 99;
+selectedDamageVoidEngine.resolveEnemyTurn();
+const selectedDamageVoidState = selectedDamageVoidEngine.snapshot();
+assert.equal(selectedDamageVoidState.lastEnemyActions[0].skill.type, 71);
+assert.equal(selectedDamageVoidState.enemies[0].damageVoidTurns, 3);
+assert.equal(selectedDamageVoidState.enemies[0].damageVoidThreshold, 1_000);
+assert.equal(selectedDamageVoidState.player.hp, 12_000);
+assert.equal(selectedDamageVoidState.rngState, padLcgStep(21_900).state);
+selectedDamageVoidEngine.enemies[0].counter = 99;
+selectedDamageVoidEngine.resolveEnemyTurn();
+assert.equal(selectedDamageVoidEngine.enemies[0].damageVoidTurns, 2);
+const damageVoidCombatEngine = new PuzzleEngine({ seed: 21_900 });
+damageVoidCombatEngine.enemies[0].damageVoidTurns = 3;
+damageVoidCombatEngine.enemies[0].damageVoidThreshold = 1;
+damageVoidCombatEngine.enemies[1].hp = 0;
+damageVoidCombatEngine.comboCount = 1;
+damageVoidCombatEngine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+damageVoidCombatEngine.resolvePlayerTurn();
+assert.equal(damageVoidCombatEngine.enemies[0].hp, damageVoidCombatEngine.enemies[0].maxHp);
+assert.equal(damageVoidCombatEngine.lastDamage, 0);
+assert.ok(damageVoidCombatEngine.lastVoidedDamage > 0);
+assert.equal(damageVoidCombatEngine.enemies[0].damagedTurnCount, 0);
 const comboAbsorbMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(comboAbsorbMonsterDefinition.buffer).setUint32(0xec, 9_046, true);
 const selectedComboAbsorbEngine = new PuzzleEngine({

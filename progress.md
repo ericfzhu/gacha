@@ -2,6 +2,22 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 enemy damage-void shield
+
+- Recovered type `71` at dispatch/setup/condition `0x629a48`, `0x6217a8`, and
+  `0x61b774`. Setup stages definition `+0x10/+0x14/+0x18` through runtime
+  `+0x678/+0x67c/+0x680`; definition `+0x1c` supplies the damage threshold.
+- Ported definition/runtime decoding, new-AI rejection while active, fixed
+  duration and expiry, snapshot/UI status, and per-hit damage voiding at or
+  above the threshold. Absorption remains earlier in the final-damage pipeline,
+  fixed nail damage stays independent, and voided hits do not increment the
+  damaged-turn counter.
+- Seeded direct/scheduled, expiry, combat, exact-table, focused-browser,
+  generic-browser, and production-build checks pass. The focused render shows
+  `VOID >=1 3T`, leaves enemy HP unchanged, and reports 3,948 voided damage;
+  scheduled seed 21900 ends at `394448415`.
+- Next: recover type `72` after this separate checkpoint.
+
 ## 2026-08-23 presentation-backed inactivity skill
 
 - Recovered type `70` at dispatch/setup/condition `0x6299fc`, `0x621790`, and

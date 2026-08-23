@@ -294,6 +294,9 @@ function drawEnemy(ctx, enemy, index, target, time) {
   if (Number(enemy.comboAbsorbTurns || 0) > 0) {
     enemyStatus.push(`ABS ≤${enemy.comboAbsorbThreshold}C ${enemy.comboAbsorbTurns}T`);
   }
+  if (Number(enemy.damageVoidTurns || 0) > 0) {
+    enemyStatus.push(`VOID ≥${Number(enemy.damageVoidThreshold || 0).toLocaleString()} ${enemy.damageVoidTurns}T`);
+  }
   if (enemyStatus.length > 0) {
     ctx.fillStyle = '#bfe9ff';
     ctx.font = '800 9px "Barlow Condensed", sans-serif';
@@ -544,7 +547,9 @@ function render(ctx, engine) {
     ctx.textAlign = 'center';
     ctx.font = '900 22px "Barlow Condensed", sans-serif';
     ctx.fillStyle = item.kind === 'heal' || item.kind === 'revive' ? '#83ef9d' : item.kind === 'poison' ? '#d995ef' : item.kind === 'bomb' ? '#ffb45f' : item.kind === 'thorn' || item.kind === 'nail' ? '#e4edf3' : item.kind === 'playerDamage' ? '#ff8b7f' : ORB_BY_ID[item.attribute]?.highlight || '#fff';
-    ctx.fillText(`${item.kind === 'heal' || item.kind === 'absorb' || item.kind === 'revive' ? '+' : '-'}${item.value.toLocaleString()}`, x, y);
+    ctx.fillText(item.kind === 'void'
+      ? 'VOID'
+      : `${item.kind === 'heal' || item.kind === 'absorb' || item.kind === 'revive' ? '+' : '-'}${item.value.toLocaleString()}`, x, y);
     ctx.globalAlpha = 1;
   });
 

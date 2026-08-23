@@ -55,6 +55,7 @@ import {
   PAD_ENEMY_SKILL_SKYFALL_RATE,
   PAD_ENEMY_SKILL_DEATH_CRY,
   PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION,
+  PAD_ENEMY_SKILL_DAMAGE_VOID,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -157,8 +158,8 @@ const PARTY = Object.freeze([
 ]);
 
 const ENEMY_TEMPLATE = Object.freeze([
-  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0 },
-  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0 },
+  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0, damageVoidTurns: 0, damageVoidThreshold: 0 },
+  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0, damageVoidTurns: 0, damageVoidThreshold: 0 },
 ]);
 
 function clamp(value, min, max) {
@@ -278,6 +279,7 @@ export class PuzzleEngine {
     this.lastComboCount = 0;
     this.lastDamage = 0;
     this.lastAbsorbedDamage = 0;
+    this.lastVoidedDamage = 0;
     this.lastNailDamage = 0;
     this.lastHealing = 0;
     this.lastPoisonDamage = 0;
@@ -474,6 +476,8 @@ export class PuzzleEngine {
     this.pendingMatches = [];
     this.pendingBombCells = [];
     this.lastDamage = 0;
+    this.lastAbsorbedDamage = 0;
+    this.lastVoidedDamage = 0;
     this.lastNailDamage = 0;
     this.lastHealing = 0;
     this.lastPoisonDamage = 0;
@@ -887,6 +891,7 @@ export class PuzzleEngine {
 
     let totalDamage = 0;
     let absorbedDamage = 0;
+    let voidedDamage = 0;
     const damagedThisTurn = new Set();
     const attackRounds = [
       (member) => ({ attribute: member.attribute, attack: member.attack }),
@@ -932,7 +937,6 @@ export class PuzzleEngine {
             effectiveDefense,
             member.damageCap,
           );
-          if (damage > 0) damagedThisTurn.add(enemyIndex);
           if (
             (Number(enemy.comboAbsorbTurns || 0) > 0
               && this.comboCount <= Number(enemy.comboAbsorbThreshold || 0))
@@ -945,6 +949,16 @@ export class PuzzleEngine {
             this.floatingText.push({ kind: 'absorb', value: damage, enemy: enemyIndex, attribute: lane.attribute, age: 0 });
             return;
           }
+          if (
+            damage > 0
+            && Number(enemy.damageVoidTurns || 0) > 0
+            && damage >= Number(enemy.damageVoidThreshold || 0)
+          ) {
+            voidedDamage += damage;
+            this.floatingText.push({ kind: 'void', value: damage, enemy: enemyIndex, attribute: lane.attribute, age: 0 });
+            return;
+          }
+          if (damage > 0) damagedThisTurn.add(enemyIndex);
           enemy.hp = Math.max(0, enemy.hp - damage);
           totalDamage += damage;
           if (damage > 0) {
@@ -970,13 +984,14 @@ export class PuzzleEngine {
     }
     this.lastNailDamage = nailDamage;
     this.lastAbsorbedDamage = absorbedDamage;
+    this.lastVoidedDamage = voidedDamage;
     this.lastDamage = totalDamage + nailDamage;
     damagedThisTurn.forEach((enemyIndex) => {
       const enemy = this.enemies[enemyIndex];
       if (enemy) enemy.damagedTurnCount = (Math.trunc(Number(enemy.damagedTurnCount) || 0) + 1) & 0xffff;
     });
     this.advancePartyBindTurns();
-    this.message = `${this.comboCount} combo${this.comboCount === 1 ? '' : 's'} · ${this.lastDamage.toLocaleString()} total damage${this.lastAbsorbedDamage ? ` · ${this.lastAbsorbedDamage.toLocaleString()} absorbed` : ''}${this.lastNailDamage ? ` · ${this.lastNailDamage.toLocaleString()} nails` : ''}${this.lastHealing ? ` · +${this.lastHealing.toLocaleString()} HP` : ''}${this.lastPoisonDamage ? ` · -${this.lastPoisonDamage.toLocaleString()} poison` : ''}${this.lastBombDamage ? ` · -${this.lastBombDamage.toLocaleString()} bombs` : ''}${this.lastThornDamage ? ` · -${this.lastThornDamage.toLocaleString()} thorns` : ''}`;
+    this.message = `${this.comboCount} combo${this.comboCount === 1 ? '' : 's'} · ${this.lastDamage.toLocaleString()} total damage${this.lastAbsorbedDamage ? ` · ${this.lastAbsorbedDamage.toLocaleString()} absorbed` : ''}${this.lastVoidedDamage ? ` · ${this.lastVoidedDamage.toLocaleString()} voided` : ''}${this.lastNailDamage ? ` · ${this.lastNailDamage.toLocaleString()} nails` : ''}${this.lastHealing ? ` · +${this.lastHealing.toLocaleString()} HP` : ''}${this.lastPoisonDamage ? ` · -${this.lastPoisonDamage.toLocaleString()} poison` : ''}${this.lastBombDamage ? ` · -${this.lastBombDamage.toLocaleString()} bombs` : ''}${this.lastThornDamage ? ` · -${this.lastThornDamage.toLocaleString()} thorns` : ''}`;
   }
 
   applyPlayerHpResolution(healing = 0, poisonDamage = 0) {
@@ -1009,6 +1024,7 @@ export class PuzzleEngine {
     this.advanceEnemyAttributeNullifyTurns();
     this.advanceEnemyAttributeAbsorbTurns();
     this.advanceEnemyComboAbsorbTurns();
+    this.advanceEnemyDamageVoidTurns();
     this.advanceSkyfallRateRules();
     this.advanceMoveTimeReductionTurns();
     this.advanceBlackOrbCountdowns();
@@ -1112,6 +1128,7 @@ export class PuzzleEngine {
       maxHp: enemy.maxHp,
       attributeAbsorbTurns: enemy.attributeAbsorbTurns,
       comboAbsorbTurns: enemy.comboAbsorbTurns,
+      enemyDamageVoidTurns: enemy.damageVoidTurns,
       skyfallNaturalTurns: this.skyfallRateRules.natural?.turnsRemaining || 0,
       skyfallNaturalMask: this.skyfallRateRules.natural?.typeMask || 0,
       skyfallHazardTurns: this.skyfallRateRules.hazard?.turnsRemaining || 0,
@@ -1538,6 +1555,16 @@ export class PuzzleEngine {
     });
   }
 
+  advanceEnemyDamageVoidTurns() {
+    this.enemies.forEach((enemy) => {
+      enemy.damageVoidTurns = Math.max(
+        0,
+        Math.trunc(Number(enemy.damageVoidTurns) || 0) - 1,
+      );
+      if (enemy.damageVoidTurns === 0) enemy.damageVoidThreshold = 0;
+    });
+  }
+
   advanceSkyfallRateRules() {
     for (const category of ['natural', 'hazard']) {
       const rule = this.skyfallRateRules[category];
@@ -1875,6 +1902,14 @@ export class PuzzleEngine {
       this.message = `${enemy?.name || 'Enemy'} pauses with effect ${skill.presentationParameters.join('/')}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'damageVoid') {
+      const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
+      if (!enemy) return false;
+      enemy.damageVoidTurns = skill.durationTurns;
+      enemy.damageVoidThreshold = skill.damageThreshold;
+      this.message = `${enemy.name} voids damage of ${skill.damageThreshold.toLocaleString()} or more for ${skill.durationTurns} turn${skill.durationTurns === 1 ? '' : 's'}.`;
+      return true;
+    }
     if (skill.supported && [
       'loneAttackBoost',
       'statusTriggeredAttackBoost',
@@ -2179,6 +2214,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_SKYFALL_RATE,
         PAD_ENEMY_SKILL_DEATH_CRY,
         PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION,
+        PAD_ENEMY_SKILL_DAMAGE_VOID,
         PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
         PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -2763,6 +2799,7 @@ export class PuzzleEngine {
       lastComboCount: this.lastComboCount,
       lastDamage: this.lastDamage,
       lastAbsorbedDamage: this.lastAbsorbedDamage,
+      lastVoidedDamage: this.lastVoidedDamage,
       lastNailDamage: this.lastNailDamage,
       lastHealing: this.lastHealing,
       lastPoisonDamage: this.lastPoisonDamage,
@@ -2802,7 +2839,7 @@ export class PuzzleEngine {
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,
-      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, deathResolved = false, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0 }, index) => ({
+      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, deathResolved = false, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0, damageVoidTurns = 0, damageVoidThreshold = 0 }, index) => ({
         id,
         name,
         attribute,
@@ -2825,6 +2862,8 @@ export class PuzzleEngine {
         attributeAbsorbMask,
         comboAbsorbTurns,
         comboAbsorbThreshold,
+        damageVoidTurns,
+        damageVoidThreshold,
         queuedEnemySkills: Math.max(
           0,
           (this.enemySkillQueues[index]?.records.length || 0) - (this.enemySkillQueues[index]?.position || 0),

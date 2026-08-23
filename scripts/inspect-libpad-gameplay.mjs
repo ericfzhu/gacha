@@ -102,6 +102,10 @@ const INACTIVITY_PRESENTATION_ENEMY_SKILL_TYPE = 70;
 const INACTIVITY_PRESENTATION_HANDLER = 0x6299fc;
 const INACTIVITY_PRESENTATION_SETUP_HANDLER = 0x621790;
 const INACTIVITY_PRESENTATION_CONDITION_HANDLER = 0x61b558;
+const DAMAGE_VOID_ENEMY_SKILL_TYPE = 71;
+const DAMAGE_VOID_HANDLER = 0x629a48;
+const DAMAGE_VOID_SETUP_HANDLER = 0x6217a8;
+const DAMAGE_VOID_CONDITION_HANDLER = 0x61b774;
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -716,6 +720,21 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : inactivityPresentationSetupTarget === INACTIVITY_PRESENTATION_SETUP_HANDLER;
   const inactivityPresentationConditionMatches = inactivityPresentationConditionTarget === null
     ? null : inactivityPresentationConditionTarget === INACTIVITY_PRESENTATION_CONDITION_HANDLER;
+  const damageVoidDispatchTarget = resolveEnemySkillTarget(
+    DAMAGE_VOID_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const damageVoidSetupTarget = resolveEnemySkillTarget(
+    DAMAGE_VOID_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const damageVoidConditionTarget = resolveEnemySkillTarget(
+    DAMAGE_VOID_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const damageVoidDispatchMatches = damageVoidDispatchTarget === null
+    ? null : damageVoidDispatchTarget === DAMAGE_VOID_HANDLER;
+  const damageVoidSetupMatches = damageVoidSetupTarget === null
+    ? null : damageVoidSetupTarget === DAMAGE_VOID_SETUP_HANDLER;
+  const damageVoidConditionMatches = damageVoidConditionTarget === null
+    ? null : damageVoidConditionTarget === DAMAGE_VOID_CONDITION_HANDLER;
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1659,6 +1678,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       inactivityPresentationDispatchMatches21_9: inactivityPresentationDispatchMatches,
       inactivityPresentationSetupMatches21_9: inactivityPresentationSetupMatches,
       inactivityPresentationConditionMatches21_9: inactivityPresentationConditionMatches,
+      damageVoidDispatchMatches21_9: damageVoidDispatchMatches,
+      damageVoidSetupMatches21_9: damageVoidSetupMatches,
+      damageVoidConditionMatches21_9: damageVoidConditionMatches,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -1985,6 +2007,18 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       inactivityPresentationConditionMatches21_9: inactivityPresentationConditionMatches,
       inactivityPresentationSemantics:
         'type 70 is a no-gameplay inactivity action with a distinct transient presentation path: setup stages +0x10/+0x14/+0x18 at runtime +0x678/+0x67c/+0x680 when the controller is empty, condition admits only while sMONSTER+0x910 reports zero, and execution applies or clears the presentation controller before the common action tail',
+      damageVoidType: DAMAGE_VOID_ENEMY_SKILL_TYPE,
+      damageVoidDispatchTarget: damageVoidDispatchTarget === null
+        ? null : hex(damageVoidDispatchTarget),
+      damageVoidDispatchMatches21_9: damageVoidDispatchMatches,
+      damageVoidSetupTarget: damageVoidSetupTarget === null
+        ? null : hex(damageVoidSetupTarget),
+      damageVoidSetupMatches21_9: damageVoidSetupMatches,
+      damageVoidConditionTarget: damageVoidConditionTarget === null
+        ? null : hex(damageVoidConditionTarget),
+      damageVoidConditionMatches21_9: damageVoidConditionMatches,
+      damageVoidSemantics:
+        'type 71: setup copies +0x10/+0x14/+0x18 to runtime +0x678/+0x67c/+0x680; the handler installs the void presentation, fixed duration, and mode while resolving the +0x1c damage threshold through the selected definition; condition admits only while the +0x8d0 void controller is inactive',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -2434,6 +2468,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || inactivityPresentationDispatchMatches === false
     || inactivityPresentationSetupMatches === false
     || inactivityPresentationConditionMatches === false
+    || damageVoidDispatchMatches === false
+    || damageVoidSetupMatches === false
+    || damageVoidConditionMatches === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

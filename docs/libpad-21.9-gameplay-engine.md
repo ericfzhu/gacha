@@ -819,6 +819,27 @@ presentation controller. With a 100% immediate record, seed 21900 therefore
 ends at `394448415`, just like type 66, while snapshots still distinguish the
 two native paths.
 
+Enemy skill type `71` installs the damage-void shield. Its dispatch, setup,
+and condition entries target `0x629a48`, `0x6217a8`, and `0x61b774`.
+Setup stages definition `+0x10/+0x14/+0x18` at runtime
+`sMONSTER+0x678/+0x67c/+0x680`; execution forwards those fields to the native
+void presentation, duration, and mode controllers at `+0x8d0/+0x8c0/+0x8e0`
+and clears the related transient value at `+0x9e0`. The authored damage
+threshold remains definition `+0x1c`. The condition admits the record only
+while the `+0x8d0` controller is inactive, so an already-active shield cannot
+be selected again through ordinary new-AI scheduling.
+
+The browser preserves the fixed duration and threshold, rejects replacement
+while active, and decrements the shield at the enemy-turn boundary. Individual
+player hits at or above the threshold become zero damage and are accumulated
+as voided damage without increasing the enemy's damaged-turn counter. Damage
+absorption is resolved before voiding, matching the recovered final-damage
+pipeline, while fixed nail damage remains independent. A focused browser
+fixture installs a three-turn threshold-one shield, resolves one fire combo,
+and keeps enemy HP unchanged while reporting the prevented damage as `VOID`.
+With a 100% immediate record and seed 21900, scheduling consumes the standard
+probability draw and ends at `394448415`.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

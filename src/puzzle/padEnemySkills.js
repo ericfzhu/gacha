@@ -39,6 +39,7 @@ export const PAD_ENEMY_SKILL_COMBO_ABSORB = 67;
 export const PAD_ENEMY_SKILL_SKYFALL_RATE = 68;
 export const PAD_ENEMY_SKILL_DEATH_CRY = 69;
 export const PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION = 70;
+export const PAD_ENEMY_SKILL_DAMAGE_VOID = 71;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES_4 = 76;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES = 77;
 export const PAD_ENEMY_SKILL_HORIZONTAL_LINES_4 = 78;
@@ -281,6 +282,19 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
         { length: 3 },
         (_, index) => definition.getInt32(0x10 + index * 4, true),
       )),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_DAMAGE_VOID) {
+    requireLength(definitionBytes, 0x20, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'damageVoid',
+      supported: true,
+      nativePresentationParameter: definition.getInt32(0x10, true),
+      durationTurns: definition.getInt32(0x14, true),
+      nativeMode: definition.getInt32(0x18, true),
+      damageThreshold: Math.max(0, definition.getInt32(0x1c, true)),
       attackWithSkillValue,
     });
   }
@@ -1023,6 +1037,24 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_DAMAGE_VOID) {
+    requireLength(definitionBytes, 0x20, 'PAD enemy-skill definition');
+    requireLength(monsterBytes, 0x684, 'PAD monster runtime');
+    return Object.freeze({
+      type,
+      kind: 'damageVoid',
+      supported: true,
+      nativePresentationParameter: monster.getInt32(0x678, true),
+      durationTurns: monster.getInt32(0x67c, true),
+      nativeMode: monster.getInt32(0x680, true),
+      damageThreshold: Math.max(0, definition.getInt32(0x1c, true)),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (
     type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST
     || type === PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST
@@ -1473,6 +1505,21 @@ export function normalizePadEnemySkillRecord(record) {
         { length: 3 },
         (_, index) => Math.trunc(Number(authored[index]) || 0),
       )),
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_DAMAGE_VOID || record?.kind === 'damageVoid') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_DAMAGE_VOID,
+      kind: 'damageVoid',
+      supported: record?.supported !== false,
+      nativePresentationParameter: Math.trunc(Number(record?.nativePresentationParameter) || 0),
+      durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)),
+      nativeMode: Math.trunc(Number(record?.nativeMode) || 0),
+      damageThreshold: Math.max(0, Math.trunc(Number(record?.damageThreshold) || 0)),
       setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
