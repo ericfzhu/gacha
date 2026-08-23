@@ -15,6 +15,7 @@ import {
   padCountNonPoisonBlocks,
   padDamageAfterDefense,
   padEnemyAttributeResistDamage,
+  padEnemyResolveThresholdHp,
   padNativeBaseAttackPower,
   padNativeRecoveryPower,
   padNailDamage,
@@ -58,6 +59,7 @@ import {
   PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION,
   PAD_ENEMY_SKILL_DAMAGE_VOID,
   PAD_ENEMY_SKILL_ATTRIBUTE_RESIST,
+  PAD_ENEMY_SKILL_RESOLVE,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -179,6 +181,7 @@ function copyEnemies() {
     hp: enemy.maxHp,
     counter: enemy.maxCounter,
     attributeResistPercentages: Array(5).fill(100),
+    resolveThresholdPercent: 0,
   }));
 }
 
@@ -974,7 +977,14 @@ export class PuzzleEngine {
             return;
           }
           if (damage > 0) damagedThisTurn.add(enemyIndex);
-          enemy.hp = Math.max(0, enemy.hp - damage);
+          const resolveThresholdHp = padEnemyResolveThresholdHp(
+            enemy.maxHp,
+            enemy.resolveThresholdPercent,
+          );
+          const resolveTriggered = damage >= enemy.hp
+            && resolveThresholdHp > 0
+            && enemy.hp >= resolveThresholdHp;
+          enemy.hp = resolveTriggered ? 1 : Math.max(0, enemy.hp - damage);
           totalDamage += damage;
           if (damage > 0) {
             this.floatingText.push({ kind: 'damage', value: damage, enemy: enemyIndex, attribute: lane.attribute, age: 0 });
@@ -2235,6 +2245,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION,
         PAD_ENEMY_SKILL_DAMAGE_VOID,
         PAD_ENEMY_SKILL_ATTRIBUTE_RESIST,
+        PAD_ENEMY_SKILL_RESOLVE,
         PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
         PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -2284,15 +2295,20 @@ export class PuzzleEngine {
     const enemy = this.enemies?.[index];
     if (!enemy) return;
     enemy.attributeResistPercentages = Array(5).fill(100);
+    enemy.resolveThresholdPercent = 0;
     const pool = this.enemyAiPools?.[index];
     if (!pool) return;
     for (const slot of pool.monster.slots) {
       const effect = pool.definitionsById.get(slot.skillId)?.effect;
-      if (effect?.type !== PAD_ENEMY_SKILL_ATTRIBUTE_RESIST) continue;
-      for (let attributeIndex = 0; attributeIndex < 5; attributeIndex += 1) {
-        if ((effect.attributeMask & (1 << attributeIndex)) !== 0) {
-          enemy.attributeResistPercentages[attributeIndex] = effect.shieldPercent & 0xffff;
+      if (effect?.type === PAD_ENEMY_SKILL_ATTRIBUTE_RESIST) {
+        for (let attributeIndex = 0; attributeIndex < 5; attributeIndex += 1) {
+          if ((effect.attributeMask & (1 << attributeIndex)) !== 0) {
+            enemy.attributeResistPercentages[attributeIndex] = effect.shieldPercent & 0xffff;
+          }
         }
+      }
+      if (effect?.type === PAD_ENEMY_SKILL_RESOLVE) {
+        enemy.resolveThresholdPercent = effect.hpThresholdPercent & 0xffff;
       }
     }
   }
@@ -2878,7 +2894,7 @@ export class PuzzleEngine {
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,
-      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, deathResolved = false, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0, damageVoidTurns = 0, damageVoidThreshold = 0, attributeResistPercentages = [100, 100, 100, 100, 100] }, index) => ({
+      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, deathResolved = false, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0, damageVoidTurns = 0, damageVoidThreshold = 0, attributeResistPercentages = [100, 100, 100, 100, 100], resolveThresholdPercent = 0 }, index) => ({
         id,
         name,
         attribute,
@@ -2904,6 +2920,7 @@ export class PuzzleEngine {
         damageVoidTurns,
         damageVoidThreshold,
         attributeResistPercentages: [...attributeResistPercentages],
+        resolveThresholdPercent,
         queuedEnemySkills: Math.max(
           0,
           (this.enemySkillQueues[index]?.records.length || 0) - (this.enemySkillQueues[index]?.position || 0),

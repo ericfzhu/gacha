@@ -2,6 +2,25 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 passive resolve
+
+- Recovered type `73` as the ordinary `ESResolve` passive. Its turn tables are
+  inert at `0x62be50`, `0x621c94`, and `0x61c01c`; the type-73 branch of
+  `_checkPassiveSkills` stores low16(`+0x10`) at `sMONSTER+0xafc` in native slot
+  order.
+- Traced the normal trigger inside `_attack2Enemy` at `0x625028`: it computes
+  `ceil(maxHP*threshold/100)` and preserves 1 HP after a lethal hit only when
+  HP began that individual hit at or above the boundary. A subsequent member,
+  secondary, or tertiary hit can kill; absorbed/voided hits and fixed nail
+  damage remain outside the trigger.
+- Ported definition/runtime records, passive lifecycle and pool clearing,
+  no-action/no-RNG scheduling, per-hit combat, snapshots, and visible
+  `RESOLVE >=50%` status. Pure boundary/multi-hit, exact table/symbol, focused
+  browser, generic browser, and production-build checks pass without page
+  errors; the focused 199,880-damage hit leaves exactly 1/92,000 HP.
+- Next: recover the first non-passive live type after this checkpoint; types
+  `74` onward are not assumed actionable from numbering alone.
+
 ## 2026-08-23 passive attribute resistance
 
 - Recovered type `72` as `ESAttributeResist`, an initialization-time passive.

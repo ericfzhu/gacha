@@ -1372,6 +1372,14 @@ export function padEnemyAttributeResistDamage(damage, shieldPercent) {
   return Math.max(0, Math.ceil(incoming * ratio));
 }
 
+// Type 73 stores its low-16-bit threshold at sMONSTER+0xafc. attack2Enemy
+// computes this boundary in binary64 and passes it through izMathCeilingSint64.
+export function padEnemyResolveThresholdHp(maxHp, thresholdPercent) {
+  const hp = Math.max(0, Math.trunc(Number(maxHp) || 0));
+  const percent = Math.trunc(Number(thresholdPercent) || 0) & 0xffff;
+  return percent === 0 ? 0 : Math.ceil((hp / 100) * percent);
+}
+
 // _calcCharge (0x64f220) runs izMathCeiling for every poison combo before it
 // adds that combo to the deferred HP-damage accumulator at game-work+0x8aacc.
 export function padPoisonDamage(maxHp, poisonMatchSizes = [], mortalPoisonMatchSizes = []) {

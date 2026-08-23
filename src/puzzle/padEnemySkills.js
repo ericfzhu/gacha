@@ -41,6 +41,7 @@ export const PAD_ENEMY_SKILL_DEATH_CRY = 69;
 export const PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION = 70;
 export const PAD_ENEMY_SKILL_DAMAGE_VOID = 71;
 export const PAD_ENEMY_SKILL_ATTRIBUTE_RESIST = 72;
+export const PAD_ENEMY_SKILL_RESOLVE = 73;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES_4 = 76;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES = 77;
 export const PAD_ENEMY_SKILL_HORIZONTAL_LINES_4 = 78;
@@ -308,6 +309,17 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       passive: true,
       attributeMask: definition.getInt32(0x10, true) & 0x1f,
       shieldPercent: definition.getInt32(0x14, true) & 0xffff,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_RESOLVE) {
+    requireLength(definitionBytes, 0x14, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'resolve',
+      supported: true,
+      passive: true,
+      hpThresholdPercent: definition.getInt32(0x10, true) & 0xffff,
       attackWithSkillValue,
     });
   }
@@ -1084,6 +1096,21 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_RESOLVE) {
+    requireLength(definitionBytes, 0x14, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'resolve',
+      supported: true,
+      passive: true,
+      hpThresholdPercent: definition.getInt32(0x10, true) & 0xffff,
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (
     type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST
     || type === PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST
@@ -1563,6 +1590,19 @@ export function normalizePadEnemySkillRecord(record) {
       passive: true,
       attributeMask: Math.trunc(Number(record?.attributeMask) || 0) & 0x1f,
       shieldPercent: Math.trunc(Number(record?.shieldPercent) || 0) & 0xffff,
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_RESOLVE || record?.kind === 'resolve') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_RESOLVE,
+      kind: 'resolve',
+      supported: record?.supported !== false,
+      passive: true,
+      hpThresholdPercent: Math.trunc(Number(record?.hpThresholdPercent) || 0) & 0xffff,
       setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null

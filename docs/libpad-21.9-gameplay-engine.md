@@ -861,6 +861,30 @@ reinstalls the five lanes from monster slots on reset. A fire/wood 50% fixture
 therefore converts a 3,948-damage fire hit to 1,974 and renders
 `RES R50%/G50%`.
 
+Enemy skill type `73` is the ordinary resolve passive. Its turn-action
+dispatch, setup, and condition entries are the same inert `0x62be50`,
+`0x621c94`, and `0x61c01c` routes used by other passives. During
+`_checkPassiveSkills`, the type-73 branch at `0x62da80` stores low16(definition
+`+0x10`) at `sMONSTER+0xafc`; later records overwrite earlier records in the
+64-slot scan. DadGuide independently names this field `ESResolve.hp_threshold`.
+
+The normal path is in `_attack2Enemy()` at `0x624998`, not
+`sMONSTER::isHitKonjyou2()` at `0x625794`, which handles the separate type-129
+super-resolve lanes. At `0x625028`, ordinary resolve computes
+`ceil(maxHP * threshold / 100)`. A lethal hit leaves the monster at 1 HP only
+when its current HP at the beginning of that hit is greater than or equal to
+the boundary. Resolve is evaluated for each damage lane, so a later member,
+secondary, or tertiary hit can kill the 1-HP monster. Absorbed and voided hits
+never reach this HP-subtraction path, and later fixed nail damage remains
+independent.
+
+The browser installs and resets the passive through the same monster-slot
+path, excludes it from turn selection and RNG, exposes the threshold in
+snapshots, and renders `RESOLVE >=n%`. A focused one-hit fixture deals 199,880
+damage to a full-health 50%-resolve enemy and leaves it at 1/92,000 HP; pure
+fixtures verify that the next hit kills and that a hit beginning below the
+46,000-HP boundary does not trigger resolve.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

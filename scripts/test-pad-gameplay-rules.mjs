@@ -24,6 +24,7 @@ import {
   PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION,
   PAD_ENEMY_SKILL_DAMAGE_VOID,
   PAD_ENEMY_SKILL_ATTRIBUTE_RESIST,
+  PAD_ENEMY_SKILL_RESOLVE,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -90,6 +91,7 @@ import {
   padCountNonPoisonBlocks,
   padDamageAfterDefense,
   padEnemyAttributeResistDamage,
+  padEnemyResolveThresholdHp,
   padEnhancementPowerMultiplier,
   padEnhancedOrbMultiplier,
   padGetRandomBlock,
@@ -2156,6 +2158,36 @@ assert.throws(
   () => new PuzzleEngine({ enemySkillQueues: [[enemyAiAttributeResistDefinition]] }),
   /passive enemy skills must be installed through monster skill slots/,
 );
+const enemyAiResolveDefinition = enemyAiInactivityDefinition.slice();
+const enemyAiResolveView = new DataView(enemyAiResolveDefinition.buffer);
+enemyAiResolveView.setUint32(0x00, 9_052, true);
+enemyAiResolveView.setInt16(0x04, PAD_ENEMY_SKILL_RESOLVE, true);
+enemyAiResolveView.setInt32(0x10, 50, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiResolveDefinition), {
+  type: 73,
+  kind: 'resolve',
+  supported: true,
+  passive: true,
+  hpThresholdPercent: 50,
+  attackWithSkillValue: 0,
+});
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiResolveDefinition,
+  new Uint8Array(0x680),
+), {
+  type: 73,
+  kind: 'resolve',
+  supported: true,
+  passive: true,
+  hpThresholdPercent: 50,
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
+assert.equal(padEnemyResolveThresholdHp(92_001, 50), 46_001);
+assert.equal(padEnemyResolveThresholdHp(92_000, 0), 0);
+assert.equal(new PuzzleEngine({ seed: 21_900 }).applyEnemySkillDefinition(
+  enemyAiResolveDefinition,
+), false);
 const enemyAiAttributeAbsorbDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiAttributeAbsorbView = new DataView(enemyAiAttributeAbsorbDefinition.buffer);
 enemyAiAttributeAbsorbView.setUint32(0x00, 9_021, true);
@@ -4490,6 +4522,51 @@ assert.deepEqual(
   passiveAttributeResistEngine.enemies[0].attributeResistPercentages,
   [100, 100, 100, 100, 100],
 );
+const resolveMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(resolveMonsterDefinition.buffer).setUint32(0xec, 9_052, true);
+const passiveResolveEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: resolveMonsterDefinition,
+    skillDefinitions: [enemyAiResolveDefinition],
+  }],
+});
+assert.equal(passiveResolveEngine.enemies[0].resolveThresholdPercent, 50);
+passiveResolveEngine.setRngState(21_900);
+assert.equal(passiveResolveEngine.takeEnemySkill(0), null);
+assert.equal(passiveResolveEngine.rng.state, 21_900);
+passiveResolveEngine.enemies[1].hp = 0;
+passiveResolveEngine.party.forEach((member, index) => {
+  member.bindTurns = index === 0 ? 0 : 1;
+});
+passiveResolveEngine.party[0].attack = 100_000;
+passiveResolveEngine.comboCount = 1;
+passiveResolveEngine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+passiveResolveEngine.resolvePlayerTurn();
+assert.equal(passiveResolveEngine.enemies[0].hp, 1);
+passiveResolveEngine.comboCount = 1;
+passiveResolveEngine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+passiveResolveEngine.resolvePlayerTurn();
+assert.equal(passiveResolveEngine.enemies[0].hp, 0);
+passiveResolveEngine.setEnemyAiDefinitionPool(0, null, []);
+assert.equal(passiveResolveEngine.enemies[0].resolveThresholdPercent, 0);
+const belowResolveEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: resolveMonsterDefinition,
+    skillDefinitions: [enemyAiResolveDefinition],
+  }],
+});
+belowResolveEngine.enemies[0].hp = 45_999;
+belowResolveEngine.enemies[1].hp = 0;
+belowResolveEngine.party.forEach((member, index) => {
+  member.bindTurns = index === 0 ? 0 : 2;
+});
+belowResolveEngine.party[0].attack = 100_000;
+belowResolveEngine.comboCount = 1;
+belowResolveEngine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+belowResolveEngine.resolvePlayerTurn();
+assert.equal(belowResolveEngine.enemies[0].hp, 0);
 const comboAbsorbMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(comboAbsorbMonsterDefinition.buffer).setUint32(0xec, 9_046, true);
 const selectedComboAbsorbEngine = new PuzzleEngine({
