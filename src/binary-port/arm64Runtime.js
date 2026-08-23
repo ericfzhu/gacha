@@ -17,6 +17,11 @@ const DEFAULT_MEMORY_PAGES = 768;
 const DEFAULT_MAXIMUM_PAGES = 4096;
 const DEFAULT_MEMORY_BIAS = 0x200000;
 const RETURN_SENTINEL = 0xffffffffffffffffn;
+// Keep the public Wasm URL versioned because a stale interpreter can accept
+// the APK bootstrap and then fail much later in a native frame callback. The
+// version identifies the decoder generation that includes the live NEG.2S,
+// USHL.2S, CCMP/CCMN, LDPSW, and scalar ADDP frame instructions.
+export const ARM64_CORE_SOURCE = '/wasm/arm64_core.wasm?v=20260823-frame2';
 const R_AARCH64_RELATIVE = 1027;
 const R_AARCH64_ABS64 = 257;
 const R_AARCH64_GLOB_DAT = 1025;
@@ -28,10 +33,10 @@ function hex(value, width = 0) {
 }
 
 export class Arm64Runtime {
-  static async create(source = '/wasm/arm64_core.wasm') {
+  static async create(source = ARM64_CORE_SOURCE) {
     const memory = new WebAssembly.Memory({ initial: DEFAULT_MEMORY_PAGES, maximum: DEFAULT_MAXIMUM_PAGES });
     const bytes = typeof source === 'string'
-      ? await fetch(source).then((response) => {
+      ? await fetch(source, { cache: 'no-store' }).then((response) => {
         if (!response.ok) throw new Error(`Unable to load ARM64 Wasm core (${response.status})`);
         return response.arrayBuffer();
       })

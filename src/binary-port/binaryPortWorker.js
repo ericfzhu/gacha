@@ -92,11 +92,11 @@ self.onmessage = async ({ data }) => {
   try {
     const { sourceName, runtimeFiles } = data;
     self.postMessage({ type: 'progress', instructions: 0, phase: 'mapping apk' });
-    const probeRuntime = await Arm64Runtime.create('/wasm/arm64_core.wasm');
+    const probeRuntime = await Arm64Runtime.create();
     const elf = probeRuntime.loadElf(runtimeFiles.libpad);
     const probe = probeRuntime.runLibpadProbe(true);
     const constructor = probeRuntime.runToFirstSyscall();
-    const runtime = await Arm64Runtime.create('/wasm/arm64_core.wasm');
+    const runtime = await Arm64Runtime.create();
     runtime.loadElf(runtimeFiles.lib6dba);
     const wrapperPath = '/data/app/jp.gungho.pad/lib/arm64/lib__6dba__.so';
     const padPath = '/data/app/jp.gungho.pad/lib/arm64/libpad.so';

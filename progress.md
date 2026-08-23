@@ -106,6 +106,10 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
 
 ## 2026-08-23 protected-startup speed and touched-frame fidelity
 
+- Versioned the browser's public ARM64-core URL and fetch it with `no-store` so
+  an older cached Wasm decoder cannot complete the protected startup and then
+  reproduce the fixed `NEG.2S` frame-callback fault. The page and worker now use
+  the same decoder URL rather than the worker bypassing the default version.
 - Profiled the exact APK bootstrap at 151,900,682 guest instructions. The
   protection wrapper accounts for 151,793,049 of those instructions, while
   `libpad.so` itself accounts for only 107,633, so startup cost is dominated by
