@@ -68,6 +68,7 @@ export const PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM = 97;
 export const PAD_ENEMY_SKILL_STICKY_BLIND_FIXED = 98;
 export const PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS = 99;
 export const PAD_ENEMY_SKILL_ORB_SEAL_ROWS = 100;
+export const PAD_ENEMY_SKILL_FIXED_START = 101;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -355,6 +356,18 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       supported: true,
       positionMask: definition.getUint32(0x10, true) & 0x1f,
       durationTurns: definition.getInt32(0x14, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_FIXED_START) {
+    requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'fixedStart',
+      supported: true,
+      randomPosition: definition.getInt32(0x10, true) !== 0,
+      authoredColumn: definition.getInt32(0x14, true),
+      authoredRowFromBottom: definition.getInt32(0x18, true),
       attackWithSkillValue,
     });
   }
@@ -1310,6 +1323,21 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
   if (type === PAD_ENEMY_SKILL_ORB_SEAL_ROWS) {
     return decodePadEnemySkillDefinition(definitionBytes);
   }
+  if (type === PAD_ENEMY_SKILL_FIXED_START) {
+    requireLength(monsterBytes, 0x680, 'PAD monster runtime');
+    return Object.freeze({
+      type,
+      kind: 'fixedStart',
+      supported: true,
+      fixedColumn: monster.getInt32(0x678, true),
+      fixedRow: monster.getInt32(0x67c, true),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -2088,6 +2116,28 @@ export function normalizePadEnemySkillRecord(record) {
       positionMask: Math.trunc(Number(record?.positionMask) || 0) & 0x1f,
       durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)) & 0x3ff,
       setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_FIXED_START || record?.kind === 'fixedStart') {
+    const positionPresent = record?.fixedColumn !== undefined && record?.fixedRow !== undefined;
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_FIXED_START,
+      kind: 'fixedStart',
+      supported: record?.supported !== false,
+      ...(positionPresent
+        ? {
+          fixedColumn: Math.trunc(Number(record.fixedColumn) || 0),
+          fixedRow: Math.trunc(Number(record.fixedRow) || 0),
+        }
+        : {
+          randomPosition: Boolean(record?.randomPosition),
+          authoredColumn: Math.trunc(Number(record?.authoredColumn) || 0),
+          authoredRowFromBottom: Math.trunc(Number(record?.authoredRowFromBottom) || 0),
+        }),
+      setupMaterialized: Boolean(record?.setupMaterialized || positionPresent),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

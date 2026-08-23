@@ -559,12 +559,22 @@ function render(ctx, engine) {
       const orb = engine.board[row][column];
       if (!orb) continue;
       const isHeld = engine.drag?.row === row && engine.drag?.column === column;
+      const isForcedStartTarget = engine.forcedStart?.row === row
+        && engine.forcedStart?.column === column;
+      const forceStartAlpha = engine.forcedStart && !isForcedStartTarget ? 0.38 : 1;
       if (isHeld) {
         ctx.fillStyle = 'rgba(255,255,255,.08)';
         ctx.beginPath();
         ctx.arc(x + board.cell / 2, y + board.cell / 2, board.cell * 0.36, 0, Math.PI * 2);
         ctx.fill();
-      } else drawOrb(ctx, orb, x + board.cell / 2, y + board.cell / 2, board.cell * 0.386);
+      } else drawOrb(
+        ctx,
+        orb,
+        x + board.cell / 2,
+        y + board.cell / 2,
+        board.cell * 0.386,
+        forceStartAlpha,
+      );
     }
   }
 
@@ -621,6 +631,29 @@ function render(ctx, engine) {
       );
       ctx.shadowColor = 'transparent';
     }
+  }
+
+  if (engine.forcedStart) {
+    const x = board.x + (engine.forcedStart.column + 0.5) * board.cell;
+    const y = board.y + (engine.forcedStart.row + 0.5) * board.cell;
+    ctx.save();
+    ctx.strokeStyle = '#fff2a6';
+    ctx.fillStyle = 'rgba(255, 210, 75, .2)';
+    ctx.lineWidth = 4;
+    ctx.shadowColor = '#ffcb33';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.arc(x, y, board.cell * 0.44, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x - board.cell * 0.18, y);
+    ctx.lineTo(x + board.cell * 0.18, y);
+    ctx.moveTo(x, y - board.cell * 0.18);
+    ctx.lineTo(x, y + board.cell * 0.18);
+    ctx.stroke();
+    ctx.restore();
   }
 
   if (engine.drag) {

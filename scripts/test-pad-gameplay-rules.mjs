@@ -22,6 +22,7 @@ import {
   PAD_ENEMY_SKILL_STICKY_BLIND_FIXED,
   PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS,
   PAD_ENEMY_SKILL_ORB_SEAL_ROWS,
+  PAD_ENEMY_SKILL_FIXED_START,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1261,6 +1262,38 @@ assert.deepEqual(decodePadEnemySkillRuntime(
   supported: true,
   positionMask: 0b01010,
   durationTurns: 2,
+  attackWithSkillValue: 0,
+});
+const enemyAiFixedStartDefinition = enemyAiOrbSealRowsDefinition.slice();
+const enemyAiFixedStartView = new DataView(enemyAiFixedStartDefinition.buffer);
+enemyAiFixedStartView.setUint32(0x00, 9_081, true);
+enemyAiFixedStartView.setInt16(0x04, PAD_ENEMY_SKILL_FIXED_START, true);
+enemyAiFixedStartView.setInt32(0x10, 1, true);
+enemyAiFixedStartView.setInt32(0x14, 0, true);
+enemyAiFixedStartView.setInt32(0x18, 0, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiFixedStartDefinition), {
+  type: 101,
+  kind: 'fixedStart',
+  supported: true,
+  randomPosition: true,
+  authoredColumn: 0,
+  authoredRowFromBottom: 0,
+  attackWithSkillValue: 0,
+});
+const fixedStartRuntime = new Uint8Array(0x680);
+const fixedStartRuntimeView = new DataView(fixedStartRuntime.buffer);
+fixedStartRuntimeView.setInt32(0x678, 5, true);
+fixedStartRuntimeView.setInt32(0x67c, 2, true);
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiFixedStartDefinition,
+  fixedStartRuntime,
+), {
+  type: 101,
+  kind: 'fixedStart',
+  supported: true,
+  fixedColumn: 5,
+  fixedRow: 2,
+  setupMaterialized: true,
   attackWithSkillValue: 0,
 });
 assert.deepEqual(decodePadEnemySkillRuntime(
@@ -5054,6 +5087,73 @@ assert.deepEqual(rejectedOrbSealRowsState.orbSealRows, {
   positionMask: 0,
   turnsRemaining: 0,
 });
+
+const directFixedStartEngine = new PuzzleEngine({ seed: 21_900 });
+directFixedStartEngine.orbSealRowMask = 0b01010;
+directFixedStartEngine.orbSealRowTurns = 2;
+directFixedStartEngine.setRngState(21_900);
+assert.equal(directFixedStartEngine.applyEnemySkillDefinition(
+  enemyAiFixedStartDefinition,
+), true);
+assert.deepEqual(directFixedStartEngine.snapshot().forcedStart, { row: 0, column: 5 });
+assert.equal(directFixedStartEngine.rng.state, padLcgStep(padLcgStep(21_900).state).state);
+directFixedStartEngine.start();
+assert.equal(directFixedStartEngine.startDrag(0, 4), false);
+assert.equal(directFixedStartEngine.startDrag(0, 5), true);
+assert.equal(directFixedStartEngine.endDrag(), true);
+assert.equal(directFixedStartEngine.snapshot().forcedStart, null);
+
+const fixedCoordinateStartDefinition = enemyAiFixedStartDefinition.slice();
+const fixedCoordinateStartView = new DataView(fixedCoordinateStartDefinition.buffer);
+fixedCoordinateStartView.setInt32(0x10, 0, true);
+fixedCoordinateStartView.setInt32(0x14, 3, true);
+fixedCoordinateStartView.setInt32(0x18, 2, true);
+const fixedCoordinateStartEngine = new PuzzleEngine({ seed: 21_900 });
+fixedCoordinateStartEngine.setRngState(21_900);
+assert.equal(fixedCoordinateStartEngine.applyEnemySkillDefinition(
+  fixedCoordinateStartDefinition,
+), true);
+assert.deepEqual(fixedCoordinateStartEngine.snapshot().forcedStart, { row: 3, column: 2 });
+assert.equal(fixedCoordinateStartEngine.rng.state, 21_900);
+
+const fixedStartMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(fixedStartMonsterDefinition.buffer).setUint32(0xec, 9_081, true);
+const selectedFixedStartEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: fixedStartMonsterDefinition,
+    skillDefinitions: [enemyAiFixedStartDefinition],
+  }],
+});
+selectedFixedStartEngine.enemies[0].counter = 1;
+selectedFixedStartEngine.enemies[1].counter = 99;
+selectedFixedStartEngine.setRngState(21_900);
+selectedFixedStartEngine.resolveEnemyTurn();
+const selectedFixedStartState = selectedFixedStartEngine.snapshot();
+assert.equal(selectedFixedStartState.lastEnemyActions[0].skill.type, 101);
+assert.deepEqual(selectedFixedStartState.forcedStart, { row: 2, column: 5 });
+assert.equal(selectedFixedStartState.rngState, padLcgStep(
+  padLcgStep(padLcgStep(21_900).state).state,
+).state);
+assert.equal(selectedFixedStartState.player.hp, 12_000);
+assert.equal(selectedFixedStartState.message, 'Your next move must start at row 3, column 6.');
+
+const rejectedFixedStartEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: fixedStartMonsterDefinition,
+    skillDefinitions: [enemyAiFixedStartDefinition],
+  }],
+});
+rejectedFixedStartEngine.forcedStart = { row: 0, column: 0 };
+rejectedFixedStartEngine.enemies[0].counter = 1;
+rejectedFixedStartEngine.enemies[1].counter = 99;
+rejectedFixedStartEngine.setRngState(21_900);
+rejectedFixedStartEngine.resolveEnemyTurn();
+const rejectedFixedStartState = rejectedFixedStartEngine.snapshot();
+assert.equal(rejectedFixedStartState.lastEnemyActions[0].kind, 'attack');
+assert.equal(rejectedFixedStartState.rngState, 21_900);
+assert.deepEqual(rejectedFixedStartState.forcedStart, { row: 0, column: 0 });
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;

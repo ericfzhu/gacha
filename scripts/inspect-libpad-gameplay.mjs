@@ -358,6 +358,30 @@ const ORB_SEAL_ROWS_INSTRUCTION_ANCHORS = Object.freeze([
   [0x61a698, 0x797f1728], // then the paired column-seal status
   [0x61bb68, 0x7200251f], // admit only when the paired counter is empty
 ]);
+const FIXED_START_ENEMY_SKILL_TYPE = 101;
+const FIXED_START_HANDLER = 0x62a030;
+const FIXED_START_SETUP_HANDLER = 0x6205c0;
+const FIXED_START_CONDITION_HANDLER = 0x61abac;
+const FIXED_START_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x6205c0, 0xb94012a8], // +0x10 selects random versus authored coordinates
+  [0x621e80, 0xb94016a8], // fixed path loads one-based authored column
+  [0x621e9c, 0xb9067a60], // store clipped zero-based column at runtime +0x678
+  [0x621ea8, 0xb9401aa8], // fixed path loads authored row from the bottom
+  [0x621eb8, 0xb9067e60], // store transformed row at runtime +0x67c
+  [0x622120, 0xf9404489], // random path returns to shared game-work RNG
+  [0x622130, 0xb86a692b], // load and advance shared LCG for column selection
+  [0x622150, 0xf9404488], // optional second draw selects a random row
+  [0x622180, 0xb9067a69], // persist selected column at runtime +0x678
+  [0x622184, 0xb9067e68], // persist selected row at runtime +0x67c
+  [0x61abac, 0x528e9d88], // condition addresses protected force-start column
+  [0x61abb8, 0x97f3c652], // load its protected value
+  [0x61abc0, 0x36f8a2e8], // existing nonnegative coordinate rejects reapply
+  [0x62a034, 0xb9467a61], // execution loads prepared column
+  [0x62a048, 0x97f3f9a2], // store protected column at +0x874ec
+  [0x62a050, 0xb9467e61], // execution loads prepared row
+  [0x62a060, 0x97f3f99c], // store protected row at +0x874fc
+  [0x62a06c, 0x97f4207d], // activate the one-move force-start presentation
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -1376,6 +1400,25 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : orbSealRowsConditionTarget === ORB_SEAL_ROWS_CONDITION_HANDLER;
   const orbSealRowsInstructionAnchorsMatch = restoredElf === null ? null
     : ORB_SEAL_ROWS_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
+  const fixedStartDispatchTarget = resolveEnemySkillTarget(
+    FIXED_START_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const fixedStartSetupTarget = resolveEnemySkillTarget(
+    FIXED_START_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const fixedStartConditionTarget = resolveEnemySkillTarget(
+    FIXED_START_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const fixedStartDispatchMatches = fixedStartDispatchTarget === null
+    ? null : fixedStartDispatchTarget === FIXED_START_HANDLER;
+  const fixedStartSetupMatches = fixedStartSetupTarget === null
+    ? null : fixedStartSetupTarget === FIXED_START_SETUP_HANDLER;
+  const fixedStartConditionMatches = fixedStartConditionTarget === null
+    ? null : fixedStartConditionTarget === FIXED_START_CONDITION_HANDLER;
+  const fixedStartInstructionAnchorsMatch = restoredElf === null ? null
+    : FIXED_START_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
@@ -2400,6 +2443,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       orbSealRowsSetupMatches21_9: orbSealRowsSetupMatches,
       orbSealRowsConditionMatches21_9: orbSealRowsConditionMatches,
       orbSealRowsInstructionAnchorsMatch21_9: orbSealRowsInstructionAnchorsMatch,
+      fixedStartDispatchMatches21_9: fixedStartDispatchMatches,
+      fixedStartSetupMatches21_9: fixedStartSetupMatches,
+      fixedStartConditionMatches21_9: fixedStartConditionMatches,
+      fixedStartInstructionAnchorsMatch21_9: fixedStartInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -2990,6 +3037,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       orbSealRowsInstructionAnchorsMatch21_9: orbSealRowsInstructionAnchorsMatch,
       orbSealRowsSemantics:
         'type 100 reads the authored +0x10 position bitmap without setup RNG, converts it to a low-eight-bit native row mask at protected sGAMEWORK+0x8750c, installs the +0x14 low-ten-bit duration at +0x8751c with the native fresh edge, and shares type 99 condition 0x61a678 so neither tape orientation stacks over an active seal',
+      fixedStartType: FIXED_START_ENEMY_SKILL_TYPE,
+      fixedStartDispatchTarget: fixedStartDispatchTarget === null
+        ? null : hex(fixedStartDispatchTarget),
+      fixedStartDispatchMatches21_9: fixedStartDispatchMatches,
+      fixedStartSetupTarget: fixedStartSetupTarget === null
+        ? null : hex(fixedStartSetupTarget),
+      fixedStartSetupMatches21_9: fixedStartSetupMatches,
+      fixedStartConditionTarget: fixedStartConditionTarget === null
+        ? null : hex(fixedStartConditionTarget),
+      fixedStartConditionMatches21_9: fixedStartConditionMatches,
+      fixedStartInstructionAnchorsMatch21_9: fixedStartInstructionAnchorsMatch,
+      fixedStartSemantics:
+        'type 101 uses +0x10 as random-position mode; random setup spends two shared-LCG draws and avoids one active tape orientation where possible, while fixed mode converts one-based +0x14 column and bottom-origin +0x18 row without RNG; execution stores the prepared cell at protected +0x874ec/+0x874fc and activates a one-move forced start, while its condition rejects an already active coordinate',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -3516,6 +3576,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || orbSealRowsSetupMatches === false
     || orbSealRowsConditionMatches === false
     || orbSealRowsInstructionAnchorsMatch === false
+    || fixedStartDispatchMatches === false
+    || fixedStartSetupMatches === false
+    || fixedStartConditionMatches === false
+    || fixedStartInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

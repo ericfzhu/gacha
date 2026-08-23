@@ -1295,6 +1295,31 @@ fixture seals rows 1 and 3 for two turns, blocks starting within or crossing
 into those rows, and resumes the exact traced movement after expiry. Horizontal
 magenta tape bands make the affected rows and remaining turns explicit.
 
+Enemy skill type `101` fixes the starting cell of the player's next move. Its
+dispatch, setup, and condition targets are `0x62a030`, `0x6205c0`, and
+`0x61abac`; the independent parser identifies it as `ESFixedStart`. Definition
+`+0x10` chooses random-position mode. When it is zero, setup converts the
+one-based `+0x14` column to zero-based board space and transforms the
+bottom-origin `+0x18` row to the engine's top-origin row, clipping both without
+touching the LCG.
+
+Random mode spends exactly two shared-LCG draws. With active column tape it
+first chooses among unsealed columns and then chooses any row; otherwise, with
+active row tape it chooses an unsealed row and then any column. With neither
+tape it chooses column then row over the full board. Execution stores the
+prepared signed-byte coordinates at protected `sGAMEWORK+0x874ec/+0x874fc`,
+activates force-start presentation, and native `doForceStart` marks every
+non-target cell with block flag `0x2000`. Condition `0x61abac` rejects the skill
+while the protected column is already nonnegative, and the force-start state is
+cleared after the constrained move.
+
+The browser enforces the same one-move input contract: all non-target cells are
+dimmed, the target receives a bright crosshair ring, drag start is rejected
+away from that cell, and release clears the restriction. From seed 21900 on a
+6×5 board, direct random setup selects bottom-left `(4,0)` and ends at shared
+state 3803934822; after the ordinary AI-selection draw, the scheduled fixture
+selects `(2,5)` and ends at 1929471377.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

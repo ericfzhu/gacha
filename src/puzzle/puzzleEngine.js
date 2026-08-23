@@ -57,6 +57,7 @@ import {
   PAD_ENEMY_SKILL_STICKY_BLIND_FIXED,
   PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS,
   PAD_ENEMY_SKILL_ORB_SEAL_ROWS,
+  PAD_ENEMY_SKILL_FIXED_START,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -329,6 +330,7 @@ export class PuzzleEngine {
     this.orbSealColumnTurns = 0;
     this.orbSealRowMask = 0;
     this.orbSealRowTurns = 0;
+    this.forcedStart = null;
     this.leaderSwapTurns = 0;
     this.leaderSwapIndex = null;
     this.enemySkillQueues.forEach((queue) => { queue.position = 0; });
@@ -469,6 +471,9 @@ export class PuzzleEngine {
   startDrag(row, column, pointerX = 0, pointerY = 0, gridColumn = column + 0.5, gridRow = row + 0.5) {
     if (this.mode !== 'playing' || this.phase !== 'input' || this.drag) return false;
     if (!this.isCell(row, column) || this.isOrbSealed(row, column)) return false;
+    if (this.forcedStart && (
+      row !== this.forcedStart.row || column !== this.forcedStart.column
+    )) return false;
     this.lastThornDamage = 0;
     this.hpResolutionApplied = false;
     this.drag = { row, column, pointerX, pointerY, gridColumn, gridRow, remaining: this.moveTime, pathLength: 0 };
@@ -535,6 +540,7 @@ export class PuzzleEngine {
     // active-touch value 1. Its swap counter only drives movement effects, so
     // releasing the selected orb without crossing a cell still spends a turn.
     this.drag = null;
+    this.forcedStart = null;
     this.turn += 1;
     this.comboCount = 0;
     this.cascadeDepth = 0;
@@ -1251,6 +1257,7 @@ export class PuzzleEngine {
       skillSealTurns: this.skillSealTurns,
       awakeningBindTurns: this.awakeningBindTurns,
       orbSealActive: this.orbSealColumnTurns > 0 || this.orbSealRowTurns > 0,
+      forcedStartActive: Boolean(this.forcedStart),
       enemyAttribute: PAD_ATTRIBUTE_INDEX[enemy.attribute] ?? -1,
       playerCurrentHp: this.player.hp,
       playerMaxHp: this.player.maxHp,
@@ -1629,6 +1636,42 @@ export class PuzzleEngine {
     }
     if (skill.supported && skill.kind === 'stickyBlindFixed' && !skill.setupMaterialized) {
       return Object.freeze({ ...record, runtimeControl: 0, setupMaterialized: true });
+    }
+    if (skill.supported && skill.kind === 'fixedStart' && !skill.setupMaterialized) {
+      if (!skill.randomPosition) {
+        return Object.freeze({
+          ...record,
+          fixedColumn: Math.max(0, Math.min(this.columns - 1, skill.authoredColumn - 1)),
+          fixedRow: Math.max(0, Math.min(
+            this.rows - 1,
+            this.rows - skill.authoredRowFromBottom,
+          )),
+          setupMaterialized: true,
+        });
+      }
+      const choose = (candidates) => {
+        const roll = this.rng.nextUint16();
+        return candidates[Math.imul(roll, candidates.length) >>> 16];
+      };
+      let fixedColumn;
+      let fixedRow;
+      if (this.orbSealColumnTurns > 0) {
+        const candidates = Array.from({ length: this.columns }, (_, column) => column)
+          .filter((column) => (this.orbSealColumnMask & (1 << column)) === 0);
+        fixedColumn = choose(candidates.length > 0
+          ? candidates : Array.from({ length: this.columns }, (_, column) => column));
+        fixedRow = choose(Array.from({ length: this.rows }, (_, row) => row));
+      } else if (this.orbSealRowTurns > 0) {
+        const candidates = Array.from({ length: this.rows }, (_, row) => row)
+          .filter((row) => (this.orbSealRowMask & (1 << row)) === 0);
+        fixedRow = choose(candidates.length > 0
+          ? candidates : Array.from({ length: this.rows }, (_, row) => row));
+        fixedColumn = choose(Array.from({ length: this.columns }, (_, column) => column));
+      } else {
+        fixedColumn = choose(Array.from({ length: this.columns }, (_, column) => column));
+        fixedRow = choose(Array.from({ length: this.rows }, (_, row) => row));
+      }
+      return Object.freeze({ ...record, fixedColumn, fixedRow, setupMaterialized: true });
     }
     if (skill.supported && skill.kind === 'activeSkillSeal' && !skill.setupMaterialized) {
       return Object.freeze({
@@ -2232,6 +2275,14 @@ export class PuzzleEngine {
       this.message = `${count} row${count === 1 ? '' : 's'} sealed for ${this.orbSealRowTurns} turn${this.orbSealRowTurns === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'fixedStart') {
+      const column = Math.max(0, Math.min(this.columns - 1, skill.fixedColumn));
+      const row = Math.max(0, Math.min(this.rows - 1, skill.fixedRow));
+      this.forcedStart = { row, column };
+      this.lastEnemySkill = Object.freeze({ ...skill, fixedColumn: column, fixedRow: row });
+      this.message = `Your next move must start at row ${row + 1}, column ${column + 1}.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'clearPlayerBuffs') {
       // _doItetukuHadou clears both recovered sGAMEWORK positive-status lanes,
       // then type 6 invokes _applyLeaderSkill(false). Leader effects in this
@@ -2767,6 +2818,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_STICKY_BLIND_FIXED,
         PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS,
         PAD_ENEMY_SKILL_ORB_SEAL_ROWS,
+        PAD_ENEMY_SKILL_FIXED_START,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -3404,6 +3456,7 @@ export class PuzzleEngine {
         positionMask: this.orbSealRowMask,
         turnsRemaining: this.orbSealRowTurns,
       },
+      forcedStart: this.forcedStart ? { ...this.forcedStart } : null,
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({
         code: ORB_BY_ID[orb.type].code,

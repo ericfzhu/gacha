@@ -21,6 +21,7 @@ import {
   PAD_ENEMY_SKILL_STICKY_BLIND_FIXED,
   PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS,
   PAD_ENEMY_SKILL_ORB_SEAL_ROWS,
+  PAD_ENEMY_SKILL_FIXED_START,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -187,6 +188,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_STICKY_BLIND_FIXED,
     PAD_ENEMY_SKILL_ORB_SEAL_COLUMNS,
     PAD_ENEMY_SKILL_ORB_SEAL_ROWS,
+    PAD_ENEMY_SKILL_FIXED_START,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
     PAD_ENEMY_SKILL_DEFENSE_BOOST,
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -573,6 +575,11 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
     const eligible = !state.orbSealActive;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
+  if (definition.effect.type === PAD_ENEMY_SKILL_FIXED_START) {
+    // 0x61abac admits only while protected force-start column is signed -1.
+    const eligible = !state.forcedStartActive;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
   if (definition.effect.type === PAD_ENEMY_SKILL_BIND_LEADER_HELPER) {
     const party = Array.isArray(state.party) ? state.party : [];
     const eligible = (
@@ -695,6 +702,7 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
         : Math.max(0, Math.trunc(Number(rule.turnsRemaining) || 0)),
     })),
     orbSealActive: Boolean(state.orbSealActive),
+    forcedStartActive: Boolean(state.forcedStartActive),
     scaledAttackGate: Math.trunc(Number(state.scaledAttackGate) || 0),
     enemyAttackBoostTurns: Math.max(0, Math.trunc(Number(state.enemyAttackBoostTurns) || 0)),
     enemyBaseAttack: Math.max(0, Math.trunc(Number(state.enemyBaseAttack) || 0)),

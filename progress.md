@@ -2,6 +2,24 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 type-101 fixed move start
+
+- Recovered type `101` at dispatch/setup/condition `0x62a030`, `0x6205c0`, and
+  `0x61abac`; the independent parser corroborates `ESFixedStart`.
+- Definition `+0x10` selects random mode. Fixed mode converts one-based `+0x14`
+  column and bottom-origin `+0x18` row without RNG. Random mode spends two
+  shared draws, avoiding the active tape orientation where possible, and
+  stores coordinates at runtime `+0x678/+0x67c`.
+- Execution installs protected coordinates at `sGAMEWORK+0x874ec/+0x874fc` and
+  activates the one-move forced-start presentation; condition rejects an
+  existing nonnegative coordinate. Native `doForceStart` marks every non-target
+  cell with block flag `0x2000` and clears the state after that move.
+- Ported decoding/runtime/materialization, exact tape-aware RNG ordering, AI
+  admission, one-move input enforcement, reset/snapshot, dimmed non-targets,
+  and a bright target crosshair. Pure rules, focused Chromium, screenshot
+  inspection, generic browser client, full native inspector with eighteen exact
+  anchors, and production build pass. Next: type `102`.
+
 ## 2026-08-24 type-100 row orb seal
 
 - Recovered type `100` at dispatch/setup/condition `0x629fbc`, `0x6217c0`, and
