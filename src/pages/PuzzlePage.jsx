@@ -491,6 +491,22 @@ function render(ctx, engine) {
     ctx.fillText(`SKY ${skyfallText}`, 434, playerStatusY);
     playerStatusY += 12;
   }
+  const activeLockedSkyfallRules = (engine.lockFallRules || []).filter((rule) => (
+    rule.turnsRemaining != null && rule.turnsRemaining > 0
+  ));
+  if (activeLockedSkyfallRules.length > 0) {
+    const lockedSkyfallText = activeLockedSkyfallRules.map((rule) => {
+      const types = ORB_TYPES
+        .filter((_, type) => (rule.typeMask & (1 << type)) !== 0)
+        .map((orb) => orb.code)
+        .join('/');
+      return `${types} ${rule.chancePercent}% ${rule.turnsRemaining}T`;
+    }).join(' · ');
+    ctx.fillStyle = '#cdd8ff';
+    ctx.font = '700 9px "Barlow Condensed", sans-serif';
+    ctx.fillText(`LOCK SKY ${lockedSkyfallText}`, 434, playerStatusY);
+    playerStatusY += 12;
+  }
   if (Number(engine.awakeningBindTurns || 0) > 0) {
     ctx.fillStyle = '#ffd2f1';
     ctx.font = '700 9px "Barlow Condensed", sans-serif';

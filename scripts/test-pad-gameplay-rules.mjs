@@ -17,6 +17,7 @@ import {
   PAD_ENEMY_SKILL_NATIVE_NO_EFFECT,
   PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS,
   PAD_ENEMY_SKILL_ENEMY_ESCAPE,
+  PAD_ENEMY_SKILL_LOCKED_SKYFALL,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1102,6 +1103,42 @@ assert.deepEqual(decodePadEnemySkillRuntime(
   type: 95,
   kind: 'enemyEscape',
   supported: true,
+  attackWithSkillValue: 0,
+});
+const enemyAiLockedSkyfallDefinition = enemyAiEnemyEscapeDefinition.slice();
+const enemyAiLockedSkyfallView = new DataView(enemyAiLockedSkyfallDefinition.buffer);
+enemyAiLockedSkyfallView.setUint32(0x00, 9_076, true);
+enemyAiLockedSkyfallView.setInt16(0x04, PAD_ENEMY_SKILL_LOCKED_SKYFALL, true);
+enemyAiLockedSkyfallView.setUint32(0x10, 0b1, true);
+enemyAiLockedSkyfallView.setInt32(0x14, 2, true);
+enemyAiLockedSkyfallView.setInt32(0x18, 4, true);
+enemyAiLockedSkyfallView.setInt32(0x1c, 100, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiLockedSkyfallDefinition), {
+  type: 96,
+  kind: 'lockedSkyfall',
+  supported: true,
+  typeMask: 0b1,
+  durationMin: 2,
+  durationMax: 4,
+  chancePercent: 100,
+  attackWithSkillValue: 0,
+});
+const lockedSkyfallRuntime = new Uint8Array(0x684);
+const lockedSkyfallRuntimeView = new DataView(lockedSkyfallRuntime.buffer);
+lockedSkyfallRuntimeView.setUint32(0x678, 0b1, true);
+lockedSkyfallRuntimeView.setInt32(0x67c, 4, true);
+lockedSkyfallRuntimeView.setInt32(0x680, 100, true);
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiLockedSkyfallDefinition,
+  lockedSkyfallRuntime,
+), {
+  type: 96,
+  kind: 'lockedSkyfall',
+  supported: true,
+  typeMask: 0b1,
+  durationTurns: 4,
+  chancePercent: 100,
+  setupMaterialized: true,
   attackWithSkillValue: 0,
 });
 assert.deepEqual(decodePadEnemySkillRuntime(
@@ -4621,6 +4658,68 @@ assert.equal(selectedEnemyEscapeState.enemies[1].hp, 76_000);
 assert.equal(selectedEnemyEscapeState.player.hp, 12_000);
 assert.equal(selectedEnemyEscapeState.rngState, padLcgStep(21_900).state);
 assert.equal(selectedEnemyEscapeState.message, 'Verdant Shell escaped.');
+
+const lockedSkyfallMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(lockedSkyfallMonsterDefinition.buffer).setUint32(0xec, 9_076, true);
+const selectedLockedSkyfallEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: lockedSkyfallMonsterDefinition,
+    skillDefinitions: [enemyAiLockedSkyfallDefinition],
+  }],
+});
+selectedLockedSkyfallEngine.enemies[0].counter = 1;
+selectedLockedSkyfallEngine.enemies[1].counter = 99;
+selectedLockedSkyfallEngine.setRngState(21_900);
+selectedLockedSkyfallEngine.resolveEnemyTurn();
+const selectedLockedSkyfallState = selectedLockedSkyfallEngine.snapshot();
+assert.equal(selectedLockedSkyfallState.lastEnemyActions[0].skill.type, 96);
+assert.equal(selectedLockedSkyfallState.lastEnemyActions[0].skill.durationTurns, 4);
+assert.deepEqual(selectedLockedSkyfallState.lockFallRules, [{
+  typeMask: 1,
+  chancePercent: 100,
+  turnsRemaining: 4,
+  source: 'enemySkill',
+}]);
+assert.equal(selectedLockedSkyfallState.player.hp, 12_000);
+assert.equal(selectedLockedSkyfallState.rngState, padLcgStep(padLcgStep(21_900).state).state);
+selectedLockedSkyfallEngine.setBoardFromCodes(Array(5).fill('DDDDDD'));
+selectedLockedSkyfallEngine.setTopLineDropTypes(Array(6).fill(0));
+selectedLockedSkyfallEngine.board[0][0] = null;
+selectedLockedSkyfallEngine.collapseAndRefill();
+assert.equal(selectedLockedSkyfallEngine.board[0][0].type, 'fire');
+assert.equal(selectedLockedSkyfallEngine.board[0][0].locked, true);
+selectedLockedSkyfallEngine.advanceLockFallRules();
+selectedLockedSkyfallEngine.advanceLockFallRules();
+selectedLockedSkyfallEngine.advanceLockFallRules();
+selectedLockedSkyfallEngine.advanceLockFallRules();
+assert.deepEqual(selectedLockedSkyfallEngine.lockFallRules, []);
+selectedLockedSkyfallEngine.applyEnemySkillDefinition(enemyAiLockedSkyfallDefinition);
+assert.equal(selectedLockedSkyfallEngine.lockFallRules.length, 1);
+selectedLockedSkyfallEngine.reset();
+assert.deepEqual(selectedLockedSkyfallEngine.lockFallRules, []);
+
+const rejectedLockedSkyfallEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: lockedSkyfallMonsterDefinition,
+    skillDefinitions: [enemyAiLockedSkyfallDefinition],
+  }],
+});
+rejectedLockedSkyfallEngine.setLockFallRules([{
+  typeMask: 1,
+  chancePercent: 50,
+  turnsRemaining: 3,
+  source: 'enemySkill',
+}]);
+rejectedLockedSkyfallEngine.enemies[0].counter = 1;
+rejectedLockedSkyfallEngine.enemies[1].counter = 99;
+rejectedLockedSkyfallEngine.setRngState(21_900);
+rejectedLockedSkyfallEngine.resolveEnemyTurn();
+const rejectedLockedSkyfallState = rejectedLockedSkyfallEngine.snapshot();
+assert.equal(rejectedLockedSkyfallState.lastEnemyActions[0].kind, 'attack');
+assert.equal(rejectedLockedSkyfallState.rngState, 21_900);
+assert.equal(rejectedLockedSkyfallState.lockFallRules.length, 1);
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;

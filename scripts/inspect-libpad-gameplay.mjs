@@ -267,6 +267,29 @@ const ENEMY_ESCAPE_INSTRUCTION_ANCHORS = Object.freeze([
   [0x629f04, 0x3900e268], // persist the escape/removal state byte
   [0x61c01c, 0xbd400fe0], // return incoming float32 condition scale unchanged
 ]);
+const LOCKED_SKYFALL_ENEMY_SKILL_TYPE = 96;
+const LOCKED_SKYFALL_HANDLER = 0x629f0c;
+const LOCKED_SKYFALL_SETUP_HANDLER = 0x6200a4;
+const LOCKED_SKYFALL_CONDITION_HANDLER = 0x61b790;
+const LOCKED_SKYFALL_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x6200a4, 0xb94012a8], // load definition +0x10 type mask
+  [0x6200b4, 0xb9067a68], // store mask at runtime +0x678
+  [0x6200d8, 0xb82b690a], // persist the shared-LCG duration draw
+  [0x6200f0, 0xb9067e68], // store materialized duration at runtime +0x67c
+  [0x6200f8, 0xb9401ea8], // load definition +0x1c chance percentage
+  [0x629f2c, 0x52800601], // allocate locked-skyfall presentation effect 48
+  [0x629f40, 0xb9467a68], // copy runtime type mask into the effect record
+  [0x629f58, 0xb9467a61], // execution loads runtime type mask
+  [0x629f5c, 0xb9467e62], // execution loads materialized duration
+  [0x629f60, 0xb9468263], // execution loads authored chance percentage
+  [0x61b790, 0xb9401268], // condition loads authored type mask
+  [0x61b7b0, 0x52800155], // scan at most ten active lock-fall records
+  [0x61b7d8, 0x91008260], // address record +0x20 source/ownership flag
+  [0x61b7e4, 0x54ff7261], // nonzero (passive) records do not block reapplication
+  [0x61b7f0, 0x6a14001f], // test active record mask overlap
+  [0x61b800, 0x6b20229f], // reject only the identical active mask
+  [0x61b808, 0x14000205], // identical record returns the zero admission scale
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -1184,6 +1207,25 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : enemyEscapeConditionTarget === ENEMY_ESCAPE_CONDITION_HANDLER;
   const enemyEscapeInstructionAnchorsMatch = restoredElf === null ? null
     : ENEMY_ESCAPE_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
+  const lockedSkyfallDispatchTarget = resolveEnemySkillTarget(
+    LOCKED_SKYFALL_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const lockedSkyfallSetupTarget = resolveEnemySkillTarget(
+    LOCKED_SKYFALL_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const lockedSkyfallConditionTarget = resolveEnemySkillTarget(
+    LOCKED_SKYFALL_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const lockedSkyfallDispatchMatches = lockedSkyfallDispatchTarget === null
+    ? null : lockedSkyfallDispatchTarget === LOCKED_SKYFALL_HANDLER;
+  const lockedSkyfallSetupMatches = lockedSkyfallSetupTarget === null
+    ? null : lockedSkyfallSetupTarget === LOCKED_SKYFALL_SETUP_HANDLER;
+  const lockedSkyfallConditionMatches = lockedSkyfallConditionTarget === null
+    ? null : lockedSkyfallConditionTarget === LOCKED_SKYFALL_CONDITION_HANDLER;
+  const lockedSkyfallInstructionAnchorsMatch = restoredElf === null ? null
+    : LOCKED_SKYFALL_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
@@ -2187,6 +2229,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       enemyEscapeSetupMatches21_9: enemyEscapeSetupMatches,
       enemyEscapeConditionMatches21_9: enemyEscapeConditionMatches,
       enemyEscapeInstructionAnchorsMatch21_9: enemyEscapeInstructionAnchorsMatch,
+      lockedSkyfallDispatchMatches21_9: lockedSkyfallDispatchMatches,
+      lockedSkyfallSetupMatches21_9: lockedSkyfallSetupMatches,
+      lockedSkyfallConditionMatches21_9: lockedSkyfallConditionMatches,
+      lockedSkyfallInstructionAnchorsMatch21_9: lockedSkyfallInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -2712,6 +2758,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       enemyEscapeInstructionAnchorsMatch21_9: enemyEscapeInstructionAnchorsMatch,
       enemyEscapeSemantics:
         'type 95 initializes 3.0/0.95 presentation lanes at runtime +0x79c/+0x7a0, zeroes protected current and displayed HP, initializes a distinct escape timeline, and sets sMONSTER+0x38 bit 0x10 rather than type 40 terminal-death flags; its condition preserves incoming scale and it owns no RNG',
+      lockedSkyfallType: LOCKED_SKYFALL_ENEMY_SKILL_TYPE,
+      lockedSkyfallDispatchTarget: lockedSkyfallDispatchTarget === null
+        ? null : hex(lockedSkyfallDispatchTarget),
+      lockedSkyfallDispatchMatches21_9: lockedSkyfallDispatchMatches,
+      lockedSkyfallSetupTarget: lockedSkyfallSetupTarget === null
+        ? null : hex(lockedSkyfallSetupTarget),
+      lockedSkyfallSetupMatches21_9: lockedSkyfallSetupMatches,
+      lockedSkyfallConditionTarget: lockedSkyfallConditionTarget === null
+        ? null : hex(lockedSkyfallConditionTarget),
+      lockedSkyfallConditionMatches21_9: lockedSkyfallConditionMatches,
+      lockedSkyfallInstructionAnchorsMatch21_9: lockedSkyfallInstructionAnchorsMatch,
+      lockedSkyfallSemantics:
+        'type 96 shares type 68 setup: +0x10 mask, one-LCG inclusive +0x14..+0x18 duration, and +0x1c chance at runtime +0x678..+0x680; execution installs a timed automatic lock-fall record with source flag zero, whose matches consume only the dedicated lock-fall LCG; condition ignores nonzero-source passive records and rejects an identical active enemy-skill mask while allowing a different mask',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -3218,6 +3277,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || enemyEscapeSetupMatches === false
     || enemyEscapeConditionMatches === false
     || enemyEscapeInstructionAnchorsMatch === false
+    || lockedSkyfallDispatchMatches === false
+    || lockedSkyfallSetupMatches === false
+    || lockedSkyfallConditionMatches === false
+    || lockedSkyfallInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

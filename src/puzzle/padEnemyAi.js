@@ -16,6 +16,7 @@ import {
   PAD_ENEMY_SKILL_NATIVE_NO_EFFECT,
   PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS,
   PAD_ENEMY_SKILL_ENEMY_ESCAPE,
+  PAD_ENEMY_SKILL_LOCKED_SKYFALL,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -177,6 +178,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_NATIVE_NO_EFFECT,
     PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS,
     PAD_ENEMY_SKILL_ENEMY_ESCAPE,
+    PAD_ENEMY_SKILL_LOCKED_SKYFALL,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
     PAD_ENEMY_SKILL_DEFENSE_BOOST,
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -536,6 +538,19 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
     const eligible = naturalEligible || hazardEligible;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
+  if (definition.effect.type === PAD_ENEMY_SKILL_LOCKED_SKYFALL) {
+    const requestedMask = definition.effect.typeMask & 0xffff;
+    const identicalActiveRule = state.lockFallRules.some((rule) => (
+      (rule.typeMask & 0xffff) === requestedMask
+      && rule.source === 'enemySkill'
+      && (rule.turnsRemaining == null || rule.turnsRemaining > 0)
+    ));
+    return {
+      eligible: !identicalActiveRule,
+      probabilityScale: identicalActiveRule ? 0 : 1,
+      rngState,
+    };
+  }
   if (definition.effect.type === PAD_ENEMY_SKILL_BIND_LEADER_HELPER) {
     const party = Array.isArray(state.party) ? state.party : [];
     const eligible = (
@@ -650,6 +665,13 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     skyfallNaturalMask: Math.trunc(Number(state.skyfallNaturalMask) || 0) & 0x3f,
     skyfallHazardTurns: Math.max(0, Math.trunc(Number(state.skyfallHazardTurns) || 0)),
     skyfallHazardMask: Math.trunc(Number(state.skyfallHazardMask) || 0) & 0x1c0,
+    lockFallRules: (Array.isArray(state.lockFallRules) ? state.lockFallRules : []).map((rule) => ({
+      typeMask: Math.trunc(Number(rule?.typeMask) || 0) & 0xffff,
+      source: rule?.source == null ? null : String(rule.source),
+      turnsRemaining: rule?.turnsRemaining == null
+        ? null
+        : Math.max(0, Math.trunc(Number(rule.turnsRemaining) || 0)),
+    })),
     scaledAttackGate: Math.trunc(Number(state.scaledAttackGate) || 0),
     enemyAttackBoostTurns: Math.max(0, Math.trunc(Number(state.enemyAttackBoostTurns) || 0)),
     enemyBaseAttack: Math.max(0, Math.trunc(Number(state.enemyBaseAttack) || 0)),

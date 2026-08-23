@@ -52,6 +52,7 @@ import {
   PAD_ENEMY_SKILL_NATIVE_NO_EFFECT,
   PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS,
   PAD_ENEMY_SKILL_ENEMY_ESCAPE,
+  PAD_ENEMY_SKILL_LOCKED_SKYFALL,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -333,6 +334,9 @@ export class PuzzleEngine {
     this.comboDropBonusCount = 0;
     this.turnNailCount = 0;
     this.skyfallRateRules = { natural: null, hazard: null };
+    this.lockFallRules = this.lockFallRules
+      .filter((rule) => rule.source !== 'enemySkill')
+      .map((rule) => ({ ...rule }));
     this.recomputeDropRates();
     this.hpResolutionApplied = false;
     this.lastLeaderMultiplier = 1;
@@ -1096,6 +1100,7 @@ export class PuzzleEngine {
     this.advanceEnemyDamageShieldTurns();
     this.advanceLeaderSwapTurns();
     this.advanceSkyfallRateRules();
+    this.advanceLockFallRules();
     this.advanceMoveTimeReductionTurns();
     this.advanceBlackOrbCountdowns();
     if (this.blackFallRule?.active && this.blackFallRule.turnsRemaining !== null) {
@@ -1234,6 +1239,7 @@ export class PuzzleEngine {
         hp: candidate.hp,
         escaped: Boolean(candidate.escaped),
       })),
+      lockFallRules: this.lockFallRules.map((rule) => ({ ...rule })),
       aiBudget: pool?.aiBudget ?? 0,
       blackFallActive: Boolean(this.blackFallRule?.active),
       boardCellCount: this.rows * this.columns,
@@ -1581,6 +1587,13 @@ export class PuzzleEngine {
         setupMaterialized: true,
       });
     }
+    if (skill.supported && skill.kind === 'lockedSkyfall' && !skill.setupMaterialized) {
+      return Object.freeze({
+        ...record,
+        durationTurns: this.rollEnemySkillDuration(skill.durationMin, skill.durationMax),
+        setupMaterialized: true,
+      });
+    }
     if (skill.supported && skill.kind === 'activeSkillSeal' && !skill.setupMaterialized) {
       return Object.freeze({
         ...record,
@@ -1877,6 +1890,17 @@ export class PuzzleEngine {
       if (rule.turnsRemaining === 0) this.skyfallRateRules[category] = null;
     }
     this.recomputeDropRates();
+  }
+
+  advanceLockFallRules() {
+    this.lockFallRules = this.lockFallRules.filter((rule) => {
+      if (rule.turnsRemaining == null) return true;
+      rule.turnsRemaining = Math.max(
+        0,
+        Math.trunc(Number(rule.turnsRemaining) || 0) - 1,
+      );
+      return rule.turnsRemaining > 0;
+    });
   }
 
   advanceEnemyStatusShieldTurns() {
@@ -2432,6 +2456,20 @@ export class PuzzleEngine {
       this.message = `Selected orbs fall at ${skill.chancePercent}% for ${durationTurns} turn${durationTurns === 1 ? '' : 's'}.`;
       return naturalMask !== 0 || hazardMask !== 0;
     }
+    if (skill.supported && skill.kind === 'lockedSkyfall') {
+      const typeMask = Math.trunc(Number(skill.typeMask) || 0) & 0xffff;
+      const durationTurns = Math.max(0, Math.trunc(Number(skill.durationTurns) || 0));
+      if (typeMask === 0 || durationTurns === 0) return false;
+      this.lockFallRules.push({
+        typeMask,
+        chancePercent: Math.trunc(Number(skill.chancePercent) || 0),
+        turnsRemaining: durationTurns,
+        source: 'enemySkill',
+      });
+      if (this.lockFallRules.length > 10) this.lockFallRules.splice(10);
+      this.message = `Selected orbs may fall locked for ${durationTurns} turn${durationTurns === 1 ? '' : 's'}.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'bindLeaderHelper') {
       const durationTurns = this.rollEnemySkillDuration(skill.durationMin, skill.durationMax);
       const result = this.doBind(skill.targetMask || 0, durationTurns);
@@ -2626,6 +2664,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_NATIVE_NO_EFFECT,
         PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS,
         PAD_ENEMY_SKILL_ENEMY_ESCAPE,
+        PAD_ENEMY_SKILL_LOCKED_SKYFALL,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -2744,6 +2783,10 @@ export class PuzzleEngine {
     this.lockFallRules = rules.map((rule) => ({
       typeMask: Number(rule.typeMask) & 0xffff,
       chancePercent: Number(rule.chancePercent),
+      ...(rule.turnsRemaining == null
+        ? {}
+        : { turnsRemaining: Math.max(0, Math.trunc(Number(rule.turnsRemaining) || 0)) }),
+      ...(rule.source == null ? {} : { source: String(rule.source) }),
     }));
   }
 

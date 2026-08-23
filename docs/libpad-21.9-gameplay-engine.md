@@ -1198,6 +1198,31 @@ focused two-enemy fixture, seed 21900 spends only the standard selection draw,
 ends at state 394448415, removes Verdant Shell, leaves Umbra and the 12,000-HP
 player untouched, and renders the message `Verdant Shell escaped.`
 
+Enemy skill type `96` creates temporary locked-orb skyfalls. Its exact
+dispatch, setup, and condition targets are `0x629f0c`, `0x6200a4`, and
+`0x61b790`; the independent PAD data-pipeline parser identifies the same raw
+record as `ESSkyfallLocked`. Definition `+0x10` is the 16-bit orb-type mask,
+`+0x14..+0x18` is the inclusive duration range, and `+0x1c` is the lock chance
+percentage. Setup uses the shared LCG once and stores mask, materialized
+duration, and chance at runtime `+0x678..+0x680`.
+
+Execution installs one of the ten records read by `_checkLockFall`, with its
+source/ownership flag zero. The type-96 condition scans that same ten-record
+array. Records with a nonzero `+0x20` source flag do not block the enemy skill;
+among zero-source active records, an exact mask match rejects reapplication,
+while a disjoint or only partially overlapping different mask remains eligible.
+This lets authored passive rules coexist with the temporary enemy effect.
+
+When a newly spawned orb matches an active record, `_checkLockFall` rolls the
+dedicated game-work `+0x66a14` LCG and sets block flag `0x800` at the authored
+percentage. It therefore changes neither the orb type chosen by the spawn RNG
+nor later enemy-AI selection. The browser stores enemy-skill ownership and
+remaining turns on the existing `lockFallRules`, expires only those timed
+records, clears them on reset, and renders a compact `LOCK SKY` status. In the
+focused fixture, seed 21900 materializes four turns for a 100% Fire rule and
+ends the shared AI stream at 3803934822; subsequent Fire generation is locked
+through the separate lock-fall stream.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

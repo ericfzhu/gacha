@@ -2,6 +2,24 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 type-96 locked skyfall
+
+- Recovered type `96` at dispatch/setup/condition `0x629f0c`, `0x6200a4`, and
+  `0x61b790`; the independent data-pipeline parser corroborates it as
+  `ESSkyfallLocked`.
+- Setup shares type 68's mask plus one-draw inclusive duration plus chance
+  layout at definition `+0x10..+0x1c` and runtime `+0x678..+0x680`. Execution
+  installs a timed automatic lock-fall record with source flag zero.
+- The condition scans ten records, ignores nonzero-source passive records, and
+  rejects only an identical active enemy-skill mask. Different masks can
+  coexist. Matching spawned orbs use the already recovered dedicated lock-fall
+  LCG, leaving both orb-type spawning and enemy-AI randomness independent.
+- Ported decoding, runtime setup, AI gating, timed record installation/expiry,
+  reset behavior, locked-orb generation, snapshots, and a visible `LOCK SKY`
+  browser status. Pure rules, exact tables plus seventeen instruction anchors,
+  focused Chromium, screenshot inspection, generic client, data tests, and the
+  production build pass. Next: recover type `97`.
+
 ## 2026-08-24 type-95 enemy escape
 
 - Recovered type `95` at dispatch/setup/condition `0x629e74`, `0x620598`, and

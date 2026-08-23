@@ -63,6 +63,7 @@ export const PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE = 92;
 export const PAD_ENEMY_SKILL_NATIVE_NO_EFFECT = 93;
 export const PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS = 94;
 export const PAD_ENEMY_SKILL_ENEMY_ESCAPE = 95;
+export const PAD_ENEMY_SKILL_LOCKED_SKYFALL = 96;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -287,6 +288,21 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       type,
       kind: 'enemyEscape',
       supported: true,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_LOCKED_SKYFALL) {
+    requireLength(definitionBytes, 0x20, 'PAD enemy-skill definition');
+    const durationMin = definition.getInt32(0x14, true);
+    const durationMax = definition.getInt32(0x18, true);
+    return Object.freeze({
+      type,
+      kind: 'lockedSkyfall',
+      supported: durationMax >= durationMin,
+      typeMask: definition.getUint32(0x10, true) & 0xffff,
+      durationMin,
+      durationMax,
+      chancePercent: definition.getInt32(0x1c, true),
       attackWithSkillValue,
     });
   }
@@ -1188,6 +1204,22 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
   if (type === PAD_ENEMY_SKILL_ENEMY_ESCAPE) {
     return decodePadEnemySkillDefinition(definitionBytes);
   }
+  if (type === PAD_ENEMY_SKILL_LOCKED_SKYFALL) {
+    requireLength(monsterBytes, 0x684, 'PAD monster runtime');
+    return Object.freeze({
+      type,
+      kind: 'lockedSkyfall',
+      supported: true,
+      typeMask: monster.getUint32(0x678, true) & 0xffff,
+      durationTurns: monster.getInt32(0x67c, true),
+      chancePercent: monster.getInt32(0x680, true),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -1880,6 +1912,25 @@ export function normalizePadEnemySkillRecord(record) {
       type: PAD_ENEMY_SKILL_ENEMY_ESCAPE,
       kind: 'enemyEscape',
       supported: record?.supported !== false,
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_LOCKED_SKYFALL || record?.kind === 'lockedSkyfall') {
+    const durationMin = Math.trunc(Number(record?.durationMin) || 0);
+    const durationMax = Math.trunc(Number(record?.durationMax) || 0);
+    const durationPresent = record?.durationTurns !== undefined && record?.durationTurns !== null;
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_LOCKED_SKYFALL,
+      kind: 'lockedSkyfall',
+      supported: record?.supported !== false && durationMax >= durationMin,
+      typeMask: Math.trunc(Number(record?.typeMask) || 0) & 0xffff,
+      ...(durationPresent
+        ? { durationTurns: Math.trunc(Number(record.durationTurns) || 0) }
+        : { durationMin, durationMax }),
+      chancePercent: Math.trunc(Number(record?.chancePercent) || 0),
+      setupMaterialized: Boolean(record?.setupMaterialized || durationPresent),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),
