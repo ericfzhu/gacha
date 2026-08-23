@@ -2,6 +2,30 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 enemy active-skill delay
+
+- Recovered type `89` at dispatch/setup/condition `0x629208`, `0x62117c`, and
+  `0x61a630`. Setup calls the named native
+  `setupEnemySkillGaugeDown(..., -1)` helper, walks all six present usable
+  gauges, rolls definition `+0x10..+0x14` inclusively per charged gauge, and
+  writes six int32 delays at runtime `sMONSTER+0x678` plus a target mask at
+  `+0x674`.
+- Traced the complete helper and execution loop. Applicable skill-delay-resist
+  latent protection is subtracted from each roll (and suppressed by the
+  ordinary awakening-bind path), the result is capped to current charge, and execution
+  subtracts it with a floor at zero. The AI condition remains unconditional,
+  including when setup ultimately has no charged target.
+- Ported definition/runtime decoding, six-slot normalization, exact shared-LCG
+  materialization, AI admission, and the charge-to-cooldown transformation. The
+  compact demo has one modeled active skill in party slot zero; the other five
+  runtime lanes remain decoded without inventing unimplemented browser skills.
+- Pure rules, exact type tables and twelve instruction anchors, focused
+  Chromium rendering, and the generic web-game client pass without page
+  errors. Seed 21900 materializes a four-turn delay after the selection draw,
+  leaves player HP unchanged, and visibly changes Tide Shift from ready to a
+  four-turn cooldown. Next: recover enemy skill type `90` as a separate
+  checkpoint.
+
 ## 2026-08-24 enemy awakening bind
 
 - Recovered type `88` at dispatch/setup/condition `0x629dc0`, `0x6218a4`, and

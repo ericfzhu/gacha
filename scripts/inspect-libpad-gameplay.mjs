@@ -175,6 +175,24 @@ const AWAKENING_BIND_INSTRUCTION_ANCHORS = Object.freeze([
   [0x678acc, 0x375000aa], // active continuation bit skips one decrement
   [0x678ae0, 0x12157948], // clear continuation bit after enemy attack
 ]);
+const SKILL_DELAY_ENEMY_SKILL_TYPE = 89;
+const SKILL_DELAY_HANDLER = 0x629208;
+const SKILL_DELAY_SETUP_HANDLER = 0x62117c;
+const SKILL_DELAY_CONDITION_HANDLER = 0x61a630;
+const SKILL_DELAY_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x62117c, 0x12800003], // setup invokes gauge-down helper in all-slot mode -1
+  [0x61f950, 0xb9067b3f], // clear each per-card runtime delay at +0x678 + index*4
+  [0x61f9c8, 0x29422b49], // load inclusive definition +0x10/+0x14 range
+  [0x61f9f4, 0xb82c6909], // persist one shared-LCG step per eligible gauge
+  [0x61fb44, 0x0b8942c9], // add scaled roll to authored minimum
+  [0x61fb68, 0x4b080136], // subtract applicable awakening protection
+  [0x61fb80, 0x6b2022df], // cap delay to the card's current skill charge
+  [0x61f928, 0xb9000296], // store the materialized per-card delay
+  [0x61fca0, 0x790cea68], // store six-bit target mask at runtime +0x674
+  [0x629278, 0xb8766afb], // execution loads per-card runtime delay
+  [0x629234, 0x4b1b0001], // subtract delay from current skill charge
+  [0x6292ac, 0x2a1f03e1], // floor charge at zero when delay is larger
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -972,6 +990,25 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : awakeningBindConditionTarget === AWAKENING_BIND_CONDITION_HANDLER;
   const awakeningBindInstructionAnchorsMatch = restoredElf === null ? null
     : AWAKENING_BIND_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
+  const skillDelayDispatchTarget = resolveEnemySkillTarget(
+    SKILL_DELAY_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const skillDelaySetupTarget = resolveEnemySkillTarget(
+    SKILL_DELAY_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const skillDelayConditionTarget = resolveEnemySkillTarget(
+    SKILL_DELAY_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const skillDelayDispatchMatches = skillDelayDispatchTarget === null
+    ? null : skillDelayDispatchTarget === SKILL_DELAY_HANDLER;
+  const skillDelaySetupMatches = skillDelaySetupTarget === null
+    ? null : skillDelaySetupTarget === SKILL_DELAY_SETUP_HANDLER;
+  const skillDelayConditionMatches = skillDelayConditionTarget === null
+    ? null : skillDelayConditionTarget === SKILL_DELAY_CONDITION_HANDLER;
+  const skillDelayInstructionAnchorsMatch = restoredElf === null ? null
+    : SKILL_DELAY_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
@@ -1950,6 +1987,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       awakeningBindSetupMatches21_9: awakeningBindSetupMatches,
       awakeningBindConditionMatches21_9: awakeningBindConditionMatches,
       awakeningBindInstructionAnchorsMatch21_9: awakeningBindInstructionAnchorsMatch,
+      skillDelayDispatchMatches21_9: skillDelayDispatchMatches,
+      skillDelaySetupMatches21_9: skillDelaySetupMatches,
+      skillDelayConditionMatches21_9: skillDelayConditionMatches,
+      skillDelayInstructionAnchorsMatch21_9: skillDelayInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -2396,6 +2437,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       awakeningBindInstructionAnchorsMatch21_9: awakeningBindInstructionAnchorsMatch,
       awakeningBindSemantics:
         'type 88: +0x10 duration is added into the protected low-ten-bit sGAMEWORK+0x874d4 counter; an already-active bind sets continuation bit 0x400 to skip one post-enemy-attack decrement; the condition admits only while the ordinary counter is zero; active reads suppress awakening-derived passives and the handler recalculates card awakenings both on application and expiry',
+      skillDelayType: SKILL_DELAY_ENEMY_SKILL_TYPE,
+      skillDelayDispatchTarget: skillDelayDispatchTarget === null
+        ? null : hex(skillDelayDispatchTarget),
+      skillDelayDispatchMatches21_9: skillDelayDispatchMatches,
+      skillDelaySetupTarget: skillDelaySetupTarget === null
+        ? null : hex(skillDelaySetupTarget),
+      skillDelaySetupMatches21_9: skillDelaySetupMatches,
+      skillDelayConditionTarget: skillDelayConditionTarget === null
+        ? null : hex(skillDelayConditionTarget),
+      skillDelayConditionMatches21_9: skillDelayConditionMatches,
+      skillDelayInstructionAnchorsMatch21_9: skillDelayInstructionAnchorsMatch,
+      skillDelaySemantics:
+        'type 89: setup walks six present usable skill gauges, advances the shared LCG for each charged gauge, rolls inclusive +0x10..+0x14, subtracts applicable skill-delay-resist latent protection (disabled by the ordinary awakening-bind path), caps to current charge, and stores six int32 delays at runtime +0x678 plus target mask +0x674; execution subtracts each stored delay and floors charge at zero; condition is unconditional',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -2878,6 +2932,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || awakeningBindSetupMatches === false
     || awakeningBindConditionMatches === false
     || awakeningBindInstructionAnchorsMatch === false
+    || skillDelayDispatchMatches === false
+    || skillDelaySetupMatches === false
+    || skillDelayConditionMatches === false
+    || skillDelayInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

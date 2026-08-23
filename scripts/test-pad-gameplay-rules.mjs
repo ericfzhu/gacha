@@ -11,6 +11,7 @@ import {
   PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL,
   PAD_ENEMY_SKILL_DAMAGE_ABSORB,
   PAD_ENEMY_SKILL_AWAKENING_BIND,
+  PAD_ENEMY_SKILL_SKILL_DELAY,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1034,6 +1035,38 @@ assert.deepEqual(decodePadEnemySkillRuntime(
   supported: true,
   durationTurns: 4,
   nativeSetupValue: 0xab,
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
+const enemyAiSkillDelayDefinition = enemyAiDamageAbsorbDefinition.slice();
+const enemyAiSkillDelayView = new DataView(enemyAiSkillDelayDefinition.buffer);
+enemyAiSkillDelayView.setUint32(0x00, 9_070, true);
+enemyAiSkillDelayView.setInt16(0x04, PAD_ENEMY_SKILL_SKILL_DELAY, true);
+enemyAiSkillDelayView.setInt32(0x10, 2, true);
+enemyAiSkillDelayView.setInt32(0x14, 4, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiSkillDelayDefinition), {
+  type: 89,
+  kind: 'skillDelay',
+  supported: true,
+  delayMin: 2,
+  delayMax: 4,
+  attackWithSkillValue: 0,
+});
+const skillDelayRuntime = new Uint8Array(0x690);
+const skillDelayRuntimeView = new DataView(skillDelayRuntime.buffer);
+skillDelayRuntimeView.setUint16(0x674, 0x21, true);
+[2, 0, 0, 0, 0, 4].forEach((delay, index) => {
+  skillDelayRuntimeView.setInt32(0x678 + index * 4, delay, true);
+});
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiSkillDelayDefinition,
+  skillDelayRuntime,
+), {
+  type: 89,
+  kind: 'skillDelay',
+  supported: true,
+  targetMask: 0x21,
+  skillDelays: [2, 0, 0, 0, 0, 4],
   setupMaterialized: true,
   attackWithSkillValue: 0,
 });
@@ -4182,6 +4215,61 @@ const awakeningBoundCardBind = awakeningBoundResistanceEngine.doBind(1, 3);
 assert.equal(awakeningBoundCardBind.boundMask, 1);
 assert.equal(awakeningBoundCardBind.resistedMask, 0);
 assert.equal(awakeningBoundResistanceEngine.party[0].bindTurns, 3);
+
+const directSkillDelayEngine = new PuzzleEngine({ seed: 21_900 });
+directSkillDelayEngine.skill.cooldown = 2;
+directSkillDelayEngine.setRngState(21_900);
+assert.equal(directSkillDelayEngine.applyEnemySkillDefinition(enemyAiSkillDelayDefinition), true);
+assert.equal(directSkillDelayEngine.skill.cooldown, 4);
+assert.deepEqual(directSkillDelayEngine.lastEnemySkill.skillDelays, [2, 0, 0, 0, 0, 0]);
+assert.equal(directSkillDelayEngine.lastEnemySkill.targetMask, 1);
+assert.equal(directSkillDelayEngine.lastEnemySkill.appliedDelay, 2);
+assert.equal(directSkillDelayEngine.rng.state, padLcgStep(21_900).state);
+
+const emptySkillGaugeDelayEngine = new PuzzleEngine({ seed: 21_900 });
+emptySkillGaugeDelayEngine.skill.cooldown = emptySkillGaugeDelayEngine.skill.maxCooldown;
+emptySkillGaugeDelayEngine.setRngState(21_900);
+assert.equal(emptySkillGaugeDelayEngine.applyEnemySkillDefinition(enemyAiSkillDelayDefinition), true);
+assert.equal(emptySkillGaugeDelayEngine.skill.cooldown, 5);
+assert.equal(emptySkillGaugeDelayEngine.lastEnemySkill.targetMask, 0);
+assert.deepEqual(emptySkillGaugeDelayEngine.lastEnemySkill.skillDelays, [0, 0, 0, 0, 0, 0]);
+assert.equal(emptySkillGaugeDelayEngine.rng.state, 21_900);
+
+const protectedSkillDelayEngine = new PuzzleEngine({ seed: 21_900 });
+protectedSkillDelayEngine.skill.skillDelayResistLatents = 2;
+protectedSkillDelayEngine.setRngState(21_900);
+assert.equal(protectedSkillDelayEngine.applyEnemySkillDefinition(enemyAiSkillDelayDefinition), true);
+assert.equal(protectedSkillDelayEngine.skill.cooldown, 0);
+assert.equal(protectedSkillDelayEngine.lastEnemySkill.targetMask, 0);
+protectedSkillDelayEngine.awakeningBindTurns = 3;
+protectedSkillDelayEngine.setRngState(21_900);
+assert.equal(protectedSkillDelayEngine.applyEnemySkillDefinition(enemyAiSkillDelayDefinition), true);
+assert.equal(protectedSkillDelayEngine.skill.cooldown, 2);
+assert.equal(protectedSkillDelayEngine.lastEnemySkill.targetMask, 1);
+
+const skillDelayMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(skillDelayMonsterDefinition.buffer).setUint32(0xec, 9_070, true);
+const selectedSkillDelayEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: skillDelayMonsterDefinition,
+    skillDefinitions: [enemyAiSkillDelayDefinition],
+  }],
+});
+selectedSkillDelayEngine.enemies[0].counter = 1;
+selectedSkillDelayEngine.enemies[1].counter = 99;
+selectedSkillDelayEngine.setRngState(21_900);
+selectedSkillDelayEngine.resolveEnemyTurn();
+const selectedSkillDelayState = selectedSkillDelayEngine.snapshot();
+assert.equal(selectedSkillDelayState.lastEnemyActions[0].skill.type, 89);
+assert.deepEqual(selectedSkillDelayState.lastEnemyActions[0].skill.skillDelays, [4, 0, 0, 0, 0, 0]);
+assert.equal(selectedSkillDelayState.lastEnemyActions[0].damage, undefined);
+assert.equal(selectedSkillDelayState.skill.cooldown, 4);
+assert.equal(selectedSkillDelayState.player.hp, 12_000);
+assert.equal(
+  selectedSkillDelayState.rngState,
+  padLcgStep(padLcgStep(21_900).state).state,
+);
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;

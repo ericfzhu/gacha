@@ -46,6 +46,7 @@ import {
   PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL,
   PAD_ENEMY_SKILL_DAMAGE_ABSORB,
   PAD_ENEMY_SKILL_AWAKENING_BIND,
+  PAD_ENEMY_SKILL_SKILL_DELAY,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -341,7 +342,12 @@ export class PuzzleEngine {
     this.enemyAiPools.forEach((_, enemyIndex) => this.applyEnemyPassiveSkills(enemyIndex));
     this.targetEnemy = 0;
     this.manualTarget = false;
-    this.skill = { name: 'Tide Shift', cooldown: 0, maxCooldown: 5 };
+    this.skill = {
+      name: 'Tide Shift',
+      cooldown: 0,
+      maxCooldown: 5,
+      skillDelayResistLatents: 0,
+    };
     this.drag = null;
     this.pendingMatches = [];
     this.pendingBombCells = [];
@@ -1551,6 +1557,29 @@ export class PuzzleEngine {
         setupMaterialized: true,
       });
     }
+    if (skill.supported && skill.kind === 'skillDelay' && !skill.setupMaterialized) {
+      // setupEnemySkillGaugeDown walks six party slots. The compact demo has
+      // one modeled active skill, owned by slot zero; unmodeled slots are the
+      // native equivalent of cards without a usable skill gauge.
+      const skillDelays = Array(6).fill(0);
+      const currentCharge = Math.max(0, this.skill.maxCooldown - this.skill.cooldown);
+      let targetMask = 0;
+      if (this.party[0]?.present !== false && currentCharge > 0) {
+        const rolledDelay = this.rollEnemySkillDuration(skill.delayMin, skill.delayMax);
+        const awakeningProtection = this.awakeningBindTurns > 0
+          ? 0
+          : Math.max(0, Math.trunc(Number(this.skill.skillDelayResistLatents) || 0));
+        const appliedDelay = Math.min(currentCharge, Math.max(0, rolledDelay - awakeningProtection));
+        skillDelays[0] = appliedDelay;
+        if (appliedDelay > 0) targetMask |= 1;
+      }
+      return Object.freeze({
+        ...record,
+        targetMask,
+        skillDelays: Object.freeze(skillDelays),
+        setupMaterialized: true,
+      });
+    }
     if (skill.supported && skill.kind === 'bindAttack' && !skill.setupMaterialized) {
       const selector = Math.trunc(Number(skill.targetSelector) || 0);
       let targetMask;
@@ -2150,6 +2179,22 @@ export class PuzzleEngine {
       this.message = `Awakenings bound for ${this.awakeningBindTurns} turn${this.awakeningBindTurns === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'skillDelay') {
+      const requestedDelay = Math.max(0, Math.trunc(Number(skill.skillDelays?.[0]) || 0));
+      const beforeCooldown = this.skill.cooldown;
+      this.skill.cooldown = Math.min(this.skill.maxCooldown, beforeCooldown + requestedDelay);
+      const appliedDelay = this.skill.cooldown - beforeCooldown;
+      this.lastEnemySkill = Object.freeze({
+        ...skill,
+        appliedDelay,
+        skillCooldownBefore: beforeCooldown,
+        skillCooldownAfter: this.skill.cooldown,
+      });
+      this.message = appliedDelay > 0
+        ? `Tide Shift was delayed by ${appliedDelay} turn${appliedDelay === 1 ? '' : 's'}.`
+        : 'The enemy tried to delay active skills.';
+      return true;
+    }
     if (skill.supported && skill.kind === 'damageShield') {
       const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
       if (!enemy) return false;
@@ -2481,6 +2526,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL,
         PAD_ENEMY_SKILL_DAMAGE_ABSORB,
         PAD_ENEMY_SKILL_AWAKENING_BIND,
+        PAD_ENEMY_SKILL_SKILL_DELAY,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,

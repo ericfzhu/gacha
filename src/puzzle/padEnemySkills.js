@@ -57,6 +57,7 @@ export const PAD_ENEMY_SKILL_POISON_MASK_SWAP = 85;
 export const PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL = 86;
 export const PAD_ENEMY_SKILL_DAMAGE_ABSORB = 87;
 export const PAD_ENEMY_SKILL_AWAKENING_BIND = 88;
+export const PAD_ENEMY_SKILL_SKILL_DELAY = 89;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -214,6 +215,18 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       kind: 'awakeningBind',
       supported: true,
       durationTurns: definition.getInt32(0x10, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_SKILL_DELAY) {
+    const delayMin = definition.getInt32(0x10, true);
+    const delayMax = definition.getInt32(0x14, true);
+    return Object.freeze({
+      type,
+      kind: 'skillDelay',
+      supported: delayMax >= delayMin,
+      delayMin,
+      delayMax,
       attackWithSkillValue,
     });
   }
@@ -1054,6 +1067,24 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_SKILL_DELAY) {
+    requireLength(monsterBytes, 0x690, 'PAD monster runtime');
+    return Object.freeze({
+      type,
+      kind: 'skillDelay',
+      supported: true,
+      targetMask: monster.getUint16(0x674, true) & 0x3f,
+      skillDelays: Object.freeze(Array.from(
+        { length: 6 },
+        (_, index) => monster.getInt32(0x678 + index * 4, true),
+      )),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -1653,6 +1684,32 @@ export function normalizePadEnemySkillRecord(record) {
         ? {}
         : { nativeSetupValue: Math.trunc(Number(record.nativeSetupValue) || 0) & 0xff }),
       setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_SKILL_DELAY || record?.kind === 'skillDelay') {
+    const delaysPresent = Array.isArray(record?.skillDelays);
+    const delayMin = Math.trunc(Number(record?.delayMin) || 0);
+    const delayMax = Math.trunc(Number(record?.delayMax) || 0);
+    const skillDelays = delaysPresent
+      ? Object.freeze(Array.from(
+        { length: 6 },
+        (_, index) => Math.max(0, Math.trunc(Number(record.skillDelays[index]) || 0)),
+      ))
+      : null;
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_SKILL_DELAY,
+      kind: 'skillDelay',
+      supported: record?.supported !== false && (delaysPresent || delayMax >= delayMin),
+      ...(delaysPresent
+        ? {
+          targetMask: Math.trunc(Number(record?.targetMask) || 0) & 0x3f,
+          skillDelays,
+        }
+        : { delayMin, delayMax }),
+      setupMaterialized: Boolean(record?.setupMaterialized || delaysPresent),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

@@ -10,6 +10,7 @@ import {
   PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL,
   PAD_ENEMY_SKILL_DAMAGE_ABSORB,
   PAD_ENEMY_SKILL_AWAKENING_BIND,
+  PAD_ENEMY_SKILL_SKILL_DELAY,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -165,6 +166,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL,
     PAD_ENEMY_SKILL_DAMAGE_ABSORB,
     PAD_ENEMY_SKILL_AWAKENING_BIND,
+    PAD_ENEMY_SKILL_SKILL_DELAY,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
     PAD_ENEMY_SKILL_DEFENSE_BOOST,
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -319,6 +321,11 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
     // eligible only while the awakening-bind counter is zero.
     const eligible = state.awakeningBindTurns <= 0;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_SKILL_DELAY) {
+    // Type 89 maps to the unconditional 0x61a630 callback. Setup can
+    // materialize an all-zero target mask when no active skill has charge.
+    return { eligible: true, probabilityScale: 1, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_ADDITIONAL_ATTACK) {
     // 0x61b450 performs this division and izMathClipF entirely in binary32.

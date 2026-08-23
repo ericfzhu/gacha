@@ -1063,6 +1063,39 @@ resumes. Differential fixtures also prove that a five-awakening skill-seal
 resistance and a super-bind resistance stop working during the bind while the
 shared RNG does not advance for those disabled checks.
 
+Enemy skill type `89` delays the party's active skills. Its dispatch, setup,
+and condition entries resolve to `0x629208`, `0x62117c`, and the unconditional
+`0x61a630`. Setup invokes
+`cGAMEMAIN::setupEnemySkillGaugeDown(sMONSTER*, sENESKILLS const*, int)` with
+mode `-1`, which scans all six party positions. It first clears the six int32
+runtime lanes at `sMONSTER+0x678 + index*4`, skips absent cards and gauges with
+zero current charge, and advances the shared LCG once for every remaining
+gauge. Each roll selects definition `+0x10..+0x14` inclusively.
+
+For each eligible card, the helper subtracts its applicable skill-delay-resist
+latent count from the selected delay. The ordinary global awakening-bind path
+at `sGAMEWORK+0x874d4` suppresses that protection. Positive results are capped to
+the gauge's current charge, stored in the corresponding runtime lane, and
+represented in the six-bit target mask at `sMONSTER+0x674`. The native helper
+also contains a fallback selector for unusual authored/protection combinations;
+ordinary positive ranges with no protection always take the direct per-card
+path.
+
+Execution loops over the same six positions. Every positive stored delay is
+subtracted from current skill charge; a delay greater than the remaining charge
+sets charge to zero. In the browser's inverse cooldown representation this is
+`cooldown = min(maxCooldown, cooldown + delay)`. The compact demo exposes one
+active skill, Tide Shift, owned by slot zero, so definition setup consumes one
+roll when that skill has charge and none when it is fully cooling down. Raw
+runtime decoding still preserves all six native lanes and the target mask.
+
+The focused new-AI fixture consumes the normal selection draw and then rolls
+four from the authored 2–4 range. It materializes `[4,0,0,0,0,0]`, leaves the
+player at 12,000 HP, and changes Tide Shift from ready to four turns remaining.
+An all-zero gauge remains an admitted no-op, matching the unconditional native
+condition, while differential tests cover capping and awakening-bind removal of
+skill-delay-resist latent protection.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`
