@@ -18,6 +18,7 @@ import {
   PAD_ENEMY_SKILL_REPEAT_ATTACK,
   PAD_ENEMY_SKILL_INACTIVITY,
   PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL,
+  PAD_ENEMY_SKILL_COMBO_ABSORB,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -1881,6 +1882,48 @@ assert.equal(directInactivityUnconditionalEngine.applyEnemySkillDefinition(
 ), true);
 assert.equal(directInactivityUnconditionalEngine.lastEnemySkill.type, 66);
 assert.equal(directInactivityUnconditionalEngine.message, 'Verdant Shell does nothing.');
+const enemyAiComboAbsorbDefinition = enemyAiInactivityDefinition.slice();
+const enemyAiComboAbsorbView = new DataView(enemyAiComboAbsorbDefinition.buffer);
+enemyAiComboAbsorbView.setUint32(0x00, 9_046, true);
+enemyAiComboAbsorbView.setInt16(0x04, PAD_ENEMY_SKILL_COMBO_ABSORB, true);
+enemyAiComboAbsorbView.setInt32(0x10, 2, true);
+enemyAiComboAbsorbView.setInt32(0x14, 4, true);
+enemyAiComboAbsorbView.setInt32(0x18, 3, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiComboAbsorbDefinition), {
+  type: 67,
+  kind: 'comboAbsorb',
+  supported: true,
+  durationMin: 2,
+  durationMax: 4,
+  comboThreshold: 3,
+  attackWithSkillValue: 0,
+});
+const comboAbsorbRuntime = new Uint8Array(0x680);
+const comboAbsorbRuntimeView = new DataView(comboAbsorbRuntime.buffer);
+comboAbsorbRuntimeView.setInt32(0x678, 4, true);
+comboAbsorbRuntimeView.setInt32(0x67c, 3, true);
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiComboAbsorbDefinition,
+  comboAbsorbRuntime,
+), {
+  type: 67,
+  kind: 'comboAbsorb',
+  supported: true,
+  durationMin: 2,
+  durationMax: 4,
+  durationTurns: 4,
+  comboThreshold: 3,
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
+const directComboAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
+directComboAbsorbEngine.setRngState(21_900);
+assert.equal(directComboAbsorbEngine.applyEnemySkillDefinition(
+  enemyAiComboAbsorbDefinition,
+), true);
+assert.equal(directComboAbsorbEngine.enemies[0].comboAbsorbTurns, 2);
+assert.equal(directComboAbsorbEngine.enemies[0].comboAbsorbThreshold, 3);
+assert.equal(directComboAbsorbEngine.rng.state, padLcgStep(21_900).state);
 const enemyAiAttributeAbsorbDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiAttributeAbsorbView = new DataView(enemyAiAttributeAbsorbDefinition.buffer);
 enemyAiAttributeAbsorbView.setUint32(0x00, 9_021, true);
@@ -4126,6 +4169,57 @@ assert.equal(selectedInactivityUnconditionalState.lastEnemyActions[0].damage, un
 assert.equal(selectedInactivityUnconditionalState.player.hp, 12_000);
 assert.equal(selectedInactivityUnconditionalState.message, 'Verdant Shell does nothing.');
 assert.equal(selectedInactivityUnconditionalState.rngState, padLcgStep(21_900).state);
+const comboAbsorbMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(comboAbsorbMonsterDefinition.buffer).setUint32(0xec, 9_046, true);
+const selectedComboAbsorbEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: comboAbsorbMonsterDefinition,
+    skillDefinitions: [enemyAiComboAbsorbDefinition],
+  }],
+});
+selectedComboAbsorbEngine.setRngState(21_900);
+selectedComboAbsorbEngine.enemies[0].counter = 1;
+selectedComboAbsorbEngine.enemies[1].counter = 99;
+selectedComboAbsorbEngine.resolveEnemyTurn();
+const selectedComboAbsorbState = selectedComboAbsorbEngine.snapshot();
+assert.equal(selectedComboAbsorbState.lastEnemyActions[0].skill.type, 67);
+assert.equal(selectedComboAbsorbState.enemies[0].comboAbsorbTurns, 4);
+assert.equal(selectedComboAbsorbState.enemies[0].comboAbsorbThreshold, 3);
+assert.equal(selectedComboAbsorbState.player.hp, 12_000);
+assert.equal(
+  selectedComboAbsorbState.rngState,
+  padLcgStep(padLcgStep(21_900).state).state,
+);
+const rejectedComboAbsorbEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: comboAbsorbMonsterDefinition,
+    skillDefinitions: [enemyAiComboAbsorbDefinition],
+  }],
+});
+rejectedComboAbsorbEngine.enemies[0].comboAbsorbTurns = 1;
+rejectedComboAbsorbEngine.setRngState(21_900);
+assert.equal(rejectedComboAbsorbEngine.takeEnemySkill(0), null);
+assert.equal(rejectedComboAbsorbEngine.rng.state, 21_900);
+const comboAbsorbDamageEngine = new PuzzleEngine({ seed: 21_900 });
+comboAbsorbDamageEngine.enemies[0].hp = 50_000;
+comboAbsorbDamageEngine.enemies[0].comboAbsorbTurns = 2;
+comboAbsorbDamageEngine.enemies[0].comboAbsorbThreshold = 3;
+comboAbsorbDamageEngine.enemies[1].hp = 0;
+comboAbsorbDamageEngine.comboCount = 3;
+comboAbsorbDamageEngine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+comboAbsorbDamageEngine.resolvePlayerTurn();
+assert.equal(comboAbsorbDamageEngine.lastDamage, 0);
+assert.ok(comboAbsorbDamageEngine.lastAbsorbedDamage > 0);
+assert.ok(comboAbsorbDamageEngine.enemies[0].hp > 50_000);
+comboAbsorbDamageEngine.enemies[0].hp = 50_000;
+comboAbsorbDamageEngine.comboCount = 4;
+comboAbsorbDamageEngine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+comboAbsorbDamageEngine.resolvePlayerTurn();
+assert.ok(comboAbsorbDamageEngine.lastDamage > 0);
+assert.equal(comboAbsorbDamageEngine.lastAbsorbedDamage, 0);
+assert.ok(comboAbsorbDamageEngine.enemies[0].hp < 50_000);
 const bindLeaderHelperMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(bindLeaderHelperMonsterDefinition.buffer).setUint32(0xec, 9_020, true);
 const selectedBindLeaderHelperEngine = new PuzzleEngine({

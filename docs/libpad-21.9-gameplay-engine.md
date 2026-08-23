@@ -746,6 +746,24 @@ the selected enemy action without a special effect. With a 100% immediate
 record, seed 21900 advances only once to `394448415`. The independent parser
 likewise distinguishes `ESInactivity66` from `ESInactivity16`.
 
+Enemy skill type `67` is combo-count absorption. Its dispatch, setup, and
+condition entries target `0x629968`, `0x61ffe8`, and `0x61ab6c`. Setup spends
+one LCG draw on the inclusive duration range at definition `+0x10..+0x14`,
+stores that duration at runtime `+0x678`, and copies the authored combo
+threshold `+0x18` to `+0x67c`. Execution applies them to the protected monster
+status lanes at `sMONSTER+0x8b0/+0x8a0`; unlike bind type 54/65, it does not
+reroll during execution. The condition reads the signed-short protected
+duration and admits only below one, consuming no RNG.
+
+While active, player attack lanes are absorbed when the resolved turn combo
+count is less than or equal to the threshold: their final damage heals the
+enemy up to maximum HP and contributes to absorbed rather than dealt damage.
+Higher combo counts pass normally; fixed nail damage remains independent. The
+status decrements at the next enemy-turn boundary. With seed 21900 and range
+2–4, an immediate selected record spends the probability and setup draws,
+stores four turns, and ends at RNG state `3803934822`. DadGuide identifies the
+same raw record as `ESAbsorbCombo` type 67.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

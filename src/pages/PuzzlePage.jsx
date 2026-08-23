@@ -291,6 +291,9 @@ function drawEnemy(ctx, enemy, index, target, time) {
       .join('/');
     enemyStatus.push(`ABS ${attributes} ${enemy.attributeAbsorbTurns}T`);
   }
+  if (Number(enemy.comboAbsorbTurns || 0) > 0) {
+    enemyStatus.push(`ABS ≤${enemy.comboAbsorbThreshold}C ${enemy.comboAbsorbTurns}T`);
+  }
   if (enemyStatus.length > 0) {
     ctx.fillStyle = '#bfe9ff';
     ctx.font = '800 9px "Barlow Condensed", sans-serif';

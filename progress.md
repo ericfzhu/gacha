@@ -2,6 +2,21 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 combo-absorb enemy skill
+
+- Recovered type `67`: dispatch `0x629968`, setup `0x61ffe8`, and condition
+  `0x61ab6c`. One setup LCG draw materializes inclusive duration
+  `+0x10..+0x14`; authored combo threshold `+0x18` is copied separately.
+- Ported protected duration/threshold status, AI rejection while active,
+  enemy-turn countdown, snapshots/UI status, and combat absorption for turns
+  at or below the combo threshold. Higher combos deal damage normally and nail
+  damage remains independent.
+- Seeded direct/scheduled, runtime, rejection, three-versus-four-combo damage,
+  exact native-table, and focused browser fixtures pass. The browser shows
+  `ABS ≤3C 4T` with final scheduled RNG `3803934822`.
+- Production build plus generic and full browser regressions pass.
+- Next: continue type 68 after this separate checkpoint.
+
 ## 2026-08-23 unconditional inactivity enemy skill
 
 - Recovered type `66`: late dispatch `0x62be50`, no-parameter setup `0x6217c0`,

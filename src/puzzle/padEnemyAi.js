@@ -17,6 +17,7 @@ import {
   PAD_ENEMY_SKILL_REPEAT_ATTACK,
   PAD_ENEMY_SKILL_INACTIVITY,
   PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL,
+  PAD_ENEMY_SKILL_COMBO_ABSORB,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -162,6 +163,7 @@ function isStaticallyEligible(definition, state) {
     PAD_ENEMY_SKILL_REPEAT_ATTACK,
     PAD_ENEMY_SKILL_INACTIVITY,
     PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL,
+    PAD_ENEMY_SKILL_COMBO_ABSORB,
     PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
     PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
     PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -410,6 +412,10 @@ function evaluateCondition(definition, state, rngState) {
     const eligible = state.attributeAbsorbTurns <= 0;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
+  if (definition.effect.type === PAD_ENEMY_SKILL_COMBO_ABSORB) {
+    const eligible = state.comboAbsorbTurns <= 0;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
   if (definition.effect.type === PAD_ENEMY_SKILL_BIND_LEADER_HELPER) {
     const party = Array.isArray(state.party) ? state.party : [];
     const eligible = (
@@ -491,6 +497,7 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     playerCurrentHp: Math.max(0, Number(state.playerCurrentHp) || 0),
     playerMaxHp: Math.max(0, Number(state.playerMaxHp) || 0),
     attributeAbsorbTurns: Math.max(0, Math.trunc(Number(state.attributeAbsorbTurns) || 0)),
+    comboAbsorbTurns: Math.max(0, Math.trunc(Number(state.comboAbsorbTurns) || 0)),
     scaledAttackGate: Math.trunc(Number(state.scaledAttackGate) || 0),
     enemyAttackBoostTurns: Math.max(0, Math.trunc(Number(state.enemyAttackBoostTurns) || 0)),
     enemyBaseAttack: Math.max(0, Math.trunc(Number(state.enemyBaseAttack) || 0)),

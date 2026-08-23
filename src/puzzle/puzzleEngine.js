@@ -51,6 +51,7 @@ import {
   PAD_ENEMY_SKILL_REPEAT_ATTACK,
   PAD_ENEMY_SKILL_INACTIVITY,
   PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL,
+  PAD_ENEMY_SKILL_COMBO_ABSORB,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -153,8 +154,8 @@ const PARTY = Object.freeze([
 ]);
 
 const ENEMY_TEMPLATE = Object.freeze([
-  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
-  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0 },
+  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0 },
+  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0 },
 ]);
 
 function clamp(value, min, max) {
@@ -877,9 +878,11 @@ export class PuzzleEngine {
           );
           if (damage > 0) damagedThisTurn.add(enemyIndex);
           if (
-            Number(enemy.attributeAbsorbTurns || 0) > 0
+            (Number(enemy.comboAbsorbTurns || 0) > 0
+              && this.comboCount <= Number(enemy.comboAbsorbThreshold || 0))
+            || (Number(enemy.attributeAbsorbTurns || 0) > 0
             && Number.isInteger(attributeIndex)
-            && (Number(enemy.attributeAbsorbMask || 0) & (1 << attributeIndex)) !== 0
+            && (Number(enemy.attributeAbsorbMask || 0) & (1 << attributeIndex)) !== 0)
           ) {
             enemy.hp = Math.min(enemy.maxHp, enemy.hp + damage);
             absorbedDamage += damage;
@@ -949,6 +952,7 @@ export class PuzzleEngine {
     this.advanceEnemyDefenseBoostTurns();
     this.advanceEnemyAttributeNullifyTurns();
     this.advanceEnemyAttributeAbsorbTurns();
+    this.advanceEnemyComboAbsorbTurns();
     this.advanceMoveTimeReductionTurns();
     this.advanceBlackOrbCountdowns();
     if (this.blackFallRule?.active && this.blackFallRule.turnsRemaining !== null) {
@@ -1050,6 +1054,7 @@ export class PuzzleEngine {
       currentHp: enemy.hp,
       maxHp: enemy.maxHp,
       attributeAbsorbTurns: enemy.attributeAbsorbTurns,
+      comboAbsorbTurns: enemy.comboAbsorbTurns,
       defenseBoostTurns: enemy.defenseBoostTurns,
       attributeNullifyTurns: enemy.attributeNullifyTurns,
       scaledAttackGate: enemy.scaledAttackGate,
@@ -1273,6 +1278,13 @@ export class PuzzleEngine {
         setupMaterialized: true,
       });
     }
+    if (skill.supported && skill.kind === 'comboAbsorb' && !skill.setupMaterialized) {
+      return Object.freeze({
+        ...record,
+        durationTurns: this.rollEnemySkillDuration(skill.durationMin, skill.durationMax),
+        setupMaterialized: true,
+      });
+    }
     if (skill.supported && skill.kind === 'activeSkillSeal' && !skill.setupMaterialized) {
       return Object.freeze({
         ...record,
@@ -1445,6 +1457,15 @@ export class PuzzleEngine {
       enemy.attributeAbsorbTurns = Math.max(
         0,
         Math.trunc(Number(enemy.attributeAbsorbTurns) || 0) - 1,
+      );
+    });
+  }
+
+  advanceEnemyComboAbsorbTurns() {
+    this.enemies.forEach((enemy) => {
+      enemy.comboAbsorbTurns = Math.max(
+        0,
+        Math.trunc(Number(enemy.comboAbsorbTurns) || 0) - 1,
       );
     });
   }
@@ -1835,6 +1856,14 @@ export class PuzzleEngine {
       this.message = `Enemy absorbs selected attributes for ${skill.durationTurns} turn${skill.durationTurns === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'comboAbsorb') {
+      const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
+      if (!enemy) return false;
+      enemy.comboAbsorbTurns = skill.durationTurns;
+      enemy.comboAbsorbThreshold = skill.comboThreshold;
+      this.message = `Enemy absorbs ${skill.comboThreshold} combos or fewer for ${skill.durationTurns} turn${skill.durationTurns === 1 ? '' : 's'}.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'bindLeaderHelper') {
       const durationTurns = this.rollEnemySkillDuration(skill.durationMin, skill.durationMax);
       const result = this.doBind(skill.targetMask || 0, durationTurns);
@@ -2023,6 +2052,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_REPEAT_ATTACK,
         PAD_ENEMY_SKILL_INACTIVITY,
         PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL,
+        PAD_ENEMY_SKILL_COMBO_ABSORB,
         PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
         PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -2637,7 +2667,7 @@ export class PuzzleEngine {
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,
-      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0 }, index) => ({
+      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0 }, index) => ({
         id,
         name,
         attribute,
@@ -2657,6 +2687,8 @@ export class PuzzleEngine {
         statusShieldTurns,
         attributeAbsorbTurns,
         attributeAbsorbMask,
+        comboAbsorbTurns,
+        comboAbsorbThreshold,
         queuedEnemySkills: Math.max(
           0,
           (this.enemySkillQueues[index]?.records.length || 0) - (this.enemySkillQueues[index]?.position || 0),

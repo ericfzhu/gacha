@@ -86,6 +86,10 @@ const UNCONDITIONAL_INACTIVITY_ENEMY_SKILL_TYPE = 66;
 const UNCONDITIONAL_INACTIVITY_HANDLER = 0x62be50;
 const UNCONDITIONAL_INACTIVITY_SETUP_HANDLER = 0x6217c0;
 const UNCONDITIONAL_INACTIVITY_CONDITION_HANDLER = 0x61a630;
+const COMBO_ABSORB_ENEMY_SKILL_TYPE = 67;
+const COMBO_ABSORB_HANDLER = 0x629968;
+const COMBO_ABSORB_SETUP_HANDLER = 0x61ffe8;
+const COMBO_ABSORB_CONDITION_HANDLER = 0x61ab6c;
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -632,6 +636,21 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : unconditionalInactivitySetupTarget === UNCONDITIONAL_INACTIVITY_SETUP_HANDLER;
   const unconditionalInactivityConditionMatches = unconditionalInactivityConditionTarget === null
     ? null : unconditionalInactivityConditionTarget === UNCONDITIONAL_INACTIVITY_CONDITION_HANDLER;
+  const comboAbsorbDispatchTarget = resolveEnemySkillTarget(
+    COMBO_ABSORB_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const comboAbsorbSetupTarget = resolveEnemySkillTarget(
+    COMBO_ABSORB_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const comboAbsorbConditionTarget = resolveEnemySkillTarget(
+    COMBO_ABSORB_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const comboAbsorbDispatchMatches = comboAbsorbDispatchTarget === null
+    ? null : comboAbsorbDispatchTarget === COMBO_ABSORB_HANDLER;
+  const comboAbsorbSetupMatches = comboAbsorbSetupTarget === null
+    ? null : comboAbsorbSetupTarget === COMBO_ABSORB_SETUP_HANDLER;
+  const comboAbsorbConditionMatches = comboAbsorbConditionTarget === null
+    ? null : comboAbsorbConditionTarget === COMBO_ABSORB_CONDITION_HANDLER;
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1563,6 +1582,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       unconditionalInactivityDispatchMatches21_9: unconditionalInactivityDispatchMatches,
       unconditionalInactivitySetupMatches21_9: unconditionalInactivitySetupMatches,
       unconditionalInactivityConditionMatches21_9: unconditionalInactivityConditionMatches,
+      comboAbsorbDispatchMatches21_9: comboAbsorbDispatchMatches,
+      comboAbsorbSetupMatches21_9: comboAbsorbSetupMatches,
+      comboAbsorbConditionMatches21_9: comboAbsorbConditionMatches,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -1841,6 +1863,18 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       unconditionalInactivityConditionMatches21_9: unconditionalInactivityConditionMatches,
       unconditionalInactivitySemantics:
         'type 66: generic no-parameter setup, no-effect dispatch, and unconditional 1.0 AI condition; selected records consume only the ordinary probability draw and then end the enemy action',
+      comboAbsorbType: COMBO_ABSORB_ENEMY_SKILL_TYPE,
+      comboAbsorbDispatchTarget: comboAbsorbDispatchTarget === null
+        ? null : hex(comboAbsorbDispatchTarget),
+      comboAbsorbDispatchMatches21_9: comboAbsorbDispatchMatches,
+      comboAbsorbSetupTarget: comboAbsorbSetupTarget === null
+        ? null : hex(comboAbsorbSetupTarget),
+      comboAbsorbSetupMatches21_9: comboAbsorbSetupMatches,
+      comboAbsorbConditionTarget: comboAbsorbConditionTarget === null
+        ? null : hex(comboAbsorbConditionTarget),
+      comboAbsorbConditionMatches21_9: comboAbsorbConditionMatches,
+      comboAbsorbSemantics:
+        'type 67: one-LCG inclusive +0x10..+0x14 duration stored at sMONSTER+0x678; +0x18 combo threshold stored at +0x67c; handler applies them to +0x8b0/+0x8a0; condition admits only while the protected duration is below one',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -2278,6 +2312,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || unconditionalInactivityDispatchMatches === false
     || unconditionalInactivitySetupMatches === false
     || unconditionalInactivityConditionMatches === false
+    || comboAbsorbDispatchMatches === false
+    || comboAbsorbSetupMatches === false
+    || comboAbsorbConditionMatches === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

@@ -35,6 +35,7 @@ export const PAD_ENEMY_SKILL_MORTAL_POISON_BLOCK_N_COUNTED = 61;
 export const PAD_ENEMY_SKILL_POISON_BLOCK_N = 64;
 export const PAD_ENEMY_SKILL_RANDOM_SUB_BIND = 65;
 export const PAD_ENEMY_SKILL_INACTIVITY_UNCONDITIONAL = 66;
+export const PAD_ENEMY_SKILL_COMBO_ABSORB = 67;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES_4 = 76;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES = 77;
 export const PAD_ENEMY_SKILL_HORIZONTAL_LINES_4 = 78;
@@ -380,6 +381,20 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       durationMin,
       durationMax,
       attributeMask,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_COMBO_ABSORB) {
+    requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    const durationMin = definition.getInt32(0x10, true);
+    const durationMax = definition.getInt32(0x14, true);
+    return Object.freeze({
+      type,
+      kind: 'comboAbsorb',
+      supported: durationMax >= durationMin,
+      durationMin,
+      durationMax,
+      comboThreshold: definition.getInt32(0x18, true),
       attackWithSkillValue,
     });
   }
@@ -1088,6 +1103,23 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_COMBO_ABSORB) {
+    requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'comboAbsorb',
+      supported: true,
+      durationMin: definition.getInt32(0x10, true),
+      durationMax: definition.getInt32(0x14, true),
+      durationTurns: monster.getInt32(0x678, true),
+      comboThreshold: monster.getInt32(0x67c, true),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_BIND_LEADER_HELPER) {
     requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
     const targetFlags = definition.getUint8(0x10) & 0x03;
@@ -1511,6 +1543,26 @@ export function normalizePadEnemySkillRecord(record) {
         ? { durationTurns: Math.trunc(Number(record.durationTurns) || 0) }
         : {}),
       setupMaterialized: Boolean(record?.setupMaterialized || durationPresent),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_COMBO_ABSORB || record?.kind === 'comboAbsorb') {
+    const durationMin = Math.trunc(Number(record?.durationMin) || 0);
+    const durationMax = Math.trunc(Number(record?.durationMax) || 0);
+    const durationPresent = record?.durationTurns !== undefined && record?.durationTurns !== null;
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_COMBO_ABSORB,
+      kind: 'comboAbsorb',
+      supported: record?.supported !== false && durationMax >= durationMin,
+      durationMin,
+      durationMax,
+      comboThreshold: Math.trunc(Number(record?.comboThreshold) || 0),
+      ...(durationPresent
+        ? { durationTurns: Math.trunc(Number(record.durationTurns) || 0) }
+        : {}),
+      setupMaterialized: Boolean(record?.setupMaterialized || durationPresent),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
     });
   }
   if (type === PAD_ENEMY_SKILL_BIND_LEADER_HELPER || record?.kind === 'bindLeaderHelper') {
