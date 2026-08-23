@@ -414,6 +414,80 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
   so a black-canvas regression cannot pass merely because the lifecycle reports
   `native game running`.
 
+## 2026-08-24 post-touch native-frame ORR decoder repair
+
+- Confirmed the earlier `0x2ea0b842` `NEG V2.2S` report no longer occurs with
+  the current versioned Wasm core. The exact APK reached 199 native frames,
+  21,766 GLES draw calls, and four touch callbacks before exposing the next
+  decoder boundary.
+- Decoded the new fault instruction `0x4f003441` at guest PC `0x2cc4d68` as
+  `ORR V1.4S, #2, LSL #8`. Extended the Advanced SIMD modified-immediate path
+  to implement both 2S and 4S ORR forms while preserving Q=0 upper-half clear
+  semantics, added exact regression fixtures, and advanced the public Wasm URL
+  version so an already cached frame decoder cannot mask the repair.
+- The following full run passed that ORR boundary and exposed `0x6e004003` at
+  guest PC `0x2ca8214`, decoded as `EXT V3.16B, V0.16B, V0.16B, #8`. Added the
+  general 8B/16B concatenation-window semantics, including source/destination
+  alias safety and Q=0 upper-half clearing, plus exact 16B and sibling 8B tests.
+- The next instruction was `0x2e658002` at `0x2ca8218`, decoded as unsigned
+  widening multiply-accumulate `UMLAL V2.4S, V0.4H, V5.4H`. Implemented all
+  valid 8→16, 16→32, and 32→64 lane widths for both lower-half `UMLAL` and
+  upper-half `UMLAL2`, with alias-safe accumulator/source snapshots and exact
+  lower/upper 4S fixtures.
+- Execution then reached `0x0f148440` at `0x2ca8220`, decoded as
+  `SHRN V0.4H, V2.4S, #12`. Added general 16→8, 32→16, and 64→32 logical
+  shift-and-narrow semantics for both `SHRN` and upper-half `SHRN2`, including
+  exact lower/upper fixtures and the architectural Q=0 upper-half clear.
+- The next callback boundary was `0x4e609e00` at `0x2ccf4c0`, decoded as
+  wrapping integer `MUL V0.8H, V16.8H, V0.8H`. Added alias-safe per-lane MUL
+  for the valid byte, halfword, and word 64/128-bit vector arrangements, with
+  exact 8H and Q=0 4H regression fixtures.
+- The following boundary `0x4e432825` at `0x2ccf844` is
+  `TRN1 V5.8H, V1.8H, V3.8H`. Added the complete byte/halfword/word and valid
+  doubleword arrangements, interleaving even source lanes with alias-safe
+  snapshots; exact 8H and Q=0 4H tests cover upper-half behavior.
+- Its immediate sibling was `0x4e436821` (`TRN2 V1.8H, V1.8H, V3.8H`) at
+  `0x2ccf848`. Generalized the same decoder across odd-lane `TRN2` and added an
+  exact destination/source-alias fixture.
+- The path next reached `0x4e863a32` at `0x2ccf884`, decoded as
+  `ZIP1 V18.4S, V17.4S, V6.4S`. Implemented lower/upper-half `ZIP1/ZIP2` lane
+  interleaving across the valid vector arrangements with exact ZIP1 and
+  destination/source-alias ZIP2 fixtures.
+- The next opcode `0x4f01a6a2` at `0x2ccf8a4` is
+  `MOVI V2.8H, #53, LSL #8`. Generalized the existing modified-immediate
+  MOVI/ORR decoder from word lanes to halfword lanes and added exact 8H MOVI
+  plus Q=0 shifted ORR fixtures.
+- Execution then reached `0x4e7284c1` at `0x2ccf8ac`, decoded as
+  `ADD V1.8H, V6.8H, V18.8H`. Generalized the byte-only integer ADD/SUB path
+  across halfword, word, and valid 2D arrangements with wrapping lane results,
+  alias-safe sources, and exact 8H ADD/Q=0 4H SUB fixtures.
+- The following opcode `0x4e62b470` at `0x2ccf8dc` is signed saturating
+  doubling multiply-high `SQDMULH V16.8H, V3.8H, V2.8H`. Added halfword/word
+  64/128-bit forms with exact min×min saturation, signed high-half behavior,
+  alias-safe sources, and exact 8H/Q=0 4H fixtures.
+- Execution next stopped on `0x4f1154a5` at `0x2ccf900`, decoded as
+  `SHL V5.8H, V5.8H, #1`. Added immediate logical-left shift for byte,
+  halfword, word, and doubleword lanes with alias-safe sources, wrapping lane
+  masks, and exact 8H/Q=0 4H fixtures.
+- The next boundary `0x0f0b94e7` at `0x2ccf95c` is signed saturating
+  shift-and-narrow `SQSHRN V7.8B, V7.8H, #5`. Added all 16→8, 32→16, and
+  64→32 widths for `SQSHRN/SQSHRN2`, including signed clamp behavior,
+  source/destination alias safety, Q=0 clearing, and exact lower/upper tests.
+- The following instruction `0x4d0085a2` at `0x2ccf9f8` is the single-lane
+  structure store `ST1 {V2.D}[1], [X13]`. Added one-register byte/halfword/
+  word/doubleword `LD1/ST1` element transfers, immediate/register post-index
+  writeback, exact D[1] store coverage, and an H[7] post-index load fixture.
+- The next callback stopped at `0x0e679698` (`MLA V24.4H, V20.4H, V7.4H`)
+  at `0x2ccf750`. Generalized multiply-accumulate from the previous 4S-only
+  path to byte, halfword, and word lanes for both vector widths, preserving
+  alias-safe wrapping accumulator semantics with exact 4H/8H tests.
+- The final full Chromium regression passed the entire sequence: the exact APK
+  remained `native game running` through 199 frames, 21,766 GLES draw calls,
+  four touch callbacks, and the expected `data048.bin`/`data030.bin` requests.
+  The pre-input native frame retained 93.1% visible pixels and the worker/page
+  reported no callback or console error. After the scripted taps the black
+  screen is the expected missing-private-data boundary, not a CPU stop.
+
 ## 2026-08-23 native frame NEG.2S decoder repair
 
 - Reproduced the post-startup browser failure reported as CPU status `-1` at
