@@ -114,6 +114,10 @@ const RESOLVE_ENEMY_SKILL_TYPE = 73;
 const RESOLVE_HANDLER = 0x62be50;
 const RESOLVE_SETUP_HANDLER = 0x621c94;
 const RESOLVE_CONDITION_HANDLER = 0x61c01c;
+const DAMAGE_SHIELD_ENEMY_SKILL_TYPE = 74;
+const DAMAGE_SHIELD_HANDLER = 0x629a78;
+const DAMAGE_SHIELD_SETUP_HANDLER = 0x61fee4;
+const DAMAGE_SHIELD_CONDITION_HANDLER = 0x61af8c;
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -777,6 +781,21 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : resolveSetupTarget === RESOLVE_SETUP_HANDLER;
   const resolveConditionMatches = resolveConditionTarget === null
     ? null : resolveConditionTarget === RESOLVE_CONDITION_HANDLER;
+  const damageShieldDispatchTarget = resolveEnemySkillTarget(
+    DAMAGE_SHIELD_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const damageShieldSetupTarget = resolveEnemySkillTarget(
+    DAMAGE_SHIELD_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const damageShieldConditionTarget = resolveEnemySkillTarget(
+    DAMAGE_SHIELD_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const damageShieldDispatchMatches = damageShieldDispatchTarget === null
+    ? null : damageShieldDispatchTarget === DAMAGE_SHIELD_HANDLER;
+  const damageShieldSetupMatches = damageShieldSetupTarget === null
+    ? null : damageShieldSetupTarget === DAMAGE_SHIELD_SETUP_HANDLER;
+  const damageShieldConditionMatches = damageShieldConditionTarget === null
+    ? null : damageShieldConditionTarget === DAMAGE_SHIELD_CONDITION_HANDLER;
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1729,6 +1748,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       resolveDispatchMatches21_9: resolveDispatchMatches,
       resolveSetupMatches21_9: resolveSetupMatches,
       resolveConditionMatches21_9: resolveConditionMatches,
+      damageShieldDispatchMatches21_9: damageShieldDispatchMatches,
+      damageShieldSetupMatches21_9: damageShieldSetupMatches,
+      damageShieldConditionMatches21_9: damageShieldConditionMatches,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -2088,6 +2110,18 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       resolveConditionMatches21_9: resolveConditionMatches,
       resolveSemantics:
         'type 73 is an initialization-time passive: ordinary dispatch/setup/condition are inert; checkPassiveSkills stores low16(+0x10) at sMONSTER+0xafc; attack2Enemy computes ceil(maxHp*threshold/100) and allows lethal damage to leave 1 HP only when current HP began that hit at or above the boundary, so a later hit can kill',
+      damageShieldType: DAMAGE_SHIELD_ENEMY_SKILL_TYPE,
+      damageShieldDispatchTarget: damageShieldDispatchTarget === null
+        ? null : hex(damageShieldDispatchTarget),
+      damageShieldDispatchMatches21_9: damageShieldDispatchMatches,
+      damageShieldSetupTarget: damageShieldSetupTarget === null
+        ? null : hex(damageShieldSetupTarget),
+      damageShieldSetupMatches21_9: damageShieldSetupMatches,
+      damageShieldConditionTarget: damageShieldConditionTarget === null
+        ? null : hex(damageShieldConditionTarget),
+      damageShieldConditionMatches21_9: damageShieldConditionMatches,
+      damageShieldSemantics:
+        'type 74: setup copies +0x10/+0x14 to runtime +0x678/+0x67c; execution installs signed-int16 turns at sMONSTER+0x940 and clamps the shield percentage to 0..100 at +0x950; condition requires the turn controller to be inactive; chcekDamageRatio4DamageDisp multiplies binary32((100-percent)/100) into the passive attribute ratio before calcAttackPow rounds upward once',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -2546,6 +2580,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || resolveDispatchMatches === false
     || resolveSetupMatches === false
     || resolveConditionMatches === false
+    || damageShieldDispatchMatches === false
+    || damageShieldSetupMatches === false
+    || damageShieldConditionMatches === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

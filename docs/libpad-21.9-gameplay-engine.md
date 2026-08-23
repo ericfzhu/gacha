@@ -885,6 +885,32 @@ damage to a full-health 50%-resolve enemy and leaves it at 1/92,000 HP; pure
 fixtures verify that the next hit kills and that a hit beginning below the
 46,000-HP boundary does not trigger resolve.
 
+Enemy skill type `74` is the timed all-damage reduction shield identified by
+DadGuide as `ESDamageShield`. Its dispatch, setup, and condition entries target
+`0x629a78`, `0x61fee4`, and `0x61af8c`. Setup copies definition `+0x10` turns
+and `+0x14` reduction percentage to runtime `sMONSTER+0x678/+0x67c` without
+consuming RNG. Execution installs the turns in the protected signed-int16
+controller at `sMONSTER+0x940`, clamps the authored percentage to `0..100`,
+and installs it at `+0x950`. The condition admits a record only while the turn
+controller is inactive.
+
+The final block of `_chcekDamageRatio4DamageDisp()` at `0x68439c` reads those
+controllers. While active it computes binary32 `(100 - percent) / 100` and
+multiplies that value into the existing type-72 attribute-resistance ratio in
+binary32. `_calcAttackPow()` then applies the combined ratio to the post-defense
+integer and rounds upward once. This also feeds native automatic-target damage
+projection, so the browser uses the same combined helper in targeting and live
+combat instead of independently rounding the two shields. Absorb and void
+thresholds therefore see the shield-reduced hit, while resolve remains on the
+later per-hit HP-subtraction path.
+
+The browser preserves the active-state admission rule, fixed duration,
+percentage clamp, enemy-turn countdown, snapshot fields, and visible
+`SHIELD n% tT` status. A focused 50%-shield fixture converts the ordinary 3,948
+fire hit to 1,974 damage, leaves the status at three turns immediately after
+installation, and ends the standard 100% scheduling draw at RNG state
+`394448415`.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

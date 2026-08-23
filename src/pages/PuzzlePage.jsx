@@ -297,6 +297,9 @@ function drawEnemy(ctx, enemy, index, target, time) {
   if (Number(enemy.damageVoidTurns || 0) > 0) {
     enemyStatus.push(`VOID ≥${Number(enemy.damageVoidThreshold || 0).toLocaleString()} ${enemy.damageVoidTurns}T`);
   }
+  if (Number(enemy.damageShieldTurns || 0) > 0) {
+    enemyStatus.push(`SHIELD ${enemy.damageShieldPercent}% ${enemy.damageShieldTurns}T`);
+  }
   const passiveResists = (enemy.attributeResistPercentages || [])
     .map((percent, attributeIndex) => ({ percent: Number(percent), attributeIndex }))
     .filter(({ percent }) => percent !== 100)

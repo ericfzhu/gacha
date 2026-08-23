@@ -21,6 +21,7 @@ import {
   PAD_ENEMY_SKILL_SKYFALL_RATE,
   PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION,
   PAD_ENEMY_SKILL_DAMAGE_VOID,
+  PAD_ENEMY_SKILL_DAMAGE_SHIELD,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -170,6 +171,7 @@ function isStaticallyEligible(definition, state) {
     PAD_ENEMY_SKILL_SKYFALL_RATE,
     PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION,
     PAD_ENEMY_SKILL_DAMAGE_VOID,
+    PAD_ENEMY_SKILL_DAMAGE_SHIELD,
     PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
     PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
     PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -353,6 +355,10 @@ function evaluateCondition(definition, state, rngState) {
     const eligible = state.enemyDamageVoidTurns <= 0;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
+  if (definition.effect.type === PAD_ENEMY_SKILL_DAMAGE_SHIELD) {
+    const eligible = state.enemyDamageShieldTurns <= 0;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
   if (
     definition.effect.type === PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION
     || definition.effect.type === PAD_ENEMY_SKILL_SOURCE_TO_JAMMER
@@ -530,6 +536,10 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     enemyDamageVoidTurns: Math.max(
       0,
       Math.trunc(Number(state.enemyDamageVoidTurns) || 0),
+    ),
+    enemyDamageShieldTurns: Math.max(
+      0,
+      Math.trunc(Number(state.enemyDamageShieldTurns) || 0),
     ),
     enemyInactivityPresentationActive: Boolean(state.enemyInactivityPresentationActive),
     skyfallNaturalTurns: Math.max(0, Math.trunc(Number(state.skyfallNaturalTurns) || 0)),

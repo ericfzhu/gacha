@@ -1363,12 +1363,32 @@ export function padDamageAfterDefense(
 // are interpreted as percentage reduction in binary32 before _calcAttackPow
 // widens the ratio, multiplies the post-defense integer, and rounds upward.
 export function padEnemyAttributeResistDamage(damage, shieldPercent) {
+  return padEnemyDamageAfterShields(damage, shieldPercent, null);
+}
+
+// The tail of _chcekDamageRatio4DamageDisp multiplies an active type-74
+// all-damage shield into the type-72 attribute ratio in binary32. calcAttackPow
+// then rounds the combined post-defense product upward exactly once.
+export function padEnemyDamageAfterShields(
+  damage,
+  attributeShieldPercent = 100,
+  damageShieldPercent = null,
+) {
   const incoming = Math.max(0, Math.trunc(Number(damage) || 0));
-  const nativePercent = Math.trunc(Number(shieldPercent) || 0) & 0xffff;
-  if (nativePercent === 100) return incoming;
-  const ratio = Math.fround(
-    Math.fround(100 - nativePercent) / Math.fround(100),
-  );
+  const nativePercent = Math.trunc(Number(attributeShieldPercent) || 0) & 0xffff;
+  let ratio = nativePercent === 100
+    ? Math.fround(1)
+    : Math.fround(Math.fround(100 - nativePercent) / Math.fround(100));
+  if (damageShieldPercent !== null && damageShieldPercent !== undefined) {
+    const clampedShield = Math.min(100, Math.max(
+      0,
+      Math.trunc(Number(damageShieldPercent) || 0),
+    ));
+    const shieldRatio = Math.fround(
+      Math.fround(100 - clampedShield) / Math.fround(100),
+    );
+    ratio = Math.fround(ratio * shieldRatio);
+  }
   return Math.max(0, Math.ceil(incoming * ratio));
 }
 

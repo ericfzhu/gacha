@@ -2,6 +2,24 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 enemy damage-reduction shield
+
+- Recovered live enemy skill type `74` (`ESDamageShield`) at dispatch/setup/
+  condition `0x629a78`, `0x61fee4`, and `0x61af8c`. Setup copies definition
+  `+0x10/+0x14` to runtime `+0x678/+0x67c`; execution installs the signed-int16
+  duration at `sMONSTER+0x940` and clamps the reduction percentage to `0..100`
+  at `+0x950`.
+- Traced its combat path through `_chcekDamageRatio4DamageDisp` at `0x684274`.
+  The timed shield multiplier is combined in binary32 with type-72 passive
+  resistance, then `_calcAttackPow` rounds the post-defense product upward once.
+  Automatic target projections use the same combined ratio.
+- Ported definition/runtime decoding, new-AI active-state rejection, execution,
+  expiry, snapshots, UI status, combined damage math, and focused browser
+  coverage. Pure rules, exact dispatch-table checks, focused and generic browser
+  runs, and the production build pass without page errors; a 50% shield reduces
+  the focused 3,948-damage hit to 1,974 and renders `SHIELD 50% 3T`.
+- Next: recover type `75` as a separate checkpoint.
+
 ## 2026-08-23 passive resolve
 
 - Recovered type `73` as the ordinary `ESResolve` passive. Its turn tables are

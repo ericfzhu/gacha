@@ -42,6 +42,7 @@ export const PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION = 70;
 export const PAD_ENEMY_SKILL_DAMAGE_VOID = 71;
 export const PAD_ENEMY_SKILL_ATTRIBUTE_RESIST = 72;
 export const PAD_ENEMY_SKILL_RESOLVE = 73;
+export const PAD_ENEMY_SKILL_DAMAGE_SHIELD = 74;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES_4 = 76;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES = 77;
 export const PAD_ENEMY_SKILL_HORIZONTAL_LINES_4 = 78;
@@ -320,6 +321,17 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       supported: true,
       passive: true,
       hpThresholdPercent: definition.getInt32(0x10, true) & 0xffff,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_DAMAGE_SHIELD) {
+    requireLength(definitionBytes, 0x18, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'damageShield',
+      supported: true,
+      durationTurns: Math.max(0, (definition.getInt32(0x10, true) << 16) >> 16),
+      shieldPercent: Math.min(100, Math.max(0, definition.getInt32(0x14, true))),
       attackWithSkillValue,
     });
   }
@@ -1111,6 +1123,21 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_DAMAGE_SHIELD) {
+    requireLength(monsterBytes, 0x680, 'PAD monster runtime');
+    return Object.freeze({
+      type,
+      kind: 'damageShield',
+      supported: true,
+      durationTurns: Math.max(0, (monster.getInt32(0x678, true) << 16) >> 16),
+      shieldPercent: Math.min(100, Math.max(0, monster.getInt32(0x67c, true))),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (
     type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST
     || type === PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST
@@ -1603,6 +1630,22 @@ export function normalizePadEnemySkillRecord(record) {
       supported: record?.supported !== false,
       passive: true,
       hpThresholdPercent: Math.trunc(Number(record?.hpThresholdPercent) || 0) & 0xffff,
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_DAMAGE_SHIELD || record?.kind === 'damageShield') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_DAMAGE_SHIELD,
+      kind: 'damageShield',
+      supported: record?.supported !== false,
+      durationTurns: Math.max(0, (Math.trunc(Number(record?.durationTurns) || 0) << 16) >> 16),
+      shieldPercent: Math.min(100, Math.max(
+        0,
+        Math.trunc(Number(record?.shieldPercent) || 0),
+      )),
       setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null

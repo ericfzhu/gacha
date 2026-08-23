@@ -14,7 +14,7 @@ import {
   padCountBlockBits,
   padCountNonPoisonBlocks,
   padDamageAfterDefense,
-  padEnemyAttributeResistDamage,
+  padEnemyDamageAfterShields,
   padEnemyResolveThresholdHp,
   padNativeBaseAttackPower,
   padNativeRecoveryPower,
@@ -60,6 +60,7 @@ import {
   PAD_ENEMY_SKILL_DAMAGE_VOID,
   PAD_ENEMY_SKILL_ATTRIBUTE_RESIST,
   PAD_ENEMY_SKILL_RESOLVE,
+  PAD_ENEMY_SKILL_DAMAGE_SHIELD,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -162,8 +163,8 @@ const PARTY = Object.freeze([
 ]);
 
 const ENEMY_TEMPLATE = Object.freeze([
-  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0, damageVoidTurns: 0, damageVoidThreshold: 0 },
-  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0, damageVoidTurns: 0, damageVoidThreshold: 0 },
+  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0, damageVoidTurns: 0, damageVoidThreshold: 0, damageShieldTurns: 0, damageShieldPercent: 0 },
+  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0, damageVoidTurns: 0, damageVoidThreshold: 0, damageShieldTurns: 0, damageShieldPercent: 0 },
 ]);
 
 function clamp(value, min, max) {
@@ -529,12 +530,13 @@ export class PuzzleEngine {
       const defendedDamage = nullified ? 0 : padDamageAfterDefense(
         attack, attributeMultiplier, effectiveDefense, damageCap,
       );
-      const damage = Number.isInteger(attributeIndex) && attributeIndex <= 4
-        ? padEnemyAttributeResistDamage(
-          defendedDamage,
-          enemy.attributeResistPercentages?.[attributeIndex] ?? 100,
-        )
-        : defendedDamage;
+      const damage = padEnemyDamageAfterShields(
+        defendedDamage,
+        Number.isInteger(attributeIndex) && attributeIndex <= 4
+          ? enemy.attributeResistPercentages?.[attributeIndex] ?? 100
+          : 100,
+        Number(enemy.damageShieldTurns || 0) > 0 ? enemy.damageShieldPercent : null,
+      );
       return {
         index,
         hp: enemy.hp,
@@ -949,12 +951,13 @@ export class PuzzleEngine {
             raw, padAttributeMultiplier(lane.attribute, enemy.attribute), effectiveDefense,
             member.damageCap,
           );
-          const damage = Number.isInteger(attributeIndex) && attributeIndex <= 4
-            ? padEnemyAttributeResistDamage(
-              defendedDamage,
-              enemy.attributeResistPercentages?.[attributeIndex] ?? 100,
-            )
-            : defendedDamage;
+          const damage = padEnemyDamageAfterShields(
+            defendedDamage,
+            Number.isInteger(attributeIndex) && attributeIndex <= 4
+              ? enemy.attributeResistPercentages?.[attributeIndex] ?? 100
+              : 100,
+            Number(enemy.damageShieldTurns || 0) > 0 ? enemy.damageShieldPercent : null,
+          );
           if (
             (Number(enemy.comboAbsorbTurns || 0) > 0
               && this.comboCount <= Number(enemy.comboAbsorbThreshold || 0))
@@ -1050,6 +1053,7 @@ export class PuzzleEngine {
     this.advanceEnemyAttributeAbsorbTurns();
     this.advanceEnemyComboAbsorbTurns();
     this.advanceEnemyDamageVoidTurns();
+    this.advanceEnemyDamageShieldTurns();
     this.advanceSkyfallRateRules();
     this.advanceMoveTimeReductionTurns();
     this.advanceBlackOrbCountdowns();
@@ -1154,6 +1158,7 @@ export class PuzzleEngine {
       attributeAbsorbTurns: enemy.attributeAbsorbTurns,
       comboAbsorbTurns: enemy.comboAbsorbTurns,
       enemyDamageVoidTurns: enemy.damageVoidTurns,
+      enemyDamageShieldTurns: enemy.damageShieldTurns,
       skyfallNaturalTurns: this.skyfallRateRules.natural?.turnsRemaining || 0,
       skyfallNaturalMask: this.skyfallRateRules.natural?.typeMask || 0,
       skyfallHazardTurns: this.skyfallRateRules.hazard?.turnsRemaining || 0,
@@ -1590,6 +1595,16 @@ export class PuzzleEngine {
     });
   }
 
+  advanceEnemyDamageShieldTurns() {
+    this.enemies.forEach((enemy) => {
+      enemy.damageShieldTurns = Math.max(
+        0,
+        Math.trunc(Number(enemy.damageShieldTurns) || 0) - 1,
+      );
+      if (enemy.damageShieldTurns === 0) enemy.damageShieldPercent = 0;
+    });
+  }
+
   advanceSkyfallRateRules() {
     for (const category of ['natural', 'hazard']) {
       const rule = this.skyfallRateRules[category];
@@ -1935,6 +1950,14 @@ export class PuzzleEngine {
       this.message = `${enemy.name} voids damage of ${skill.damageThreshold.toLocaleString()} or more for ${skill.durationTurns} turn${skill.durationTurns === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'damageShield') {
+      const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
+      if (!enemy) return false;
+      enemy.damageShieldTurns = skill.durationTurns;
+      enemy.damageShieldPercent = skill.shieldPercent;
+      this.message = `${enemy.name} reduces damage by ${skill.shieldPercent}% for ${skill.durationTurns} turn${skill.durationTurns === 1 ? '' : 's'}.`;
+      return true;
+    }
     if (skill.supported && [
       'loneAttackBoost',
       'statusTriggeredAttackBoost',
@@ -2246,6 +2269,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_DAMAGE_VOID,
         PAD_ENEMY_SKILL_ATTRIBUTE_RESIST,
         PAD_ENEMY_SKILL_RESOLVE,
+        PAD_ENEMY_SKILL_DAMAGE_SHIELD,
         PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
         PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -2894,7 +2918,7 @@ export class PuzzleEngine {
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,
-      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, deathResolved = false, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0, damageVoidTurns = 0, damageVoidThreshold = 0, attributeResistPercentages = [100, 100, 100, 100, 100], resolveThresholdPercent = 0 }, index) => ({
+      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, deathResolved = false, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0, damageVoidTurns = 0, damageVoidThreshold = 0, damageShieldTurns = 0, damageShieldPercent = 0, attributeResistPercentages = [100, 100, 100, 100, 100], resolveThresholdPercent = 0 }, index) => ({
         id,
         name,
         attribute,
@@ -2919,6 +2943,8 @@ export class PuzzleEngine {
         comboAbsorbThreshold,
         damageVoidTurns,
         damageVoidThreshold,
+        damageShieldTurns,
+        damageShieldPercent,
         attributeResistPercentages: [...attributeResistPercentages],
         resolveThresholdPercent,
         queuedEnemySkills: Math.max(
