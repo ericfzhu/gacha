@@ -2,6 +2,27 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 repeat-attack enemy skill
+
+- Recovered live enemy skill type `15`: dispatch `0x62be50`, setup
+  `0x6214a8`, and condition `0x61b49c`. Setup spends one shared LCG advance
+  selecting an inclusive hit count from definition `+0x10..+0x14`, caps it at
+  15, zeroes the completed-hit bitset, and copies per-hit damage percentage
+  `+0x18` into runtime `sMONSTER+0x680`.
+- Recovered `_doRepeatAttack` (`0x625a64`) and `_setEnemyAttack` (`0x625bcc`).
+  The native animation path visits each unmarked hit index, sends its percentage
+  separately through `_setEnemyAttack`, and records completion in
+  `sMONSTER+0x67c`; it does not combine the authored percentage before native
+  attack rounding.
+- Ported definition/runtime decoding, exact one-draw materialization, the
+  15-hit cap, individual hit damage snapshots, attack-boost interaction, and
+  composition with the generic definition `+0x44` accompanying attack. Pure,
+  exact-table, production-build, and focused browser fixtures pass; the seeded
+  browser fixture reproduces three 740-damage hits plus a 925-damage
+  accompanying attack for 3,145 total damage.
+- Next: resolve type `16`'s scheduler role before assigning semantics to its
+  no-effect dispatch and water-attribute condition callback.
+
 ## 2026-08-23 random party bind and active-skill seal
 
 - Recovered early live enemy skill type `13` as a separate random-party bind:

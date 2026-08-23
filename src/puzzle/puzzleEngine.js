@@ -44,6 +44,7 @@ import {
   PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
   PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
   PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
+  PAD_ENEMY_SKILL_REPEAT_ATTACK,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -939,7 +940,7 @@ export class PuzzleEngine {
       enemy.counter -= 1;
       if (enemy.counter <= 0) {
         enemy.counter = enemy.maxCounter;
-        const skill = this.takeEnemySkill(index);
+        let skill = this.takeEnemySkill(index);
         if (skill) {
           const activeBoostPercent = enemy.attackBoostTurns > 0
             ? enemy.attackBoostPercent
@@ -960,6 +961,16 @@ export class PuzzleEngine {
             );
           } else if (skill.kind === 'additionalAttack') {
             damage += padEnemySkillAdditionalAttack(enemy.attack, skill.damagePercent);
+          } else if (skill.kind === 'repeatAttack') {
+            const hitCount = Math.max(0, Math.min(15, Math.trunc(skill.hitCount)));
+            const hitDamage = padEnemySkillBoostedAttack(
+              enemy.attack,
+              skill.damagePercent,
+              activeBoostPercent,
+            );
+            const hitDamages = Object.freeze(Array(hitCount).fill(hitDamage));
+            damage += hitDamage * hitCount;
+            skill = Object.freeze({ ...skill, hitDamages });
           }
           total += damage;
           this.lastEnemyActions.push({
@@ -1163,6 +1174,15 @@ export class PuzzleEngine {
           : skill.kind === 'additionalAttack'
             ? { damagePercent: percent }
             : { boostPercent: percent }),
+        setupMaterialized: true,
+      });
+    }
+    if (skill.supported && skill.kind === 'repeatAttack' && !skill.setupMaterialized) {
+      const selectedHitCount = this.rollEnemySkillDuration(skill.hitCountMin, skill.hitCountMax);
+      return Object.freeze({
+        ...record,
+        hitCount: Math.min(selectedHitCount, 15),
+        completedHitMask: 0,
         setupMaterialized: true,
       });
     }
@@ -1602,6 +1622,10 @@ export class PuzzleEngine {
         : `Active skills sealed for ${this.skillSealTurns} turn${this.skillSealTurns === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'repeatAttack') {
+      this.message = `Enemy attacks ${Math.max(0, skill.hitCount)} times at ${skill.damagePercent}% power.`;
+      return true;
+    }
     if (skill.supported && [
       'loneAttackBoost',
       'statusTriggeredAttackBoost',
@@ -1864,6 +1888,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
         PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
         PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
+        PAD_ENEMY_SKILL_REPEAT_ATTACK,
         PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
         PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,

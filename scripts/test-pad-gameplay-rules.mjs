@@ -11,6 +11,7 @@ import {
   PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
   PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
   PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
+  PAD_ENEMY_SKILL_REPEAT_ATTACK,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -1572,6 +1573,55 @@ assert.equal(resistedActiveSkillSealEngine.applyEnemySkillRuntime(
 assert.equal(resistedActiveSkillSealEngine.skillSealTurns, 0);
 assert.equal(resistedActiveSkillSealEngine.lastEnemySkill.resisted, true);
 assert.equal(resistedActiveSkillSealEngine.rng.state, padLcgStep(21_900).state);
+const enemyAiRepeatAttackDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiRepeatAttackView = new DataView(enemyAiRepeatAttackDefinition.buffer);
+enemyAiRepeatAttackView.setUint32(0x00, 9_039, true);
+enemyAiRepeatAttackView.setInt16(0x04, PAD_ENEMY_SKILL_REPEAT_ATTACK, true);
+enemyAiRepeatAttackView.setInt32(0x10, 3, true);
+enemyAiRepeatAttackView.setInt32(0x14, 5, true);
+enemyAiRepeatAttackView.setInt32(0x18, 40, true);
+enemyAiRepeatAttackView.setInt32(0x30, 10_000, true);
+enemyAiRepeatAttackView.setInt32(0x34, 1_000, true);
+enemyAiRepeatAttackView.setInt32(0x38, 100, true);
+enemyAiRepeatAttackView.setInt32(0x40, 20, true);
+enemyAiRepeatAttackView.setInt32(0x44, 50, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiRepeatAttackDefinition), {
+  type: 15,
+  kind: 'repeatAttack',
+  supported: true,
+  hitCountMin: 3,
+  hitCountMax: 5,
+  damagePercent: 40,
+  attackWithSkillValue: 50,
+});
+const repeatAttackMonsterRuntime = new Uint8Array(0x684);
+const repeatAttackMonsterRuntimeView = new DataView(repeatAttackMonsterRuntime.buffer);
+repeatAttackMonsterRuntimeView.setInt32(0x678, 4, true);
+repeatAttackMonsterRuntimeView.setUint32(0x67c, 0b0101, true);
+repeatAttackMonsterRuntimeView.setInt32(0x680, 40, true);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiRepeatAttackDefinition, repeatAttackMonsterRuntime),
+  {
+    type: 15,
+    kind: 'repeatAttack',
+    supported: true,
+    hitCount: 4,
+    completedHitMask: 0b0101,
+    damagePercent: 40,
+    setupMaterialized: true,
+    attackWithSkillValue: 50,
+  },
+);
+const cappedRepeatAttackDefinition = enemyAiRepeatAttackDefinition.slice();
+const cappedRepeatAttackView = new DataView(cappedRepeatAttackDefinition.buffer);
+cappedRepeatAttackView.setInt32(0x10, 16, true);
+cappedRepeatAttackView.setInt32(0x14, 18, true);
+const cappedRepeatAttackEngine = new PuzzleEngine({ seed: 21_900 });
+cappedRepeatAttackEngine.setRngState(21_900);
+assert.equal(cappedRepeatAttackEngine.applyEnemySkillDefinition(cappedRepeatAttackDefinition), true);
+assert.equal(cappedRepeatAttackEngine.lastEnemySkill.hitCount, 15);
+assert.equal(cappedRepeatAttackEngine.lastEnemySkill.completedHitMask, 0);
+assert.equal(cappedRepeatAttackEngine.rng.state, padLcgStep(21_900).state);
 const enemyAiAttributeAbsorbDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiAttributeAbsorbView = new DataView(enemyAiAttributeAbsorbDefinition.buffer);
 enemyAiAttributeAbsorbView.setUint32(0x00, 9_021, true);
@@ -3588,6 +3638,32 @@ assert.equal(selectedActiveSkillSealState.skill.ready, false);
 selectedActiveSkillSealEngine.enemies[0].counter = 1;
 selectedActiveSkillSealEngine.resolveEnemyTurn();
 assert.equal(selectedActiveSkillSealEngine.skillSealTurns, 5);
+const repeatAttackMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(repeatAttackMonsterDefinition.buffer).setUint32(0xec, 9_039, true);
+const selectedRepeatAttackEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: repeatAttackMonsterDefinition,
+    skillDefinitions: [enemyAiRepeatAttackDefinition],
+  }],
+});
+selectedRepeatAttackEngine.setRngState(21_900);
+selectedRepeatAttackEngine.enemies[0].counter = 1;
+selectedRepeatAttackEngine.enemies[1].counter = 99;
+selectedRepeatAttackEngine.resolveEnemyTurn();
+const selectedRepeatAttackState = selectedRepeatAttackEngine.snapshot();
+assert.equal(selectedRepeatAttackState.lastEnemyActions[0].skill.type, 15);
+assert.equal(selectedRepeatAttackState.lastEnemyActions[0].skill.hitCount, 5);
+assert.deepEqual(
+  selectedRepeatAttackState.lastEnemyActions[0].skill.hitDamages,
+  [740, 740, 740, 740, 740],
+);
+assert.equal(selectedRepeatAttackState.lastEnemyActions[0].damage, 4_625);
+assert.equal(selectedRepeatAttackState.player.hp, 7_375);
+assert.equal(
+  selectedRepeatAttackState.rngState,
+  padLcgStep(padLcgStep(21_900).state).state,
+);
 const bindLeaderHelperMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(bindLeaderHelperMonsterDefinition.buffer).setUint32(0xec, 9_020, true);
 const selectedBindLeaderHelperEngine = new PuzzleEngine({

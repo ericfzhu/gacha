@@ -8,6 +8,7 @@ export const PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY = 11;
 export const PAD_ENEMY_SKILL_SOURCE_TO_JAMMER = 12;
 export const PAD_ENEMY_SKILL_RANDOM_PARTY_BIND = 13;
 export const PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL = 14;
+export const PAD_ENEMY_SKILL_REPEAT_ATTACK = 15;
 export const PAD_ENEMY_SKILL_LONE_ATTACK_BOOST = 17;
 export const PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST = 18;
 export const PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST = 19;
@@ -197,6 +198,20 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       supported: durationMax >= durationMin,
       durationMin,
       durationMax,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_REPEAT_ATTACK) {
+    requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    const hitCountMin = definition.getInt32(0x10, true);
+    const hitCountMax = definition.getInt32(0x14, true);
+    return Object.freeze({
+      type,
+      kind: 'repeatAttack',
+      supported: hitCountMax >= hitCountMin,
+      hitCountMin,
+      hitCountMax,
+      damagePercent: definition.getInt32(0x18, true),
       attackWithSkillValue,
     });
   }
@@ -807,6 +822,22 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_REPEAT_ATTACK) {
+    requireLength(monsterBytes, 0x684, 'PAD monster runtime');
+    return Object.freeze({
+      type,
+      kind: 'repeatAttack',
+      supported: true,
+      hitCount: monster.getInt32(0x678, true),
+      completedHitMask: monster.getUint32(0x67c, true),
+      damagePercent: monster.getInt32(0x680, true),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (
     type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST
     || type === PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST
@@ -1105,6 +1136,25 @@ export function normalizePadEnemySkillRecord(record) {
         ? {}
         : { targetMask: Math.trunc(Number(record.targetMask) || 0) & 0x3f }),
       setupMaterialized: Boolean(record?.setupMaterialized || durationPresent),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_REPEAT_ATTACK || record?.kind === 'repeatAttack') {
+    const hitCountPresent = record?.hitCount !== undefined && record?.hitCount !== null;
+    const hitCountMin = Math.trunc(Number(record?.hitCountMin) || 0);
+    const hitCountMax = Math.trunc(Number(record?.hitCountMax) || 0);
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_REPEAT_ATTACK,
+      kind: 'repeatAttack',
+      supported: hitCountPresent || hitCountMax >= hitCountMin,
+      ...(hitCountPresent
+        ? { hitCount: Math.trunc(Number(record.hitCount) || 0) }
+        : { hitCountMin, hitCountMax }),
+      damagePercent: Math.trunc(Number(record?.damagePercent) || 0),
+      completedHitMask: Math.trunc(Number(record?.completedHitMask) || 0) >>> 0,
+      setupMaterialized: Boolean(record?.setupMaterialized || hitCountPresent),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

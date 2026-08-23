@@ -10,6 +10,7 @@ import {
   PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
   PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
   PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
+  PAD_ENEMY_SKILL_REPEAT_ATTACK,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -148,6 +149,7 @@ function isStaticallyEligible(definition, state) {
     PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
     PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
     PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
+    PAD_ENEMY_SKILL_REPEAT_ATTACK,
     PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
     PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
     PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -245,6 +247,22 @@ function evaluateCondition(definition, state, rngState) {
     // eligible and _doVoidActSkill extends them.
     const eligible = state.skillSealTurns <= 63;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_REPEAT_ATTACK) {
+    // Type 15's 0x61b49c callback compares current player HP with the signed
+    // 32-bit product of base attack and the authored maximum hit count. A
+    // potentially lethal sequence forces the condition scale to 1.0;
+    // otherwise it preserves the incoming scale (1.0 at this recovered new-AI
+    // boundary). The callback itself consumes no RNG.
+    const lethalDamage = Math.imul(
+      definition.effect.hitCountMax | 0,
+      state.enemyBaseAttack | 0,
+    );
+    const incomingScale = Math.fround(1);
+    const probabilityScale = state.playerCurrentHp < lethalDamage
+      ? Math.fround(1)
+      : incomingScale;
+    return { eligible: true, probabilityScale, rngState };
   }
   if (
     definition.effect.type === PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION

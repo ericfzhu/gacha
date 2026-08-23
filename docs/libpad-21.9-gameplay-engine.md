@@ -785,6 +785,29 @@ action, while an extension does not. The browser exposes this counter, disables
 active-skill input while it is positive, renders the sealed state, and retains
 the exact ten-bit wrap and resistance RNG boundary.
 
+Enemy skill type `15` is the repeated or multi-hit attack. Its dispatch entry
+is the shared no-effect tail at `0x62be50`, setup is `0x6214a8`, and its AI
+condition is `0x61b49c`. Setup advances the global LCG once to select an
+inclusive signed hit count from definition `+0x10..+0x14`, caps that count at
+15 into `sMONSTER+0x678`, zeroes the completed-hit bitset at `+0x67c`, and
+copies definition per-hit damage percentage `+0x18` to `+0x680`.
+
+The actual repeated attack is driven by `_doRepeatAttack` (`0x625a64`) rather
+than the dispatch-table tail. As the native animation progresses, every hit
+index whose bit is not set at `+0x67c` is passed separately to
+`_setEnemyAttack` (`0x625bcc`) with binary32 `damagePercent / 100`; the bit is
+then marked. Each hit therefore independently uses the active enemy attack
+boost and `_setEnemyAttackMain`'s native rounding. The browser core preserves
+the individual hit damages in the action snapshot while applying their sum to
+HP, and independently composes the generic definition `+0x44` accompanying
+attack prepared by `_doEnemySkill`.
+
+Condition `0x61b49c` computes the signed low-32-bit product of the authored
+maximum hit count and enemy base attack. When player current HP is below that
+value it forces probability scale 1.0; otherwise it preserves the incoming
+scale. The recovered new-AI caller supplies 1.0, so type `15` remains eligible
+without condition-owned RNG at this boundary.
+
 Enemy skill type `17` is the lone-enemy attack boost. Its late dispatch entry
 targets shared boost handler `0x629064`, setup targets `0x61ffdc`, and AI
 condition targets `0x61acdc`. Setup copies definition duration `+0x14` to

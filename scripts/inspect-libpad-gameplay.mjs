@@ -58,6 +58,10 @@ const EARLY_PARTY_CONTROL_SKILLS = Object.freeze([
     condition: 0x61aca4,
   }),
 ]);
+const REPEAT_ATTACK_ENEMY_SKILL_TYPE = 15;
+const REPEAT_ATTACK_HANDLER = 0x62be50;
+const REPEAT_ATTACK_SETUP_HANDLER = 0x6214a8;
+const REPEAT_ATTACK_CONDITION_HANDLER = 0x61b49c;
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -255,6 +259,7 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['enemy-ai', 'canBindCard', '_ZNK9cGAMEMAIN12_canBindCardEi', 0x6168b8],
   ['enemy-ai', 'doVoidActSkill', '_ZN9cGAMEMAIN15_doVoidActSkillEPK8sMONSTER', 0x616924],
   ['enemy-ai', 'doOnPostEnemyAttack', '_ZN9cGAMEMAIN20_doOnPostEnemyAttackEv', 0x678980],
+  ['enemy-ai', 'doRepeatAttack', '_ZN9cGAMEMAIN15_doRepeatAttackEP8sMONSTER', 0x625a64],
   ['enemy-ai', 'hasPassiveSkillsCard', '_ZNK9cGAMEMAIN17_hasPassiveSkillsEPK5sCARDi', 0x640a90],
   ['enemy-ai', 'isValidCardNumber', '_ZN9cSAVEDATA17isValidCardNumberEib', 0x74393c],
   ['combat', 'checkMonsterAbsorb', '_ZN9cGAMEMAIN18_checkMonterAbsorbEv', 0x6239dc],
@@ -268,6 +273,7 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['math', 'roundSignedInt64', 'izMathRoundSint64', 0x36b3e0],
   ['math', 'signedIntMultiplyAdd', 'izMathSint32MulAdd', 0x36b3fc],
   ['combat', 'setEnemyAttackMain', '_ZN9cGAMEMAIN20__setEnemyAttackMainEP8sMONSTERbfi', 0x62c2cc],
+  ['combat', 'setEnemyAttack', '_ZN9cGAMEMAIN15_setEnemyAttackEP8sMONSTERfi', 0x625bcc],
   ['match', 'checkCombos', '_ZN9cGAMEMAIN12_checkCombosEii', 0x659d24],
   ['match', 'checkFlood', '_ZN9cGAMEMAIN11_checkFloodEiiiRi', 0x666724],
   ['match', 'checkFlood4bomb', '_ZN9cGAMEMAIN16_checkFlood4bombEiiiRi', 0x6668e4],
@@ -481,6 +487,21 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
   });
   const earlyPartyControlEntriesMatch = restoredElf === null
     ? null : earlyPartyControlTargets.every((entry) => entry.matches21_9);
+  const repeatAttackDispatchTarget = resolveEnemySkillTarget(
+    REPEAT_ATTACK_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const repeatAttackSetupTarget = resolveEnemySkillTarget(
+    REPEAT_ATTACK_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const repeatAttackConditionTarget = resolveEnemySkillTarget(
+    REPEAT_ATTACK_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const repeatAttackDispatchMatches = repeatAttackDispatchTarget === null
+    ? null : repeatAttackDispatchTarget === REPEAT_ATTACK_HANDLER;
+  const repeatAttackSetupMatches = repeatAttackSetupTarget === null
+    ? null : repeatAttackSetupTarget === REPEAT_ATTACK_SETUP_HANDLER;
+  const repeatAttackConditionMatches = repeatAttackConditionTarget === null
+    ? null : repeatAttackConditionTarget === REPEAT_ATTACK_CONDITION_HANDLER;
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1391,6 +1412,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       additionalAttackConditionMatches21_9: additionalAttackConditionMatches,
       earlyDefenseShieldEntriesMatch21_9: earlyDefenseShieldEntriesMatch,
       earlyPartyControlEntriesMatch21_9: earlyPartyControlEntriesMatch,
+      repeatAttackDispatchMatches21_9: repeatAttackDispatchMatches,
+      repeatAttackSetupMatches21_9: repeatAttackSetupMatches,
+      repeatAttackConditionMatches21_9: repeatAttackConditionMatches,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -1406,6 +1430,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
         'type 13: +0x10 target count; choose currently unbound party cards with the native two-step/private-state shuffle, then bind each for the hardcoded six-turn operand',
       activeSkillSealSemantics:
         'type 14: one-LCG inclusive +0x10..+0x14 duration; 20% per resistance awakening plus badge; add into protected low-ten-bit sGAMEWORK+0x87250 and count down in _doOnPostEnemyAttack',
+      repeatAttackSemantics:
+        'type 15: one-LCG inclusive +0x10..+0x14 hit count capped at 15; +0x18 percent is sent once per hit through _setEnemyAttack; +0x67c is the completed-hit bitset',
       healPlayerDispatchMatches21_9: healPlayerDispatchMatches,
       healPlayerSetupMatches21_9: healPlayerSetupMatches,
       healPlayerConditionMatches21_9: healPlayerConditionMatches,
@@ -1589,6 +1615,15 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       additionalAttackConditionMatches21_9: additionalAttackConditionMatches,
       additionalAttackSemantics:
         'one-LCG inclusive +0x10..+0x14 percentage; add round(float32(int64 attack*percent)/100); condition clipF(float32(player HP)/float32(enemy attack), 0, 2)',
+      repeatAttackType: REPEAT_ATTACK_ENEMY_SKILL_TYPE,
+      repeatAttackDispatchTarget: repeatAttackDispatchTarget === null
+        ? null : hex(repeatAttackDispatchTarget),
+      repeatAttackDispatchMatches21_9: repeatAttackDispatchMatches,
+      repeatAttackSetupTarget: repeatAttackSetupTarget === null ? null : hex(repeatAttackSetupTarget),
+      repeatAttackSetupMatches21_9: repeatAttackSetupMatches,
+      repeatAttackConditionTarget: repeatAttackConditionTarget === null
+        ? null : hex(repeatAttackConditionTarget),
+      repeatAttackConditionMatches21_9: repeatAttackConditionMatches,
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -2005,6 +2040,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || additionalAttackConditionMatches === false
     || earlyDefenseShieldEntriesMatch === false
     || earlyPartyControlEntriesMatch === false
+    || repeatAttackDispatchMatches === false
+    || repeatAttackSetupMatches === false
+    || repeatAttackConditionMatches === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false
