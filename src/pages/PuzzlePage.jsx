@@ -294,6 +294,9 @@ function drawEnemy(ctx, enemy, index, target, time) {
   if (Number(enemy.comboAbsorbTurns || 0) > 0) {
     enemyStatus.push(`ABS ≤${enemy.comboAbsorbThreshold}C ${enemy.comboAbsorbTurns}T`);
   }
+  if (Number(enemy.damageAbsorbTurns || 0) > 0) {
+    enemyStatus.push(`ABS ≥${Number(enemy.damageAbsorbThreshold || 0).toLocaleString()} ${enemy.damageAbsorbTurns}T`);
+  }
   if (Number(enemy.damageVoidTurns || 0) > 0) {
     enemyStatus.push(`VOID ≥${Number(enemy.damageVoidThreshold || 0).toLocaleString()} ${enemy.damageVoidTurns}T`);
   }

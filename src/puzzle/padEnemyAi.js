@@ -8,6 +8,7 @@ import {
   PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
   PAD_ENEMY_SKILL_HEAL_ENEMY,
   PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL,
+  PAD_ENEMY_SKILL_DAMAGE_ABSORB,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -161,6 +162,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
     PAD_ENEMY_SKILL_HEAL_ENEMY,
     PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL,
+    PAD_ENEMY_SKILL_DAMAGE_ABSORB,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
     PAD_ENEMY_SKILL_DEFENSE_BOOST,
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -303,6 +305,11 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
     // Type 86 shares type 7's setup and execution handlers, but maps to the
     // unconditional 0x61a630 condition instead of the player-survival gate.
     return { eligible: true, probabilityScale: 1, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_DAMAGE_ABSORB) {
+    // 0x61af94 admits only while protected signed-int16 sMONSTER+0x960 is < 1.
+    const eligible = state.enemyDamageAbsorbTurns <= 0;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_ADDITIONAL_ATTACK) {
     // 0x61b450 performs this division and izMathClipF entirely in binary32.
@@ -579,6 +586,10 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     playerMaxHp: Math.max(0, Number(state.playerMaxHp) || 0),
     attributeAbsorbTurns: Math.max(0, Math.trunc(Number(state.attributeAbsorbTurns) || 0)),
     comboAbsorbTurns: Math.max(0, Math.trunc(Number(state.comboAbsorbTurns) || 0)),
+    enemyDamageAbsorbTurns: Math.max(
+      0,
+      Math.trunc(Number(state.enemyDamageAbsorbTurns) || 0),
+    ),
     enemyDamageVoidTurns: Math.max(
       0,
       Math.trunc(Number(state.enemyDamageVoidTurns) || 0),

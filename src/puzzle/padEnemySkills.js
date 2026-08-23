@@ -55,6 +55,7 @@ export const PAD_ENEMY_SKILL_MULTI_ATTACK = 83;
 export const PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT = 84;
 export const PAD_ENEMY_SKILL_POISON_MASK_SWAP = 85;
 export const PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL = 86;
+export const PAD_ENEMY_SKILL_DAMAGE_ABSORB = 87;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -193,6 +194,16 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       supported: percentMax >= percentMin,
       percentMin,
       percentMax,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_DAMAGE_ABSORB) {
+    return Object.freeze({
+      type,
+      kind: 'damageAbsorb',
+      supported: true,
+      durationTurns: Math.max(0, (definition.getInt32(0x10, true) << 16) >> 16),
+      damageThreshold: definition.getInt32(0x14, true),
       attackWithSkillValue,
     });
   }
@@ -1004,6 +1015,21 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_DAMAGE_ABSORB) {
+    requireLength(monsterBytes, 0x680, 'PAD monster runtime');
+    return Object.freeze({
+      type,
+      kind: 'damageAbsorb',
+      supported: true,
+      durationTurns: Math.max(0, (monster.getInt32(0x678, true) << 16) >> 16),
+      damageThreshold: monster.getInt32(0x67c, true),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -1575,6 +1601,19 @@ export function normalizePadEnemySkillRecord(record) {
           : { damagePercent: Math.trunc(Number(record.damagePercent) || 0) }
         : { percentMin, percentMax }),
       setupMaterialized: Boolean(record?.setupMaterialized || percentPresent),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_DAMAGE_ABSORB || record?.kind === 'damageAbsorb') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_DAMAGE_ABSORB,
+      kind: 'damageAbsorb',
+      supported: record?.supported !== false,
+      durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)),
+      damageThreshold: Math.trunc(Number(record?.damageThreshold) || 0),
+      setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

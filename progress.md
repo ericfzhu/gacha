@@ -2,6 +2,25 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 enemy damage absorption
+
+- Recovered type `87` at dispatch/setup/condition `0x629d9c`, `0x61fee4`, and
+  `0x61af94`. Generic setup copies signed definition `+0x10/+0x14` into runtime
+  duration/threshold `+0x678/+0x67c`; execution installs protected signed-int16
+  duration at `sMONSTER+0x960` and signed-int32 threshold at `+0x970`.
+- Traced `_calcFinalDamage` at `0x624458`: each positive resolved attack lane is
+  compared after defense and shield reduction, damage greater than or equal to
+  the threshold is absorbed before the later damage-void check, and fixed nail
+  damage remains outside this path. The condition rejects reapplication while
+  the protected duration is active.
+- Ported definition/runtime records, normalization, AI admission, status
+  lifecycle, per-lane combat ordering, healing/accounting, snapshots, and the
+  visible `ABS >=n tT` marker. Differential fixtures prove a 1,660 lane is
+  absorbed at an equal threshold while 1,661 passes it through normally.
+- Pure rules, exact tables and eight instruction anchors, focused and generic
+  Chromium interaction, and the production build pass without page errors.
+  Next: recover type `88` awakening bind as a separate checkpoint.
+
 ## 2026-08-24 unconditional enemy self-heal
 
 - Recovered type `86` as the unconditional variant of enemy self-heal. Its

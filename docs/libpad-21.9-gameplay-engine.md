@@ -1006,6 +1006,31 @@ differential fixture rejects type 7 before RNG but admits type 86, selects 29%
 after the parent and setup draws, and heals Verdant Shell from 50,000 to 76,680
 HP without damaging the player.
 
+Enemy skill type `87` installs threshold-based damage absorption. Its dispatch,
+setup, and condition entries target `0x629d9c`, `0x61fee4`, and `0x61af94`.
+Generic setup copies signed definition duration `+0x10` and damage threshold
+`+0x14` to runtime `sMONSTER+0x678/+0x67c` without an additional RNG draw.
+Execution writes the duration through the protected signed-int16 controller at
+`sMONSTER+0x960`, the threshold through the protected signed-int32 controller
+at `+0x970`, and clears the auxiliary dynamic-threshold lane at `+0x9f0`.
+
+The condition reads `+0x960` and returns binary32 1.0 only while its signed
+duration is below one, so an active absorption status rejects reapplication
+before the ordinary probability draw. `_calcFinalDamage` reads the same
+duration at `0x624458` and threshold at `0x62446c`. It compares each positive
+resolved attack lane independently after defense, passive resistance, and the
+timed damage-shield ratio. Damage greater than or equal to the threshold enters
+the absorption path before the subsequent damage-void check; absorbed damage
+heals the enemy up to maximum HP and does not increment the damaged-turn
+counter. Fixed nail damage is handled later and remains independent.
+
+The browser preserves that per-lane boundary and ordering rather than comparing
+the final turn total. In the focused fixture, a single 1,660 fire lane against
+an equal threshold is absorbed, healing Verdant Shell from 50,000 to 51,660 HP.
+Raising the threshold to 1,661 lets the same lane deal 1,660 damage instead.
+The installed status is exposed as `ABS >=1,660 3T` and counts down at the next
+enemy-turn boundary with the other native monster statuses.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

@@ -9,6 +9,7 @@ import {
   PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
   PAD_ENEMY_SKILL_HEAL_ENEMY,
   PAD_ENEMY_SKILL_HEAL_ENEMY_UNCONDITIONAL,
+  PAD_ENEMY_SKILL_DAMAGE_ABSORB,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -971,6 +972,42 @@ assert.deepEqual(decodePadEnemySkillRuntime(
   setupMaterialized: true,
   attackWithSkillValue: 0,
 });
+const enemyAiDamageAbsorbDefinition = enemyAiUnconditionalHealDefinition.slice();
+const enemyAiDamageAbsorbView = new DataView(enemyAiDamageAbsorbDefinition.buffer);
+enemyAiDamageAbsorbView.setUint32(0x00, 9_068, true);
+enemyAiDamageAbsorbView.setInt16(0x04, PAD_ENEMY_SKILL_DAMAGE_ABSORB, true);
+enemyAiDamageAbsorbView.setInt32(0x10, 3, true);
+enemyAiDamageAbsorbView.setInt32(0x14, 1_660, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiDamageAbsorbDefinition), {
+  type: 87,
+  kind: 'damageAbsorb',
+  supported: true,
+  durationTurns: 3,
+  damageThreshold: 1_660,
+  attackWithSkillValue: 0,
+});
+const damageAbsorbRuntime = new Uint8Array(0x680);
+const damageAbsorbRuntimeView = new DataView(damageAbsorbRuntime.buffer);
+damageAbsorbRuntimeView.setInt32(0x678, 3, true);
+damageAbsorbRuntimeView.setInt32(0x67c, 1_660, true);
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiDamageAbsorbDefinition,
+  damageAbsorbRuntime,
+), {
+  type: 87,
+  kind: 'damageAbsorb',
+  supported: true,
+  durationTurns: 3,
+  damageThreshold: 1_660,
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
+const signedDamageAbsorbDefinition = enemyAiDamageAbsorbDefinition.slice();
+new DataView(signedDamageAbsorbDefinition.buffer).setInt32(0x14, -1, true);
+assert.equal(
+  decodePadEnemySkillDefinition(signedDamageAbsorbDefinition).damageThreshold,
+  -1,
+);
 const enemyAiAdditionalAttackDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiAdditionalAttackView = new DataView(enemyAiAdditionalAttackDefinition.buffer);
 enemyAiAdditionalAttackView.setUint32(0x00, 9_037, true);
@@ -4009,6 +4046,96 @@ assert.equal(
   selectedUnconditionalHealState.rngState,
   padLcgStep(padLcgStep(21_900).state).state,
 );
+const damageAbsorbMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(damageAbsorbMonsterDefinition.buffer).setUint32(0xec, 9_068, true);
+const selectedDamageAbsorbEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: damageAbsorbMonsterDefinition,
+    skillDefinitions: [enemyAiDamageAbsorbDefinition],
+  }],
+});
+selectedDamageAbsorbEngine.enemies[0].counter = 1;
+selectedDamageAbsorbEngine.enemies[1].counter = 99;
+selectedDamageAbsorbEngine.setRngState(21_900);
+selectedDamageAbsorbEngine.resolveEnemyTurn();
+const selectedDamageAbsorbState = selectedDamageAbsorbEngine.snapshot();
+assert.equal(selectedDamageAbsorbState.lastEnemyActions[0].skill.type, 87);
+assert.equal(selectedDamageAbsorbState.enemies[0].damageAbsorbTurns, 3);
+assert.equal(selectedDamageAbsorbState.enemies[0].damageAbsorbThreshold, 1_660);
+assert.equal(selectedDamageAbsorbState.player.hp, 12_000);
+assert.equal(selectedDamageAbsorbState.rngState, padLcgStep(21_900).state);
+selectedDamageAbsorbEngine.setRngState(selectedDamageAbsorbState.rngState);
+assert.equal(selectedDamageAbsorbEngine.takeEnemySkill(0), null);
+assert.equal(selectedDamageAbsorbEngine.rng.state, selectedDamageAbsorbState.rngState);
+selectedDamageAbsorbEngine.enemies[0].counter = 99;
+selectedDamageAbsorbEngine.resolveEnemyTurn();
+assert.equal(selectedDamageAbsorbEngine.enemies[0].damageAbsorbTurns, 2);
+
+const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
+exactDamageAbsorbEngine.enemies[0].hp = 50_000;
+exactDamageAbsorbEngine.enemies[0].damageAbsorbTurns = 3;
+exactDamageAbsorbEngine.enemies[0].damageAbsorbThreshold = 1_660;
+exactDamageAbsorbEngine.enemies[1].hp = 0;
+exactDamageAbsorbEngine.party.forEach((member, index) => {
+  member.bindTurns = index === 0 ? 0 : 1;
+});
+exactDamageAbsorbEngine.comboCount = 1;
+exactDamageAbsorbEngine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+exactDamageAbsorbEngine.resolvePlayerTurn();
+assert.equal(exactDamageAbsorbEngine.lastDamage, 0);
+assert.equal(exactDamageAbsorbEngine.lastAbsorbedDamage, 1_660);
+assert.equal(exactDamageAbsorbEngine.enemies[0].hp, 51_660);
+assert.equal(exactDamageAbsorbEngine.enemies[0].damagedTurnCount, 0);
+
+const belowDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
+belowDamageAbsorbEngine.enemies[0].hp = 50_000;
+belowDamageAbsorbEngine.enemies[0].damageAbsorbTurns = 3;
+belowDamageAbsorbEngine.enemies[0].damageAbsorbThreshold = 1_661;
+belowDamageAbsorbEngine.enemies[1].hp = 0;
+belowDamageAbsorbEngine.party.forEach((member, index) => {
+  member.bindTurns = index === 0 ? 0 : 1;
+});
+belowDamageAbsorbEngine.comboCount = 1;
+belowDamageAbsorbEngine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+belowDamageAbsorbEngine.resolvePlayerTurn();
+assert.equal(belowDamageAbsorbEngine.lastAbsorbedDamage, 0);
+assert.equal(belowDamageAbsorbEngine.lastDamage, 1_660);
+assert.equal(belowDamageAbsorbEngine.enemies[0].hp, 48_340);
+
+const damageAbsorbBeforeVoidEngine = new PuzzleEngine({ seed: 21_900 });
+damageAbsorbBeforeVoidEngine.enemies[0].hp = 50_000;
+damageAbsorbBeforeVoidEngine.enemies[0].damageAbsorbTurns = 3;
+damageAbsorbBeforeVoidEngine.enemies[0].damageAbsorbThreshold = 1_660;
+damageAbsorbBeforeVoidEngine.enemies[0].damageVoidTurns = 3;
+damageAbsorbBeforeVoidEngine.enemies[0].damageVoidThreshold = 1;
+damageAbsorbBeforeVoidEngine.enemies[1].hp = 0;
+damageAbsorbBeforeVoidEngine.party.forEach((member, index) => {
+  member.bindTurns = index === 0 ? 0 : 1;
+});
+damageAbsorbBeforeVoidEngine.comboCount = 1;
+damageAbsorbBeforeVoidEngine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+damageAbsorbBeforeVoidEngine.resolvePlayerTurn();
+assert.equal(damageAbsorbBeforeVoidEngine.lastAbsorbedDamage, 1_660);
+assert.equal(damageAbsorbBeforeVoidEngine.lastVoidedDamage, 0);
+assert.equal(damageAbsorbBeforeVoidEngine.enemies[0].hp, 51_660);
+
+const shieldBeforeDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
+shieldBeforeDamageAbsorbEngine.enemies[0].hp = 50_000;
+shieldBeforeDamageAbsorbEngine.enemies[0].damageShieldTurns = 3;
+shieldBeforeDamageAbsorbEngine.enemies[0].damageShieldPercent = 50;
+shieldBeforeDamageAbsorbEngine.enemies[0].damageAbsorbTurns = 3;
+shieldBeforeDamageAbsorbEngine.enemies[0].damageAbsorbThreshold = 831;
+shieldBeforeDamageAbsorbEngine.enemies[1].hp = 0;
+shieldBeforeDamageAbsorbEngine.party.forEach((member, index) => {
+  member.bindTurns = index === 0 ? 0 : 1;
+});
+shieldBeforeDamageAbsorbEngine.comboCount = 1;
+shieldBeforeDamageAbsorbEngine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+shieldBeforeDamageAbsorbEngine.resolvePlayerTurn();
+assert.equal(shieldBeforeDamageAbsorbEngine.lastAbsorbedDamage, 0);
+assert.equal(shieldBeforeDamageAbsorbEngine.lastDamage, 830);
+assert.equal(shieldBeforeDamageAbsorbEngine.enemies[0].hp, 49_170);
 const additionalAttackMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(additionalAttackMonsterDefinition.buffer).setUint32(0xec, 9_037, true);
 const selectedAdditionalAttackEngine = new PuzzleEngine({

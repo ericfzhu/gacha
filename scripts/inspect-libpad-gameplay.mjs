@@ -145,6 +145,20 @@ const UNCONDITIONAL_HEAL_ENEMY_SKILL_TYPE = 86;
 const UNCONDITIONAL_HEAL_HANDLER = 0x629098;
 const UNCONDITIONAL_HEAL_SETUP_HANDLER = 0x61ff5c;
 const UNCONDITIONAL_HEAL_CONDITION_HANDLER = 0x61a630;
+const DAMAGE_ABSORB_ENEMY_SKILL_TYPE = 87;
+const DAMAGE_ABSORB_HANDLER = 0x629d9c;
+const DAMAGE_ABSORB_SETUP_HANDLER = 0x61fee4;
+const DAMAGE_ABSORB_CONDITION_HANDLER = 0x61af94;
+const DAMAGE_ABSORB_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x629d9c, 0xb9467a61], // runtime +0x678 duration
+  [0x629da0, 0x91258260], // protected duration at sMONSTER+0x960
+  [0x629da8, 0xb9467e61], // runtime +0x67c damage threshold
+  [0x629dac, 0x9125c260], // protected threshold at sMONSTER+0x970
+  [0x61af94, 0x912582a0], // condition reads protected duration
+  [0x624458, 0x91258280], // combat reads damage-absorb duration
+  [0x62446c, 0x9125c280], // combat reads damage threshold
+  [0x6244e0, 0xeb08033f], // compare resolved damage against threshold
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -906,6 +920,25 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : unconditionalHealSetupTarget === UNCONDITIONAL_HEAL_SETUP_HANDLER;
   const unconditionalHealConditionMatches = unconditionalHealConditionTarget === null
     ? null : unconditionalHealConditionTarget === UNCONDITIONAL_HEAL_CONDITION_HANDLER;
+  const damageAbsorbDispatchTarget = resolveEnemySkillTarget(
+    DAMAGE_ABSORB_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const damageAbsorbSetupTarget = resolveEnemySkillTarget(
+    DAMAGE_ABSORB_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const damageAbsorbConditionTarget = resolveEnemySkillTarget(
+    DAMAGE_ABSORB_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const damageAbsorbDispatchMatches = damageAbsorbDispatchTarget === null
+    ? null : damageAbsorbDispatchTarget === DAMAGE_ABSORB_HANDLER;
+  const damageAbsorbSetupMatches = damageAbsorbSetupTarget === null
+    ? null : damageAbsorbSetupTarget === DAMAGE_ABSORB_SETUP_HANDLER;
+  const damageAbsorbConditionMatches = damageAbsorbConditionTarget === null
+    ? null : damageAbsorbConditionTarget === DAMAGE_ABSORB_CONDITION_HANDLER;
+  const damageAbsorbInstructionAnchorsMatch = restoredElf === null ? null
+    : DAMAGE_ABSORB_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1874,6 +1907,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       unconditionalHealDispatchMatches21_9: unconditionalHealDispatchMatches,
       unconditionalHealSetupMatches21_9: unconditionalHealSetupMatches,
       unconditionalHealConditionMatches21_9: unconditionalHealConditionMatches,
+      damageAbsorbDispatchMatches21_9: damageAbsorbDispatchMatches,
+      damageAbsorbSetupMatches21_9: damageAbsorbSetupMatches,
+      damageAbsorbConditionMatches21_9: damageAbsorbConditionMatches,
+      damageAbsorbInstructionAnchorsMatch21_9: damageAbsorbInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -2294,6 +2331,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       unconditionalHealConditionMatches21_9: unconditionalHealConditionMatches,
       unconditionalHealSemantics:
         'type 86: shares type 7 dispatch/setup, selecting one inclusive +0x10..+0x14 max-HP percentage with one LCG roll and adding round(maxHP*percent/100); unlike type 7 it uses the unconditional 1.0 condition at 0x61a630',
+      damageAbsorbType: DAMAGE_ABSORB_ENEMY_SKILL_TYPE,
+      damageAbsorbDispatchTarget: damageAbsorbDispatchTarget === null
+        ? null : hex(damageAbsorbDispatchTarget),
+      damageAbsorbDispatchMatches21_9: damageAbsorbDispatchMatches,
+      damageAbsorbSetupTarget: damageAbsorbSetupTarget === null
+        ? null : hex(damageAbsorbSetupTarget),
+      damageAbsorbSetupMatches21_9: damageAbsorbSetupMatches,
+      damageAbsorbConditionTarget: damageAbsorbConditionTarget === null
+        ? null : hex(damageAbsorbConditionTarget),
+      damageAbsorbConditionMatches21_9: damageAbsorbConditionMatches,
+      damageAbsorbInstructionAnchorsMatch21_9: damageAbsorbInstructionAnchorsMatch,
+      damageAbsorbSemantics:
+        'type 87: generic +0x10/+0x14 setup stores duration/threshold at runtime +0x678/+0x67c; execution installs protected signed-int16 duration at sMONSTER+0x960 and signed-int32 threshold at +0x970; condition admits only while duration < 1; _calcFinalDamage absorbs each positive post-shield lane whose damage is >= threshold before the later damage-void check',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -2768,6 +2818,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || unconditionalHealDispatchMatches === false
     || unconditionalHealSetupMatches === false
     || unconditionalHealConditionMatches === false
+    || damageAbsorbDispatchMatches === false
+    || damageAbsorbSetupMatches === false
+    || damageAbsorbConditionMatches === false
+    || damageAbsorbInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false
