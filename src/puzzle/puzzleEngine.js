@@ -49,6 +49,7 @@ import {
   PAD_ENEMY_SKILL_SKILL_DELAY,
   PAD_ENEMY_SKILL_PRESENCE_CHECK,
   PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE,
+  PAD_ENEMY_SKILL_NATIVE_NO_EFFECT,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -2236,6 +2237,11 @@ export class PuzzleEngine {
       this.message = `${changed} random orb${changed === 1 ? '' : 's'} changed.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'nativeNoEffect') {
+      const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
+      this.message = `${enemy?.name || 'Enemy'} takes no special action.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'damageShield') {
       const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
       if (!enemy) return false;
@@ -2570,6 +2576,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_SKILL_DELAY,
         PAD_ENEMY_SKILL_PRESENCE_CHECK,
         PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE,
+        PAD_ENEMY_SKILL_NATIVE_NO_EFFECT,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,

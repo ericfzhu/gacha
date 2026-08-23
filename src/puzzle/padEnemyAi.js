@@ -13,6 +13,7 @@ import {
   PAD_ENEMY_SKILL_SKILL_DELAY,
   PAD_ENEMY_SKILL_PRESENCE_CHECK,
   PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE,
+  PAD_ENEMY_SKILL_NATIVE_NO_EFFECT,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -171,6 +172,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_SKILL_DELAY,
     PAD_ENEMY_SKILL_PRESENCE_CHECK,
     PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE,
+    PAD_ENEMY_SKILL_NATIVE_NO_EFFECT,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
     PAD_ENEMY_SKILL_DEFENSE_BOOST,
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -334,6 +336,11 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
   if (definition.effect.type === PAD_ENEMY_SKILL_PRESENCE_CHECK) {
     // In 21.9's new-AI tables type 90 points directly at the common epilogue,
     // which returns the incoming float32 scale without inspecting the list.
+    return { eligible: true, probabilityScale: 1, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_NATIVE_NO_EFFECT) {
+    // Type 93's 0x61bb1c callback clears an internal control slot and falls
+    // through to the epilogue that returns the incoming float32 scale.
     return { eligible: true, probabilityScale: 1, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_ADDITIONAL_ATTACK) {

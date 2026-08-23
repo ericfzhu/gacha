@@ -220,6 +220,16 @@ const MASKED_RANDOM_ORB_CHANGE_INSTRUCTION_ANCHORS = Object.freeze([
   [0x629e38, 0xb9467a61], // execution loads runtime +0x678 count
   [0x629e54, 0x97f3f607], // execution calls _doPoisonBlockN2
 ]);
+const NATIVE_NO_EFFECT_ENEMY_SKILL_TYPE = 93;
+const NATIVE_NO_EFFECT_HANDLER = 0x62be50;
+const NATIVE_NO_EFFECT_SETUP_HANDLER = 0x6217c0;
+const NATIVE_NO_EFFECT_CONDITION_HANDLER = 0x61bb1c;
+const NATIVE_NO_EFFECT_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x6217c0, 0xf9400048], // generic setup enters the shared sentinel tail
+  [0x62be50, 0x900045e9], // common no-special-effect execution tail
+  [0x61bb1c, 0xb9000fff], // clear the condition callback's control slot
+  [0x61bb20, 0x1400013f], // return through the incoming-scale epilogue
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -1080,6 +1090,25 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : maskedRandomOrbChangeConditionTarget === MASKED_RANDOM_ORB_CHANGE_CONDITION_HANDLER;
   const maskedRandomOrbChangeInstructionAnchorsMatch = restoredElf === null ? null
     : MASKED_RANDOM_ORB_CHANGE_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
+  const nativeNoEffectDispatchTarget = resolveEnemySkillTarget(
+    NATIVE_NO_EFFECT_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const nativeNoEffectSetupTarget = resolveEnemySkillTarget(
+    NATIVE_NO_EFFECT_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const nativeNoEffectConditionTarget = resolveEnemySkillTarget(
+    NATIVE_NO_EFFECT_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const nativeNoEffectDispatchMatches = nativeNoEffectDispatchTarget === null
+    ? null : nativeNoEffectDispatchTarget === NATIVE_NO_EFFECT_HANDLER;
+  const nativeNoEffectSetupMatches = nativeNoEffectSetupTarget === null
+    ? null : nativeNoEffectSetupTarget === NATIVE_NO_EFFECT_SETUP_HANDLER;
+  const nativeNoEffectConditionMatches = nativeNoEffectConditionTarget === null
+    ? null : nativeNoEffectConditionTarget === NATIVE_NO_EFFECT_CONDITION_HANDLER;
+  const nativeNoEffectInstructionAnchorsMatch = restoredElf === null ? null
+    : NATIVE_NO_EFFECT_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
@@ -2071,6 +2100,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       maskedRandomOrbChangeConditionMatches21_9: maskedRandomOrbChangeConditionMatches,
       maskedRandomOrbChangeInstructionAnchorsMatch21_9:
         maskedRandomOrbChangeInstructionAnchorsMatch,
+      nativeNoEffectDispatchMatches21_9: nativeNoEffectDispatchMatches,
+      nativeNoEffectSetupMatches21_9: nativeNoEffectSetupMatches,
+      nativeNoEffectConditionMatches21_9: nativeNoEffectConditionMatches,
+      nativeNoEffectInstructionAnchorsMatch21_9: nativeNoEffectInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -2557,6 +2590,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
         maskedRandomOrbChangeInstructionAnchorsMatch,
       maskedRandomOrbChangeSemantics:
         'type 92 copies +0x10 count, +0x14 destination mask, and +0x18 excluded-source mask to runtime +0x678..+0x680; setup advances the shared LCG once and stores its high 16 bits at +0x684; condition dry-runs _doPoisonBlockN2 without RNG mutation; execution seeds a private shuffle channel from +0x684 and performs the masked board change without advancing the shared AI stream',
+      nativeNoEffectType: NATIVE_NO_EFFECT_ENEMY_SKILL_TYPE,
+      nativeNoEffectDispatchTarget: nativeNoEffectDispatchTarget === null
+        ? null : hex(nativeNoEffectDispatchTarget),
+      nativeNoEffectDispatchMatches21_9: nativeNoEffectDispatchMatches,
+      nativeNoEffectSetupTarget: nativeNoEffectSetupTarget === null
+        ? null : hex(nativeNoEffectSetupTarget),
+      nativeNoEffectSetupMatches21_9: nativeNoEffectSetupMatches,
+      nativeNoEffectConditionTarget: nativeNoEffectConditionTarget === null
+        ? null : hex(nativeNoEffectConditionTarget),
+      nativeNoEffectConditionMatches21_9: nativeNoEffectConditionMatches,
+      nativeNoEffectInstructionAnchorsMatch21_9: nativeNoEffectInstructionAnchorsMatch,
+      nativeNoEffectSemantics:
+        'type 93 uses generic sentinel setup and the common no-special-effect dispatch tail; its condition clears an internal control slot and returns the incoming float32 scale unchanged, so it consumes only ordinary selection probability and owns no runtime parameters or RNG',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -3051,6 +3097,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || maskedRandomOrbChangeSetupMatches === false
     || maskedRandomOrbChangeConditionMatches === false
     || maskedRandomOrbChangeInstructionAnchorsMatch === false
+    || nativeNoEffectDispatchMatches === false
+    || nativeNoEffectSetupMatches === false
+    || nativeNoEffectConditionMatches === false
+    || nativeNoEffectInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

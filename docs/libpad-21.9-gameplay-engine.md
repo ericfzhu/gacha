@@ -1142,6 +1142,21 @@ destination type, which is why the native-style attempted count is four while
 three cells visibly differ. A board containing only excluded Heart cells rejects
 the skill before probability selection and leaves the shared RNG unchanged.
 
+Enemy skill type `93` is a distinct no-special-effect record in the exact 21.9
+new-AI tables. It maps to generic sentinel setup `0x6217c0` and the shared inert
+execution tail `0x62be50`; neither path reads authored parameters or owns RNG.
+Its condition entry at `0x61bb1c` clears an internal callback control slot, then
+jumps to the common epilogue that returns the incoming float32 selection scale
+unchanged.
+
+The port keeps type 93 as `nativeNoEffect` rather than collapsing it into the
+older type-16/type-66 inactivity records, preserving binary identity through
+definition/runtime decoding and snapshots. Seed 21900 consumes only the ordinary
+selection draw, ending at 394448415, while the board, active skill, and 12,000
+player HP remain unchanged. Definition `+0x44` still composes through the common
+attack-with-skill path when authored positive; the focused fixture sets it to
+zero and renders the inert action directly.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

@@ -14,6 +14,7 @@ import {
   PAD_ENEMY_SKILL_SKILL_DELAY,
   PAD_ENEMY_SKILL_PRESENCE_CHECK,
   PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE,
+  PAD_ENEMY_SKILL_NATIVE_NO_EFFECT,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1029,6 +1030,25 @@ assert.deepEqual(decodePadEnemySkillRuntime(
   excludedSourceTypeMask: 0x1a0,
   selectionSeed: 6_018,
   setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
+const enemyAiNativeNoEffectDefinition = enemyAiMaskedRandomOrbChangeDefinition.slice();
+const enemyAiNativeNoEffectView = new DataView(enemyAiNativeNoEffectDefinition.buffer);
+enemyAiNativeNoEffectView.setUint32(0x00, 9_073, true);
+enemyAiNativeNoEffectView.setInt16(0x04, PAD_ENEMY_SKILL_NATIVE_NO_EFFECT, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiNativeNoEffectDefinition), {
+  type: 93,
+  kind: 'nativeNoEffect',
+  supported: true,
+  attackWithSkillValue: 0,
+});
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiNativeNoEffectDefinition,
+  new Uint8Array(0x680),
+), {
+  type: 93,
+  kind: 'nativeNoEffect',
+  supported: true,
   attackWithSkillValue: 0,
 });
 assert.deepEqual(decodePadEnemySkillRuntime(
@@ -4426,6 +4446,39 @@ const rejectedMaskedRandomOrbChangeState = rejectedMaskedRandomOrbChangeEngine.s
 assert.equal(rejectedMaskedRandomOrbChangeState.lastEnemyActions[0].kind, 'attack');
 assert.equal(rejectedMaskedRandomOrbChangeState.rngState, 21_900);
 assert.equal(rejectedMaskedRandomOrbChangeState.player.hp, 10_150);
+
+const directNativeNoEffectEngine = new PuzzleEngine({ seed: 21_900 });
+const directNativeNoEffectBoard = directNativeNoEffectEngine.snapshot().board;
+directNativeNoEffectEngine.setRngState(21_900);
+assert.equal(directNativeNoEffectEngine.applyEnemySkillDefinition(
+  enemyAiNativeNoEffectDefinition,
+), true);
+assert.equal(directNativeNoEffectEngine.lastEnemySkill.type, 93);
+assert.equal(directNativeNoEffectEngine.rng.state, 21_900);
+assert.deepEqual(directNativeNoEffectEngine.snapshot().board, directNativeNoEffectBoard);
+
+const nativeNoEffectMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(nativeNoEffectMonsterDefinition.buffer).setUint32(0xec, 9_073, true);
+const selectedNativeNoEffectEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: nativeNoEffectMonsterDefinition,
+    skillDefinitions: [enemyAiNativeNoEffectDefinition],
+  }],
+});
+selectedNativeNoEffectEngine.enemies[0].counter = 1;
+selectedNativeNoEffectEngine.enemies[1].counter = 99;
+selectedNativeNoEffectEngine.setRngState(21_900);
+selectedNativeNoEffectEngine.resolveEnemyTurn();
+const selectedNativeNoEffectState = selectedNativeNoEffectEngine.snapshot();
+assert.equal(selectedNativeNoEffectState.lastEnemyActions[0].skill.type, 93);
+assert.equal(selectedNativeNoEffectState.lastEnemyActions[0].damage, undefined);
+assert.equal(selectedNativeNoEffectState.player.hp, 12_000);
+assert.equal(selectedNativeNoEffectState.rngState, padLcgStep(21_900).state);
+assert.equal(
+  selectedNativeNoEffectState.message,
+  'Verdant Shell takes no special action.',
+);
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;

@@ -2,6 +2,20 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 type-93 native no-effect record
+
+- Recovered type `93` at dispatch/setup/condition `0x62be50`, `0x6217c0`, and
+  `0x61bb1c`. It has generic sentinel setup, the common no-special-effect
+  execution tail, and a condition that clears an internal control slot before
+  returning the incoming float32 scale unchanged.
+- Ported it as a distinct `nativeNoEffect` record so type identity survives
+  definition/runtime decoding, normalization, AI selection, action accounting,
+  snapshots, and presentation. It owns no parameters or type-specific RNG.
+- Pure rules, exact tables plus four instruction anchors, focused Chromium
+  rendering, screenshot inspection, and the generic web-game client pass with
+  no page errors. Seed 21900 consumes one ordinary selection draw, preserves the
+  board and 12,000 HP, and ends at state 394448415. Next: recover type `94`.
+
 ## 2026-08-24 type-92 masked random-orb change
 
 - Recovered type `92` at dispatch/setup/condition `0x629e2c`, `0x62057c`, and
