@@ -54,6 +54,7 @@ import {
   PAD_ENEMY_SKILL_ENEMY_ESCAPE,
   PAD_ENEMY_SKILL_LOCKED_SKYFALL,
   PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM,
+  PAD_ENEMY_SKILL_STICKY_BLIND_FIXED,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1605,6 +1606,9 @@ export class PuzzleEngine {
         setupMaterialized: true,
       });
     }
+    if (skill.supported && skill.kind === 'stickyBlindFixed' && !skill.setupMaterialized) {
+      return Object.freeze({ ...record, runtimeControl: 0, setupMaterialized: true });
+    }
     if (skill.supported && skill.kind === 'activeSkillSeal' && !skill.setupMaterialized) {
       return Object.freeze({
         ...record,
@@ -2165,6 +2169,22 @@ export class PuzzleEngine {
       this.message = `${selected.length} orb${selected.length === 1 ? '' : 's'} were obscured.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'stickyBlindFixed') {
+      let blindedOrbCount = 0;
+      this.board.forEach((row, rowIndex) => row.forEach((orb, columnIndex) => {
+        if (((skill.rowMasks?.[rowIndex] || 0) & (1 << columnIndex)) === 0) return;
+        orb.blockFlags = (Number(orb.blockFlags) >>> 0)
+          | PAD_BLOCK_BLIND_FLAG
+          | PAD_BLOCK_BLIND_FRESH_FLAG;
+        orb.blind = true;
+        orb.blindFresh = true;
+        orb.blindCountdown = Math.max(0, skill.durationTurns);
+        blindedOrbCount += 1;
+      }));
+      this.lastEnemySkill = Object.freeze({ ...skill, blindedOrbCount });
+      this.message = `${blindedOrbCount} orb${blindedOrbCount === 1 ? '' : 's'} were obscured.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'clearPlayerBuffs') {
       // _doItetukuHadou clears both recovered sGAMEWORK positive-status lanes,
       // then type 6 invokes _applyLeaderSkill(false). Leader effects in this
@@ -2697,6 +2717,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_ENEMY_ESCAPE,
         PAD_ENEMY_SKILL_LOCKED_SKYFALL,
         PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM,
+        PAD_ENEMY_SKILL_STICKY_BLIND_FIXED,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,

@@ -1244,6 +1244,22 @@ count four, private seed 29441, and final shared state 1929471377. On the 6×5
 fixture, row-major coordinates `(2,5)`, `(3,4)`, `(4,0)`, and `(4,2)` become
 obscured for three turns and visibly render their countdowns.
 
+Enemy skill type `98` is the fixed-position sticky-blind form. Dispatch, setup,
+and condition resolve to `0x62be50`, `0x6205a8`, and `0x61a630`; the independent
+parser identifies `ESBlindStickyFixed`. Definition `+0x10` is duration and the
+five integers at `+0x14..+0x24` are six-bit row maps for the native 6×5 board.
+
+Setup copies duration and the first row map to runtime `+0x678/+0x67c` and
+explicitly clears `+0x684`; it does not touch either gameplay LCG. The remaining
+row maps remain available through the selected definition record. The condition
+is the unconditional binary32 1.0 target and dispatch reaches the shared
+post-effect tail.
+
+The browser applies the low six bits of each authored row directly to the same
+sticky-blind flag/countdown state used by type 97. A fixture with maps
+`[1,2,4,8,48]` obscures `(0,0)`, `(1,1)`, `(2,2)`, `(3,3)`, `(4,4)`, and
+`(4,5)` for two turns, consumes no RNG, and visibly renders all six countdowns.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

@@ -19,6 +19,7 @@ import {
   PAD_ENEMY_SKILL_ENEMY_ESCAPE,
   PAD_ENEMY_SKILL_LOCKED_SKYFALL,
   PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM,
+  PAD_ENEMY_SKILL_STICKY_BLIND_FIXED,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1173,6 +1174,40 @@ assert.deepEqual(decodePadEnemySkillRuntime(
   durationTurns: 3,
   blindCount: 4,
   selectionSeed: 29_441,
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
+const enemyAiStickyBlindFixedDefinition = enemyAiStickyBlindRandomDefinition.slice();
+const enemyAiStickyBlindFixedView = new DataView(enemyAiStickyBlindFixedDefinition.buffer);
+enemyAiStickyBlindFixedView.setUint32(0x00, 9_078, true);
+enemyAiStickyBlindFixedView.setInt16(0x04, PAD_ENEMY_SKILL_STICKY_BLIND_FIXED, true);
+enemyAiStickyBlindFixedView.setInt32(0x10, 2, true);
+[1, 2, 4, 8, 48].forEach((mask, row) => (
+  enemyAiStickyBlindFixedView.setUint32(0x14 + row * 4, mask, true)
+));
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiStickyBlindFixedDefinition), {
+  type: 98,
+  kind: 'stickyBlindFixed',
+  supported: true,
+  durationTurns: 2,
+  rowMasks: [1, 2, 4, 8, 48],
+  attackWithSkillValue: 0,
+});
+const stickyBlindFixedRuntime = new Uint8Array(0x688);
+const stickyBlindFixedRuntimeView = new DataView(stickyBlindFixedRuntime.buffer);
+stickyBlindFixedRuntimeView.setInt32(0x678, 2, true);
+stickyBlindFixedRuntimeView.setUint32(0x67c, 1, true);
+stickyBlindFixedRuntimeView.setUint32(0x684, 0, true);
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiStickyBlindFixedDefinition,
+  stickyBlindFixedRuntime,
+), {
+  type: 98,
+  kind: 'stickyBlindFixed',
+  supported: true,
+  durationTurns: 2,
+  rowMasks: [1, 2, 4, 8, 48],
+  runtimeControl: 0,
   setupMaterialized: true,
   attackWithSkillValue: 0,
 });
@@ -4787,6 +4822,31 @@ assert.deepEqual(selectedStickyBlindRandomState.boardState.flatMap((row, rowInde
 ]);
 assert.equal(selectedStickyBlindRandomState.boardState[2][5].blindCountdown, 3);
 assert.equal(selectedStickyBlindRandomState.player.hp, 12_000);
+
+const stickyBlindFixedMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(stickyBlindFixedMonsterDefinition.buffer).setUint32(0xec, 9_078, true);
+const selectedStickyBlindFixedEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: stickyBlindFixedMonsterDefinition,
+    skillDefinitions: [enemyAiStickyBlindFixedDefinition],
+  }],
+});
+selectedStickyBlindFixedEngine.enemies[0].counter = 1;
+selectedStickyBlindFixedEngine.enemies[1].counter = 99;
+selectedStickyBlindFixedEngine.setRngState(21_900);
+selectedStickyBlindFixedEngine.resolveEnemyTurn();
+const selectedStickyBlindFixedState = selectedStickyBlindFixedEngine.snapshot();
+assert.equal(selectedStickyBlindFixedState.lastEnemyActions[0].skill.type, 98);
+assert.equal(selectedStickyBlindFixedState.lastEnemySkill.blindedOrbCount, 6);
+assert.equal(selectedStickyBlindFixedState.rngState, padLcgStep(21_900).state);
+assert.deepEqual(selectedStickyBlindFixedState.boardState.flatMap((row, rowIndex) => (
+  row.map((orb, columnIndex) => ({ orb, row: rowIndex, column: columnIndex }))
+)).filter(({ orb }) => orb.blind).map(({ row, column }) => [row, column]), [
+  [0, 0], [1, 1], [2, 2], [3, 3], [4, 4], [4, 5],
+]);
+assert.equal(selectedStickyBlindFixedState.boardState[4][5].blindCountdown, 2);
+assert.equal(selectedStickyBlindFixedState.player.hp, 12_000);
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;

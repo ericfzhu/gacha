@@ -2,6 +2,20 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 type-98 fixed sticky blind
+
+- Recovered type `98` at dispatch/setup/condition `0x62be50`, `0x6205a8`, and
+  `0x61a630`; the independent parser corroborates `ESBlindStickyFixed` with
+  five authored six-bit row maps.
+- Setup copies duration and the first row map to runtime `+0x678/+0x67c`,
+  clears control lane `+0x684`, and owns no RNG. The condition is
+  unconditional; remaining row maps stay in the definition record.
+- Ported definition/runtime decoding, fixed 6×5 position application,
+  per-orb blind countdowns, snapshots, and visible browser rendering. A
+  six-cell diagonal-plus-tail fixture preserves shared state 21900.
+- Pure rules, exact tables plus seven instruction anchors, focused Chromium,
+  and screenshot inspection pass. Next: broad verification and type `99`.
+
 ## 2026-08-24 type-97 random sticky blind
 
 - Recovered type `97` at dispatch/setup/condition `0x62be50`, `0x6218e0`, and

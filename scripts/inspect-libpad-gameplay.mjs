@@ -307,6 +307,19 @@ const STICKY_BLIND_RANDOM_INSTRUCTION_ANCHORS = Object.freeze([
   [0x61a630, 0x52a7f008], // unconditional binary32 1.0 admission
   [0x62be50, 0x900045e9], // shared post-effect dispatch tail
 ]);
+const STICKY_BLIND_FIXED_ENEMY_SKILL_TYPE = 98;
+const STICKY_BLIND_FIXED_HANDLER = 0x62be50;
+const STICKY_BLIND_FIXED_SETUP_HANDLER = 0x6205a8;
+const STICKY_BLIND_FIXED_CONDITION_HANDLER = 0x61a630;
+const STICKY_BLIND_FIXED_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x6205a8, 0xb94012a8], // load authored duration from definition +0x10
+  [0x6205ac, 0xb9067a68], // store duration at runtime +0x678
+  [0x6205b0, 0xb94016a8], // load first authored row mask from +0x14
+  [0x6205b4, 0xb906867f], // clear runtime control lane +0x684
+  [0x6205b8, 0xb9067e68], // store first row mask at runtime +0x67c
+  [0x61a630, 0x52a7f008], // unconditional binary32 1.0 admission
+  [0x62be50, 0x900045e9], // shared post-effect dispatch tail
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -1268,6 +1281,25 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : stickyBlindRandomConditionTarget === STICKY_BLIND_RANDOM_CONDITION_HANDLER;
   const stickyBlindRandomInstructionAnchorsMatch = restoredElf === null ? null
     : STICKY_BLIND_RANDOM_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
+  const stickyBlindFixedDispatchTarget = resolveEnemySkillTarget(
+    STICKY_BLIND_FIXED_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const stickyBlindFixedSetupTarget = resolveEnemySkillTarget(
+    STICKY_BLIND_FIXED_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const stickyBlindFixedConditionTarget = resolveEnemySkillTarget(
+    STICKY_BLIND_FIXED_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const stickyBlindFixedDispatchMatches = stickyBlindFixedDispatchTarget === null
+    ? null : stickyBlindFixedDispatchTarget === STICKY_BLIND_FIXED_HANDLER;
+  const stickyBlindFixedSetupMatches = stickyBlindFixedSetupTarget === null
+    ? null : stickyBlindFixedSetupTarget === STICKY_BLIND_FIXED_SETUP_HANDLER;
+  const stickyBlindFixedConditionMatches = stickyBlindFixedConditionTarget === null
+    ? null : stickyBlindFixedConditionTarget === STICKY_BLIND_FIXED_CONDITION_HANDLER;
+  const stickyBlindFixedInstructionAnchorsMatch = restoredElf === null ? null
+    : STICKY_BLIND_FIXED_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
@@ -2280,6 +2312,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       stickyBlindRandomConditionMatches21_9: stickyBlindRandomConditionMatches,
       stickyBlindRandomInstructionAnchorsMatch21_9:
         stickyBlindRandomInstructionAnchorsMatch,
+      stickyBlindFixedDispatchMatches21_9: stickyBlindFixedDispatchMatches,
+      stickyBlindFixedSetupMatches21_9: stickyBlindFixedSetupMatches,
+      stickyBlindFixedConditionMatches21_9: stickyBlindFixedConditionMatches,
+      stickyBlindFixedInstructionAnchorsMatch21_9: stickyBlindFixedInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -2831,6 +2867,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       stickyBlindRandomInstructionAnchorsMatch21_9: stickyBlindRandomInstructionAnchorsMatch,
       stickyBlindRandomSemantics:
         'type 97 copies +0x10 duration, spends one shared-LCG draw on inclusive +0x14..+0x18 count, then a second shared draw whose high 16 bits become the private selection seed at runtime +0x680; its condition is unconditional and its table dispatch reaches the shared post-effect tail',
+      stickyBlindFixedType: STICKY_BLIND_FIXED_ENEMY_SKILL_TYPE,
+      stickyBlindFixedDispatchTarget: stickyBlindFixedDispatchTarget === null
+        ? null : hex(stickyBlindFixedDispatchTarget),
+      stickyBlindFixedDispatchMatches21_9: stickyBlindFixedDispatchMatches,
+      stickyBlindFixedSetupTarget: stickyBlindFixedSetupTarget === null
+        ? null : hex(stickyBlindFixedSetupTarget),
+      stickyBlindFixedSetupMatches21_9: stickyBlindFixedSetupMatches,
+      stickyBlindFixedConditionTarget: stickyBlindFixedConditionTarget === null
+        ? null : hex(stickyBlindFixedConditionTarget),
+      stickyBlindFixedConditionMatches21_9: stickyBlindFixedConditionMatches,
+      stickyBlindFixedInstructionAnchorsMatch21_9: stickyBlindFixedInstructionAnchorsMatch,
+      stickyBlindFixedSemantics:
+        'type 98 copies +0x10 duration and the first +0x14 row bitmap to runtime +0x678/+0x67c, clears +0x684, owns no RNG, uses an unconditional condition, and preserves the remaining authored row bitmaps for its fixed 6x5 board positions',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -3345,6 +3394,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || stickyBlindRandomSetupMatches === false
     || stickyBlindRandomConditionMatches === false
     || stickyBlindRandomInstructionAnchorsMatch === false
+    || stickyBlindFixedDispatchMatches === false
+    || stickyBlindFixedSetupMatches === false
+    || stickyBlindFixedConditionMatches === false
+    || stickyBlindFixedInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

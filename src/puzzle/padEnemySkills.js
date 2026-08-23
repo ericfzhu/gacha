@@ -65,6 +65,7 @@ export const PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS = 94;
 export const PAD_ENEMY_SKILL_ENEMY_ESCAPE = 95;
 export const PAD_ENEMY_SKILL_LOCKED_SKYFALL = 96;
 export const PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM = 97;
+export const PAD_ENEMY_SKILL_STICKY_BLIND_FIXED = 98;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -318,6 +319,20 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       durationTurns: definition.getInt32(0x10, true),
       countMin,
       countMax,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_STICKY_BLIND_FIXED) {
+    requireLength(definitionBytes, 0x28, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'stickyBlindFixed',
+      supported: true,
+      durationTurns: definition.getInt32(0x10, true),
+      rowMasks: Object.freeze(Array.from(
+        { length: 5 },
+        (_, row) => definition.getUint32(0x14 + row * 4, true) & 0x3f,
+      )),
       attackWithSkillValue,
     });
   }
@@ -1251,6 +1266,20 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_STICKY_BLIND_FIXED) {
+    requireLength(monsterBytes, 0x688, 'PAD monster runtime');
+    const definitionRecord = decodePadEnemySkillDefinition(definitionBytes);
+    return Object.freeze({
+      ...definitionRecord,
+      durationTurns: monster.getInt32(0x678, true),
+      rowMasks: Object.freeze([
+        monster.getUint32(0x67c, true) & 0x3f,
+        ...definitionRecord.rowMasks.slice(1),
+      ]),
+      runtimeControl: monster.getUint32(0x684, true),
+      setupMaterialized: true,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -1983,6 +2012,26 @@ export function normalizePadEnemySkillRecord(record) {
         }
         : { countMin, countMax }),
       setupMaterialized: Boolean(record?.setupMaterialized || countPresent),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_STICKY_BLIND_FIXED || record?.kind === 'stickyBlindFixed') {
+    const rowMasks = Array.from(
+      { length: 5 },
+      (_, row) => Math.trunc(Number(record?.rowMasks?.[row]) || 0) & 0x3f,
+    );
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_STICKY_BLIND_FIXED,
+      kind: 'stickyBlindFixed',
+      supported: record?.supported !== false,
+      durationTurns: Math.trunc(Number(record?.durationTurns) || 0),
+      rowMasks: Object.freeze(rowMasks),
+      ...(record?.runtimeControl == null
+        ? {}
+        : { runtimeControl: Math.trunc(Number(record.runtimeControl) || 0) >>> 0 }),
+      setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),
