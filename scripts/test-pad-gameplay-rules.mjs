@@ -33,6 +33,7 @@ import {
   PAD_ENEMY_SKILL_RANDOM_SPINNERS,
   PAD_ENEMY_SKILL_FIXED_SPINNERS,
   PAD_ENEMY_SKILL_MAX_HP_CHANGE,
+  PAD_ENEMY_SKILL_FIXED_TARGET,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1588,6 +1589,26 @@ assert.equal(padEnemySkillMaxHpParameter(0, 8_000), 8_000);
 assert.equal(padEnemySkillChangedMaxHp(12_001, -50), 6_001);
 assert.equal(padEnemySkillChangedMaxHp(12_001, 8_000), 8_000);
 assert.equal(padEnemySkillChangedMaxHp(12_001, 0), 12_001);
+const enemyAiFixedTargetDefinition = enemyAiMaxHpChangeDefinition.slice();
+const enemyAiFixedTargetView = new DataView(enemyAiFixedTargetDefinition.buffer);
+enemyAiFixedTargetView.setUint32(0x00, 9_092, true);
+enemyAiFixedTargetView.setInt16(0x04, PAD_ENEMY_SKILL_FIXED_TARGET, true);
+enemyAiFixedTargetView.setInt32(0x10, 3, true);
+const expectedFixedTargetDefinition = {
+  type: 112,
+  kind: 'fixedTarget',
+  supported: true,
+  durationTurns: 3,
+  attackWithSkillValue: 0,
+};
+assert.deepEqual(
+  decodePadEnemySkillDefinition(enemyAiFixedTargetDefinition),
+  expectedFixedTargetDefinition,
+);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiFixedTargetDefinition, new Uint8Array(0x680)),
+  expectedFixedTargetDefinition,
+);
 assert.deepEqual(decodePadEnemySkillRuntime(
   enemyAiUnconditionalHealDefinition,
   healEnemyMonsterRuntime,
@@ -6106,6 +6127,51 @@ selectedMaxHpChangeEngine.resolveEnemyTurn();
 selectedMaxHpChangeState = selectedMaxHpChangeEngine.snapshot();
 assert.equal(selectedMaxHpChangeState.lastEnemyActions[0].kind, 'attack');
 assert.equal(selectedMaxHpChangeState.maxHpChange.turnsRemaining, 2);
+
+const directFixedTargetEngine = new PuzzleEngine({ seed: 21_900 });
+directFixedTargetEngine.setRngState(21_900);
+assert.equal(directFixedTargetEngine.applyEnemySkillRecord(
+  expectedFixedTargetDefinition,
+  1,
+), true);
+let directFixedTargetState = directFixedTargetEngine.snapshot();
+assert.deepEqual(directFixedTargetState.fixedTarget, { turnsRemaining: 3, enemyIndex: 1 });
+assert.equal(directFixedTargetState.targetEnemy, 1);
+assert.equal(directFixedTargetState.manualTarget, false);
+assert.equal(directFixedTargetState.rngState, 21_900);
+directFixedTargetEngine.selectEnemy(0);
+assert.equal(directFixedTargetEngine.snapshot().targetEnemy, 1);
+assert.equal(directFixedTargetEngine.chooseAttackTarget('fire', 1_000), 1);
+directFixedTargetEngine.advanceFixedTargetTurns();
+directFixedTargetEngine.advanceFixedTargetTurns();
+assert.equal(directFixedTargetEngine.snapshot().fixedTarget.turnsRemaining, 1);
+directFixedTargetEngine.advanceFixedTargetTurns();
+assert.equal(directFixedTargetEngine.snapshot().fixedTarget, null);
+directFixedTargetEngine.applyEnemySkillRecord(expectedFixedTargetDefinition, 1);
+directFixedTargetEngine.enemies[1].hp = 0;
+assert.notEqual(directFixedTargetEngine.chooseAttackTarget('fire', 1_000), 1);
+assert.equal(directFixedTargetEngine.snapshot().fixedTarget, null);
+
+const fixedTargetMonster0 = enemyAiMonsterDefinition.slice();
+const fixedTargetMonster1 = enemyAiMonsterDefinition.slice();
+new DataView(fixedTargetMonster0.buffer).setUint32(0xec, 9_092, true);
+new DataView(fixedTargetMonster1.buffer).setUint32(0xec, 9_092, true);
+const selectedFixedTargetEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [
+    { monsterDefinition: fixedTargetMonster0, skillDefinitions: [enemyAiFixedTargetDefinition] },
+    { monsterDefinition: fixedTargetMonster1, skillDefinitions: [enemyAiFixedTargetDefinition] },
+  ],
+});
+selectedFixedTargetEngine.enemies[0].counter = 1;
+selectedFixedTargetEngine.enemies[1].counter = 1;
+selectedFixedTargetEngine.setRngState(21_900);
+selectedFixedTargetEngine.resolveEnemyTurn();
+const selectedFixedTargetState = selectedFixedTargetEngine.snapshot();
+assert.deepEqual(selectedFixedTargetState.fixedTarget, { turnsRemaining: 3, enemyIndex: 1 });
+assert.equal(selectedFixedTargetState.lastEnemyActions[0].skill.type, 112);
+assert.equal(selectedFixedTargetState.lastEnemyActions[1].skill.type, 112);
+assert.equal(selectedFixedTargetState.rngState, 3_803_934_822);
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;

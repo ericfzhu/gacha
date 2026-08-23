@@ -32,6 +32,7 @@ import {
   PAD_ENEMY_SKILL_RANDOM_SPINNERS,
   PAD_ENEMY_SKILL_FIXED_SPINNERS,
   PAD_ENEMY_SKILL_MAX_HP_CHANGE,
+  PAD_ENEMY_SKILL_FIXED_TARGET,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -210,6 +211,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_RANDOM_SPINNERS,
     PAD_ENEMY_SKILL_FIXED_SPINNERS,
     PAD_ENEMY_SKILL_MAX_HP_CHANGE,
+    PAD_ENEMY_SKILL_FIXED_TARGET,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
     PAD_ENEMY_SKILL_DEFENSE_BOOST,
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -624,6 +626,12 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
       || Math.trunc(Number(state.maxHpChangeParameter) || 0) !== requested;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
+  if (definition.effect.type === PAD_ENEMY_SKILL_FIXED_TARGET) {
+    const eligible = Number(state.fixedTargetTurns || 0) <= 0
+      || Math.trunc(Number(state.fixedTargetEnemyIndex) || 0)
+        !== Math.trunc(Number(state.actingEnemyIndex) || 0);
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
   if (definition.effect.type === PAD_ENEMY_SKILL_CLOUD) {
     const eligible = !state.cloudActive;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
@@ -732,6 +740,9 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     playerMaxHp: Math.max(0, Number(state.playerMaxHp) || 0),
     maxHpChangeTurns: Math.max(0, Math.trunc(Number(state.maxHpChangeTurns) || 0)),
     maxHpChangeParameter: Math.trunc(Number(state.maxHpChangeParameter) || 0),
+    fixedTargetTurns: Math.max(0, Math.trunc(Number(state.fixedTargetTurns) || 0)),
+    fixedTargetEnemyIndex: Math.trunc(Number(state.fixedTargetEnemyIndex) || 0),
+    actingEnemyIndex: Math.trunc(Number(state.actingEnemyIndex) || 0),
     attributeAbsorbTurns: Math.max(0, Math.trunc(Number(state.attributeAbsorbTurns) || 0)),
     comboAbsorbTurns: Math.max(0, Math.trunc(Number(state.comboAbsorbTurns) || 0)),
     enemyDamageAbsorbTurns: Math.max(

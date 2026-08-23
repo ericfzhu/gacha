@@ -1529,6 +1529,28 @@ rules. In the percentage fixture, 50% changes 12,000/12,000 to 6,000/6,000 for
 three turns and expiry restores 12,000 maximum with current HP still 6,000. A
 12,001 boundary rounds to 6,001; absolute 8,000 mode clamps 12,000 HP to 8,000.
 
+Enemy skill type `112` fixes the player's attack target to the acting monster.
+Its dispatch, generic setup, and condition entries resolve to `0x62a5c4`,
+`0x6217c0`, and `0x61a89c`; the independent parser identifies
+`ESFixedTarget`. Execution narrows definition `+0x10` into the protected
+low-ten-bit duration at `sGAMEWORK+0x87740`. It derives the acting monster's
+signed index from the `0xb50`-byte monster-array stride, stores that index at
+protected `+0x87744`, and publishes it to the visible/combat target owner at
+`+0x8ab0c`. No setup or execution RNG is consumed.
+
+During `_calcCards`, an active status reads that target index, confirms the
+monster is still present, and makes it the ordinary per-card target. This takes
+precedence over manual targeting; five-orb mass attacks still attack all live
+enemies through their separate branch. If the forced monster is absent or dies,
+the native calculation clears the duration immediately and transitions the
+visible target away. `_incEneTurn` otherwise decrements the duration and writes
+signed target sentinel `-1` on expiry. Condition `0x61a89c` admits an inactive
+status or a different acting-monster index and rejects only the same active
+target, so another enemy can replace the lock. The browser preserves this
+replacement rule, disables manual retargeting while active, clears a dead
+target, renders the persistent target ring/status, and snapshots the remaining
+lifetime and enemy index.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

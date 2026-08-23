@@ -537,6 +537,17 @@ function render(ctx, engine) {
     );
     playerStatusY += 12;
   }
+  if (engine.fixedTarget?.turnsRemaining > 0) {
+    const enemy = engine.enemies[engine.fixedTarget.enemyIndex];
+    ctx.fillStyle = '#ffdf79';
+    ctx.font = '700 9px "Barlow Condensed", sans-serif';
+    ctx.fillText(
+      `TARGET ${enemy?.name?.toUpperCase() || engine.fixedTarget.enemyIndex} · ${engine.fixedTarget.turnsRemaining}T`,
+      434,
+      playerStatusY,
+    );
+    playerStatusY += 12;
+  }
   if (engine.attributeBlock?.turnsRemaining > 0) {
     const blockedTypes = ORB_TYPES
       .filter((_, typeIndex) => (engine.attributeBlock.typeMask & (1 << typeIndex)) !== 0)
@@ -587,7 +598,9 @@ function render(ctx, engine) {
     ctx.fillText(`AWKN BIND · ${engine.awakeningBindTurns}T`, 434, playerStatusY);
   }
 
-  const visibleTarget = engine.manualTarget ? engine.targetEnemy : -1;
+  const visibleTarget = engine.fixedTarget?.turnsRemaining > 0
+    ? engine.fixedTarget.enemyIndex
+    : engine.manualTarget ? engine.targetEnemy : -1;
   engine.enemies.forEach((enemy, index) => drawEnemy(ctx, enemy, index, visibleTarget, engine.visualTime));
   drawParty(ctx, engine);
 

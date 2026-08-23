@@ -68,6 +68,7 @@ import {
   PAD_ENEMY_SKILL_RANDOM_SPINNERS,
   PAD_ENEMY_SKILL_FIXED_SPINNERS,
   PAD_ENEMY_SKILL_MAX_HP_CHANGE,
+  PAD_ENEMY_SKILL_FIXED_TARGET,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -352,6 +353,7 @@ export class PuzzleEngine {
     this.recoveryDebuff = null;
     this.attributeBlock = null;
     this.maxHpChange = null;
+    this.fixedTarget = null;
     this.leaderSwapTurns = 0;
     this.leaderSwapIndex = null;
     this.enemySkillQueues.forEach((queue) => { queue.position = 0; });
@@ -591,6 +593,7 @@ export class PuzzleEngine {
 
   selectEnemy(index) {
     if (this.enemies[index]?.hp <= 0) return;
+    if (this.fixedTarget?.turnsRemaining > 0) return;
     if (this.manualTarget && this.targetEnemy === index) {
       this.manualTarget = false;
       return;
@@ -600,6 +603,13 @@ export class PuzzleEngine {
   }
 
   chooseAttackTarget(attribute, attack, damageCap = PAD_INT32_MAX) {
+    if (this.fixedTarget?.turnsRemaining > 0) {
+      if (this.enemies[this.fixedTarget.enemyIndex]?.hp > 0) {
+        this.targetEnemy = this.fixedTarget.enemyIndex;
+        return this.targetEnemy;
+      }
+      this.clearFixedTargetIfUnavailable();
+    }
     if (this.manualTarget && this.enemies[this.targetEnemy]?.hp > 0) return this.targetEnemy;
     this.manualTarget = false;
     const candidates = this.enemies.map((enemy, index) => {
@@ -1127,6 +1137,7 @@ export class PuzzleEngine {
       const nextAlive = this.enemies.findIndex((enemy) => enemy.hp > 0);
       if (nextAlive >= 0) this.targetEnemy = nextAlive;
     }
+    this.clearFixedTargetIfUnavailable();
     this.lastNailDamage = nailDamage;
     this.lastAbsorbedDamage = absorbedDamage;
     this.lastVoidedDamage = voidedDamage;
@@ -1184,6 +1195,7 @@ export class PuzzleEngine {
     this.advanceAttributeBlockTurns();
     this.advanceSpinnerTurns();
     this.advanceMaxHpChangeTurns();
+    this.advanceFixedTargetTurns();
     if (this.blackFallRule?.active && this.blackFallRule.turnsRemaining !== null) {
       this.blackFallRule.turnsRemaining = Math.max(0, this.blackFallRule.turnsRemaining - 1);
       if (this.blackFallRule.turnsRemaining === 0) this.blackFallRule.active = false;
@@ -1321,6 +1333,9 @@ export class PuzzleEngine {
       attributeBlockActive: Boolean(this.attributeBlock?.turnsRemaining > 0),
       maxHpChangeTurns: this.maxHpChange?.turnsRemaining || 0,
       maxHpChangeParameter: this.maxHpChange?.parameter || 0,
+      fixedTargetTurns: this.fixedTarget?.turnsRemaining || 0,
+      fixedTargetEnemyIndex: this.fixedTarget?.enemyIndex ?? -1,
+      actingEnemyIndex: enemyIndex,
       playerRecovery: this.player.recovery,
       recoveryMultiplier: this.recoveryDebuff?.multiplier ?? 1,
       enemyAttribute: PAD_ATTRIBUTE_INDEX[enemy.attribute] ?? -1,
@@ -2549,6 +2564,27 @@ export class PuzzleEngine {
       this.message = `Maximum HP changed to ${this.player.maxHp.toLocaleString()} for ${turnsRemaining} turn${turnsRemaining === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'fixedTarget') {
+      const target = Math.trunc(Number(enemyIndex));
+      const turnsRemaining = Math.max(0, skill.durationTurns) & 0x3ff;
+      this.fixedTarget = turnsRemaining > 0 && this.enemies[target]?.hp > 0 ? {
+        turnsRemaining,
+        enemyIndex: target,
+      } : null;
+      if (this.fixedTarget) {
+        this.targetEnemy = target;
+        this.manualTarget = false;
+      }
+      this.lastEnemySkill = Object.freeze({
+        ...skill,
+        targetEnemyIndex: target,
+        durationTurns: turnsRemaining,
+      });
+      this.message = this.fixedTarget
+        ? `${this.enemies[target].name} fixed the party's target for ${turnsRemaining} turn${turnsRemaining === 1 ? '' : 's'}.`
+        : 'The forced target had no effect.';
+      return true;
+    }
     if (skill.supported && skill.kind === 'clearPlayerBuffs') {
       // _doItetukuHadou clears both recovered sGAMEWORK positive-status lanes,
       // then type 6 invokes _applyLeaderSkill(false). Leader effects in this
@@ -3095,6 +3131,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_RANDOM_SPINNERS,
         PAD_ENEMY_SKILL_FIXED_SPINNERS,
         PAD_ENEMY_SKILL_MAX_HP_CHANGE,
+        PAD_ENEMY_SKILL_FIXED_TARGET,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -3785,6 +3822,20 @@ export class PuzzleEngine {
     this.player.hp = Math.min(this.player.hp, this.player.maxHp);
   }
 
+  advanceFixedTargetTurns() {
+    if (!this.fixedTarget || this.fixedTarget.turnsRemaining <= 0) return;
+    this.fixedTarget.turnsRemaining = Math.max(0, this.fixedTarget.turnsRemaining - 1);
+    if (this.fixedTarget.turnsRemaining === 0) this.fixedTarget = null;
+  }
+
+  clearFixedTargetIfUnavailable() {
+    if (!this.fixedTarget || this.enemies[this.fixedTarget.enemyIndex]?.hp > 0) return;
+    this.fixedTarget = null;
+    this.manualTarget = false;
+    const nextAlive = this.enemies.findIndex((enemy) => enemy.hp > 0);
+    if (nextAlive >= 0) this.targetEnemy = nextAlive;
+  }
+
   snapshot() {
     return {
       coordinateSystem: `board origin top-left; rows 0-${this.rows - 1} downward; columns 0-${this.columns - 1} rightward`,
@@ -3832,6 +3883,7 @@ export class PuzzleEngine {
       recoveryDebuff: this.recoveryDebuff ? { ...this.recoveryDebuff } : null,
       attributeBlock: this.attributeBlock ? { ...this.attributeBlock } : null,
       maxHpChange: this.maxHpChange ? { ...this.maxHpChange } : null,
+      fixedTarget: this.fixedTarget ? { ...this.fixedTarget } : null,
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({
         code: ORB_BY_ID[orb.type].code,

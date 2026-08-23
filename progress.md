@@ -2,6 +2,24 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 forced enemy target
+
+- Recovered type `112` at dispatch/setup/condition `0x62a5c4`, `0x6217c0`, and
+  `0x61a89c`; the independent parser corroborates `ESFixedTarget`.
+- Execution installs low-ten-bit duration `+0x10` at protected
+  `sGAMEWORK+0x87740`, derives the acting monster's native array index, stores
+  it at `+0x87744`, and publishes it to the combat/UI target at `+0x8ab0c`.
+  Setup and execution consume no RNG.
+- `_calcCards` forces ordinary single-target lanes to that living monster and
+  clears the status if it disappears; mass attacks remain board-wide.
+  `_incEneTurn` decrements the lifetime and restores target sentinel `-1` at
+  expiry. Condition rejects only the same active monster, allowing a different
+  actor to replace it. The browser ports AI replacement, manual-target lockout,
+  target-death clearing, lifetime, snapshot, status text, and target ring. Pure
+  fixtures, thirty-four ARM64 anchors, focused Chromium with APK art,
+  screenshot inspection, generic browser smoke, the full native inspector,
+  PAD data checks, and production build pass. Next: type `113`.
+
 ## 2026-08-24 temporary maximum-HP change
 
 - Recovered type `111` at dispatch/setup/condition `0x62a568`, `0x6217c0`, and

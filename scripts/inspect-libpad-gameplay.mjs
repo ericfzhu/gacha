@@ -698,6 +698,46 @@ const MAX_HP_CHANGE_INSTRUCTION_ANCHORS = Object.freeze([
   [0x676c10, 0x2a1f03e1], // clear the max-HP modifier on expiry
   [0x676c14, 0x97f2767b], // restore base maximum HP without healing
 ]);
+const FIXED_TARGET_ENEMY_SKILL_TYPE = 112;
+const FIXED_TARGET_HANDLER = 0x62a5c4;
+const FIXED_TARGET_SETUP_HANDLER = 0x6217c0;
+const FIXED_TARGET_CONDITION_HANDLER = 0x61a89c;
+const FIXED_TARGET_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x62a5c8, 0xbd416260], // load the acting monster's horizontal position
+  [0x62a5cc, 0xbd416661], // load its vertical position for presentation
+  [0x62a5d4, 0x52800821], // request fixed-target effect id 65
+  [0x62a5e8, 0x528ee809], // address protected duration at +0x87740
+  [0x62a5f0, 0x794022ab], // narrow authored +0x10 to an unsigned halfword
+  [0x62a604, 0x3300256a], // insert duration into the low ten status bits
+  [0x62a608, 0x3216014a], // mark the status freshly applied
+  [0x62a620, 0xcb08026b], // derive acting-monster displacement from the array base
+  [0x62a62c, 0xd344fd29], // divide the displacement by the 0xb50-byte stride
+  [0x62a630, 0x1b0a7d21], // finish the native signed index calculation
+  [0x62a634, 0x8b140100], // address protected target index at +0x87744
+  [0x62a638, 0x97f37d66], // store the acting monster index
+  [0x62a644, 0x97f408c7], // read back the protected target index
+  [0x62a64c, 0x52956189], // address the visible target owner at +0x8ab0c
+  [0x62a654, 0x78296900], // publish the forced target for combat/UI
+  [0x61a89c, 0xb9000fff], // condition starts from rejection scale zero
+  [0x61a8a0, 0x79431108], // load the protected fixed-target duration
+  [0x61a8ac, 0x7100051f], // inactive status admits immediately
+  [0x61a8c0, 0x97f44828], // read the active target enemy index
+  [0x61a8d0, 0xcb0802a8], // derive the candidate acting-monster displacement
+  [0x61a8e4, 0x1b097d08], // finish the candidate index calculation
+  [0x61a8e8, 0x6b20a11f], // compare active and requested enemy indices
+  [0x677edc, 0x528ee809], // _incEneTurn addresses the duration lane
+  [0x677efc, 0x5100052a], // decrement the low-ten-bit duration
+  [0x677f1c, 0x7200253f], // detect expiry after decrement
+  [0x677f30, 0x529fffe9], // prepare visible target sentinel -1
+  [0x677f34, 0x79000109], // clear the published target on expiry
+  [0x6543b4, 0x528ee809], // _calcCards checks the fixed-target status
+  [0x6543e0, 0x97f36160], // read the forced enemy index
+  [0x6543ec, 0x52816a0a], // use the native 0xb50-byte monster stride
+  [0x654400, 0x34001109], // clear the status if the forced target is absent
+  [0x654424, 0x78296900], // publish the live forced target to attack calculation
+  [0x654620, 0x528ee809], // address the status when its target disappears
+  [0x654630, 0x3216014a], // clear duration and mark the transition fresh
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -1969,6 +2009,31 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     : MAX_HP_CHANGE_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
+  const fixedTargetDispatchTarget = resolveEnemySkillTarget(
+    FIXED_TARGET_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const fixedTargetSetupTarget = resolveEnemySkillTarget(
+    FIXED_TARGET_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const fixedTargetConditionTarget = resolveEnemySkillTarget(
+    FIXED_TARGET_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const fixedTargetDispatchMatches = fixedTargetDispatchTarget === null
+    ? null : fixedTargetDispatchTarget === FIXED_TARGET_HANDLER;
+  const fixedTargetSetupMatches = fixedTargetSetupTarget === null
+    ? null : fixedTargetSetupTarget === FIXED_TARGET_SETUP_HANDLER;
+  const fixedTargetConditionMatches = fixedTargetConditionTarget === null
+    ? null : fixedTargetConditionTarget === FIXED_TARGET_CONDITION_HANDLER;
+  const fixedTargetInstructionAnchorsMatch = restoredElf === null ? null
+    : FIXED_TARGET_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -3035,6 +3100,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       maxHpChangeSetupMatches21_9: maxHpChangeSetupMatches,
       maxHpChangeConditionMatches21_9: maxHpChangeConditionMatches,
       maxHpChangeInstructionAnchorsMatch21_9: maxHpChangeInstructionAnchorsMatch,
+      fixedTargetDispatchMatches21_9: fixedTargetDispatchMatches,
+      fixedTargetSetupMatches21_9: fixedTargetSetupMatches,
+      fixedTargetConditionMatches21_9: fixedTargetConditionMatches,
+      fixedTargetInstructionAnchorsMatch21_9: fixedTargetInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -3765,6 +3834,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       maxHpChangeInstructionAnchorsMatch21_9: maxHpChangeInstructionAnchorsMatch,
       maxHpChangeSemantics:
         'type 111 uses +0x18 as a protected low-ten-bit duration; nonzero +0x10 stores percent-100 as the max-HP modifier, otherwise +0x14 stores an absolute maximum; sPLAYER::mhp derives the effective cap and execution clamps current HP downward, condition rejects only an identical active modifier, and _incTurn clears the modifier on expiry without restoring current HP',
+      fixedTargetType: FIXED_TARGET_ENEMY_SKILL_TYPE,
+      fixedTargetDispatchTarget: fixedTargetDispatchTarget === null
+        ? null : hex(fixedTargetDispatchTarget),
+      fixedTargetDispatchMatches21_9: fixedTargetDispatchMatches,
+      fixedTargetSetupTarget: fixedTargetSetupTarget === null
+        ? null : hex(fixedTargetSetupTarget),
+      fixedTargetSetupMatches21_9: fixedTargetSetupMatches,
+      fixedTargetConditionTarget: fixedTargetConditionTarget === null
+        ? null : hex(fixedTargetConditionTarget),
+      fixedTargetConditionMatches21_9: fixedTargetConditionMatches,
+      fixedTargetInstructionAnchorsMatch21_9: fixedTargetInstructionAnchorsMatch,
+      fixedTargetSemantics:
+        'type 112 installs low-ten-bit +0x10 duration at +0x87740 and the acting monster index at +0x87744, forcing ordinary card attacks to that live enemy; condition rejects only the same active target and permits a different actor to replace it, _calcCards clears the status when the target disappears, and _incEneTurn clears the published index on expiry; no RNG is consumed',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -4335,6 +4417,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || maxHpChangeSetupMatches === false
     || maxHpChangeConditionMatches === false
     || maxHpChangeInstructionAnchorsMatch === false
+    || fixedTargetDispatchMatches === false
+    || fixedTargetSetupMatches === false
+    || fixedTargetConditionMatches === false
+    || fixedTargetInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

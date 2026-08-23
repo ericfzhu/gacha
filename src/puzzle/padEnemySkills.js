@@ -79,6 +79,7 @@ export const PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE = 108;
 export const PAD_ENEMY_SKILL_RANDOM_SPINNERS = 109;
 export const PAD_ENEMY_SKILL_FIXED_SPINNERS = 110;
 export const PAD_ENEMY_SKILL_MAX_HP_CHANGE = 111;
+export const PAD_ENEMY_SKILL_FIXED_TARGET = 112;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -512,6 +513,16 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       maxHpPercent: definition.getInt32(0x10, true),
       fixedMaxHp: definition.getInt32(0x14, true),
       durationTurns: definition.getInt32(0x18, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_FIXED_TARGET) {
+    requireLength(definitionBytes, 0x14, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'fixedTarget',
+      supported: true,
+      durationTurns: definition.getInt32(0x10, true),
       attackWithSkillValue,
     });
   }
@@ -1590,6 +1601,9 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
     // Generic setup owns no private fields; execution reads the definition.
     return decodePadEnemySkillDefinition(definitionBytes);
   }
+  if (type === PAD_ENEMY_SKILL_FIXED_TARGET) {
+    return decodePadEnemySkillDefinition(definitionBytes);
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -2540,6 +2554,17 @@ export function normalizePadEnemySkillRecord(record) {
       supported: record?.supported !== false,
       maxHpPercent: Math.trunc(Number(record?.maxHpPercent) || 0),
       fixedMaxHp: Math.trunc(Number(record?.fixedMaxHp) || 0),
+      durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)) & 0x3ff,
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_FIXED_TARGET || record?.kind === 'fixedTarget') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_FIXED_TARGET,
+      kind: 'fixedTarget',
+      supported: record?.supported !== false,
       durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)) & 0x3ff,
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
