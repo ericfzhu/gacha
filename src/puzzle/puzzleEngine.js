@@ -38,6 +38,7 @@ import {
   PAD_ENEMY_SKILL_ENTIRE_BLIND,
   PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT,
   PAD_ENEMY_SKILL_BIND_ATTACK,
+  PAD_ENEMY_SKILL_RANDOM_SUB_BIND,
   PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
   PAD_ENEMY_SKILL_HEAL_ENEMY,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
@@ -1298,6 +1299,18 @@ export class PuzzleEngine {
         setupMaterialized: true,
       });
     }
+    if (skill.supported && skill.kind === 'randomSubBind' && !skill.setupMaterialized) {
+      const targets = this.selectRandomBindablePartyTargets(
+        skill.targetCount,
+        [1, 2, 3, 4],
+      );
+      return Object.freeze({
+        ...record,
+        targetMask: targets.reduce((mask, index) => mask | (1 << index), 0),
+        setupDurationTurns: this.rollEnemySkillDuration(skill.durationMin, skill.durationMax),
+        setupMaterialized: true,
+      });
+    }
     if (!skill.supported || skill.kind !== 'bindLeaderHelper' || skill.setupMaterialized) {
       return record;
     }
@@ -1710,6 +1723,15 @@ export class PuzzleEngine {
       this.message = `${boundCount} party member${boundCount === 1 ? '' : 's'} bound for ${skill.durationTurns} turn${skill.durationTurns === 1 ? '' : 's'}${resistedCount ? ` · ${resistedCount} resisted` : ''}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'randomSubBind') {
+      const durationTurns = this.rollEnemySkillDuration(skill.durationMin, skill.durationMax);
+      const result = this.doBind(skill.targetMask || 0, durationTurns);
+      this.lastEnemySkill = Object.freeze({ ...skill, ...result });
+      const boundCount = result.boundMask.toString(2).replaceAll('0', '').length;
+      const resistedCount = result.resistedMask.toString(2).replaceAll('0', '').length;
+      this.message = `${boundCount} random sub${boundCount === 1 ? '' : 's'} bound for ${durationTurns} turn${durationTurns === 1 ? '' : 's'}${resistedCount ? ` · ${resistedCount} resisted` : ''}.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'activeSkillSeal') {
       const result = this.applyActiveSkillSeal(skill.durationTurns);
       this.lastEnemySkill = Object.freeze({ ...skill, ...result });
@@ -1983,6 +2005,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_ENTIRE_BLIND,
         PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT,
         PAD_ENEMY_SKILL_BIND_ATTACK,
+        PAD_ENEMY_SKILL_RANDOM_SUB_BIND,
         PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
         PAD_ENEMY_SKILL_HEAL_ENEMY,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,

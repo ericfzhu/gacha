@@ -2,6 +2,23 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 random-sub bind enemy skill
+
+- Recovered type `65`: shared late bind dispatch `0x628fe0`, setup `0x621108`,
+  and condition `0x61b6f0`. Definition `+0x10` supplies the count and
+  `+0x14..+0x18` the inclusive duration range; selector 4 restricts the native
+  two-draw/private-state shuffle to party slots 1–4.
+- Preserved the otherwise surprising duration behavior: setup stores one roll
+  at runtime `+0x678`, but execution rerolls the authored range before
+  `_doBind`. Scheduled seed 21900 therefore selects mask `0x12`, materializes
+  2 turns, executes 3 turns, and ends on global RNG state `1848838291`.
+- Pure definition/runtime, direct, scheduled-AI, generic-attack composition,
+  no-candidate rejection, exact native-table checks, and focused browser
+  coverage pass. The browser reproduces slots 1/4 bound for 3 turns, 925
+  accompanying damage, HP 11075, and final RNG `1848838291`.
+- Next: run the full matrix and commit this as a separate checkpoint, then
+  continue adjacent live actions and the recorded player-damage placement fix.
+
 ## 2026-08-23 bind-plus-attack enemy skill
 
 - Recovered type `63`: early dispatch `0x628b94`, setup `0x621544`, and

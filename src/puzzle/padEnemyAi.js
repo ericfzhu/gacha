@@ -4,6 +4,7 @@ import {
   PAD_ENEMY_SKILL_ENTIRE_BLIND,
   PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT,
   PAD_ENEMY_SKILL_BIND_ATTACK,
+  PAD_ENEMY_SKILL_RANDOM_SUB_BIND,
   PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
   PAD_ENEMY_SKILL_HEAL_ENEMY,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
@@ -147,6 +148,7 @@ function isStaticallyEligible(definition, state) {
     PAD_ENEMY_SKILL_ENTIRE_BLIND,
     PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT,
     PAD_ENEMY_SKILL_BIND_ATTACK,
+    PAD_ENEMY_SKILL_RANDOM_SUB_BIND,
     PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
     PAD_ENEMY_SKILL_HEAL_ENEMY,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
@@ -234,6 +236,13 @@ function evaluateCondition(definition, state, rngState) {
             ? [1, 2, 3, 4]
             : [0, 1, 2, 3, 4, 5];
     const eligible = targetIndices.some((index) => (
+      state.party[index]?.present !== false
+      && Number(state.party[index]?.bindTurns || 0) <= 0
+    ));
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_RANDOM_SUB_BIND) {
+    const eligible = [1, 2, 3, 4].some((index) => (
       state.party[index]?.present !== false
       && Number(state.party[index]?.bindTurns || 0) <= 0
     ));

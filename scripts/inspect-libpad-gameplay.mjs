@@ -33,6 +33,10 @@ const BIND_ATTACK_ENEMY_SKILL_TYPE = 63;
 const BIND_ATTACK_HANDLER = 0x628b94;
 const BIND_ATTACK_SETUP_HANDLER = 0x621544;
 const BIND_ATTACK_CONDITION_HANDLER = 0x61a87c;
+const RANDOM_SUB_BIND_ENEMY_SKILL_TYPE = 65;
+const RANDOM_SUB_BIND_HANDLER = 0x628fe0;
+const RANDOM_SUB_BIND_SETUP_HANDLER = 0x621108;
+const RANDOM_SUB_BIND_CONDITION_HANDLER = 0x61b6f0;
 const CLEAR_PLAYER_BUFFS_ENEMY_SKILL_TYPE = 6;
 const CLEAR_PLAYER_BUFFS_HANDLER = 0x6292e8;
 const CLEAR_PLAYER_BUFFS_SETUP_HANDLER = 0x6217c0;
@@ -448,6 +452,23 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : bindAttackSetupTarget === BIND_ATTACK_SETUP_HANDLER;
   const bindAttackConditionMatches = bindAttackConditionTarget === null
     ? null : bindAttackConditionTarget === BIND_ATTACK_CONDITION_HANDLER;
+  const randomSubBindDispatchTarget = resolveEnemySkillTarget(
+    RANDOM_SUB_BIND_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const randomSubBindSetupTarget = resolveEnemySkillTarget(
+    RANDOM_SUB_BIND_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const randomSubBindConditionTarget = resolveEnemySkillTarget(
+    RANDOM_SUB_BIND_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const randomSubBindDispatchMatches = randomSubBindDispatchTarget === null
+    ? null : randomSubBindDispatchTarget === RANDOM_SUB_BIND_HANDLER;
+  const randomSubBindSetupMatches = randomSubBindSetupTarget === null
+    ? null : randomSubBindSetupTarget === RANDOM_SUB_BIND_SETUP_HANDLER;
+  const randomSubBindConditionMatches = randomSubBindConditionTarget === null
+    ? null : randomSubBindConditionTarget === RANDOM_SUB_BIND_CONDITION_HANDLER;
   const clearPlayerBuffsDispatchTarget = resolveEnemySkillTarget(
     CLEAR_PLAYER_BUFFS_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1494,6 +1515,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       bindAttackDispatchMatches21_9: bindAttackDispatchMatches,
       bindAttackSetupMatches21_9: bindAttackSetupMatches,
       bindAttackConditionMatches21_9: bindAttackConditionMatches,
+      randomSubBindDispatchMatches21_9: randomSubBindDispatchMatches,
+      randomSubBindSetupMatches21_9: randomSubBindSetupMatches,
+      randomSubBindConditionMatches21_9: randomSubBindConditionMatches,
       clearPlayerBuffsDispatchMatches21_9: clearPlayerBuffsDispatchMatches,
       clearPlayerBuffsSetupMatches21_9: clearPlayerBuffsSetupMatches,
       clearPlayerBuffsConditionMatches21_9: clearPlayerBuffsConditionMatches,
@@ -1710,6 +1734,18 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       bindAttackConditionMatches21_9: bindAttackConditionMatches,
       bindAttackSemantics:
         'type 63: +0x14..+0x18 inclusive duration; +0x1c target selector and +0x20 target count feed doSelectBindTarges; target selection precedes the duration LCG; handler calls doBind with sMONSTER+0x674 mask and +0x684 duration; +0x44 attack composes afterward',
+      randomSubBindType: RANDOM_SUB_BIND_ENEMY_SKILL_TYPE,
+      randomSubBindDispatchTarget: randomSubBindDispatchTarget === null
+        ? null : hex(randomSubBindDispatchTarget),
+      randomSubBindDispatchMatches21_9: randomSubBindDispatchMatches,
+      randomSubBindSetupTarget: randomSubBindSetupTarget === null
+        ? null : hex(randomSubBindSetupTarget),
+      randomSubBindSetupMatches21_9: randomSubBindSetupMatches,
+      randomSubBindConditionTarget: randomSubBindConditionTarget === null
+        ? null : hex(randomSubBindConditionTarget),
+      randomSubBindConditionMatches21_9: randomSubBindConditionMatches,
+      randomSubBindSemantics:
+        'type 65: +0x10 count selects only subs through doSelectBindTarges selector 4; setup stores mask at sMONSTER+0x674 and an inclusive +0x14..+0x18 duration at +0x678; common bind execution rerolls that duration before doBind; condition admits iff any present sub is unbound',
       clearPlayerBuffsType: CLEAR_PLAYER_BUFFS_ENEMY_SKILL_TYPE,
       clearPlayerBuffsDispatchTarget: clearPlayerBuffsDispatchTarget === null
         ? null : hex(clearPlayerBuffsDispatchTarget),
@@ -2179,6 +2215,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || bindAttackDispatchMatches === false
     || bindAttackSetupMatches === false
     || bindAttackConditionMatches === false
+    || randomSubBindDispatchMatches === false
+    || randomSubBindSetupMatches === false
+    || randomSubBindConditionMatches === false
     || clearPlayerBuffsDispatchMatches === false
     || clearPlayerBuffsSetupMatches === false
     || clearPlayerBuffsConditionMatches === false

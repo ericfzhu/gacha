@@ -717,6 +717,25 @@ per-card bind resistance and existing-bind extension semantics. The generic
 definition `+0x44` attack is then composed independently. The raw semantic is
 corroborated by the DadGuide parser's `ESBindAttack` type-63 record.
 
+Enemy skill type `65` is the random-sub bind variant. Its late dispatch entry
+targets the shared bind handler at `0x628fe0`; setup and condition target
+`0x621108` and `0x61b6f0`. Setup calls `_doSelectBindTarges` with selector 4,
+definition target count `+0x10`, and only present, unbound party indices 1–4.
+The selector spends two global LCG advances and uses its private-state shuffle,
+then setup spends another advance to materialize the inclusive authored
+duration `+0x14..+0x18` into `sMONSTER+0x678`. The selected six-bit mask is
+stored at `sMONSTER+0x674`.
+
+As with type 54, the shared execution handler deliberately ignores that setup
+duration and spends a further LCG advance to reroll the same range before
+calling `_doBind`. The condition scans only subs and admits exactly when any
+present sub is unbound; it consumes no RNG. An immediate scheduled action thus
+spends five global draws without resistance: probability, two target-selection
+draws, setup duration, and execution duration. With seed 21900, count 2, and
+range 2–4, it selects mask `0x12`, materializes 2 turns, executes 3 turns, and
+ends at RNG state `1848838291`. The independent raw-data parser corroborates
+the record as `ESBindRandomSub` type 65.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

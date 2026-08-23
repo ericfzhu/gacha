@@ -5,6 +5,7 @@ import {
   PAD_ENEMY_SKILL_ENTIRE_BLIND,
   PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT,
   PAD_ENEMY_SKILL_BIND_ATTACK,
+  PAD_ENEMY_SKILL_RANDOM_SUB_BIND,
   PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
   PAD_ENEMY_SKILL_HEAL_ENEMY,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
@@ -1588,6 +1589,59 @@ assert(directBindAttackState.lastEnemySkill.durationTurns >= 2);
 assert(directBindAttackState.lastEnemySkill.durationTurns <= 4);
 const bindAttackSetupState = padLcgStep(padLcgStep(padLcgStep(21_900).state).state).state;
 assert.equal(directBindAttackState.rngState, bindAttackSetupState);
+const enemyAiRandomSubBindDefinition = enemyAiEntireBlindDefinition.slice();
+const enemyAiRandomSubBindView = new DataView(enemyAiRandomSubBindDefinition.buffer);
+enemyAiRandomSubBindView.setUint32(0x00, 9_044, true);
+enemyAiRandomSubBindView.setInt16(0x04, PAD_ENEMY_SKILL_RANDOM_SUB_BIND, true);
+enemyAiRandomSubBindView.setInt32(0x10, 2, true);
+enemyAiRandomSubBindView.setInt32(0x14, 2, true);
+enemyAiRandomSubBindView.setInt32(0x18, 4, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiRandomSubBindDefinition), {
+  type: 65,
+  kind: 'randomSubBind',
+  supported: true,
+  targetCount: 2,
+  durationMin: 2,
+  durationMax: 4,
+  attackWithSkillValue: 50,
+});
+const randomSubBindRuntime = new Uint8Array(0x680);
+const randomSubBindRuntimeView = new DataView(randomSubBindRuntime.buffer);
+randomSubBindRuntimeView.setUint16(0x674, 0x12, true);
+randomSubBindRuntimeView.setInt32(0x678, 2, true);
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiRandomSubBindDefinition,
+  randomSubBindRuntime,
+), {
+  type: 65,
+  kind: 'randomSubBind',
+  supported: true,
+  targetCount: 2,
+  durationMin: 2,
+  durationMax: 4,
+  targetMask: 0x12,
+  setupDurationTurns: 2,
+  setupMaterialized: true,
+  attackWithSkillValue: 50,
+});
+const directRandomSubBindEngine = new PuzzleEngine({ seed: 21_900 });
+directRandomSubBindEngine.setRngState(21_900);
+assert.equal(directRandomSubBindEngine.applyEnemySkillDefinition(
+  enemyAiRandomSubBindDefinition,
+), true);
+const directRandomSubBindState = directRandomSubBindEngine.snapshot();
+assert.equal(directRandomSubBindState.lastEnemySkill.type, 65);
+assert.equal(directRandomSubBindState.lastEnemySkill.targetMask, 0x06);
+assert.equal(directRandomSubBindState.lastEnemySkill.setupDurationTurns, 3);
+assert.equal(directRandomSubBindState.lastEnemySkill.durationTurns, 2);
+assert.deepEqual(
+  directRandomSubBindState.party.map((member) => member.bindTurns),
+  [0, 2, 2, 0, 0, 0],
+);
+assert.equal(
+  directRandomSubBindState.rngState,
+  padLcgStep(padLcgStep(padLcgStep(padLcgStep(21_900).state).state).state).state,
+);
 const directEntireBlindEngine = new PuzzleEngine({ seed: 21_900 });
 directEntireBlindEngine.setBoardFromCodes(['JBGHLD', 'BGLDHR', 'GLXHRB', 'LDHRBG', 'DHRBGL']);
 directEntireBlindEngine.setOrbState(0, 0, {
@@ -3855,6 +3909,49 @@ rejectedBindAttackEngine.party.slice(1, 5).forEach((member) => {
 rejectedBindAttackEngine.setRngState(21_900);
 assert.equal(rejectedBindAttackEngine.takeEnemySkill(0), null);
 assert.equal(rejectedBindAttackEngine.rng.state, 21_900);
+const randomSubBindMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(randomSubBindMonsterDefinition.buffer).setUint32(0xec, 9_044, true);
+const selectedRandomSubBindEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: randomSubBindMonsterDefinition,
+    skillDefinitions: [enemyAiRandomSubBindDefinition],
+  }],
+});
+selectedRandomSubBindEngine.setRngState(21_900);
+selectedRandomSubBindEngine.enemies[0].counter = 1;
+selectedRandomSubBindEngine.enemies[1].counter = 99;
+selectedRandomSubBindEngine.resolveEnemyTurn();
+const selectedRandomSubBindState = selectedRandomSubBindEngine.snapshot();
+assert.equal(selectedRandomSubBindState.lastEnemyActions[0].skill.type, 65);
+assert.equal(selectedRandomSubBindState.lastEnemyActions[0].damage, 925);
+assert.equal(selectedRandomSubBindState.player.hp, 11_075);
+assert.equal(selectedRandomSubBindState.lastEnemySkill.targetMask, 0x12);
+assert.equal(selectedRandomSubBindState.lastEnemySkill.setupDurationTurns, 2);
+assert.equal(selectedRandomSubBindState.lastEnemySkill.durationTurns, 3);
+assert.deepEqual(
+  selectedRandomSubBindState.party.map((member) => member.bindTurns),
+  [0, 3, 0, 0, 3, 0],
+);
+assert.equal(
+  selectedRandomSubBindState.rngState,
+  padLcgStep(padLcgStep(padLcgStep(padLcgStep(
+    padLcgStep(21_900).state,
+  ).state).state).state).state,
+);
+const rejectedRandomSubBindEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: randomSubBindMonsterDefinition,
+    skillDefinitions: [enemyAiRandomSubBindDefinition],
+  }],
+});
+rejectedRandomSubBindEngine.party.slice(1, 5).forEach((member) => {
+  member.bindTurns = 5;
+});
+rejectedRandomSubBindEngine.setRngState(21_900);
+assert.equal(rejectedRandomSubBindEngine.takeEnemySkill(0), null);
+assert.equal(rejectedRandomSubBindEngine.rng.state, 21_900);
 const randomPartyBindMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(randomPartyBindMonsterDefinition.buffer).setUint32(0xec, 9_023, true);
 const selectedRandomPartyBindEngine = new PuzzleEngine({
