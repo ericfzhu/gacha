@@ -76,6 +76,7 @@ export const PAD_ENEMY_SKILL_RECOVERY_DEBUFF = 105;
 export const PAD_ENEMY_SKILL_TURN_CHANGE = 106;
 export const PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK = 107;
 export const PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE = 108;
+export const PAD_ENEMY_SKILL_RANDOM_SPINNERS = 109;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -465,6 +466,18 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       damagePercent: definition.getInt32(0x10, true),
       sourceTypeMask: definition.getInt32(0x14, true) & 0xffff,
       destinationTypeMask: definition.getInt32(0x18, true) & 0xffff,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_RANDOM_SPINNERS) {
+    requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'randomSpinners',
+      supported: true,
+      durationTurns: definition.getInt32(0x10, true),
+      speedCentiseconds: definition.getInt32(0x14, true),
+      spinnerCount: definition.getInt32(0x18, true),
       attackWithSkillValue,
     });
   }
@@ -1509,6 +1522,13 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_RANDOM_SPINNERS) {
+    return Object.freeze({
+      ...decodePadEnemySkillDefinition(definitionBytes),
+      selectionSeed: monster.getUint32(0x678, true) & 0xffff,
+      setupMaterialized: true,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -2414,6 +2434,23 @@ export function normalizePadEnemySkillRecord(record) {
       sourceTypeMask: Math.trunc(Number(record?.sourceTypeMask) || 0) & 0xffff,
       destinationTypeMask: Math.trunc(Number(record?.destinationTypeMask) || 0) & 0xffff,
       setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_RANDOM_SPINNERS || record?.kind === 'randomSpinners') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_RANDOM_SPINNERS,
+      kind: 'randomSpinners',
+      supported: record?.supported !== false,
+      durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)) & 0x3ff,
+      speedCentiseconds: Math.max(1, Math.trunc(Number(record?.speedCentiseconds) || 0)),
+      spinnerCount: Math.max(0, Math.trunc(Number(record?.spinnerCount) || 0)),
+      ...(record?.selectionSeed == null
+        ? {}
+        : { selectionSeed: Math.trunc(Number(record.selectionSeed) || 0) & 0xffff }),
+      setupMaterialized: Boolean(record?.setupMaterialized || record?.selectionSeed != null),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

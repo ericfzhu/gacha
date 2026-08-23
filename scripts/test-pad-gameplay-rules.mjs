@@ -30,6 +30,7 @@ import {
   PAD_ENEMY_SKILL_TURN_CHANGE,
   PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK,
   PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE,
+  PAD_ENEMY_SKILL_RANDOM_SPINNERS,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1495,6 +1496,36 @@ attackOrbChangeRuntimeView.setInt32(0x68c, 0x02, true);
 assert.deepEqual(
   decodePadEnemySkillRuntime(enemyAiAttackOrbChangeDefinition, attackOrbChangeRuntime),
   { ...expectedAttackOrbChangeDefinition, setupMaterialized: true },
+);
+const enemyAiRandomSpinnersDefinition = enemyAiAttackOrbChangeDefinition.slice();
+const enemyAiRandomSpinnersView = new DataView(enemyAiRandomSpinnersDefinition.buffer);
+enemyAiRandomSpinnersView.setUint32(0x00, 9_089, true);
+enemyAiRandomSpinnersView.setInt16(0x04, PAD_ENEMY_SKILL_RANDOM_SPINNERS, true);
+enemyAiRandomSpinnersView.setInt32(0x10, 3, true);
+enemyAiRandomSpinnersView.setInt32(0x14, 100, true);
+enemyAiRandomSpinnersView.setInt32(0x18, 3, true);
+const expectedRandomSpinnersDefinition = {
+  type: 109,
+  kind: 'randomSpinners',
+  supported: true,
+  durationTurns: 3,
+  speedCentiseconds: 100,
+  spinnerCount: 3,
+  attackWithSkillValue: 0,
+};
+assert.deepEqual(
+  decodePadEnemySkillDefinition(enemyAiRandomSpinnersDefinition),
+  expectedRandomSpinnersDefinition,
+);
+const randomSpinnersRuntime = new Uint8Array(0x680);
+new DataView(randomSpinnersRuntime.buffer).setUint32(0x678, 6_018, true);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiRandomSpinnersDefinition, randomSpinnersRuntime),
+  {
+    ...expectedRandomSpinnersDefinition,
+    selectionSeed: 6_018,
+    setupMaterialized: true,
+  },
 );
 assert.deepEqual(decodePadEnemySkillRuntime(
   enemyAiUnconditionalHealDefinition,
@@ -5854,6 +5885,61 @@ const rejectedAttackOrbChangeState = rejectedAttackOrbChangeEngine.snapshot();
 assert.equal(rejectedAttackOrbChangeState.lastEnemyActions[0].kind, 'attack');
 assert.equal(rejectedAttackOrbChangeState.lastEnemyActions[0].damage, 1_850);
 assert.equal(rejectedAttackOrbChangeState.rngState, 21_900);
+
+const directRandomSpinnersEngine = new PuzzleEngine({ seed: 21_900 });
+directRandomSpinnersEngine.setBoardFromCodes(attackOrbChangeBoard);
+directRandomSpinnersEngine.setRngState(21_900);
+assert.equal(directRandomSpinnersEngine.applyEnemySkillDefinition(
+  enemyAiRandomSpinnersDefinition,
+), true);
+let directRandomSpinnersState = directRandomSpinnersEngine.snapshot();
+assert.deepEqual(directRandomSpinnersState.lastEnemySkill.selectedCells, [
+  { row: 4, column: 2 },
+  { row: 3, column: 4 },
+  { row: 2, column: 3 },
+]);
+assert.equal(directRandomSpinnersState.rngState, 394_448_415);
+assert.equal(directRandomSpinnersState.boardState.flat().filter((orb) => orb.spinner).length, 3);
+directRandomSpinnersEngine.updateSpinnerOrbs(0.99);
+assert.deepEqual(directRandomSpinnersEngine.snapshot().board, attackOrbChangeBoard);
+directRandomSpinnersEngine.updateSpinnerOrbs(0.02);
+directRandomSpinnersState = directRandomSpinnersEngine.snapshot();
+assert.equal(directRandomSpinnersState.board[4][2], 'G');
+assert.equal(directRandomSpinnersState.board[3][4], 'B');
+assert.equal(directRandomSpinnersState.board[2][3], 'R');
+directRandomSpinnersEngine.advanceSpinnerTurns();
+directRandomSpinnersEngine.advanceSpinnerTurns();
+assert.equal(
+  directRandomSpinnersEngine.snapshot().boardState.flat().filter((orb) => orb.spinner).length,
+  3,
+);
+directRandomSpinnersEngine.advanceSpinnerTurns();
+assert.equal(
+  directRandomSpinnersEngine.snapshot().boardState.flat().filter((orb) => orb.spinner).length,
+  0,
+);
+
+const randomSpinnersMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(randomSpinnersMonsterDefinition.buffer).setUint32(0xec, 9_089, true);
+const selectedRandomSpinnersEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: randomSpinnersMonsterDefinition,
+    skillDefinitions: [enemyAiRandomSpinnersDefinition],
+  }],
+});
+selectedRandomSpinnersEngine.setBoardFromCodes(attackOrbChangeBoard);
+selectedRandomSpinnersEngine.enemies[0].counter = 1;
+selectedRandomSpinnersEngine.enemies[1].counter = 99;
+selectedRandomSpinnersEngine.setRngState(21_900);
+selectedRandomSpinnersEngine.resolveEnemyTurn();
+const selectedRandomSpinnersState = selectedRandomSpinnersEngine.snapshot();
+assert.equal(selectedRandomSpinnersState.lastEnemyActions[0].skill.type, 109);
+assert.equal(selectedRandomSpinnersState.lastEnemyActions[0].damage, undefined);
+assert.equal(selectedRandomSpinnersState.player.hp, 12_000);
+assert.equal(selectedRandomSpinnersState.lastEnemySkill.spinnerCount, 3);
+assert.equal(selectedRandomSpinnersState.lastEnemySkill.selectionSeed, 58_043);
+assert.equal(selectedRandomSpinnersState.rngState, 3_803_934_822);
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;

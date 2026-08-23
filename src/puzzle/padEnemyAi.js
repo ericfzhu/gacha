@@ -29,6 +29,7 @@ import {
   PAD_ENEMY_SKILL_TURN_CHANGE,
   PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK,
   PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE,
+  PAD_ENEMY_SKILL_RANDOM_SPINNERS,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -203,6 +204,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_TURN_CHANGE,
     PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK,
     PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE,
+    PAD_ENEMY_SKILL_RANDOM_SPINNERS,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
     PAD_ENEMY_SKILL_DEFENSE_BOOST,
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -602,6 +604,9 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
   }
   if ([PAD_ENEMY_SKILL_RANDOM_BOMBS, PAD_ENEMY_SKILL_FIXED_BOMBS]
     .includes(definition.effect.type)) {
+    return { eligible: true, probabilityScale: 1, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_RANDOM_SPINNERS) {
     return { eligible: true, probabilityScale: 1, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_CLOUD) {

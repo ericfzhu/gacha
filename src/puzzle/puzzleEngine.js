@@ -65,6 +65,7 @@ import {
   PAD_ENEMY_SKILL_TURN_CHANGE,
   PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK,
   PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE,
+  PAD_ENEMY_SKILL_RANDOM_SPINNERS,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -471,6 +472,10 @@ export class PuzzleEngine {
       thornActive,
       thornDescriptor,
       thornPercent,
+      spinner: Boolean(state.spinner),
+      spinnerTurnsRemaining: Math.max(0, Math.trunc(Number(state.spinnerTurnsRemaining) || 0)),
+      spinnerIntervalSeconds: Math.max(0.01, Number(state.spinnerIntervalSeconds) || 1),
+      spinnerElapsedSeconds: Math.max(0, Number(state.spinnerElapsedSeconds) || 0),
     };
   }
 
@@ -665,6 +670,7 @@ export class PuzzleEngine {
     const elapsed = Math.max(0, Number(deltaSeconds) || 0);
     const dt = clamp(elapsed, 0, 0.1);
     this.visualTime += dt;
+    this.updateSpinnerOrbs(elapsed);
     this.floatingText = this.floatingText.map((item) => ({ ...item, age: item.age + dt })).filter((item) => item.age < 1.15);
 
     if (this.mode !== 'playing') return;
@@ -1170,6 +1176,7 @@ export class PuzzleEngine {
     this.advanceCloudTurns();
     this.advanceRecoveryDebuffTurns();
     this.advanceAttributeBlockTurns();
+    this.advanceSpinnerTurns();
     if (this.blackFallRule?.active && this.blackFallRule.turnsRemaining !== null) {
       this.blackFallRule.turnsRemaining = Math.max(0, this.blackFallRule.turnsRemaining - 1);
       if (this.blackFallRule.turnsRemaining === 0) this.blackFallRule.active = false;
@@ -1613,6 +1620,13 @@ export class PuzzleEngine {
         destinationType,
         setupMaterialized: true,
         executionMaterialized: true,
+      });
+    }
+    if (skill.supported && skill.kind === 'randomSpinners' && !skill.setupMaterialized) {
+      return Object.freeze({
+        ...record,
+        selectionSeed: this.rng.nextUint16(),
+        setupMaterialized: true,
       });
     }
     if (skill.supported && skill.kind === 'changeEnemyAttribute' && !skill.setupMaterialized) {
@@ -2484,6 +2498,30 @@ export class PuzzleEngine {
       this.message = `Enemy attacked and changed ${changedOrbCount} orb${changedOrbCount === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'randomSpinners') {
+      const candidates = [];
+      this.board.forEach((row, rowIndex) => row.forEach((orb, columnIndex) => {
+        candidates.push({ row: rowIndex, column: columnIndex });
+      }));
+      const selected = padShuffleLockDropCandidates(skill.selectionSeed, candidates)
+        .slice(0, Math.max(0, Math.min(candidates.length, skill.spinnerCount)));
+      const intervalSeconds = skill.speedCentiseconds / 100;
+      selected.forEach(({ row, column }) => {
+        const orb = this.board[row][column];
+        orb.spinner = true;
+        orb.spinnerTurnsRemaining = skill.durationTurns;
+        orb.spinnerIntervalSeconds = intervalSeconds;
+        orb.spinnerElapsedSeconds = 0;
+      });
+      this.lastEnemySkill = Object.freeze({
+        ...skill,
+        spinnerCount: selected.length,
+        selectedCells: Object.freeze(selected.map((cell) => Object.freeze({ ...cell }))),
+        intervalSeconds,
+      });
+      this.message = `${selected.length} orb${selected.length === 1 ? '' : 's'} began changing every ${intervalSeconds.toFixed(1)}s.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'clearPlayerBuffs') {
       // _doItetukuHadou clears both recovered sGAMEWORK positive-status lanes,
       // then type 6 invokes _applyLeaderSkill(false). Leader effects in this
@@ -3027,6 +3065,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_TURN_CHANGE,
         PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK,
         PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE,
+        PAD_ENEMY_SKILL_RANDOM_SPINNERS,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -3661,6 +3700,33 @@ export class PuzzleEngine {
     if (this.attributeBlock.turnsRemaining === 0) this.attributeBlock = null;
   }
 
+  updateSpinnerOrbs(elapsedSeconds) {
+    const elapsed = Math.max(0, Number(elapsedSeconds) || 0);
+    if (elapsed <= 0) return;
+    this.board.forEach((row) => row.forEach((orb) => {
+      if (!orb?.spinner || orb.spinnerTurnsRemaining <= 0) return;
+      const interval = Math.max(0.01, Number(orb.spinnerIntervalSeconds) || 1);
+      orb.spinnerElapsedSeconds += elapsed;
+      const steps = Math.floor(orb.spinnerElapsedSeconds / interval);
+      if (steps < 1) return;
+      orb.spinnerElapsedSeconds -= steps * interval;
+      const current = ORB_TYPES.findIndex((candidate) => candidate.id === orb.type);
+      const naturalIndex = current >= 0 && current < 6 ? current : 5;
+      orb.type = NATURAL_ORB_TYPES[(naturalIndex + steps) % 6].id;
+    }));
+  }
+
+  advanceSpinnerTurns() {
+    this.board.forEach((row) => row.forEach((orb) => {
+      if (!orb?.spinner || orb.spinnerTurnsRemaining <= 0) return;
+      orb.spinnerTurnsRemaining = Math.max(0, orb.spinnerTurnsRemaining - 1);
+      if (orb.spinnerTurnsRemaining === 0) {
+        orb.spinner = false;
+        orb.spinnerElapsedSeconds = 0;
+      }
+    }));
+  }
+
   snapshot() {
     return {
       coordinateSystem: `board origin top-left; rows 0-${this.rows - 1} downward; columns 0-${this.columns - 1} rightward`,
@@ -3727,6 +3793,9 @@ export class PuzzleEngine {
         thornActive: orb.thornActive,
         thornDescriptor: orb.thornDescriptor,
         thornPercent: orb.thornPercent,
+        spinner: orb.spinner,
+        spinnerTurnsRemaining: orb.spinnerTurnsRemaining,
+        spinnerIntervalSeconds: orb.spinnerIntervalSeconds,
       }))),
       drag: this.drag ? { row: this.drag.row, column: this.drag.column, remainingSeconds: Number(this.drag.remaining.toFixed(2)), pathLength: this.drag.pathLength } : null,
       comboCount: this.comboCount,

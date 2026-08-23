@@ -96,6 +96,43 @@ function drawOrbState(ctx, orb, x, y, radius, alpha) {
     ctx.textAlign = 'center';
     ctx.fillText('▣', x, y + radius * 0.24);
   }
+  if (orb.spinner && orb.spinnerTurnsRemaining > 0) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.strokeStyle = 'rgba(255, 255, 255, .94)';
+    ctx.fillStyle = 'rgba(17, 26, 43, .86)';
+    ctx.lineWidth = Math.max(2, radius * 0.09);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.82, -Math.PI * 0.8, Math.PI * 0.22);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(radius * 0.77, radius * 0.02);
+    ctx.lineTo(radius * 0.98, radius * 0.18);
+    ctx.lineTo(radius * 0.72, radius * 0.28);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255, 255, 255, .94)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.82, Math.PI * 0.2, Math.PI * 1.22);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-radius * 0.77, -radius * 0.02);
+    ctx.lineTo(-radius * 0.98, -radius * 0.18);
+    ctx.lineTo(-radius * 0.72, -radius * 0.28);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(17, 26, 43, .88)';
+    ctx.beginPath();
+    ctx.arc(radius * 0.63, -radius * 0.62, radius * 0.31, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = `900 ${Math.round(radius * 0.42)}px "Barlow Condensed", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(orb.spinnerTurnsRemaining), radius * 0.63, -radius * 0.61);
+    ctx.restore();
+  }
   if (orb.blind) {
     const shade = ctx.createRadialGradient(
       x - radius * 0.25, y - radius * 0.28, radius * 0.08,

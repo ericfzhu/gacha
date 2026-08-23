@@ -1461,6 +1461,28 @@ destination mask Water, and seven Fire cells, direct seed 21900 changes all
 seven and ends at 891458469. Ordinary AI selection first spends its own draw;
 the combined 150% action then deals 2,775 damage and ends at 1256568788.
 
+Enemy skill type `109` creates roulette/spinner orbs at random positions. Its
+dispatch, setup, and unconditional condition entries resolve to `0x62a4e8`,
+`0x61ffa8`, and `0x61a630`; the independent parser identifies
+`ESSpinnersRandom`. Definition `+0x10` is the duration in enemy turns, `+0x14`
+is the change interval in centiseconds, and `+0x18` is the requested spinner
+count. Setup advances the global LCG exactly once and stores the draw's high 16
+bits at runtime `sMONSTER+0x678`. Execution passes that seed, the interval,
+count, and duration to the common roulette helper with random-placement mode
+enabled. The helper's protected selection internals are represented with the
+same deterministic row-major shuffle already established for random board
+placement mechanics.
+
+The browser keeps roulette state on the orb object, so the effect follows an
+orb through crossed-cell swaps. Every authored interval it advances the orb
+through Fire, Water, Wood, Light, Dark, and Heart; hazards do not enter the
+cycle. Each affected orb's lifetime decreases on enemy-turn advancement and
+the roulette marker disappears at zero. With duration 3, interval 100, count
+3, and direct seed 21900, setup stores selection seed 6018, leaves the global
+state at 394448415, and selects row/column `(4,2)`, `(3,4)`, and `(2,3)`.
+Elapsed-time boundary fixtures verify that 0.99 seconds does not change a
+spinner while the next 0.02 seconds advances it exactly once.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

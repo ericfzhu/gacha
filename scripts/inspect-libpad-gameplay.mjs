@@ -617,6 +617,27 @@ const ATTACK_ORB_CHANGE_INSTRUCTION_ANCHORS = Object.freeze([
   [0x61b948, 0x54ff674c], // admit if the final source count is positive
   [0x61b94c, 0x140001b4], // reject when no requested source exists
 ]);
+const RANDOM_SPINNERS_ENEMY_SKILL_TYPE = 109;
+const RANDOM_SPINNERS_HANDLER = 0x62a4e8;
+const RANDOM_SPINNERS_SETUP_HANDLER = 0x61ffa8;
+const RANDOM_SPINNERS_CONDITION_HANDLER = 0x61a630;
+const RANDOM_SPINNERS_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x61ffa8, 0xf9400048], // setup loads shared game work
+  [0x61ffac, 0x528d4209], // address shared LCG state at +0x66a10
+  [0x61ffb8, 0xb869690a], // load current shared LCG state
+  [0x61ffc8, 0x1b0b314a], // advance it with the native multiply-add
+  [0x61ffcc, 0xb829690a], // persist advanced shared state
+  [0x61ffd0, 0x53107d48], // take its high 16 bits as private seed
+  [0x61ffd4, 0xb9000348], // store seed at runtime +0x678
+  [0x62a4e8, 0xb9467a61], // execution loads private selection seed
+  [0x62a4ec, 0x29428aa5], // load +0x14 speed and +0x18 random count
+  [0x62a4f0, 0xb94012a4], // load +0x10 duration
+  [0x62a4f8, 0x52800026], // select random-position mode
+  [0x62a4fc, 0xaa1f03e3], // pass no fixed-position map
+  [0x62a500, 0x14000017], // enter the common roulette-helper call tail
+  [0x62a55c, 0x2a1f03e7], // clear the helper's final control argument
+  [0x62a560, 0x97f3d720], // install the random roulette orbs
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -1813,6 +1834,31 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     : ATTACK_ORB_CHANGE_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
+  const randomSpinnersDispatchTarget = resolveEnemySkillTarget(
+    RANDOM_SPINNERS_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const randomSpinnersSetupTarget = resolveEnemySkillTarget(
+    RANDOM_SPINNERS_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const randomSpinnersConditionTarget = resolveEnemySkillTarget(
+    RANDOM_SPINNERS_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const randomSpinnersDispatchMatches = randomSpinnersDispatchTarget === null
+    ? null : randomSpinnersDispatchTarget === RANDOM_SPINNERS_HANDLER;
+  const randomSpinnersSetupMatches = randomSpinnersSetupTarget === null
+    ? null : randomSpinnersSetupTarget === RANDOM_SPINNERS_SETUP_HANDLER;
+  const randomSpinnersConditionMatches = randomSpinnersConditionTarget === null
+    ? null : randomSpinnersConditionTarget === RANDOM_SPINNERS_CONDITION_HANDLER;
+  const randomSpinnersInstructionAnchorsMatch = restoredElf === null ? null
+    : RANDOM_SPINNERS_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -2867,6 +2913,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       attackOrbChangeSetupMatches21_9: attackOrbChangeSetupMatches,
       attackOrbChangeConditionMatches21_9: attackOrbChangeConditionMatches,
       attackOrbChangeInstructionAnchorsMatch21_9: attackOrbChangeInstructionAnchorsMatch,
+      randomSpinnersDispatchMatches21_9: randomSpinnersDispatchMatches,
+      randomSpinnersSetupMatches21_9: randomSpinnersSetupMatches,
+      randomSpinnersConditionMatches21_9: randomSpinnersConditionMatches,
+      randomSpinnersInstructionAnchorsMatch21_9: randomSpinnersInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -3558,6 +3608,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       attackOrbChangeInstructionAnchorsMatch21_9: attackOrbChangeInstructionAnchorsMatch,
       attackOrbChangeSemantics:
         'type 108 copies +0x10 attack percentage and +0x14/+0x18 source/destination masks to runtime +0x690/+0x688/+0x68c without setup RNG; its staged execution performs the accompanying attack and the native mask-based block swap, whose recovered per-cell distribution owns the execution RNG; condition folds poison/mortal-poison into a source mask that names neither and admits only when at least one requested board type exists',
+      randomSpinnersType: RANDOM_SPINNERS_ENEMY_SKILL_TYPE,
+      randomSpinnersDispatchTarget: randomSpinnersDispatchTarget === null
+        ? null : hex(randomSpinnersDispatchTarget),
+      randomSpinnersDispatchMatches21_9: randomSpinnersDispatchMatches,
+      randomSpinnersSetupTarget: randomSpinnersSetupTarget === null
+        ? null : hex(randomSpinnersSetupTarget),
+      randomSpinnersSetupMatches21_9: randomSpinnersSetupMatches,
+      randomSpinnersConditionTarget: randomSpinnersConditionTarget === null
+        ? null : hex(randomSpinnersConditionTarget),
+      randomSpinnersConditionMatches21_9: randomSpinnersConditionMatches,
+      randomSpinnersInstructionAnchorsMatch21_9: randomSpinnersInstructionAnchorsMatch,
+      randomSpinnersSemantics:
+        'type 109 uses +0x10 duration, +0x14 speed in centiseconds, and +0x18 random count; setup spends one shared-LCG draw and stores its high 16 bits at runtime +0x678 as a private placement seed; execution calls the common roulette helper in random-position mode with no fixed map, and its AI condition is unconditional',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -4116,6 +4179,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || attackOrbChangeSetupMatches === false
     || attackOrbChangeConditionMatches === false
     || attackOrbChangeInstructionAnchorsMatch === false
+    || randomSpinnersDispatchMatches === false
+    || randomSpinnersSetupMatches === false
+    || randomSpinnersConditionMatches === false
+    || randomSpinnersInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false
