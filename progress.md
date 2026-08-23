@@ -2,6 +2,20 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 remaining-enemy branch
+
+- Recovered type `120` / `ESBranchRemainingEnemies`. Ordinary dispatch/setup/
+  condition are inert, while `_parseFlowControl` scans all enemy slots and
+  counts non-escaped monsters with positive protected signed-64-bit HP.
+- Native AArch64 confirms the inclusive predicate
+  `remainingEnemyCount <= enemy_ai`; the alive acting enemy is included and
+  `enemy_rnd` is the zero-based destination. This branch spends no action or
+  RNG.
+- The guarded browser queue now supports the reference operands and passes
+  above/exact/below remaining-count boundaries, raw/runtime decoding, 17 flow
+  and table anchors, and the exact native inspector. Next: type `121`
+  immunity-off, then type `122` remaining-enemy turn-change passive.
+
 ## 2026-08-24 timed damage immunity
 
 - Recovered type `119` / `ESInvulnerableOn` at dispatch/setup/condition

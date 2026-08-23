@@ -77,6 +77,7 @@ import {
   PAD_ENEMY_SKILL_BRANCH_ERASED_ATTRIBUTES,
   PAD_ENEMY_SKILL_TYPE_RESIST,
   PAD_ENEMY_SKILL_DAMAGE_IMMUNITY,
+  PAD_ENEMY_SKILL_BRANCH_REMAINING_ENEMIES,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1571,6 +1572,16 @@ export class PuzzleEngine {
         }
         if (skill.kind === 'branchErasedAttributes') {
           queue.position = this.lastErasedAttributeMask === skill.attributeMask
+            ? skill.targetRound
+            : queue.position + 1;
+          controlFlowSteps += 1;
+          continue;
+        }
+        if (skill.kind === 'branchRemainingEnemies') {
+          const remainingEnemies = this.enemies.reduce((count, enemy) => (
+            count + Number(enemy.hp > 0 && !enemy.escaped)
+          ), 0);
+          queue.position = remainingEnemies <= skill.branchValue
             ? skill.targetRound
             : queue.position + 1;
           controlFlowSteps += 1;
@@ -3191,6 +3202,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_BRANCH_SKILL_USE,
         PAD_ENEMY_SKILL_BRANCH_DAMAGE,
         PAD_ENEMY_SKILL_BRANCH_ERASED_ATTRIBUTES,
+        PAD_ENEMY_SKILL_BRANCH_REMAINING_ENEMIES,
       ].includes(decoded.type)) return decoded;
       if (!reference) {
         throw new TypeError(`PAD type-${decoded.type} branches require a skill-reference record.`);
@@ -3208,6 +3220,7 @@ export class PuzzleEngine {
         ...([
           PAD_ENEMY_SKILL_BRANCH_COMBO,
           PAD_ENEMY_SKILL_BRANCH_SKILL_USE,
+          PAD_ENEMY_SKILL_BRANCH_REMAINING_ENEMIES,
         ].includes(decoded.type)
           ? { branchValue: reference.enemyAi }
           : {}),
@@ -3299,6 +3312,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_ATTRIBUTE_RESIST,
         PAD_ENEMY_SKILL_TYPE_RESIST,
         PAD_ENEMY_SKILL_DAMAGE_IMMUNITY,
+        PAD_ENEMY_SKILL_BRANCH_REMAINING_ENEMIES,
         PAD_ENEMY_SKILL_RESOLVE,
         PAD_ENEMY_SKILL_DAMAGE_SHIELD,
         PAD_ENEMY_SKILL_LEADER_SWAP,

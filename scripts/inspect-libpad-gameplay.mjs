@@ -837,6 +837,29 @@ const DAMAGE_IMMUNITY_INSTRUCTION_ANCHORS = Object.freeze([
   [0x623c60, 0x7100051f], // compare timer with one
   [0x623c64, 0x9a9fb33b], // keep damage below one; otherwise select zero
 ]);
+const REMAINING_ENEMIES_BRANCH_ENEMY_SKILL_TYPE = 120;
+const REMAINING_ENEMIES_BRANCH_HANDLER = 0x62be50;
+const REMAINING_ENEMIES_BRANCH_SETUP_HANDLER = 0x621c94;
+const REMAINING_ENEMIES_BRANCH_CONDITION_HANDLER = 0x61c01c;
+const REMAINING_ENEMIES_BRANCH_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x621c94, 0x12800008], // ordinary setup installs selected-skill sentinel -1
+  [0x621c98, 0xb9067268], // store that sentinel at sMONSTER+0x670
+  [0x62be50, 0x900045e9], // ordinary execution enters the generic inert tail
+  [0x61c01c, 0xbd400fe0], // ordinary new-AI condition returns zero scale
+  [0x619ef4, 0xf94046c8], // flow controller loads the game-work base
+  [0x619f04, 0x97f43cf3], // query the number of stage enemy slots
+  [0x619f08, 0x7100041f], // special-case fewer than one slot
+  [0x619f4c, 0x39400769], // skip unavailable/escaped enemy slots
+  [0x619f54, 0xd106e360], // address the protected current-HP pair
+  [0x619f70, 0xb3607ea9], // combine protected HP halves into signed int64
+  [0x619f74, 0xf100013f], // compare current HP with zero
+  [0x619f78, 0x1a97d6f7], // increment remaining count only for positive HP
+  [0x61a46c, 0xb9800268], // load the current eight-byte reference-slot index
+  [0x61a474, 0x39405129], // load unsigned enemy_ai threshold at reference +4
+  [0x61a478, 0x6b0902ff], // compare remaining count with threshold
+  [0x61a47c, 0x540006ed], // branch when remaining count is less than or equal
+  [0x61a55c, 0x39405508], // load unsigned enemy_rnd destination at reference +5
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -2308,6 +2331,31 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     : DAMAGE_IMMUNITY_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
+  const remainingEnemiesBranchDispatchTarget = resolveEnemySkillTarget(
+    REMAINING_ENEMIES_BRANCH_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const remainingEnemiesBranchSetupTarget = resolveEnemySkillTarget(
+    REMAINING_ENEMIES_BRANCH_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const remainingEnemiesBranchConditionTarget = resolveEnemySkillTarget(
+    REMAINING_ENEMIES_BRANCH_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const remainingEnemiesBranchDispatchMatches = remainingEnemiesBranchDispatchTarget === null
+    ? null : remainingEnemiesBranchDispatchTarget === REMAINING_ENEMIES_BRANCH_HANDLER;
+  const remainingEnemiesBranchSetupMatches = remainingEnemiesBranchSetupTarget === null
+    ? null : remainingEnemiesBranchSetupTarget === REMAINING_ENEMIES_BRANCH_SETUP_HANDLER;
+  const remainingEnemiesBranchConditionMatches = remainingEnemiesBranchConditionTarget === null
+    ? null : remainingEnemiesBranchConditionTarget === REMAINING_ENEMIES_BRANCH_CONDITION_HANDLER;
+  const remainingEnemiesBranchInstructionAnchorsMatch = restoredElf === null ? null
+    : REMAINING_ENEMIES_BRANCH_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -3408,6 +3456,11 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       damageImmunitySetupMatches21_9: damageImmunitySetupMatches,
       damageImmunityConditionMatches21_9: damageImmunityConditionMatches,
       damageImmunityInstructionAnchorsMatch21_9: damageImmunityInstructionAnchorsMatch,
+      remainingEnemiesBranchDispatchMatches21_9: remainingEnemiesBranchDispatchMatches,
+      remainingEnemiesBranchSetupMatches21_9: remainingEnemiesBranchSetupMatches,
+      remainingEnemiesBranchConditionMatches21_9: remainingEnemiesBranchConditionMatches,
+      remainingEnemiesBranchInstructionAnchorsMatch21_9:
+        remainingEnemiesBranchInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -4244,6 +4297,20 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       damageImmunityInstructionAnchorsMatch21_9: damageImmunityInstructionAnchorsMatch,
       damageImmunitySemantics:
         'type 119 installs signed-low16 definition +0x10 in protected sMONSTER+0x9c0; its AI condition rejects reapplication while that timer is positive, and calcFinalDamage replaces the final signed damage lane with zero whenever the timer is at least one',
+      remainingEnemiesBranchType: REMAINING_ENEMIES_BRANCH_ENEMY_SKILL_TYPE,
+      remainingEnemiesBranchDispatchTarget: remainingEnemiesBranchDispatchTarget === null
+        ? null : hex(remainingEnemiesBranchDispatchTarget),
+      remainingEnemiesBranchDispatchMatches21_9: remainingEnemiesBranchDispatchMatches,
+      remainingEnemiesBranchSetupTarget: remainingEnemiesBranchSetupTarget === null
+        ? null : hex(remainingEnemiesBranchSetupTarget),
+      remainingEnemiesBranchSetupMatches21_9: remainingEnemiesBranchSetupMatches,
+      remainingEnemiesBranchConditionTarget: remainingEnemiesBranchConditionTarget === null
+        ? null : hex(remainingEnemiesBranchConditionTarget),
+      remainingEnemiesBranchConditionMatches21_9: remainingEnemiesBranchConditionMatches,
+      remainingEnemiesBranchInstructionAnchorsMatch21_9:
+        remainingEnemiesBranchInstructionAnchorsMatch,
+      remainingEnemiesBranchSemantics:
+        'type 120 is an enemy-skill-list control record: ordinary dispatch/setup/condition are inert; parseFlowControl counts non-escaped monsters with positive protected HP, including the actor, and jumps to zero-based reference-slot enemy_rnd when remainingCount <= unsigned enemy_ai; it consumes no action or RNG',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,

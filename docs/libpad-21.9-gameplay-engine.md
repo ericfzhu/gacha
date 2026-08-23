@@ -1676,6 +1676,21 @@ timers advance before enemy action selection; a newly installed three-turn
 immunity therefore remains at three through its activation action and reaches
 two at the next enemy boundary.
 
+Enemy skill type `120` is the remaining-enemy flow-control branch. Its ordinary
+dispatch, setup, and new-AI condition entries are the same inert paths used by
+the other late branch records, but `_parseFlowControl` has a dedicated case at
+`0x619ef4`. It scans the stage's enemy slots, skips unavailable/escaped slots,
+reconstructs each protected signed 64-bit current HP, and counts values greater
+than zero. The acting enemy is included while alive.
+
+The branch takes unsigned reference-slot byte `enemy_ai` as its inclusive upper
+bound and jumps when `remainingCount <= enemy_ai`; unsigned byte `enemy_rnd` is
+the zero-based destination. This confirms the independent
+`ESBranchRemainingEnemies` classification while resolving an ambiguity in its
+external evaluator, which used equality. The browser queue mirrors the native
+inclusive comparison, consumes no action or RNG, and guards the same malformed
+control-flow cycles as types 113–117.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

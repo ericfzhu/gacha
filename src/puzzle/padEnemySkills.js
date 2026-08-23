@@ -87,6 +87,7 @@ export const PAD_ENEMY_SKILL_BRANCH_DAMAGE = 116;
 export const PAD_ENEMY_SKILL_BRANCH_ERASED_ATTRIBUTES = 117;
 export const PAD_ENEMY_SKILL_TYPE_RESIST = 118;
 export const PAD_ENEMY_SKILL_DAMAGE_IMMUNITY = 119;
+export const PAD_ENEMY_SKILL_BRANCH_REMAINING_ENEMIES = 120;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -729,6 +730,15 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       kind: 'damageImmunity',
       supported: true,
       durationTurns: Math.max(0, (definition.getInt32(0x10, true) << 16) >> 16),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_BRANCH_REMAINING_ENEMIES) {
+    return Object.freeze({
+      type,
+      kind: 'branchRemainingEnemies',
+      supported: true,
+      controlFlow: true,
       attackWithSkillValue,
     });
   }
@@ -1885,6 +1895,9 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_BRANCH_REMAINING_ENEMIES) {
+    return decodePadEnemySkillDefinition(definitionBytes);
+  }
   if (type === PAD_ENEMY_SKILL_RESOLVE) {
     requireLength(definitionBytes, 0x14, 'PAD enemy-skill definition');
     return Object.freeze({
@@ -2931,6 +2944,22 @@ export function normalizePadEnemySkillRecord(record) {
         (Math.trunc(Number(record?.durationTurns) || 0) << 16) >> 16,
       ),
       setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (
+    type === PAD_ENEMY_SKILL_BRANCH_REMAINING_ENEMIES
+    || record?.kind === 'branchRemainingEnemies'
+  ) {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_BRANCH_REMAINING_ENEMIES,
+      kind: 'branchRemainingEnemies',
+      supported: record?.supported !== false,
+      controlFlow: true,
+      branchValue: Math.trunc(Number(record?.branchValue) || 0) & 0xff,
+      targetRound: Math.trunc(Number(record?.targetRound) || 0) & 0xff,
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),
