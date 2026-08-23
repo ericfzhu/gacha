@@ -78,6 +78,7 @@ export const PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK = 107;
 export const PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE = 108;
 export const PAD_ENEMY_SKILL_RANDOM_SPINNERS = 109;
 export const PAD_ENEMY_SKILL_FIXED_SPINNERS = 110;
+export const PAD_ENEMY_SKILL_MAX_HP_CHANGE = 111;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -499,6 +500,18 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
         definition.getUint32(0x1c, true) & 0x3f,
         definition.getUint32(0x18, true) & 0x3f,
       ]),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_MAX_HP_CHANGE) {
+    requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'maxHpChange',
+      supported: true,
+      maxHpPercent: definition.getInt32(0x10, true),
+      fixedMaxHp: definition.getInt32(0x14, true),
+      durationTurns: definition.getInt32(0x18, true),
       attackWithSkillValue,
     });
   }
@@ -1112,6 +1125,25 @@ export function padEnemyTurnChangeTriggered(currentHp, maxHp, thresholdPercent) 
   return rounded <= threshold;
 }
 
+// Type 111 stores percentage mode as (authored percent - 100), while a zero
+// percentage selects the authored absolute maximum-HP operand directly.
+export function padEnemySkillMaxHpParameter(maxHpPercent, fixedMaxHp) {
+  const percent = Math.trunc(Number(maxHpPercent) || 0);
+  return percent !== 0 ? percent - 100 : Math.trunc(Number(fixedMaxHp) || 0);
+}
+
+// sPLAYER::mhp returns a positive type-111 parameter as an absolute cap. A
+// negative parameter scales the party's base maximum in binary64, clamps the
+// result to signed-int range, and rounds halves away from zero.
+export function padEnemySkillChangedMaxHp(baseMaxHp, parameter) {
+  const base = Math.max(0, Math.trunc(Number(baseMaxHp) || 0));
+  const value = Math.trunc(Number(parameter) || 0);
+  if (value > 0) return value;
+  if (value === 0) return base;
+  const scaled = Math.max(1, Math.min(PAD_INT32_MAX, base * -value / 100));
+  return Math.trunc(scaled + 0.5);
+}
+
 // Type 52's late handler reconstructs the target monster's protected int64
 // max HP, multiplies it by the signed +0x10 percentage in binary64, divides by
 // 100, and calls izMathRoundD (halves away from zero) before writing current HP.
@@ -1551,6 +1583,10 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
     });
   }
   if (type === PAD_ENEMY_SKILL_FIXED_SPINNERS) {
+    // Generic setup owns no private fields; execution reads the definition.
+    return decodePadEnemySkillDefinition(definitionBytes);
+  }
+  if (type === PAD_ENEMY_SKILL_MAX_HP_CHANGE) {
     // Generic setup owns no private fields; execution reads the definition.
     return decodePadEnemySkillDefinition(definitionBytes);
   }
@@ -2492,6 +2528,19 @@ export function normalizePadEnemySkillRecord(record) {
       rowMasks: Object.freeze(Array.from({ length: 5 }, (_, index) => (
         Math.trunc(Number(rowMasks[index]) || 0) & 0x3f
       ))),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_MAX_HP_CHANGE || record?.kind === 'maxHpChange') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_MAX_HP_CHANGE,
+      kind: 'maxHpChange',
+      supported: record?.supported !== false,
+      maxHpPercent: Math.trunc(Number(record?.maxHpPercent) || 0),
+      fixedMaxHp: Math.trunc(Number(record?.fixedMaxHp) || 0),
+      durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)) & 0x3ff,
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

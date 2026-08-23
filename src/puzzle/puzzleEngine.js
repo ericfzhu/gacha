@@ -67,6 +67,7 @@ import {
   PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE,
   PAD_ENEMY_SKILL_RANDOM_SPINNERS,
   PAD_ENEMY_SKILL_FIXED_SPINNERS,
+  PAD_ENEMY_SKILL_MAX_HP_CHANGE,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -133,6 +134,8 @@ import {
   padEnemySkillPlayerHeal,
   padEnemySkillReviveHp,
   padEnemyTurnChangeTriggered,
+  padEnemySkillMaxHpParameter,
+  padEnemySkillChangedMaxHp,
 } from './padEnemySkills.js';
 import {
   decodePadEnemyAiMonsterDefinition,
@@ -348,6 +351,7 @@ export class PuzzleEngine {
     this.cloud = null;
     this.recoveryDebuff = null;
     this.attributeBlock = null;
+    this.maxHpChange = null;
     this.leaderSwapTurns = 0;
     this.leaderSwapIndex = null;
     this.enemySkillQueues.forEach((queue) => { queue.position = 0; });
@@ -372,6 +376,7 @@ export class PuzzleEngine {
     this.player = {
       hp: 12000,
       maxHp: 12000,
+      baseMaxHp: 12000,
       recovery: this.party.reduce((total, member) => total + member.recovery, 0),
     };
     this.enemies = copyEnemies().map((enemy) => ({
@@ -1178,6 +1183,7 @@ export class PuzzleEngine {
     this.advanceRecoveryDebuffTurns();
     this.advanceAttributeBlockTurns();
     this.advanceSpinnerTurns();
+    this.advanceMaxHpChangeTurns();
     if (this.blackFallRule?.active && this.blackFallRule.turnsRemaining !== null) {
       this.blackFallRule.turnsRemaining = Math.max(0, this.blackFallRule.turnsRemaining - 1);
       if (this.blackFallRule.turnsRemaining === 0) this.blackFallRule.active = false;
@@ -1313,6 +1319,8 @@ export class PuzzleEngine {
       forcedStartActive: Boolean(this.forcedStart),
       cloudActive: Boolean(this.cloud?.turnsRemaining > 0),
       attributeBlockActive: Boolean(this.attributeBlock?.turnsRemaining > 0),
+      maxHpChangeTurns: this.maxHpChange?.turnsRemaining || 0,
+      maxHpChangeParameter: this.maxHpChange?.parameter || 0,
       playerRecovery: this.player.recovery,
       recoveryMultiplier: this.recoveryDebuff?.multiplier ?? 1,
       enemyAttribute: PAD_ATTRIBUTE_INDEX[enemy.attribute] ?? -1,
@@ -2519,6 +2527,28 @@ export class PuzzleEngine {
       this.installSpinnerCells(skill, selected);
       return true;
     }
+    if (skill.supported && skill.kind === 'maxHpChange') {
+      const parameter = padEnemySkillMaxHpParameter(skill.maxHpPercent, skill.fixedMaxHp);
+      const turnsRemaining = Math.max(0, skill.durationTurns) & 0x3ff;
+      this.maxHpChange = turnsRemaining > 0 ? {
+        turnsRemaining,
+        parameter,
+        maxHpPercent: skill.maxHpPercent,
+        fixedMaxHp: skill.fixedMaxHp,
+      } : null;
+      this.player.maxHp = padEnemySkillChangedMaxHp(
+        this.player.baseMaxHp,
+        this.maxHpChange?.parameter || 0,
+      );
+      this.player.hp = Math.min(this.player.hp, this.player.maxHp);
+      this.lastEnemySkill = Object.freeze({
+        ...skill,
+        maxHpParameter: parameter,
+        effectiveMaxHp: this.player.maxHp,
+      });
+      this.message = `Maximum HP changed to ${this.player.maxHp.toLocaleString()} for ${turnsRemaining} turn${turnsRemaining === 1 ? '' : 's'}.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'clearPlayerBuffs') {
       // _doItetukuHadou clears both recovered sGAMEWORK positive-status lanes,
       // then type 6 invokes _applyLeaderSkill(false). Leader effects in this
@@ -3064,6 +3094,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE,
         PAD_ENEMY_SKILL_RANDOM_SPINNERS,
         PAD_ENEMY_SKILL_FIXED_SPINNERS,
+        PAD_ENEMY_SKILL_MAX_HP_CHANGE,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -3745,6 +3776,15 @@ export class PuzzleEngine {
     }));
   }
 
+  advanceMaxHpChangeTurns() {
+    if (!this.maxHpChange || this.maxHpChange.turnsRemaining <= 0) return;
+    this.maxHpChange.turnsRemaining = Math.max(0, this.maxHpChange.turnsRemaining - 1);
+    if (this.maxHpChange.turnsRemaining > 0) return;
+    this.maxHpChange = null;
+    this.player.maxHp = this.player.baseMaxHp;
+    this.player.hp = Math.min(this.player.hp, this.player.maxHp);
+  }
+
   snapshot() {
     return {
       coordinateSystem: `board origin top-left; rows 0-${this.rows - 1} downward; columns 0-${this.columns - 1} rightward`,
@@ -3791,6 +3831,7 @@ export class PuzzleEngine {
       cloud: this.cloud ? { ...this.cloud } : null,
       recoveryDebuff: this.recoveryDebuff ? { ...this.recoveryDebuff } : null,
       attributeBlock: this.attributeBlock ? { ...this.attributeBlock } : null,
+      maxHpChange: this.maxHpChange ? { ...this.maxHpChange } : null,
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({
         code: ORB_BY_ID[orb.type].code,

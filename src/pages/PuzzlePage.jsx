@@ -524,6 +524,19 @@ function render(ctx, engine) {
     );
     playerStatusY += 12;
   }
+  if (engine.maxHpChange?.turnsRemaining > 0) {
+    const maxHpLabel = engine.maxHpChange.maxHpPercent
+      ? `${engine.maxHpChange.maxHpPercent}%`
+      : Number(engine.maxHpChange.fixedMaxHp || 0).toLocaleString();
+    ctx.fillStyle = '#ffbf8e';
+    ctx.font = '700 9px "Barlow Condensed", sans-serif';
+    ctx.fillText(
+      `MAX HP ${maxHpLabel} · ${engine.maxHpChange.turnsRemaining}T`,
+      434,
+      playerStatusY,
+    );
+    playerStatusY += 12;
+  }
   if (engine.attributeBlock?.turnsRemaining > 0) {
     const blockedTypes = ORB_TYPES
       .filter((_, typeIndex) => (engine.attributeBlock.typeMask & (1 << typeIndex)) !== 0)

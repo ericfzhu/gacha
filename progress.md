@@ -2,6 +2,24 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 temporary maximum-HP change
+
+- Recovered type `111` at dispatch/setup/condition `0x62a568`, `0x6217c0`, and
+  `0x61abc8`; the independent parser corroborates `ESMaxHPChange`.
+- Execution installs low-ten-bit duration `+0x18`. Nonzero `+0x10` stores
+  `percent - 100` at protected `sGAMEWORK+0x87688`; otherwise nonzero `+0x14`
+  stores an absolute maximum. `sPLAYER::mhp()` returns positive values directly
+  or derives a rounded base-HP percentage from negative values, then execution
+  clamps current HP only when it exceeds the new cap.
+- Condition rejects only an identical active modifier and admits inactive or
+  differently valued replacements. `_incTurn` clears the modifier on expiry,
+  restoring base maximum HP without healing current HP. The browser ports both
+  percentage and absolute modes, AI admission, lifetime, snapshot, HP-bar
+  change, and status presentation. Pure fixtures, thirty-one ARM64 anchors,
+  focused Chromium with APK art, screenshot inspection, generic browser smoke,
+  the full native inspector, PAD data checks, and production build pass. Next:
+  type `112`.
+
 ## 2026-08-24 fixed-position spinner orbs
 
 - Recovered type `110` at dispatch/setup/condition `0x62a504`, `0x6217c0`, and

@@ -661,6 +661,43 @@ const FIXED_SPINNERS_INSTRUCTION_ANCHORS = Object.freeze([
   [0x62a55c, 0x2a1f03e7], // clear the helper's final control argument
   [0x62a560, 0x97f3d720], // install the fixed roulette orbs
 ]);
+const MAX_HP_CHANGE_ENEMY_SKILL_TYPE = 111;
+const MAX_HP_CHANGE_HANDLER = 0x62a568;
+const MAX_HP_CHANGE_SETUP_HANDLER = 0x6217c0;
+const MAX_HP_CHANGE_CONDITION_HANDLER = 0x61abc8;
+const MAX_HP_CHANGE_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x62a568, 0xf9400288], // load shared game work
+  [0x62a56c, 0x794032b6], // narrow +0x18 duration to an unsigned halfword
+  [0x62a578, 0x8b090100], // address the embedded player object at +0x86570
+  [0x62a57c, 0x97f3c2f9], // read current player HP before changing the cap
+  [0x62a58c, 0x7869690a], // load protected max-HP status at +0x87684
+  [0x62a594, 0x330026ca], // insert duration into the low ten status bits
+  [0x62a598, 0x3216014a], // mark the status freshly applied
+  [0x62a5b4, 0xb94012a8], // load percentage-mode +0x10
+  [0x62a5bc, 0x51019101], // encode percentage mode as percent minus 100
+  [0x62ba14, 0xb94016a1], // otherwise load absolute maximum HP from +0x14
+  [0x62ba18, 0x340000c1], // leave the modifier unchanged when both are zero
+  [0x62ba2c, 0x97f3f011], // install the protected max-HP modifier
+  [0x62ba4c, 0x97f3bdc5], // derive the new effective maximum HP
+  [0x62ba60, 0x6b18001f], // compare current HP with the new maximum
+  [0x62ba64, 0x5400040d], // skip clamping when current HP already fits
+  [0x62ba90, 0x97f3a938], // clamp current HP to the new maximum
+  [0x61abc8, 0x79419908], // condition loads the protected duration/status
+  [0x61abd4, 0x7100fd3f], // inactive status admits immediately
+  [0x61abdc, 0x375fd2a8], // transition state also admits replacement
+  [0x61abec, 0x97f3b731], // read the active max-HP modifier
+  [0x61abf0, 0xb9401268], // load requested percentage mode
+  [0x61abf8, 0x51019108], // encode it as percent minus 100
+  [0x61abfc, 0x6b08001f], // compare active and requested percentage values
+  [0x61c1c0, 0xb9401668], // absolute mode loads +0x14
+  [0x61c1c8, 0x6b08001f], // compare active and requested absolute values
+  [0x676b60, 0x528ed089], // _incTurn addresses the max-HP duration lane
+  [0x676b7c, 0x37580509], // do not age a transitioning status
+  [0x676bb8, 0x5100052a], // decrement the protected low-ten-bit duration
+  [0x676be8, 0x7100fd3f], // detect expiry at zero
+  [0x676c10, 0x2a1f03e1], // clear the max-HP modifier on expiry
+  [0x676c14, 0x97f2767b], // restore base maximum HP without healing
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -1907,6 +1944,31 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     : FIXED_SPINNERS_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
+  const maxHpChangeDispatchTarget = resolveEnemySkillTarget(
+    MAX_HP_CHANGE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const maxHpChangeSetupTarget = resolveEnemySkillTarget(
+    MAX_HP_CHANGE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const maxHpChangeConditionTarget = resolveEnemySkillTarget(
+    MAX_HP_CHANGE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const maxHpChangeDispatchMatches = maxHpChangeDispatchTarget === null
+    ? null : maxHpChangeDispatchTarget === MAX_HP_CHANGE_HANDLER;
+  const maxHpChangeSetupMatches = maxHpChangeSetupTarget === null
+    ? null : maxHpChangeSetupTarget === MAX_HP_CHANGE_SETUP_HANDLER;
+  const maxHpChangeConditionMatches = maxHpChangeConditionTarget === null
+    ? null : maxHpChangeConditionTarget === MAX_HP_CHANGE_CONDITION_HANDLER;
+  const maxHpChangeInstructionAnchorsMatch = restoredElf === null ? null
+    : MAX_HP_CHANGE_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -2969,6 +3031,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       fixedSpinnersSetupMatches21_9: fixedSpinnersSetupMatches,
       fixedSpinnersConditionMatches21_9: fixedSpinnersConditionMatches,
       fixedSpinnersInstructionAnchorsMatch21_9: fixedSpinnersInstructionAnchorsMatch,
+      maxHpChangeDispatchMatches21_9: maxHpChangeDispatchMatches,
+      maxHpChangeSetupMatches21_9: maxHpChangeSetupMatches,
+      maxHpChangeConditionMatches21_9: maxHpChangeConditionMatches,
+      maxHpChangeInstructionAnchorsMatch21_9: maxHpChangeInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -3686,6 +3752,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       fixedSpinnersInstructionAnchorsMatch21_9: fixedSpinnersInstructionAnchorsMatch,
       fixedSpinnersSemantics:
         'type 110 uses +0x10 duration and +0x14 speed in centiseconds; execution narrows +0x18..+0x28 into five row masks, reverses their authored bottom-origin order, and calls the common roulette helper with a fixed map and zero random count; generic setup consumes no RNG and its AI condition is unconditional',
+      maxHpChangeType: MAX_HP_CHANGE_ENEMY_SKILL_TYPE,
+      maxHpChangeDispatchTarget: maxHpChangeDispatchTarget === null
+        ? null : hex(maxHpChangeDispatchTarget),
+      maxHpChangeDispatchMatches21_9: maxHpChangeDispatchMatches,
+      maxHpChangeSetupTarget: maxHpChangeSetupTarget === null
+        ? null : hex(maxHpChangeSetupTarget),
+      maxHpChangeSetupMatches21_9: maxHpChangeSetupMatches,
+      maxHpChangeConditionTarget: maxHpChangeConditionTarget === null
+        ? null : hex(maxHpChangeConditionTarget),
+      maxHpChangeConditionMatches21_9: maxHpChangeConditionMatches,
+      maxHpChangeInstructionAnchorsMatch21_9: maxHpChangeInstructionAnchorsMatch,
+      maxHpChangeSemantics:
+        'type 111 uses +0x18 as a protected low-ten-bit duration; nonzero +0x10 stores percent-100 as the max-HP modifier, otherwise +0x14 stores an absolute maximum; sPLAYER::mhp derives the effective cap and execution clamps current HP downward, condition rejects only an identical active modifier, and _incTurn clears the modifier on expiry without restoring current HP',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -4252,6 +4331,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || fixedSpinnersSetupMatches === false
     || fixedSpinnersConditionMatches === false
     || fixedSpinnersInstructionAnchorsMatch === false
+    || maxHpChangeDispatchMatches === false
+    || maxHpChangeSetupMatches === false
+    || maxHpChangeConditionMatches === false
+    || maxHpChangeInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

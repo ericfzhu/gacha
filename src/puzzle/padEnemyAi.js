@@ -31,6 +31,7 @@ import {
   PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE,
   PAD_ENEMY_SKILL_RANDOM_SPINNERS,
   PAD_ENEMY_SKILL_FIXED_SPINNERS,
+  PAD_ENEMY_SKILL_MAX_HP_CHANGE,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -83,6 +84,7 @@ import {
   decodePadEnemySkillDefinition,
   padEnemySkillAttributeCandidates,
   padEnemySkillPlayerHpCondition,
+  padEnemySkillMaxHpParameter,
 } from './padEnemySkills.js';
 
 export const PAD_ENEMY_AI_MONSTER_LAYOUT = Object.freeze({
@@ -207,6 +209,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE,
     PAD_ENEMY_SKILL_RANDOM_SPINNERS,
     PAD_ENEMY_SKILL_FIXED_SPINNERS,
+    PAD_ENEMY_SKILL_MAX_HP_CHANGE,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
     PAD_ENEMY_SKILL_DEFENSE_BOOST,
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -612,6 +615,15 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
     .includes(definition.effect.type)) {
     return { eligible: true, probabilityScale: 1, rngState };
   }
+  if (definition.effect.type === PAD_ENEMY_SKILL_MAX_HP_CHANGE) {
+    const requested = padEnemySkillMaxHpParameter(
+      definition.effect.maxHpPercent,
+      definition.effect.fixedMaxHp,
+    );
+    const eligible = Number(state.maxHpChangeTurns || 0) <= 0
+      || Math.trunc(Number(state.maxHpChangeParameter) || 0) !== requested;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
   if (definition.effect.type === PAD_ENEMY_SKILL_CLOUD) {
     const eligible = !state.cloudActive;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
@@ -718,6 +730,8 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     maxHp: Math.max(0, Number(state.maxHp) || 0),
     playerCurrentHp: Math.max(0, Number(state.playerCurrentHp) || 0),
     playerMaxHp: Math.max(0, Number(state.playerMaxHp) || 0),
+    maxHpChangeTurns: Math.max(0, Math.trunc(Number(state.maxHpChangeTurns) || 0)),
+    maxHpChangeParameter: Math.trunc(Number(state.maxHpChangeParameter) || 0),
     attributeAbsorbTurns: Math.max(0, Math.trunc(Number(state.attributeAbsorbTurns) || 0)),
     comboAbsorbTurns: Math.max(0, Math.trunc(Number(state.comboAbsorbTurns) || 0)),
     enemyDamageAbsorbTurns: Math.max(

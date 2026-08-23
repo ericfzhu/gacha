@@ -32,6 +32,7 @@ import {
   PAD_ENEMY_SKILL_ATTACK_ORB_CHANGE,
   PAD_ENEMY_SKILL_RANDOM_SPINNERS,
   PAD_ENEMY_SKILL_FIXED_SPINNERS,
+  PAD_ENEMY_SKILL_MAX_HP_CHANGE,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -99,6 +100,8 @@ import {
   padEnemySkillPlayerHpCondition,
   padEnemySkillReviveHp,
   padEnemyTurnChangeTriggered,
+  padEnemySkillMaxHpParameter,
+  padEnemySkillChangedMaxHp,
 } from '../src/puzzle/padEnemySkills.js';
 import {
   decodePadEnemyAiMonsterDefinition,
@@ -1556,6 +1559,35 @@ assert.deepEqual(
   decodePadEnemySkillRuntime(enemyAiFixedSpinnersDefinition, new Uint8Array(0x680)),
   expectedFixedSpinnersDefinition,
 );
+const enemyAiMaxHpChangeDefinition = enemyAiFixedSpinnersDefinition.slice();
+const enemyAiMaxHpChangeView = new DataView(enemyAiMaxHpChangeDefinition.buffer);
+enemyAiMaxHpChangeView.setUint32(0x00, 9_091, true);
+enemyAiMaxHpChangeView.setInt16(0x04, PAD_ENEMY_SKILL_MAX_HP_CHANGE, true);
+enemyAiMaxHpChangeView.setInt32(0x10, 50, true);
+enemyAiMaxHpChangeView.setInt32(0x14, 0, true);
+enemyAiMaxHpChangeView.setInt32(0x18, 3, true);
+const expectedMaxHpChangeDefinition = {
+  type: 111,
+  kind: 'maxHpChange',
+  supported: true,
+  maxHpPercent: 50,
+  fixedMaxHp: 0,
+  durationTurns: 3,
+  attackWithSkillValue: 0,
+};
+assert.deepEqual(
+  decodePadEnemySkillDefinition(enemyAiMaxHpChangeDefinition),
+  expectedMaxHpChangeDefinition,
+);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiMaxHpChangeDefinition, new Uint8Array(0x680)),
+  expectedMaxHpChangeDefinition,
+);
+assert.equal(padEnemySkillMaxHpParameter(50, 0), -50);
+assert.equal(padEnemySkillMaxHpParameter(0, 8_000), 8_000);
+assert.equal(padEnemySkillChangedMaxHp(12_001, -50), 6_001);
+assert.equal(padEnemySkillChangedMaxHp(12_001, 8_000), 8_000);
+assert.equal(padEnemySkillChangedMaxHp(12_001, 0), 12_001);
 assert.deepEqual(decodePadEnemySkillRuntime(
   enemyAiUnconditionalHealDefinition,
   healEnemyMonsterRuntime,
@@ -6014,6 +6046,66 @@ assert.equal(selectedFixedSpinnersState.lastEnemyActions[0].damage, undefined);
 assert.equal(selectedFixedSpinnersState.player.hp, 12_000);
 assert.equal(selectedFixedSpinnersState.lastEnemySkill.spinnerCount, 5);
 assert.equal(selectedFixedSpinnersState.rngState, 394_448_415);
+
+const directMaxHpChangeEngine = new PuzzleEngine({ seed: 21_900 });
+directMaxHpChangeEngine.setRngState(21_900);
+assert.equal(directMaxHpChangeEngine.applyEnemySkillDefinition(
+  enemyAiMaxHpChangeDefinition,
+), true);
+let directMaxHpChangeState = directMaxHpChangeEngine.snapshot();
+assert.equal(directMaxHpChangeState.player.baseMaxHp, 12_000);
+assert.equal(directMaxHpChangeState.player.maxHp, 6_000);
+assert.equal(directMaxHpChangeState.player.hp, 6_000);
+assert.deepEqual(directMaxHpChangeState.maxHpChange, {
+  turnsRemaining: 3,
+  parameter: -50,
+  maxHpPercent: 50,
+  fixedMaxHp: 0,
+});
+assert.equal(directMaxHpChangeState.rngState, 21_900);
+directMaxHpChangeEngine.advanceMaxHpChangeTurns();
+directMaxHpChangeEngine.advanceMaxHpChangeTurns();
+assert.equal(directMaxHpChangeEngine.snapshot().player.maxHp, 6_000);
+directMaxHpChangeEngine.advanceMaxHpChangeTurns();
+directMaxHpChangeState = directMaxHpChangeEngine.snapshot();
+assert.equal(directMaxHpChangeState.maxHpChange, null);
+assert.equal(directMaxHpChangeState.player.maxHp, 12_000);
+assert.equal(directMaxHpChangeState.player.hp, 6_000);
+directMaxHpChangeEngine.player.hp = 12_000;
+assert.equal(directMaxHpChangeEngine.applyEnemySkillRecord({
+  type: 111,
+  kind: 'maxHpChange',
+  supported: true,
+  maxHpPercent: 0,
+  fixedMaxHp: 8_000,
+  durationTurns: 2,
+}), true);
+assert.equal(directMaxHpChangeEngine.snapshot().player.maxHp, 8_000);
+assert.equal(directMaxHpChangeEngine.snapshot().player.hp, 8_000);
+
+const maxHpChangeMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(maxHpChangeMonsterDefinition.buffer).setUint32(0xec, 9_091, true);
+const selectedMaxHpChangeEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: maxHpChangeMonsterDefinition,
+    skillDefinitions: [enemyAiMaxHpChangeDefinition],
+  }],
+});
+selectedMaxHpChangeEngine.enemies[0].counter = 1;
+selectedMaxHpChangeEngine.enemies[1].counter = 99;
+selectedMaxHpChangeEngine.setRngState(21_900);
+selectedMaxHpChangeEngine.resolveEnemyTurn();
+let selectedMaxHpChangeState = selectedMaxHpChangeEngine.snapshot();
+assert.equal(selectedMaxHpChangeState.lastEnemyActions[0].skill.type, 111);
+assert.equal(selectedMaxHpChangeState.player.maxHp, 6_000);
+assert.equal(selectedMaxHpChangeState.player.hp, 6_000);
+assert.equal(selectedMaxHpChangeState.rngState, 394_448_415);
+selectedMaxHpChangeEngine.enemies[0].counter = 1;
+selectedMaxHpChangeEngine.resolveEnemyTurn();
+selectedMaxHpChangeState = selectedMaxHpChangeEngine.snapshot();
+assert.equal(selectedMaxHpChangeState.lastEnemyActions[0].kind, 'attack');
+assert.equal(selectedMaxHpChangeState.maxHpChange.turnsRemaining, 2);
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;

@@ -1503,6 +1503,32 @@ bottom-up masks `1/2/4/8/16` becomes top-down `16/8/4/2/1`, marks the exact
 diagonal `(0,4)` through `(4,0)` for four turns, advances every 0.5 seconds,
 and leaves direct seed 21900 unchanged.
 
+Enemy skill type `111` temporarily changes the player's maximum HP. Its
+dispatch, generic setup, and condition entries resolve to `0x62a568`,
+`0x6217c0`, and `0x61abc8`; the independent parser identifies `ESMaxHPChange`.
+Definition `+0x18` is narrowed into the protected low-ten-bit duration at
+`sGAMEWORK+0x87684`. When `+0x10` is nonzero, execution stores `+0x10 - 100`
+as the protected modifier at `+0x87688`. Otherwise it stores a nonzero `+0x14`
+directly. Generic setup and execution consume no RNG.
+
+`sPLAYER::mhp()` interprets a positive modifier as an absolute maximum HP. A
+negative modifier scales the party's unmodified maximum by its magnitude in
+binary64, divides by 100, clamps into the positive signed-int range, and rounds
+with the native math helper. Zero returns the unmodified maximum. After
+installation, the handler compares current HP with the newly derived maximum
+and clamps only when current HP is too high. It never heals merely because the
+maximum rises. Condition `0x61abc8` admits an inactive/transitioning status or
+a requested encoded modifier different from the active value; it rejects an
+identical active percentage or absolute cap.
+
+`_incTurn` decrements the status before enemy action setup. At zero it clears
+the modifier, which restores the unmodified maximum through `sPLAYER::mhp()`
+while leaving current HP unchanged. The browser stores base and effective
+maximums separately and preserves the same replacement, clamp, and expiry
+rules. In the percentage fixture, 50% changes 12,000/12,000 to 6,000/6,000 for
+three turns and expiry restores 12,000 maximum with current HP still 6,000. A
+12,001 boundary rounds to 6,001; absolute 8,000 mode clamps 12,000 HP to 8,000.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`
