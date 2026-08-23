@@ -1850,6 +1850,22 @@ lifecycle exports, more than 100 million interpreted guest instructions, more
 than 100 frames and 10,000 translated draws, four delivered touch callbacks,
 and both missing-data requests with no console errors.
 
+The post-touch path also enters libjpeg-turbo's AArch64 color-conversion
+routines (`jsimd_ycc_extrgb_convert_neon` at `0xcd076c` and the adjacent
+four-channel variant at `0xcd09c0`). Timing-dependent runs initially stopped on
+the exact instructions `0x2e679680` (`MLS V0.4H`), `0x6f0387e0`
+(`MVNI V0.8H, #127`), and `0x2e341017` (`UADDW V23.8H`). Decoder generation
+`20260824-frame21` covers the full widening multiply/add/subtract, rounded
+narrowing and multiply-high, saturating narrow, modified-immediate, and
+single-lane structure-store families used by these routines. A clean Chromium
+run reaches frame 199 and 21,766 translated draws after four touch callbacks.
+
+Cold startup still interprets 151,900,682 guest instructions. The protection
+wrapper contributes 151,793,049 of them; `libpad.so` contributes 107,633 before
+the native lifecycle begins. The page reports elapsed time, current instruction
+count, and decoder generation so this expected minute-scale bootstrap is not
+confused with a stalled or stale worker.
+
 This is an account/server boundary, not a CPU-port failure: protection, JNI,
 lifecycle, rendering, frames, touch callbacks, private-file loading, and payload
 reads are all running. The remaining offline work is coverage of modern

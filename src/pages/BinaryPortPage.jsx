@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Arm64Runtime, LIBPAD_CONSTRUCTOR_ADDRESS } from '../binary-port/arm64Runtime.js';
+import { ARM64_CORE_BUILD, Arm64Runtime, LIBPAD_CONSTRUCTOR_ADDRESS } from '../binary-port/arm64Runtime.js';
 import { VirtualLinux } from '../binary-port/virtualLinux.js';
 import { extractPadRuntimeFromApk } from '../binary-port/apk.js';
 import { PadBrowserInputModel } from '../binary-port/padInputModel.js';
@@ -133,6 +133,7 @@ export default function BinaryPortPage() {
   const runtimeRef = useRef(null);
   const workerRef = useRef(null);
   const frameRequestRef = useRef(0);
+  const loadStartedAtRef = useRef(0);
   const inputRef = useRef(new PadBrowserInputModel());
   const [state, setState] = useState({ phase: 'booting', probe: null, elf: null, error: null });
 
@@ -157,6 +158,7 @@ export default function BinaryPortPage() {
   useEffect(() => {
     const renderToText = () => JSON.stringify({
       coordinateSystem: 'diagnostic canvas: origin top-left, +x right, +y down',
+      decoderBuild: ARM64_CORE_BUILD,
       gameplay: state.phase === 'native game running' ? {
         canvas: { width: GAME_WIDTH, height: GAME_HEIGHT },
         input: 'Android onTouchEvent(FFIIIIJI)',
@@ -191,7 +193,8 @@ export default function BinaryPortPage() {
     const file = selectedFiles[0];
     const runtime = runtimeRef.current;
     if (!file || !runtime) return;
-    setState((current) => ({ ...current, phase: 'mapping elf', error: null }));
+    loadStartedAtRef.current = performance.now();
+    setState((current) => ({ ...current, phase: 'mapping elf', error: null, elapsedSeconds: 0 }));
     try {
       await new Promise((resolve) => requestAnimationFrame(resolve));
       const apk = selectedFiles.find((candidate) => candidate.name.toLowerCase().endsWith('.apk'));
@@ -223,9 +226,23 @@ export default function BinaryPortPage() {
         };
         worker.onmessage = ({ data }) => {
           if (data.type === 'progress') {
-            setState((current) => ({ ...current, phase: data.phase, error: null }));
+            setState((current) => ({
+              ...current,
+              phase: data.phase,
+              error: null,
+              startupInstructions: data.instructions ?? current.startupInstructions,
+              elapsedSeconds: (performance.now() - loadStartedAtRef.current) / 1000,
+            }));
           } else if (data.type === 'complete') {
-            setState({ phase: data.phase, probe: data.probe, elf: data.elf, error: null, frame: 1, drawCalls: data.elf.firstFrameDrawCalls });
+            setState({
+              phase: data.phase,
+              probe: data.probe,
+              elf: data.elf,
+              error: null,
+              frame: 1,
+              drawCalls: data.elf.firstFrameDrawCalls,
+              elapsedSeconds: (performance.now() - loadStartedAtRef.current) / 1000,
+            });
             requestNativeFrame();
           } else if (data.type === 'frame') {
             setState((current) => ({
@@ -361,11 +378,15 @@ export default function BinaryPortPage() {
             <input id="libpad-file" type="file" multiple accept=".apk,.so,.dat,.bin,application/vnd.android.package-archive,application/octet-stream" onChange={loadElf} />
           </label>
           <output id="binary-port-state" aria-live="polite">
-            {state.phase}{state.elf ? ` · ${state.elf.deepInstructions.toLocaleString()} instructions · ${state.elf.executableStages} executable stages` : ''}
+            {state.phase}{state.elapsedSeconds != null ? ` · ${state.elapsedSeconds.toFixed(1)}s` : ''}
+            {` · decoder ${ARM64_CORE_BUILD}`}
+            {state.elf ? ` · ${state.elf.deepInstructions.toLocaleString()} instructions · ${state.elf.executableStages} executable stages`
+              : state.startupInstructions ? ` · ${state.startupInstructions.toLocaleString()} instructions` : ''}
             {state.platform?.files?.some((event) => event.name === 'openat' && event.result === -2 && /\/(data048|data030)\.bin$/.test(event.path))
               ? ' · private data048/data030 state not present; native client remains at its offline startup screen'
               : ''}
           </output>
+          <small className="binary-port-note">First load interprets about 152 million protected ARM64 instructions and can take over a minute.</small>
         </div>
       </section>
     </main>

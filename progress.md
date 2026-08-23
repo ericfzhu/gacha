@@ -2,6 +2,31 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 post-touch JPEG/NEON callback completion
+
+- Reproduced the reported `0x2ea0b842` callback banner on the exact APK path
+  and confirmed that opcode is already covered by the current `NEG V2.2S`
+  decoder. Clean reruns then exposed three later timing-dependent instructions
+  at frame 199: `MLS V0.4H` (`0x2e679680`), `MVNI V0.8H, #127`
+  (`0x6f0387e0`), and `UADDW V23.8H` (`0x2e341017`).
+- Used the restored `jsimd_ycc_extrgb[x]_convert_neon` disassembly around
+  `0xcd076c`–`0xcd0c64` to cover the complete routine rather than chasing one
+  opcode per minute-long launch. Added generalized MLA/MLS, MOVI/MVNI/ORR/BIC,
+  S/UADDW and S/USUBW, signed/unsigned widening multiply/add/subtract,
+  SHRN/RSHRN, SQDMULH/SQRDMULH, SQXTUN, and one-lane LD/ST2–4 semantics.
+- Added exact and sibling regression fixtures, rebuilt the checked-in Wasm,
+  and advanced the public decoder generation to `20260824-frame21`. The binary
+  page now shows that build identifier, live instruction progress, elapsed
+  startup time, and an explicit first-load cost note.
+- Final clean Chromium verification passed through the four scripted touches:
+  `native game running`, frame 199, 21,766 draw calls, 151,900,682 startup
+  instructions, 93.1% pre-input visual presence, expected private
+  `data048.bin`/`data030.bin` requests, and no callback or page error.
+- The remaining startup delay is not APK extraction or `libpad.so`: the
+  protected wrapper accounts for 151,793,049 of 151,900,682 interpreted guest
+  instructions. A substantial speedup still requires a faithful full-process
+  checkpoint/direct transform or a compiled execution tier.
+
 ## 2026-08-24 explicit normal-attack enemy record
 
 - Closed the first remaining gap after the already-ported type-76–85 board
