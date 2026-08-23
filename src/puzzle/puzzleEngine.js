@@ -90,6 +90,7 @@ import {
   PAD_ENEMY_SKILL_VERTICAL_LINES_4,
   PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
   PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT,
+  PAD_ENEMY_SKILL_MULTI_ATTACK,
   PAD_ENEMY_SKILL_POISON_MASK_SWAP,
   PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT,
   PAD_ENEMY_SKILL_BLOCK_MINUS,
@@ -111,6 +112,7 @@ import {
 import {
   decodePadEnemyAiMonsterDefinition,
   decodePadEnemyAiSkillDefinition,
+  evaluatePadEnemyAiSub,
   selectPadEnemyAiNew,
 } from './padEnemyAi.js';
 
@@ -311,7 +313,10 @@ export class PuzzleEngine {
     this.leaderSwapIndex = null;
     this.enemySkillQueues.forEach((queue) => { queue.position = 0; });
     this.enemyAiPools.forEach((pool) => {
-      if (pool) pool.aiBudget = pool.monster.budgetCap;
+      if (pool) {
+        pool.aiBudget = pool.monster.budgetCap;
+        pool.multiAttack = null;
+      }
     });
     this.pendingComboDrops = 0;
     this.comboDropBonusCount = 0;
@@ -1072,18 +1077,26 @@ export class PuzzleEngine {
       if (enemy.counter <= 0) {
         enemy.counter = enemy.maxCounter;
         let skill = this.takeEnemySkill(index);
-        if (skill) {
+        let resolvedSkillCount = 0;
+        let structuralEnd = false;
+        while (skill && resolvedSkillCount < 9) {
+          if (skill.kind === 'multiAttackEnd') {
+            structuralEnd = true;
+            break;
+          }
           const activeBoostPercent = enemy.attackBoostTurns > 0
             ? enemy.attackBoostPercent
             : 100;
           let damage = padEnemySkillBoostedAttack(
             enemy.attack,
-            skill.kind === 'normalAttack' ? 100 : skill.attackWithSkillValue,
+            skill.kind === 'multiAttack'
+              ? 0
+              : skill.kind === 'normalAttack' ? 100 : skill.attackWithSkillValue,
             activeBoostPercent,
           );
           this.applyEnemySkillRecord(skill, index);
           if (skill.kind === 'currentHpGravity') {
-            damage = padEnemySkillCurrentHpGravity(this.player.hp - total, skill.damagePercent);
+            damage = padEnemySkillCurrentHpGravity(this.player.hp, skill.damagePercent);
           } else if (skill.kind === 'scaledAttack') {
             damage = padEnemySkillBoostedAttack(
               enemy.attack,
@@ -1111,11 +1124,18 @@ export class PuzzleEngine {
             ...(damage > 0 ? { damage } : {}),
           });
           if (damage > 0) {
+            this.player.hp = Math.max(0, this.player.hp - damage);
             this.floatingText.push({
               kind: 'playerDamage', value: damage, enemy: -1, sourceEnemy: index, age: 0,
             });
           }
-          // monsterEndOfAttack clears sMONSTER+0x07 after the monster acts.
+          resolvedSkillCount += 1;
+          if (!this.enemyAiPools[index]?.multiAttack || !skill.multiAttackParentSkillId) break;
+          skill = this.takeEnemySkill(index);
+        }
+        if (resolvedSkillCount > 0 || structuralEnd) {
+          // monsterEndOfAttack clears sMONSTER+0x07 after the complete
+          // structural chain, not between its child actions.
           enemy.transientDebuffActive = false;
           return;
         }
@@ -1125,6 +1145,7 @@ export class PuzzleEngine {
           enemy.attackBoostTurns > 0 ? enemy.attackBoostPercent : 100,
         );
         total += damage;
+        this.player.hp = Math.max(0, this.player.hp - damage);
         this.lastEnemyActions.push({ enemy: index, kind: 'attack', damage });
         this.floatingText.push({
           kind: 'playerDamage', value: damage, enemy: -1, sourceEnemy: index, age: 0,
@@ -1133,7 +1154,6 @@ export class PuzzleEngine {
       }
     });
     if (total) {
-      this.player.hp = Math.max(0, this.player.hp - total);
       this.message = `Enemies attacked for ${total.toLocaleString()} damage.`;
     }
     // _doOnPostEnemyAttack owns the protected low-ten-bit active-skill-seal
@@ -1142,22 +1162,9 @@ export class PuzzleEngine {
     this.advanceSkillSealTurnsPostEnemyAttack();
   }
 
-  takeEnemySkill(enemyIndex) {
-    const queue = this.enemySkillQueues[enemyIndex];
-    if (queue?.records.length) {
-      if (queue.position >= queue.records.length) {
-        if (queue.repeat) queue.position = 0;
-      }
-      if (queue.position < queue.records.length) {
-        const skill = queue.records[queue.position];
-        queue.position += 1;
-        return this.materializeEnemySkillRecord(skill, enemyIndex);
-      }
-    }
-    const pool = this.enemyAiPools[enemyIndex];
-    if (!pool) return null;
+  enemyAiState(enemyIndex, pool = this.enemyAiPools[enemyIndex]) {
     const enemy = this.enemies[enemyIndex];
-    const selection = selectPadEnemyAiNew(pool.monster, pool.definitions, {
+    return {
       currentHp: enemy.hp,
       maxHp: enemy.maxHp,
       attributeAbsorbTurns: enemy.attributeAbsorbTurns,
@@ -1190,7 +1197,7 @@ export class PuzzleEngine {
         bindTurns: Math.max(0, Math.trunc(Number(member.bindTurns) || 0)),
       })),
       enemies: this.enemies.map((candidate) => ({ hp: candidate.hp })),
-      aiBudget: pool.aiBudget,
+      aiBudget: pool?.aiBudget ?? 0,
       blackFallActive: Boolean(this.blackFallRule?.active),
       boardCellCount: this.rows * this.columns,
       blackBlockCount: this.board.reduce((total, row) => total + row.reduce((count, orb) => (
@@ -1288,15 +1295,114 @@ export class PuzzleEngine {
         }
         return { eligible: false, rngState: this.rng.state };
       },
-    });
+    };
+  }
+
+  takeEnemySkill(enemyIndex) {
+    const queue = this.enemySkillQueues[enemyIndex];
+    if (queue?.records.length) {
+      if (queue.position >= queue.records.length) {
+        if (queue.repeat) queue.position = 0;
+      }
+      if (queue.position < queue.records.length) {
+        const skill = queue.records[queue.position];
+        queue.position += 1;
+        return this.materializeEnemySkillRecord(skill, enemyIndex);
+      }
+    }
+    const pool = this.enemyAiPools[enemyIndex];
+    if (!pool) return null;
+    if (pool.multiAttack) return this.takeEnemyMultiAttackSkill(enemyIndex, pool);
+    const selection = selectPadEnemyAiNew(
+      pool.monster,
+      pool.definitions,
+      this.enemyAiState(enemyIndex, pool),
+    );
     this.rng.setState(selection.rngState);
     pool.aiBudget = selection.aiBudget;
+    if (selection.effect?.kind === 'multiAttack') {
+      pool.multiAttack = {
+        parentSkillId: selection.skillId,
+        childSkillIds: selection.effect.childSkillIds,
+        cursor: 0,
+      };
+      return this.takeEnemyMultiAttackSkill(enemyIndex, pool);
+    }
     return selection.effect
       ? this.materializeEnemySkillRecord(
         { ...selection.effect, skillId: selection.skillId },
         enemyIndex,
       )
       : null;
+  }
+
+  takeEnemyMultiAttackSkill(enemyIndex, pool = this.enemyAiPools[enemyIndex]) {
+    const chain = pool?.multiAttack;
+    if (!chain || chain.cursor >= chain.childSkillIds.length || chain.cursor >= 8) {
+      if (pool) pool.multiAttack = null;
+      return Object.freeze({
+        type: PAD_ENEMY_SKILL_MULTI_ATTACK,
+        kind: 'multiAttackEnd',
+        supported: true,
+        attackWithSkillValue: 0,
+        parentSkillId: chain?.parentSkillId ?? null,
+      });
+    }
+    const cursor = chain.cursor;
+    const childSkillId = chain.childSkillIds[cursor];
+    chain.cursor += 1;
+    const child = pool.definitionsById.get(childSkillId);
+    if (!child) {
+      pool.multiAttack = null;
+      return Object.freeze({
+        type: PAD_ENEMY_SKILL_MULTI_ATTACK,
+        kind: 'multiAttackEnd',
+        supported: true,
+        attackWithSkillValue: 0,
+        parentSkillId: chain.parentSkillId,
+        missingChildSkillId: childSkillId,
+      });
+    }
+
+    // _setupDoubleAttack uses -1.0 and selected-skill -1 for both an explicit
+    // type-82 child and a child whose chooseEnemyAiSub callback rejects it.
+    // The surrounding controller therefore performs one ordinary attack and
+    // ends the structural chain in either case.
+    if (child.effect.type === PAD_ENEMY_SKILL_NORMAL_ATTACK) {
+      pool.multiAttack = null;
+      return this.materializeEnemySkillRecord({
+        ...child.effect,
+        skillId: childSkillId,
+        multiAttackParentSkillId: chain.parentSkillId,
+        multiAttackCursor: cursor,
+      }, enemyIndex);
+    }
+    const condition = evaluatePadEnemyAiSub(
+      child,
+      this.enemyAiState(enemyIndex, pool),
+      this.rng.state,
+    );
+    this.rng.setState(condition.rngState);
+    if (!condition.eligible) {
+      pool.multiAttack = null;
+      return Object.freeze({
+        type: PAD_ENEMY_SKILL_NORMAL_ATTACK,
+        kind: 'normalAttack',
+        supported: true,
+        damagePercent: 100,
+        attackWithSkillValue: 0,
+        setupMaterialized: true,
+        multiAttackParentSkillId: chain.parentSkillId,
+        rejectedChildSkillId: childSkillId,
+        multiAttackCursor: cursor,
+      });
+    }
+    return this.materializeEnemySkillRecord({
+      ...child.effect,
+      skillId: childSkillId,
+      multiAttackParentSkillId: chain.parentSkillId,
+      multiAttackCursor: cursor,
+    }, enemyIndex);
   }
 
   rollEnemySkillDuration(durationMin, durationMax) {
@@ -2276,6 +2382,9 @@ export class PuzzleEngine {
     if (records.some((record) => !record.supported)) {
       throw new Error('PAD enemy skill queue contains a definition type that is not implemented.');
     }
+    if (records.some((record) => record.kind === 'multiAttack')) {
+      throw new Error('PAD type-83 multi-attack records require an AI definition pool for child lookup.');
+    }
     if (records.some((record) => record.passive)) {
       throw new Error('PAD passive enemy skills must be installed through monster skill slots.');
     }
@@ -2358,6 +2467,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_VERTICAL_LINES_4,
         PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
         PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT,
+        PAD_ENEMY_SKILL_MULTI_ATTACK,
         PAD_ENEMY_SKILL_POISON_MASK_SWAP,
         PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT,
         PAD_ENEMY_SKILL_BLOCK_MINUS,
@@ -2371,6 +2481,7 @@ export class PuzzleEngine {
       definitions,
       definitionsById,
       aiBudget: monster.budgetCap,
+      multiAttack: null,
     };
     if (this.enemies) this.applyEnemyPassiveSkills(index);
   }

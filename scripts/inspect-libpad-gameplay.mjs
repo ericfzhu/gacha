@@ -126,6 +126,21 @@ const NORMAL_ATTACK_ENEMY_SKILL_TYPE = 82;
 const NORMAL_ATTACK_HANDLER = 0x62be50;
 const NORMAL_ATTACK_SETUP_HANDLER = 0x621c94;
 const NORMAL_ATTACK_CONDITION_HANDLER = 0x61a630;
+const MULTI_ATTACK_ENEMY_SKILL_TYPE = 83;
+const MULTI_ATTACK_HANDLER = 0x62be50;
+const MULTI_ATTACK_SETUP_HANDLER = 0x621c94;
+const MULTI_ATTACK_CONDITION_HANDLER = 0x61a630;
+const MULTI_ATTACK_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x6222a0, 0x71014d1f], // cmp child-list owner type, #0x53
+  [0x6222b0, 0x92400d08], // and cursor, packed state, #0xf
+  [0x6222bc, 0xb9401101], // ldr child skill ID, [parent + cursor*4 + 0x10]
+  [0x6222e0, 0x32180108], // set packed-state active bit 8
+  [0x6226b4, 0x11000509], // increment the low-nibble child cursor
+  [0x622808, 0x52801e0b], // initialize completed-child nibble to signed -1
+  [0x622814, 0x3317594b], // insert parent ID into packed bits 9..31
+  [0x628550, 0x13041d09], // signed extract of completed-child nibble
+  [0x628570, 0xb907de68], // persist completed-child advance
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -312,6 +327,8 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['enemy-ai', 'setupSkillWithAttack', '_ZN9cGAMEMAIN21_setupSkillWithAttackEP8sMONSTERPK10sENESKILLS', 0x61fcec],
   ['enemy-ai', 'setupEnemyAttackSub', '_ZN9cGAMEMAIN20_setupEnemyAttackSubEP8sMONSTERPK10sENESKILLS', 0x61fd78],
   ['enemy-ai', 'doEnemyAi', '_ZN9cGAMEMAIN10_doEnemyAiEP8sMONSTER', 0x622544],
+  ['enemy-ai', 'setupDoubleAttack', '_ZN9cGAMEMAIN18_setupDoubleAttackEP8sMONSTER', 0x62224c],
+  ['enemy-ai', 'checkEndOfMultiAttack', '_ZN9cGAMEMAIN22_checkEndOfMultiAttackEP8sMONSTER', 0x628510],
   ['enemy-ai', 'setupEnemyAttack', '_ZN9cGAMEMAIN17_setupEnemyAttackEv', 0x622f64],
   ['enemy-ai', 'resetEnemyAtkLeft', '_ZN9cGAMEMAIN18_resetEnemyAtkLeftEP8sMONSTER', 0x6408f0],
   ['enemy-ai', 'resetMonsterStatus', '_ZN8sMONSTER11resetStatusEv', 0x6b159c],
@@ -395,6 +412,16 @@ function readUint16Virtual(elf, bytes, address) {
   if (!segment) return null;
   const offset = segment.fileOffset + address - segment.virtualAddress;
   return new DataView(bytes.buffer, bytes.byteOffset + offset, 2).getUint16(0, true);
+}
+
+function readUint32Virtual(elf, bytes, address) {
+  const segment = elf?.loadSegments.find((candidate) => (
+    address >= candidate.virtualAddress
+    && address + 4 <= candidate.virtualAddress + candidate.fileSize
+  ));
+  if (!segment) return null;
+  const offset = segment.fileOffset + address - segment.virtualAddress;
+  return new DataView(bytes.buffer, bytes.byteOffset + offset, 4).getUint32(0, true);
 }
 
 function usage() {
@@ -835,6 +862,25 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : normalAttackSetupTarget === NORMAL_ATTACK_SETUP_HANDLER;
   const normalAttackConditionMatches = normalAttackConditionTarget === null
     ? null : normalAttackConditionTarget === NORMAL_ATTACK_CONDITION_HANDLER;
+  const multiAttackDispatchTarget = resolveEnemySkillTarget(
+    MULTI_ATTACK_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const multiAttackSetupTarget = resolveEnemySkillTarget(
+    MULTI_ATTACK_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const multiAttackConditionTarget = resolveEnemySkillTarget(
+    MULTI_ATTACK_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const multiAttackDispatchMatches = multiAttackDispatchTarget === null
+    ? null : multiAttackDispatchTarget === MULTI_ATTACK_HANDLER;
+  const multiAttackSetupMatches = multiAttackSetupTarget === null
+    ? null : multiAttackSetupTarget === MULTI_ATTACK_SETUP_HANDLER;
+  const multiAttackConditionMatches = multiAttackConditionTarget === null
+    ? null : multiAttackConditionTarget === MULTI_ATTACK_CONDITION_HANDLER;
+  const multiAttackInstructionAnchorsMatch = restoredElf === null ? null
+    : MULTI_ATTACK_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1796,6 +1842,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       normalAttackDispatchMatches21_9: normalAttackDispatchMatches,
       normalAttackSetupMatches21_9: normalAttackSetupMatches,
       normalAttackConditionMatches21_9: normalAttackConditionMatches,
+      multiAttackDispatchMatches21_9: multiAttackDispatchMatches,
+      multiAttackSetupMatches21_9: multiAttackSetupMatches,
+      multiAttackConditionMatches21_9: multiAttackConditionMatches,
+      multiAttackInstructionAnchorsMatch21_9: multiAttackInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -2191,6 +2241,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       normalAttackConditionMatches21_9: normalAttackConditionMatches,
       normalAttackSemantics:
         'type 82: unconditional AI condition, sentinel setup writes -1 to sMONSTER+0x670, and the shared no-special-effect dispatch performs one ordinary 100%-power hit independently of the generic +0x44 attack-with-skill field',
+      multiAttackType: MULTI_ATTACK_ENEMY_SKILL_TYPE,
+      multiAttackDispatchTarget: multiAttackDispatchTarget === null
+        ? null : hex(multiAttackDispatchTarget),
+      multiAttackDispatchMatches21_9: multiAttackDispatchMatches,
+      multiAttackSetupTarget: multiAttackSetupTarget === null
+        ? null : hex(multiAttackSetupTarget),
+      multiAttackSetupMatches21_9: multiAttackSetupMatches,
+      multiAttackConditionTarget: multiAttackConditionTarget === null
+        ? null : hex(multiAttackConditionTarget),
+      multiAttackConditionMatches21_9: multiAttackConditionMatches,
+      multiAttackInstructionAnchorsMatch21_9: multiAttackInstructionAnchorsMatch,
+      multiAttackSemantics:
+        'type 83: unconditional structural parent with up to eight positive child IDs at +0x10..+0x2c; packed sMONSTER+0x7dc stores active bit 8, signed completed-child nibble 4..7, low-nibble cursor, and parent ID in bits 9..31; each child condition runs at scale 1.0 without child slot/HP/budget gates, eligible children execute in order in the same enemy turn, type 82 or a rejected child takes the -1.0 ordinary-attack path and terminates, while the zero/missing-child -1000.0 path ends without another attack',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -2658,6 +2721,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || normalAttackDispatchMatches === false
     || normalAttackSetupMatches === false
     || normalAttackConditionMatches === false
+    || multiAttackDispatchMatches === false
+    || multiAttackSetupMatches === false
+    || multiAttackConditionMatches === false
+    || multiAttackInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

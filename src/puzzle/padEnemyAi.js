@@ -51,6 +51,7 @@ import {
   PAD_ENEMY_SKILL_VERTICAL_LINES_4,
   PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
   PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT,
+  PAD_ENEMY_SKILL_MULTI_ATTACK,
   PAD_ENEMY_SKILL_POISON_MASK_SWAP,
   PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT,
   PAD_ENEMY_SKILL_BLOCK_MINUS,
@@ -150,8 +151,7 @@ function normalizeDefinitionMap(definitions) {
   }));
 }
 
-function isStaticallyEligible(definition, state) {
-  if (!definition.effect.supported || ![
+const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
     PAD_ENEMY_SKILL_ENTIRE_BLIND,
     PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT,
@@ -203,18 +203,29 @@ function isStaticallyEligible(definition, state) {
     PAD_ENEMY_SKILL_VERTICAL_LINES_4,
     PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP,
     PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT,
+    PAD_ENEMY_SKILL_MULTI_ATTACK,
     PAD_ENEMY_SKILL_POISON_MASK_SWAP,
     PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT,
     PAD_ENEMY_SKILL_BLOCK_MINUS,
     PAD_ENEMY_SKILL_BUR_DROP,
-  ].includes(definition.effect.type)) return false;
+]);
+
+function isSupportedDefinition(definition) {
+  return Boolean(definition?.effect?.supported)
+    && PAD_SUPPORTED_ENEMY_AI_TYPES.includes(definition.effect.type);
+}
+
+function isStaticallyEligible(definition, state) {
+  if (!isSupportedDefinition(definition)) return false;
   if (definition.budgetCost > state.aiBudget) return false;
   const hpPercent = state.maxHp > 0 ? state.currentHp / state.maxHp * 100 : 0;
   return hpPercent <= definition.hpThresholdPercent;
 }
 
-function evaluateCondition(definition, state, rngState) {
-  if (!isStaticallyEligible(definition, state)) {
+function evaluateCondition(definition, state, rngState, applyStaticEligibility = true) {
+  if (!(applyStaticEligibility
+    ? isStaticallyEligible(definition, state)
+    : isSupportedDefinition(definition))) {
     return { eligible: false, probabilityScale: 0, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_BLACK_FALL) {
@@ -370,6 +381,11 @@ function evaluateCondition(definition, state, rngState) {
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_NORMAL_ATTACK) {
+    return { eligible: true, probabilityScale: 1, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_MULTI_ATTACK) {
+    // Type 83 maps to the unconditional 0x61a630 condition entry. Child
+    // conditions are evaluated later by _setupDoubleAttack with scale 1.0.
     return { eligible: true, probabilityScale: 1, rngState };
   }
   if (
@@ -532,8 +548,18 @@ function immediateProbability(definition, slot, conditionScale = 1) {
   return Math.fround(Math.min(10_000, scaled));
 }
 
-// Supported subset of chooseEnemyAiNew (0x61d450). Flow-control definitions
-// and condition callbacks outside the explicitly decoded set remain rejected.
+// _setupDoubleAttack (0x62224c) invokes chooseEnemyAiSub for each type-83
+// child with an incoming float32 scale of 1.0. It deliberately bypasses the
+// child's slot probability, HP threshold, and AI-budget fields; only the
+// child's type-specific condition callback (and any RNG it owns) participates.
+export function evaluatePadEnemyAiSub(definition, state = {}, rngState = state.rngState) {
+  const decoded = definition?.effect ? definition : decodePadEnemyAiSkillDefinition(definition);
+  return Object.freeze(evaluateCondition(decoded, state, Number(rngState) >>> 0, false));
+}
+
+// Supported subset of chooseEnemyAiNew (0x61d450). Type 83 is selected as an
+// ordinary structural record; its children are resolved by evaluatePadEnemyAiSub
+// after selection. Condition callbacks outside the decoded set remain rejected.
 // The native scan multiplies immediate chance by chooseEnemyAiSub's float32
 // return, but uses that return only as a positive gate for the later unscaled
 // +0xf1 weighted fallback.

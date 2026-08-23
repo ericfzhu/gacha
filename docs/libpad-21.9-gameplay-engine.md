@@ -953,6 +953,41 @@ record consumes the single standard probability draw, deals Verdant Shell's
 1,850 base damage, leaves player HP at 10,150, and ends at RNG state
 `394448415`.
 
+Enemy skill type `83` is a structural multi-attack controller rather than a
+damage effect of its own. Its dispatch, setup, and condition table entries are
+`0x62be50`, `0x621c94`, and `0x61a630`; the parent is therefore admitted as an
+ordinary unconditional new-AI record. Definition words `+0x10..+0x2c` contain
+at most eight signed child skill IDs, with the first non-positive value ending
+the list. The parent's separate `+0x44` attack field is not applied as another
+hit.
+
+After the parent wins selection, `_setupDoubleAttack` at `0x62224c` walks those
+IDs. The packed word at `sMONSTER+0x7dc` carries the active flag in bit 8, the
+parent ID in bits 9–31, the next-child cursor in its low nibble, and the last
+completed child in the signed high nibble. Each child is passed to
+`_chooseEnemyAiSub` with an incoming binary32 scale of `1.0`. This sub-selection
+boundary deliberately ignores the child's authored slot probability, HP
+threshold, and budget cost. It still runs the child's type-specific condition,
+including any RNG that condition owns. Only the selected parent consumes the
+ordinary probability draw and AI budget.
+
+An eligible child is set up and executed, then the cursor advances so the next
+child acts during the same monster turn. A terminator or missing child resets
+the packed controller and returns the `-1000.0` end sentinel without adding a
+normal hit. An explicit type-82 child or a child rejected by its sub-condition
+uses the selected-skill `-1` path: one 100% ordinary attack is executed and the
+chain ends. The browser mirrors this with pool-owned structural state and a
+nine-step safety bound (eight children plus the terminator), while queued skill
+records reject type 83 because a queue has no child-definition lookup table.
+
+The focused browser fixture selects a type-83 parent containing inactivity,
+25%-current-HP gravity, and type-82 children. All three actions execute in
+order; damage is applied between children so the gravity observes the live
+12,000 HP and the final normal attack observes the resulting 9,000 HP. The
+turn deals 3,000 then 1,850 damage, leaves 7,150 HP, charges only the parent's
+20-point budget, and ends at RNG state `394448415` after the single parent
+probability roll.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

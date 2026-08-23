@@ -28,6 +28,7 @@ import {
   PAD_ENEMY_SKILL_DAMAGE_SHIELD,
   PAD_ENEMY_SKILL_LEADER_SWAP,
   PAD_ENEMY_SKILL_NORMAL_ATTACK,
+  PAD_ENEMY_SKILL_MULTI_ATTACK,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
   PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
@@ -2299,6 +2300,51 @@ assert.deepEqual(decodePadEnemySkillRuntime(
   setupMaterialized: true,
   attackWithSkillValue: 0,
 });
+const enemyAiMultiAttackDefinition = new Uint8Array(0x48);
+const enemyAiMultiAttackView = new DataView(enemyAiMultiAttackDefinition.buffer);
+enemyAiMultiAttackView.setUint32(0x00, 9_061, true);
+enemyAiMultiAttackView.setInt16(0x04, PAD_ENEMY_SKILL_MULTI_ATTACK, true);
+enemyAiMultiAttackView.setInt32(0x10, 9_062, true);
+enemyAiMultiAttackView.setInt32(0x14, 9_063, true);
+enemyAiMultiAttackView.setInt32(0x18, 9_064, true);
+enemyAiMultiAttackView.setInt32(0x1c, 0, true);
+// These are AI metadata, not additional child IDs.
+enemyAiMultiAttackView.setInt32(0x30, 10_000, true);
+enemyAiMultiAttackView.setInt32(0x34, 1_000, true);
+enemyAiMultiAttackView.setInt32(0x38, 100, true);
+enemyAiMultiAttackView.setInt32(0x40, 20, true);
+enemyAiMultiAttackView.setInt32(0x44, 777, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiMultiAttackDefinition), {
+  type: 83,
+  kind: 'multiAttack',
+  supported: true,
+  childSkillIds: [9_062, 9_063, 9_064],
+  attackWithSkillValue: 777,
+});
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiMultiAttackDefinition,
+  new Uint8Array(0x680),
+), {
+  type: 83,
+  kind: 'multiAttack',
+  supported: true,
+  childSkillIds: [9_062, 9_063, 9_064],
+  attackWithSkillValue: 777,
+  setupMaterialized: true,
+});
+const enemyAiMultiInactivityDefinition = enemyAiInactivityUnconditionalDefinition.slice();
+const enemyAiMultiInactivityView = new DataView(enemyAiMultiInactivityDefinition.buffer);
+enemyAiMultiInactivityView.setUint32(0x00, 9_062, true);
+enemyAiMultiInactivityView.setInt32(0x38, 0, true);
+enemyAiMultiInactivityView.setInt32(0x40, 999, true);
+enemyAiMultiInactivityView.setInt32(0x44, 0, true);
+const enemyAiMultiGravityDefinition = enemyAiCurrentHpGravityDefinition.slice();
+const enemyAiMultiGravityView = new DataView(enemyAiMultiGravityDefinition.buffer);
+enemyAiMultiGravityView.setUint32(0x00, 9_063, true);
+enemyAiMultiGravityView.setInt32(0x10, 25, true);
+enemyAiMultiGravityView.setInt32(0x44, 0, true);
+const enemyAiMultiNormalDefinition = enemyAiNormalAttackDefinition.slice();
+new DataView(enemyAiMultiNormalDefinition.buffer).setUint32(0x00, 9_064, true);
 const enemyAiAttributeAbsorbDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiAttributeAbsorbView = new DataView(enemyAiAttributeAbsorbDefinition.buffer);
 enemyAiAttributeAbsorbView.setUint32(0x00, 9_021, true);
@@ -4799,6 +4845,94 @@ assert.equal(selectedNormalAttackState.lastEnemyActions[0].damage, 1_850);
 assert.equal(selectedNormalAttackState.player.hp, 10_150);
 assert.equal(selectedNormalAttackState.rngState, padLcgStep(21_900).state);
 assert.equal(selectedNormalAttackState.enemies[0].enemyAiBudget, 80);
+const multiAttackMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(multiAttackMonsterDefinition.buffer).setUint32(0xec, 9_061, true);
+const selectedMultiAttackEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: multiAttackMonsterDefinition,
+    skillDefinitions: [
+      enemyAiMultiAttackDefinition,
+      enemyAiMultiInactivityDefinition,
+      enemyAiMultiGravityDefinition,
+      enemyAiMultiNormalDefinition,
+    ],
+  }],
+});
+selectedMultiAttackEngine.setRngState(21_900);
+selectedMultiAttackEngine.enemies[0].counter = 1;
+selectedMultiAttackEngine.enemies[1].counter = 99;
+selectedMultiAttackEngine.resolveEnemyTurn();
+const selectedMultiAttackState = selectedMultiAttackEngine.snapshot();
+assert.deepEqual(
+  selectedMultiAttackState.lastEnemyActions.map(({ skill }) => skill.type),
+  [66, 50, 82],
+);
+assert.deepEqual(
+  selectedMultiAttackState.lastEnemyActions.map(({ skill }) => skill.multiAttackCursor),
+  [0, 1, 2],
+);
+assert.equal(selectedMultiAttackState.lastEnemyActions[0].damage, undefined);
+assert.equal(selectedMultiAttackState.lastEnemyActions[1].damage, 3_000);
+assert.equal(selectedMultiAttackState.lastEnemyActions[2].damage, 1_850);
+assert.equal(selectedMultiAttackState.player.hp, 7_150);
+assert.equal(selectedMultiAttackState.rngState, padLcgStep(21_900).state);
+assert.equal(selectedMultiAttackState.enemies[0].enemyAiBudget, 80);
+assert.equal(selectedMultiAttackEngine.enemyAiPools[0].multiAttack, null);
+
+const rejectedMultiAttackDefinition = enemyAiMultiAttackDefinition.slice();
+const rejectedMultiAttackView = new DataView(rejectedMultiAttackDefinition.buffer);
+rejectedMultiAttackView.setUint32(0x00, 9_065, true);
+rejectedMultiAttackView.setInt32(0x10, 9_029, true);
+rejectedMultiAttackView.setInt32(0x14, 9_063, true);
+rejectedMultiAttackView.setInt32(0x18, 0, true);
+const rejectedMultiAttackMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(rejectedMultiAttackMonsterDefinition.buffer).setUint32(0xec, 9_065, true);
+const rejectedMultiAttackEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: rejectedMultiAttackMonsterDefinition,
+    skillDefinitions: [
+      rejectedMultiAttackDefinition,
+      enemyAiStatusShieldDefinition,
+      enemyAiMultiGravityDefinition,
+    ],
+  }],
+});
+rejectedMultiAttackEngine.enemies[0].statusShieldTurns = 2;
+rejectedMultiAttackEngine.setRngState(21_900);
+rejectedMultiAttackEngine.enemies[0].counter = 1;
+rejectedMultiAttackEngine.enemies[1].counter = 99;
+rejectedMultiAttackEngine.resolveEnemyTurn();
+const rejectedMultiAttackState = rejectedMultiAttackEngine.snapshot();
+assert.equal(rejectedMultiAttackState.lastEnemyActions.length, 1);
+assert.equal(rejectedMultiAttackState.lastEnemyActions[0].skill.type, 82);
+assert.equal(rejectedMultiAttackState.lastEnemyActions[0].skill.rejectedChildSkillId, 9_029);
+assert.equal(rejectedMultiAttackState.lastEnemyActions[0].damage, 1_850);
+assert.equal(rejectedMultiAttackState.player.hp, 10_150);
+assert.equal(rejectedMultiAttackEngine.enemyAiPools[0].multiAttack, null);
+
+const missingMultiAttackDefinition = enemyAiMultiAttackDefinition.slice();
+const missingMultiAttackView = new DataView(missingMultiAttackDefinition.buffer);
+missingMultiAttackView.setUint32(0x00, 9_066, true);
+missingMultiAttackView.setInt32(0x10, 99_999, true);
+missingMultiAttackView.setInt32(0x14, 0, true);
+const missingMultiAttackMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(missingMultiAttackMonsterDefinition.buffer).setUint32(0xec, 9_066, true);
+const missingMultiAttackEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: missingMultiAttackMonsterDefinition,
+    skillDefinitions: [missingMultiAttackDefinition],
+  }],
+});
+missingMultiAttackEngine.setRngState(21_900);
+missingMultiAttackEngine.enemies[0].counter = 1;
+missingMultiAttackEngine.enemies[1].counter = 99;
+missingMultiAttackEngine.resolveEnemyTurn();
+assert.equal(missingMultiAttackEngine.snapshot().lastEnemyActions.length, 0);
+assert.equal(missingMultiAttackEngine.player.hp, 12_000);
+assert.equal(missingMultiAttackEngine.enemyAiPools[0].multiAttack, null);
 const comboAbsorbMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(comboAbsorbMonsterDefinition.buffer).setUint32(0xec, 9_046, true);
 const selectedComboAbsorbEngine = new PuzzleEngine({

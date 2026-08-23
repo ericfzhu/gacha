@@ -2,6 +2,30 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 enemy multi-attack controller
+
+- Recovered enemy skill type `83` as the native structural multi-attack/
+  choose-flow controller. Its definition holds as many as eight positive child
+  skill IDs at `+0x10..+0x2c`, terminated by a non-positive ID; the parent uses
+  the ordinary unconditional AI condition and alone pays the probability,
+  HP-threshold, and AI-budget gates.
+- Traced `_setupDoubleAttack` at `0x62224c` and the packed chain state at
+  `sMONSTER+0x7dc`. Each child is evaluated with `_chooseEnemyAiSub(..., 1.0)`:
+  child slot chance, HP threshold, and budget are bypassed, while its
+  type-specific condition and condition-owned RNG remain active. Eligible
+  children execute in order during the same enemy turn. A zero/missing child
+  ends quietly; type `82` or a rejected child performs one ordinary attack and
+  terminates the chain.
+- Ported definition/runtime decoding, normalization, parent selection, child
+  lookup, sub-condition evaluation, bounded cursor state, immediate sequential
+  damage, reset behavior, and queue rejection where no definition pool exists.
+  The focused chain executes types `66`, `50`, and `82` in order, deals
+  3,000 + 1,850 damage, leaves 7,150/12,000 HP, charges only the parent's
+  20-point budget, and consumes only its standard probability roll.
+- Pure rules, exact type-table and instruction-anchor inspection, focused and
+  generic Chromium interaction, and the production build pass without page
+  errors. Next: recover type `86` self-heal as a separate checkpoint.
+
 ## 2026-08-24 post-touch JPEG/NEON callback completion
 
 - Reproduced the reported `0x2ea0b842` callback banner on the exact APK path

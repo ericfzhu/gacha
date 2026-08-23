@@ -51,6 +51,7 @@ export const PAD_ENEMY_SKILL_HORIZONTAL_LINES = 79;
 export const PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP_DIRECT = 80;
 export const PAD_ENEMY_SKILL_POISON_TYPE_LIST_SWAP = 81;
 export const PAD_ENEMY_SKILL_NORMAL_ATTACK = 82;
+export const PAD_ENEMY_SKILL_MULTI_ATTACK = 83;
 export const PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT = 84;
 export const PAD_ENEMY_SKILL_POISON_MASK_SWAP = 85;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
@@ -354,6 +355,22 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       kind: 'normalAttack',
       supported: true,
       damagePercent: 100,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_MULTI_ATTACK) {
+    requireLength(definitionBytes, 0x30, 'PAD enemy-skill definition');
+    const childSkillIds = [];
+    for (let index = 0; index < 8; index += 1) {
+      const childSkillId = definition.getInt32(0x10 + index * 4, true);
+      if (childSkillId <= 0) break;
+      childSkillIds.push(childSkillId);
+    }
+    return Object.freeze({
+      type,
+      kind: 'multiAttack',
+      supported: childSkillIds.length > 0,
+      childSkillIds: Object.freeze(childSkillIds),
       attackWithSkillValue,
     });
   }
@@ -1189,6 +1206,12 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_MULTI_ATTACK) {
+    return Object.freeze({
+      ...decodePadEnemySkillDefinition(definitionBytes),
+      setupMaterialized: true,
+    });
+  }
   if (
     type === PAD_ENEMY_SKILL_LONE_ATTACK_BOOST
     || type === PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST
@@ -1723,6 +1746,24 @@ export function normalizePadEnemySkillRecord(record) {
       kind: 'normalAttack',
       supported: record?.supported !== false,
       damagePercent: 100,
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_MULTI_ATTACK || record?.kind === 'multiAttack') {
+    const childSkillIds = Object.freeze((Array.isArray(record?.childSkillIds)
+      ? record.childSkillIds
+      : [])
+      .slice(0, 8)
+      .map((skillId) => Math.trunc(Number(skillId) || 0))
+      .filter((skillId) => skillId > 0));
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_MULTI_ATTACK,
+      kind: 'multiAttack',
+      supported: record?.supported !== false && childSkillIds.length > 0,
+      childSkillIds,
       setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null

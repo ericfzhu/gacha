@@ -28,6 +28,7 @@ const renderResolveState = process.argv.includes('--resolve-render');
 const renderDamageShieldState = process.argv.includes('--damage-shield-render');
 const renderLeaderSwapState = process.argv.includes('--leader-swap-render');
 const renderNormalAttackState = process.argv.includes('--normal-attack-render');
+const renderMultiAttackState = process.argv.includes('--multi-attack-render');
 const renderReviveState = process.argv.includes('--revive-render');
 const renderAttributeChangeState = process.argv.includes('--attribute-change-render');
 const renderSelfDestructState = process.argv.includes('--self-destruct-render');
@@ -2448,6 +2449,65 @@ try {
     || normalAttackRenderState.rngState !== 394_448_415
   )) throw new Error(`Normal-attack render-state mismatch: ${JSON.stringify(normalAttackRenderState)}`);
   if (normalAttackRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
+  const multiAttackRenderState = renderMultiAttackState ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    const monsterDefinition = new Uint8Array(0x2ec);
+    const monsterView = new DataView(monsterDefinition.buffer);
+    monsterView.setUint8(0xe0, 1);
+    monsterView.setInt16(0xe2, 100, true);
+    monsterView.setInt16(0xe4, 10, true);
+    monsterView.setUint32(0xec, 9_061, true);
+    monsterView.setUint8(0xf0, 100);
+    const definition = (skillId, type) => {
+      const bytes = new Uint8Array(0x48);
+      const view = new DataView(bytes.buffer);
+      view.setUint32(0x00, skillId, true);
+      view.setInt16(0x04, type, true);
+      view.setInt32(0x30, 10_000, true);
+      view.setInt32(0x34, 1_000, true);
+      view.setInt32(0x38, 100, true);
+      view.setInt32(0x40, 20, true);
+      return { bytes, view };
+    };
+    const parent = definition(9_061, 83);
+    parent.view.setInt32(0x10, 9_062, true);
+    parent.view.setInt32(0x14, 9_063, true);
+    parent.view.setInt32(0x18, 9_064, true);
+    parent.view.setInt32(0x1c, 0, true);
+    parent.view.setInt32(0x44, 777, true);
+    const inactivity = definition(9_062, 66);
+    inactivity.view.setInt32(0x38, 0, true);
+    inactivity.view.setInt32(0x40, 999, true);
+    inactivity.view.setInt32(0x44, 0, true);
+    const gravity = definition(9_063, 50);
+    gravity.view.setInt32(0x10, 25, true);
+    gravity.view.setInt32(0x44, 0, true);
+    const normal = definition(9_064, 82);
+    normal.view.setInt32(0x44, 0, true);
+    engine.reset();
+    engine.start();
+    engine.setEnemySkillQueue(0, []);
+    engine.setEnemyAiDefinitionPool(0, monsterDefinition, [
+      parent.bytes, inactivity.bytes, gravity.bytes, normal.bytes,
+    ]);
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    return engine.snapshot();
+  }) : null;
+  if (multiAttackRenderState && (
+    multiAttackRenderState.lastEnemyActions?.length !== 3
+    || multiAttackRenderState.lastEnemyActions?.[0]?.skill?.type !== 66
+    || multiAttackRenderState.lastEnemyActions?.[1]?.skill?.type !== 50
+    || multiAttackRenderState.lastEnemyActions?.[1]?.damage !== 3_000
+    || multiAttackRenderState.lastEnemyActions?.[2]?.skill?.type !== 82
+    || multiAttackRenderState.lastEnemyActions?.[2]?.damage !== 1_850
+    || multiAttackRenderState.player?.hp !== 7_150
+    || multiAttackRenderState.enemies?.[0]?.enemyAiBudget !== 80
+    || multiAttackRenderState.rngState !== 394_448_415
+  )) throw new Error(`Multi-attack render-state mismatch: ${JSON.stringify(multiAttackRenderState)}`);
+  if (multiAttackRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   const reviveRenderState = renderReviveState ? await page.evaluate(() => {
     const engine = window.__puzzleGame;
     engine.reset();
@@ -3037,9 +3097,9 @@ try {
   )) throw new Error(`Attack-boost render-state mismatch: ${JSON.stringify(attackBoostRenderState)}`);
   if (attackBoostRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   await page.screenshot({ path: outputPath, fullPage: true });
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, comboAbsorbRenderState, skyfallRateRenderState, deathCryRenderState, damageVoidRenderState, attributeResistRenderState, resolveRenderState, damageShieldRenderState, leaderSwapRenderState, normalAttackRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, earlyPartyControlRenderState, bindAttackRenderState, randomSubBindRenderState, repeatAttackRenderState, entireBlindRenderState, inactivityRenderState, attackBoostRenderState, consoleMessages }, null, 2));
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, comboAbsorbRenderState, skyfallRateRenderState, deathCryRenderState, damageVoidRenderState, attributeResistRenderState, resolveRenderState, damageShieldRenderState, leaderSwapRenderState, normalAttackRenderState, multiAttackRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, earlyPartyControlRenderState, bindAttackRenderState, randomSubBindRenderState, repeatAttackRenderState, entireBlindRenderState, inactivityRenderState, attackBoostRenderState, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
-  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, comboAbsorbRenderState, skyfallRateRenderState, deathCryRenderState, damageVoidRenderState, attributeResistRenderState, resolveRenderState, damageShieldRenderState, leaderSwapRenderState, normalAttackRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, earlyPartyControlRenderState, bindAttackRenderState, randomSubBindRenderState, repeatAttackRenderState, entireBlindRenderState, inactivityRenderState, attackBoostRenderState, consoleMessages }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, comboAbsorbRenderState, skyfallRateRenderState, deathCryRenderState, damageVoidRenderState, attributeResistRenderState, resolveRenderState, damageShieldRenderState, leaderSwapRenderState, normalAttackRenderState, multiAttackRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, earlyPartyControlRenderState, bindAttackRenderState, randomSubBindRenderState, repeatAttackRenderState, entireBlindRenderState, inactivityRenderState, attackBoostRenderState, consoleMessages }, null, 2)}\n`);
 } finally {
   await browser.close();
 }
