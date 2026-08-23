@@ -2,6 +2,25 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 type-92 masked random-orb change
+
+- Recovered type `92` at dispatch/setup/condition `0x629e2c`, `0x62057c`, and
+  `0x61ab88`. Definition `+0x10/+0x14/+0x18` supplies per-destination count,
+  destination-type mask, and excluded-source mask; setup copies them to runtime
+  `+0x678..+0x680`, takes one shared-LCG step, and stores its high 16 bits as a
+  private shuffle seed at `+0x684`.
+- The condition dry-runs the already recovered `_doPoisonBlockN2` primitive and
+  consumes no RNG. Execution uses the stored private seed for its two-step
+  masked shuffle, so it does not advance the shared enemy-AI stream.
+- Ported definition/runtime decoding, normalization, condition admission, exact
+  setup materialization, private execution RNG, board mutation, snapshots, and
+  browser presentation. Seed 21900 stores private seed 58043, attempts four
+  assignments, produces final row `HPPGLJ`, and leaves the shared state at
+  3803934822 after selection plus setup.
+- Pure rules, exact tables plus twelve instruction anchors, focused Chromium
+  rendering, screenshot inspection, and the generic web-game client pass with
+  no page errors. Next: recover enemy skill type `93` as a separate checkpoint.
+
 ## 2026-08-24 type-90 presence-list marker
 
 - Recovered type `90` at dispatch/setup/condition `0x62be50`, `0x621c94`, and

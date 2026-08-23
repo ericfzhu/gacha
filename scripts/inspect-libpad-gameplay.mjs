@@ -202,6 +202,24 @@ const PRESENCE_CHECK_INSTRUCTION_ANCHORS = Object.freeze([
   [0x62be50, 0x900045e9], // common no-special-effect execution tail
   [0x61c01c, 0xbd400fe0], // return the incoming float32 condition scale
 ]);
+const MASKED_RANDOM_ORB_CHANGE_ENEMY_SKILL_TYPE = 92;
+const MASKED_RANDOM_ORB_CHANGE_HANDLER = 0x629e2c;
+const MASKED_RANDOM_ORB_CHANGE_SETUP_HANDLER = 0x62057c;
+const MASKED_RANDOM_ORB_CHANGE_CONDITION_HANDLER = 0x61ab88;
+const MASKED_RANDOM_ORB_CHANGE_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x62057c, 0xb94012a8], // load definition +0x10 per-destination-type count
+  [0x620580, 0xb9067a68], // store count at runtime +0x678
+  [0x62058c, 0xb9401aa8], // load definition +0x18 excluded-source mask
+  [0x620590, 0xb9068268], // store excluded-source mask at runtime +0x680
+  [0x621618, 0xb829690a], // persist the single shared-LCG setup step
+  [0x621620, 0xb9068668], // store its high 16 bits as private seed at +0x684
+  [0x61ab88, 0x29420a61], // condition loads definition +0x10/+0x14 parameters
+  [0x61aba0, 0x97f432b4], // dry-run condition calls _doPoisonBlockN2
+  [0x61aba4, 0x7100001f], // accept only when at least one candidate exists
+  [0x629e2c, 0xb9468661], // execution loads the stored private seed
+  [0x629e38, 0xb9467a61], // execution loads runtime +0x678 count
+  [0x629e54, 0x97f3f607], // execution calls _doPoisonBlockN2
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -1037,6 +1055,31 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : presenceCheckConditionTarget === PRESENCE_CHECK_CONDITION_HANDLER;
   const presenceCheckInstructionAnchorsMatch = restoredElf === null ? null
     : PRESENCE_CHECK_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
+  const maskedRandomOrbChangeDispatchTarget = resolveEnemySkillTarget(
+    MASKED_RANDOM_ORB_CHANGE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const maskedRandomOrbChangeSetupTarget = resolveEnemySkillTarget(
+    MASKED_RANDOM_ORB_CHANGE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const maskedRandomOrbChangeConditionTarget = resolveEnemySkillTarget(
+    MASKED_RANDOM_ORB_CHANGE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const maskedRandomOrbChangeDispatchMatches = maskedRandomOrbChangeDispatchTarget === null
+    ? null : maskedRandomOrbChangeDispatchTarget === MASKED_RANDOM_ORB_CHANGE_HANDLER;
+  const maskedRandomOrbChangeSetupMatches = maskedRandomOrbChangeSetupTarget === null
+    ? null : maskedRandomOrbChangeSetupTarget === MASKED_RANDOM_ORB_CHANGE_SETUP_HANDLER;
+  const maskedRandomOrbChangeConditionMatches = maskedRandomOrbChangeConditionTarget === null
+    ? null : maskedRandomOrbChangeConditionTarget === MASKED_RANDOM_ORB_CHANGE_CONDITION_HANDLER;
+  const maskedRandomOrbChangeInstructionAnchorsMatch = restoredElf === null ? null
+    : MASKED_RANDOM_ORB_CHANGE_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
@@ -2023,6 +2066,11 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       presenceCheckSetupMatches21_9: presenceCheckSetupMatches,
       presenceCheckConditionMatches21_9: presenceCheckConditionMatches,
       presenceCheckInstructionAnchorsMatch21_9: presenceCheckInstructionAnchorsMatch,
+      maskedRandomOrbChangeDispatchMatches21_9: maskedRandomOrbChangeDispatchMatches,
+      maskedRandomOrbChangeSetupMatches21_9: maskedRandomOrbChangeSetupMatches,
+      maskedRandomOrbChangeConditionMatches21_9: maskedRandomOrbChangeConditionMatches,
+      maskedRandomOrbChangeInstructionAnchorsMatch21_9:
+        maskedRandomOrbChangeInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -2495,6 +2543,20 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       presenceCheckInstructionAnchorsMatch21_9: presenceCheckInstructionAnchorsMatch,
       presenceCheckSemantics:
         'type 90 carries a zero-terminated list of up to eight card IDs, but the 21.9 new-AI tables route it to generic sentinel setup, the common no-special-effect dispatch tail, and the shared epilogue that returns the incoming float32 scale unchanged; it therefore consumes ordinary selection probability and performs no special gameplay action in this path',
+      maskedRandomOrbChangeType: MASKED_RANDOM_ORB_CHANGE_ENEMY_SKILL_TYPE,
+      maskedRandomOrbChangeDispatchTarget: maskedRandomOrbChangeDispatchTarget === null
+        ? null : hex(maskedRandomOrbChangeDispatchTarget),
+      maskedRandomOrbChangeDispatchMatches21_9: maskedRandomOrbChangeDispatchMatches,
+      maskedRandomOrbChangeSetupTarget: maskedRandomOrbChangeSetupTarget === null
+        ? null : hex(maskedRandomOrbChangeSetupTarget),
+      maskedRandomOrbChangeSetupMatches21_9: maskedRandomOrbChangeSetupMatches,
+      maskedRandomOrbChangeConditionTarget: maskedRandomOrbChangeConditionTarget === null
+        ? null : hex(maskedRandomOrbChangeConditionTarget),
+      maskedRandomOrbChangeConditionMatches21_9: maskedRandomOrbChangeConditionMatches,
+      maskedRandomOrbChangeInstructionAnchorsMatch21_9:
+        maskedRandomOrbChangeInstructionAnchorsMatch,
+      maskedRandomOrbChangeSemantics:
+        'type 92 copies +0x10 count, +0x14 destination mask, and +0x18 excluded-source mask to runtime +0x678..+0x680; setup advances the shared LCG once and stores its high 16 bits at +0x684; condition dry-runs _doPoisonBlockN2 without RNG mutation; execution seeds a private shuffle channel from +0x684 and performs the masked board change without advancing the shared AI stream',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -2985,6 +3047,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || presenceCheckSetupMatches === false
     || presenceCheckConditionMatches === false
     || presenceCheckInstructionAnchorsMatch === false
+    || maskedRandomOrbChangeDispatchMatches === false
+    || maskedRandomOrbChangeSetupMatches === false
+    || maskedRandomOrbChangeConditionMatches === false
+    || maskedRandomOrbChangeInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

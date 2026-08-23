@@ -13,6 +13,7 @@ import {
   PAD_ENEMY_SKILL_AWAKENING_BIND,
   PAD_ENEMY_SKILL_SKILL_DELAY,
   PAD_ENEMY_SKILL_PRESENCE_CHECK,
+  PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -986,6 +987,48 @@ assert.deepEqual(decodePadEnemySkillRuntime(
   kind: 'presenceCheck',
   supported: true,
   candidateCardIds: [1_234, 5_678, 9_012],
+  attackWithSkillValue: 0,
+});
+const enemyAiMaskedRandomOrbChangeDefinition = enemyAiPresenceCheckDefinition.slice();
+const enemyAiMaskedRandomOrbChangeView = new DataView(
+  enemyAiMaskedRandomOrbChangeDefinition.buffer,
+);
+enemyAiMaskedRandomOrbChangeView.setUint32(0x00, 9_072, true);
+enemyAiMaskedRandomOrbChangeView.setInt16(
+  0x04,
+  PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE,
+  true,
+);
+enemyAiMaskedRandomOrbChangeView.setInt32(0x10, 2, true);
+enemyAiMaskedRandomOrbChangeView.setUint32(0x14, 0xc0, true);
+enemyAiMaskedRandomOrbChangeView.setUint32(0x18, 0x1a0, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiMaskedRandomOrbChangeDefinition), {
+  type: 92,
+  kind: 'maskedRandomOrbChange',
+  supported: true,
+  perTypeCount: 2,
+  destinationTypeMask: 0xc0,
+  excludedSourceTypeMask: 0x1a0,
+  attackWithSkillValue: 0,
+});
+const maskedRandomOrbChangeRuntime = new Uint8Array(0x688);
+const maskedRandomOrbChangeRuntimeView = new DataView(maskedRandomOrbChangeRuntime.buffer);
+maskedRandomOrbChangeRuntimeView.setInt32(0x678, 2, true);
+maskedRandomOrbChangeRuntimeView.setUint32(0x67c, 0xc0, true);
+maskedRandomOrbChangeRuntimeView.setUint32(0x680, 0x1a0, true);
+maskedRandomOrbChangeRuntimeView.setUint32(0x684, 6_018, true);
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiMaskedRandomOrbChangeDefinition,
+  maskedRandomOrbChangeRuntime,
+), {
+  type: 92,
+  kind: 'maskedRandomOrbChange',
+  supported: true,
+  perTypeCount: 2,
+  destinationTypeMask: 0xc0,
+  excludedSourceTypeMask: 0x1a0,
+  selectionSeed: 6_018,
+  setupMaterialized: true,
   attackWithSkillValue: 0,
 });
 assert.deepEqual(decodePadEnemySkillRuntime(
@@ -4322,6 +4365,67 @@ assert.equal(
   selectedPresenceCheckState.message,
   'Verdant Shell checks the party and takes no action.',
 );
+
+const directMaskedRandomOrbChangeEngine = new PuzzleEngine({ seed: 21_900 });
+directMaskedRandomOrbChangeEngine.setBoardFromCodes([
+  'RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD',
+]);
+directMaskedRandomOrbChangeEngine.setRngState(21_900);
+assert.equal(directMaskedRandomOrbChangeEngine.applyEnemySkillDefinition(
+  enemyAiMaskedRandomOrbChangeDefinition,
+), true);
+assert.equal(directMaskedRandomOrbChangeEngine.lastEnemySkill.selectionSeed, 6_018);
+assert.equal(directMaskedRandomOrbChangeEngine.lastEnemySkill.changedOrbCount, 4);
+assert.equal(directMaskedRandomOrbChangeEngine.rng.state, padLcgStep(21_900).state);
+assert.equal(directMaskedRandomOrbChangeEngine.board[0][0].type, 'jammer');
+assert.equal(directMaskedRandomOrbChangeEngine.board[4][3].type, 'poison');
+assert.equal(directMaskedRandomOrbChangeEngine.board[4][4].type, 'poison');
+
+const maskedRandomOrbChangeMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(maskedRandomOrbChangeMonsterDefinition.buffer).setUint32(0xec, 9_072, true);
+const selectedMaskedRandomOrbChangeEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: maskedRandomOrbChangeMonsterDefinition,
+    skillDefinitions: [enemyAiMaskedRandomOrbChangeDefinition],
+  }],
+});
+selectedMaskedRandomOrbChangeEngine.setBoardFromCodes([
+  'RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD',
+]);
+selectedMaskedRandomOrbChangeEngine.enemies[0].counter = 1;
+selectedMaskedRandomOrbChangeEngine.enemies[1].counter = 99;
+selectedMaskedRandomOrbChangeEngine.setRngState(21_900);
+selectedMaskedRandomOrbChangeEngine.resolveEnemyTurn();
+const selectedMaskedRandomOrbChangeState = selectedMaskedRandomOrbChangeEngine.snapshot();
+assert.equal(selectedMaskedRandomOrbChangeState.lastEnemyActions[0].skill.type, 92);
+assert.equal(selectedMaskedRandomOrbChangeState.lastEnemyActions[0].skill.selectionSeed, 58_043);
+assert.equal(selectedMaskedRandomOrbChangeEngine.lastEnemySkill.changedOrbCount, 4);
+assert.equal(selectedMaskedRandomOrbChangeState.player.hp, 12_000);
+assert.equal(
+  selectedMaskedRandomOrbChangeState.rngState,
+  padLcgStep(padLcgStep(21_900).state).state,
+);
+assert.equal(selectedMaskedRandomOrbChangeEngine.board[4][1].type, 'poison');
+assert.equal(selectedMaskedRandomOrbChangeEngine.board[4][2].type, 'poison');
+assert.equal(selectedMaskedRandomOrbChangeEngine.board[4][5].type, 'jammer');
+
+const rejectedMaskedRandomOrbChangeEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: maskedRandomOrbChangeMonsterDefinition,
+    skillDefinitions: [enemyAiMaskedRandomOrbChangeDefinition],
+  }],
+});
+rejectedMaskedRandomOrbChangeEngine.setBoardFromCodes(Array(5).fill('HHHHHH'));
+rejectedMaskedRandomOrbChangeEngine.enemies[0].counter = 1;
+rejectedMaskedRandomOrbChangeEngine.enemies[1].counter = 99;
+rejectedMaskedRandomOrbChangeEngine.setRngState(21_900);
+rejectedMaskedRandomOrbChangeEngine.resolveEnemyTurn();
+const rejectedMaskedRandomOrbChangeState = rejectedMaskedRandomOrbChangeEngine.snapshot();
+assert.equal(rejectedMaskedRandomOrbChangeState.lastEnemyActions[0].kind, 'attack');
+assert.equal(rejectedMaskedRandomOrbChangeState.rngState, 21_900);
+assert.equal(rejectedMaskedRandomOrbChangeState.player.hp, 10_150);
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;

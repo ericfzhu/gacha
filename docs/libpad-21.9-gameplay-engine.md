@@ -1117,6 +1117,31 @@ The focused fixture carries IDs 1234, 5678, and 9012 followed by zero. Seed
 the player at 12,000 HP, and renders the action without changing the board or
 active skill.
 
+Enemy skill type `92` is the generalized masked random-orb change. Definition
+`+0x10` is the number of cells requested per destination type, `+0x14` is the
+destination-type bitmask, and `+0x18` excludes matching source types. Dispatch,
+setup, and condition entries resolve to `0x629e2c`, `0x62057c`, and `0x61ab88`.
+Setup copies the three parameters to `sMONSTER+0x678..+0x680`, advances the
+shared LCG exactly once, and stores that result's high 16 bits at
+`sMONSTER+0x684`.
+
+The condition invokes `_doPoisonBlockN2` in dry-run mode and admits the record
+only when the board has at least one eligible source cell; this path consumes no
+RNG. Execution initializes a private shuffle channel from runtime `+0x684` and
+calls the same primitive in write mode. Its two-step masked shuffle therefore
+does not perturb later enemy-AI randomness. Destination bits are processed in
+ascending type order, with up to `+0x10` board positions assigned to each bit,
+while sources covered by `+0x18` are skipped.
+
+The browser port reuses the previously recovered `padSelectMaskedBlockChanges`
+primitive for both paths. In the focused fixture, seed 21900 consumes the normal
+selection draw and one setup draw, stores private seed 58043, attempts four
+assignments, and leaves the shared state at 3803934822. The visible last row
+changes from `HJGGLD` to `HPPGLJ`; one attempted assignment already had its
+destination type, which is why the native-style attempted count is four while
+three cells visibly differ. A board containing only excluded Heart cells rejects
+the skill before probability selection and leaves the shared RNG unchanged.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

@@ -59,6 +59,7 @@ export const PAD_ENEMY_SKILL_DAMAGE_ABSORB = 87;
 export const PAD_ENEMY_SKILL_AWAKENING_BIND = 88;
 export const PAD_ENEMY_SKILL_SKILL_DELAY = 89;
 export const PAD_ENEMY_SKILL_PRESENCE_CHECK = 90;
+export const PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE = 92;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -244,6 +245,18 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       kind: 'presenceCheck',
       supported: true,
       candidateCardIds: Object.freeze(candidateCardIds),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE) {
+    requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'maskedRandomOrbChange',
+      supported: true,
+      perTypeCount: definition.getInt32(0x10, true),
+      destinationTypeMask: definition.getUint32(0x14, true),
+      excludedSourceTypeMask: definition.getUint32(0x18, true),
       attackWithSkillValue,
     });
   }
@@ -1106,6 +1119,23 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
     requireLength(definitionBytes, 0x30, 'PAD enemy-skill definition');
     return decodePadEnemySkillDefinition(definitionBytes);
   }
+  if (type === PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE) {
+    requireLength(monsterBytes, 0x688, 'PAD monster runtime');
+    return Object.freeze({
+      type,
+      kind: 'maskedRandomOrbChange',
+      supported: true,
+      perTypeCount: monster.getInt32(0x678, true),
+      destinationTypeMask: monster.getUint32(0x67c, true),
+      excludedSourceTypeMask: monster.getUint32(0x680, true),
+      selectionSeed: monster.getUint32(0x684, true) & 0xffff,
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -1744,6 +1774,25 @@ export function normalizePadEnemySkillRecord(record) {
       candidateCardIds: Object.freeze((Array.isArray(record?.candidateCardIds)
         ? record.candidateCardIds
         : []).slice(0, 8).map((cardId) => Math.trunc(Number(cardId) || 0))),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (
+    type === PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE
+    || record?.kind === 'maskedRandomOrbChange'
+  ) {
+    const seedPresent = record?.selectionSeed !== undefined && record?.selectionSeed !== null;
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE,
+      kind: 'maskedRandomOrbChange',
+      supported: record?.supported !== false,
+      perTypeCount: Math.trunc(Number(record?.perTypeCount) || 0),
+      destinationTypeMask: Number(record?.destinationTypeMask) >>> 0,
+      excludedSourceTypeMask: Number(record?.excludedSourceTypeMask) >>> 0,
+      ...(seedPresent ? { selectionSeed: Number(record.selectionSeed) & 0xffff } : {}),
+      setupMaterialized: Boolean(record?.setupMaterialized || seedPresent),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

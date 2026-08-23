@@ -48,6 +48,7 @@ import {
   PAD_ENEMY_SKILL_AWAKENING_BIND,
   PAD_ENEMY_SKILL_SKILL_DELAY,
   PAD_ENEMY_SKILL_PRESENCE_CHECK,
+  PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1319,6 +1320,15 @@ export class PuzzleEngine {
             rngState: this.rng.state,
           };
         }
+        if (definition.effect.kind === 'maskedRandomOrbChange') {
+          const eligible = this.doPoisonBlockN2(
+            definition.effect.perTypeCount,
+            definition.effect.destinationTypeMask,
+            definition.effect.excludedSourceTypeMask,
+            true,
+          ) >= 1;
+          return { eligible, probabilityScale: eligible ? 1 : 0, rngState: this.rng.state };
+        }
         return { eligible: false, rngState: this.rng.state };
       },
     };
@@ -1578,6 +1588,17 @@ export class PuzzleEngine {
         ...record,
         targetMask,
         skillDelays: Object.freeze(skillDelays),
+        setupMaterialized: true,
+      });
+    }
+    if (
+      skill.supported
+      && skill.kind === 'maskedRandomOrbChange'
+      && !skill.setupMaterialized
+    ) {
+      return Object.freeze({
+        ...record,
+        selectionSeed: this.rng.nextUint16(),
         setupMaterialized: true,
       });
     }
@@ -2201,6 +2222,20 @@ export class PuzzleEngine {
       this.message = `${enemy?.name || 'Enemy'} checks the party and takes no action.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'maskedRandomOrbChange') {
+      const changed = this.doPoisonBlockN2(
+        skill.perTypeCount,
+        skill.destinationTypeMask,
+        skill.excludedSourceTypeMask,
+        false,
+        true,
+        null,
+        createPadRng(skill.selectionSeed),
+      );
+      this.lastEnemySkill = Object.freeze({ ...skill, changedOrbCount: changed });
+      this.message = `${changed} random orb${changed === 1 ? '' : 's'} changed.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'damageShield') {
       const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
       if (!enemy) return false;
@@ -2534,6 +2569,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_AWAKENING_BIND,
         PAD_ENEMY_SKILL_SKILL_DELAY,
         PAD_ENEMY_SKILL_PRESENCE_CHECK,
+        PAD_ENEMY_SKILL_MASKED_RANDOM_ORB_CHANGE,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -2902,11 +2938,12 @@ export class PuzzleEngine {
     dryRun = false,
     presentation = true,
     selectedRows = null,
+    rng = this.rng,
   ) {
     const boardTypes = this.board.map((row) => row.map((orb) => (
       ORB_TYPES.findIndex((candidate) => candidate.id === orb.type)
     )));
-    const selected = this.rng.selectMaskedBlockChanges(
+    const selected = rng.selectMaskedBlockChanges(
       boardTypes,
       perTypeCount,
       destinationTypeMask,
