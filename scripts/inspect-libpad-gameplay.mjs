@@ -29,6 +29,10 @@ const ENTIRE_BLIND_ALT_ENEMY_SKILL_TYPE = 62;
 const ENTIRE_BLIND_ALT_HANDLER = 0x6289b8;
 const ENTIRE_BLIND_ALT_SETUP_HANDLER = 0x620154;
 const ENTIRE_BLIND_ALT_CONDITION_HANDLER = 0x61ae4c;
+const BIND_ATTACK_ENEMY_SKILL_TYPE = 63;
+const BIND_ATTACK_HANDLER = 0x628b94;
+const BIND_ATTACK_SETUP_HANDLER = 0x621544;
+const BIND_ATTACK_CONDITION_HANDLER = 0x61a87c;
 const CLEAR_PLAYER_BUFFS_ENEMY_SKILL_TYPE = 6;
 const CLEAR_PLAYER_BUFFS_HANDLER = 0x6292e8;
 const CLEAR_PLAYER_BUFFS_SETUP_HANDLER = 0x6217c0;
@@ -431,6 +435,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : entireBlindAltSetupTarget === ENTIRE_BLIND_ALT_SETUP_HANDLER;
   const entireBlindAltConditionMatches = entireBlindAltConditionTarget === null
     ? null : entireBlindAltConditionTarget === ENTIRE_BLIND_ALT_CONDITION_HANDLER;
+  const bindAttackDispatchTarget = resolveEarlyEnemySkillTarget(BIND_ATTACK_ENEMY_SKILL_TYPE);
+  const bindAttackSetupTarget = resolveEnemySkillTarget(
+    BIND_ATTACK_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const bindAttackConditionTarget = resolveEnemySkillTarget(
+    BIND_ATTACK_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const bindAttackDispatchMatches = bindAttackDispatchTarget === null
+    ? null : bindAttackDispatchTarget === BIND_ATTACK_HANDLER;
+  const bindAttackSetupMatches = bindAttackSetupTarget === null
+    ? null : bindAttackSetupTarget === BIND_ATTACK_SETUP_HANDLER;
+  const bindAttackConditionMatches = bindAttackConditionTarget === null
+    ? null : bindAttackConditionTarget === BIND_ATTACK_CONDITION_HANDLER;
   const clearPlayerBuffsDispatchTarget = resolveEnemySkillTarget(
     CLEAR_PLAYER_BUFFS_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1474,6 +1491,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       entireBlindAltDispatchMatches21_9: entireBlindAltDispatchMatches,
       entireBlindAltSetupMatches21_9: entireBlindAltSetupMatches,
       entireBlindAltConditionMatches21_9: entireBlindAltConditionMatches,
+      bindAttackDispatchMatches21_9: bindAttackDispatchMatches,
+      bindAttackSetupMatches21_9: bindAttackSetupMatches,
+      bindAttackConditionMatches21_9: bindAttackConditionMatches,
       clearPlayerBuffsDispatchMatches21_9: clearPlayerBuffsDispatchMatches,
       clearPlayerBuffsSetupMatches21_9: clearPlayerBuffsSetupMatches,
       clearPlayerBuffsConditionMatches21_9: clearPlayerBuffsConditionMatches,
@@ -1679,6 +1699,17 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       entireBlindAltConditionMatches21_9: entireBlindAltConditionMatches,
       entireBlindAltSemantics:
         'type 62 alternate presentation setup copies +0x10 to sMONSTER+0x680 and initializes 3.0/0.4 animation lanes; early handler inlines the same bit 0x4/0x8 board mutation; condition returns exactly 1.0 iff any board cell lacks bit 0x4',
+      bindAttackType: BIND_ATTACK_ENEMY_SKILL_TYPE,
+      bindAttackDispatchTarget: bindAttackDispatchTarget === null
+        ? null : hex(bindAttackDispatchTarget),
+      bindAttackDispatchMatches21_9: bindAttackDispatchMatches,
+      bindAttackSetupTarget: bindAttackSetupTarget === null ? null : hex(bindAttackSetupTarget),
+      bindAttackSetupMatches21_9: bindAttackSetupMatches,
+      bindAttackConditionTarget: bindAttackConditionTarget === null
+        ? null : hex(bindAttackConditionTarget),
+      bindAttackConditionMatches21_9: bindAttackConditionMatches,
+      bindAttackSemantics:
+        'type 63: +0x14..+0x18 inclusive duration; +0x1c target selector and +0x20 target count feed doSelectBindTarges; target selection precedes the duration LCG; handler calls doBind with sMONSTER+0x674 mask and +0x684 duration; +0x44 attack composes afterward',
       clearPlayerBuffsType: CLEAR_PLAYER_BUFFS_ENEMY_SKILL_TYPE,
       clearPlayerBuffsDispatchTarget: clearPlayerBuffsDispatchTarget === null
         ? null : hex(clearPlayerBuffsDispatchTarget),
@@ -2145,6 +2176,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || entireBlindAltDispatchMatches === false
     || entireBlindAltSetupMatches === false
     || entireBlindAltConditionMatches === false
+    || bindAttackDispatchMatches === false
+    || bindAttackSetupMatches === false
+    || bindAttackConditionMatches === false
     || clearPlayerBuffsDispatchMatches === false
     || clearPlayerBuffsSetupMatches === false
     || clearPlayerBuffsConditionMatches === false

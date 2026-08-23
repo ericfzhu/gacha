@@ -3,6 +3,7 @@ import {
   PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
   PAD_ENEMY_SKILL_ENTIRE_BLIND,
   PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT,
+  PAD_ENEMY_SKILL_BIND_ATTACK,
   PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
   PAD_ENEMY_SKILL_HEAL_ENEMY,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
@@ -145,6 +146,7 @@ function isStaticallyEligible(definition, state) {
     PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
     PAD_ENEMY_SKILL_ENTIRE_BLIND,
     PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT,
+    PAD_ENEMY_SKILL_BIND_ATTACK,
     PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
     PAD_ENEMY_SKILL_HEAL_ENEMY,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
@@ -219,6 +221,23 @@ function evaluateCondition(definition, state, rngState) {
         ))
         : Math.fround(0);
     return { eligible: probabilityScale > 0, probabilityScale, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_BIND_ATTACK) {
+    const selector = Math.trunc(Number(definition.effect.targetSelector) || 0);
+    const targetIndices = selector === 1
+      ? [0]
+      : selector === 2
+        ? [5]
+        : selector === 3
+          ? [0, 5]
+          : selector === 4
+            ? [1, 2, 3, 4]
+            : [0, 1, 2, 3, 4, 5];
+    const eligible = targetIndices.some((index) => (
+      state.party[index]?.present !== false
+      && Number(state.party[index]?.bindTurns || 0) <= 0
+    ));
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS) {
     // Type 6's callback calls _getCountClearParams. For the two recovered

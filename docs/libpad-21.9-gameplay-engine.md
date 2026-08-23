@@ -696,6 +696,27 @@ gets the full authored immediate chance for type 62, while type 5 scales that
 chance by the visible fraction. The port shares execution and movement reveal
 but preserves these distinct AI callbacks and raw type identities.
 
+Enemy skill type `63` combines party binding with the generic accompanying
+attack. Its early dispatch, setup, and condition entries target `0x628b94`,
+`0x621544`, and `0x61a87c`. Setup passes definition target selector `+0x1c`
+and target count `+0x20` through `_doSelectBindTarges` (`0x61652c`), storing
+the resulting six-bit party mask at `sMONSTER+0x674`. Selector 1 fixes the
+leader, 2 fixes the helper, 3 selects leaders, 4 selects subs, and other values
+select across the party. The random selector paths gather present unbound
+cards, spend two global LCG advances, and use the same private-state
+Fisher-Yates construction recovered for type 13 before taking the authored
+count.
+
+After target selection, setup spends one more global LCG advance to choose the
+inclusive duration from definition `+0x14..+0x18`, storing it at
+`sMONSTER+0x684` and its signed-int16 mirror `+0x7e4`. The condition calls the
+same selector helper in its read-only mode and returns one exactly when at
+least one matching card can be bound, with no condition RNG. Execution calls
+`_doBind` (`0x616de4`) with the materialized mask and duration, retaining
+per-card bind resistance and existing-bind extension semantics. The generic
+definition `+0x44` attack is then composed independently. The raw semantic is
+corroborated by the DadGuide parser's `ESBindAttack` type-63 record.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

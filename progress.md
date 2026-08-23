@@ -2,6 +2,23 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 bind-plus-attack enemy skill
+
+- Recovered type `63`: early dispatch `0x628b94`, setup `0x621544`, and
+  condition `0x61a87c`. Definition `+0x1c/+0x20` selects party targets through
+  `_doSelectBindTarges`; `+0x14..+0x18` supplies the inclusive duration range.
+- Preserved selector modes for leader, helper, leaders, subs, and whole party;
+  random modes use the native two-global-step/private-state shuffle before the
+  duration's separate LCG step. The condition only checks for at least one
+  bindable matching card and consumes no RNG.
+- Ported definition/runtime records, materialization ordering, bind resistance
+  and timers, generic `+0x44` attack composition, AI dry rejection, exact table
+  checks, seeded direct/enemy-turn fixtures, and a focused browser fixture that
+  reproduces mask `0x12`, duration 2, 925 damage, and final RNG `919597584`.
+- Next: continue the adjacent live enemy-action table. The focused screenshot
+  also exposes a separate presentation issue: player damage currently floats
+  over an enemy instead of the player HP area.
+
 ## 2026-08-23 alternate whole-board blind enemy skill
 
 - Recovered type `62` as a second classic whole-board blind: early dispatch

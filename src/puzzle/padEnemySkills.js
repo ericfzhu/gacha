@@ -1,6 +1,7 @@
 export const PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION = 4;
 export const PAD_ENEMY_SKILL_ENTIRE_BLIND = 5;
 export const PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT = 62;
+export const PAD_ENEMY_SKILL_BIND_ATTACK = 63;
 export const PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS = 6;
 export const PAD_ENEMY_SKILL_HEAL_ENEMY = 7;
 export const PAD_ENEMY_SKILL_ADDITIONAL_ATTACK = 8;
@@ -123,6 +124,22 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       type,
       kind: 'entireBlind',
       supported: true,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_BIND_ATTACK) {
+    requireLength(definitionBytes, 0x24, 'PAD enemy-skill definition');
+    const durationMin = definition.getInt32(0x14, true);
+    const durationMax = definition.getInt32(0x18, true);
+    return Object.freeze({
+      type,
+      kind: 'bindAttack',
+      supported: durationMax >= durationMin,
+      nativePresentationParameter: definition.getInt32(0x10, true),
+      durationMin,
+      durationMax,
+      targetSelector: definition.getInt32(0x1c, true),
+      targetCount: definition.getInt32(0x20, true),
       attackWithSkillValue,
     });
   }
@@ -750,6 +767,22 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_BIND_ATTACK) {
+    requireLength(monsterBytes, 0x688, 'PAD monster runtime');
+    return Object.freeze({
+      type,
+      kind: 'bindAttack',
+      supported: true,
+      nativePresentationParameter: monster.getInt32(0x680, true),
+      durationTurns: monster.getInt32(0x684, true),
+      targetMask: monster.getUint16(0x674, true) & 0x3f,
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS) {
     return Object.freeze({
       type,
@@ -1074,6 +1107,32 @@ export function normalizePadEnemySkillRecord(record) {
         : PAD_ENEMY_SKILL_ENTIRE_BLIND,
       kind: 'entireBlind',
       supported: true,
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_BIND_ATTACK || record?.kind === 'bindAttack') {
+    const durationMin = Math.trunc(Number(record?.durationMin) || 0);
+    const durationMax = Math.trunc(Number(record?.durationMax) || 0);
+    const durationPresent = record?.durationTurns !== undefined
+      && record?.durationTurns !== null;
+    const targetMaskPresent = record?.targetMask !== undefined && record?.targetMask !== null;
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_BIND_ATTACK,
+      kind: 'bindAttack',
+      supported: record?.supported !== false && (durationPresent || durationMax >= durationMin),
+      nativePresentationParameter: Math.trunc(Number(record?.nativePresentationParameter) || 0),
+      ...(durationPresent
+        ? { durationTurns: Math.trunc(Number(record.durationTurns) || 0) }
+        : { durationMin, durationMax }),
+      ...(targetMaskPresent
+        ? { targetMask: Math.trunc(Number(record.targetMask) || 0) & 0x3f }
+        : {
+          targetSelector: Math.trunc(Number(record?.targetSelector) || 0),
+          targetCount: Math.trunc(Number(record?.targetCount) || 0),
+        }),
+      setupMaterialized: Boolean(record?.setupMaterialized || durationPresent || targetMaskPresent),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

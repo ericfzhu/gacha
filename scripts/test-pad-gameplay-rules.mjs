@@ -4,6 +4,7 @@ import {
   PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
   PAD_ENEMY_SKILL_ENTIRE_BLIND,
   PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT,
+  PAD_ENEMY_SKILL_BIND_ATTACK,
   PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
   PAD_ENEMY_SKILL_HEAL_ENEMY,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
@@ -1535,6 +1536,58 @@ assert.equal(directEntireBlindAltEngine.applyEnemySkillDefinition(
 assert.equal(directEntireBlindAltEngine.lastEnemySkill.type, 62);
 assert.equal(directEntireBlindAltEngine.snapshot().boardState.flat()
   .filter((orb) => orb.entireBlind).length, 30);
+const enemyAiBindAttackDefinition = enemyAiEntireBlindDefinition.slice();
+const enemyAiBindAttackView = new DataView(enemyAiBindAttackDefinition.buffer);
+enemyAiBindAttackView.setUint32(0x00, 9_043, true);
+enemyAiBindAttackView.setInt16(0x04, PAD_ENEMY_SKILL_BIND_ATTACK, true);
+enemyAiBindAttackView.setInt32(0x10, 50, true);
+enemyAiBindAttackView.setInt32(0x14, 2, true);
+enemyAiBindAttackView.setInt32(0x18, 4, true);
+enemyAiBindAttackView.setInt32(0x1c, 4, true);
+enemyAiBindAttackView.setInt32(0x20, 2, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiBindAttackDefinition), {
+  type: 63,
+  kind: 'bindAttack',
+  supported: true,
+  nativePresentationParameter: 50,
+  durationMin: 2,
+  durationMax: 4,
+  targetSelector: 4,
+  targetCount: 2,
+  attackWithSkillValue: 50,
+});
+const bindAttackRuntime = new Uint8Array(0x688);
+const bindAttackRuntimeView = new DataView(bindAttackRuntime.buffer);
+bindAttackRuntimeView.setUint16(0x674, 0x0a, true);
+bindAttackRuntimeView.setInt32(0x680, 50, true);
+bindAttackRuntimeView.setInt32(0x684, 3, true);
+assert.deepEqual(decodePadEnemySkillRuntime(enemyAiBindAttackDefinition, bindAttackRuntime), {
+  type: 63,
+  kind: 'bindAttack',
+  supported: true,
+  nativePresentationParameter: 50,
+  durationTurns: 3,
+  targetMask: 0x0a,
+  setupMaterialized: true,
+  attackWithSkillValue: 50,
+});
+const directBindAttackEngine = new PuzzleEngine({ seed: 21_900 });
+directBindAttackEngine.setRngState(21_900);
+assert.equal(directBindAttackEngine.applyEnemySkillDefinition(enemyAiBindAttackDefinition), true);
+const directBindAttackState = directBindAttackEngine.snapshot();
+assert.equal(directBindAttackState.lastEnemySkill.type, 63);
+assert.equal(directBindAttackState.lastEnemySkill.boundMask, directBindAttackState.lastEnemySkill.targetMask);
+assert.equal(directBindAttackState.lastEnemySkill.targetMask, 0x06);
+assert.equal(directBindAttackState.lastEnemySkill.durationTurns, 3);
+assert.equal(directBindAttackState.lastEnemySkill.boundMask.toString(2).replaceAll('0', '').length, 2);
+assert.equal(directBindAttackState.party[0].bindTurns, 0);
+assert.equal(directBindAttackState.party[5].bindTurns, 0);
+assert.equal(directBindAttackState.party.slice(1, 5)
+  .filter((member) => member.bindTurns === directBindAttackState.lastEnemySkill.durationTurns).length, 2);
+assert(directBindAttackState.lastEnemySkill.durationTurns >= 2);
+assert(directBindAttackState.lastEnemySkill.durationTurns <= 4);
+const bindAttackSetupState = padLcgStep(padLcgStep(padLcgStep(21_900).state).state).state;
+assert.equal(directBindAttackState.rngState, bindAttackSetupState);
 const directEntireBlindEngine = new PuzzleEngine({ seed: 21_900 });
 directEntireBlindEngine.setBoardFromCodes(['JBGHLD', 'BGLDHR', 'GLXHRB', 'LDHRBG', 'DHRBGL']);
 directEntireBlindEngine.setOrbState(0, 0, {
@@ -3762,6 +3815,46 @@ const partialEntireBlindAltSelection = selectPadEnemyAiNew(
 assert.equal(partialEntireBlindAltSelection.skillId, 9_042);
 assert.equal(partialEntireBlindAltSelection.effect.type, 62);
 assert.equal(partialEntireBlindAltSelection.rngState, padLcgStep(21_900).state);
+const bindAttackMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(bindAttackMonsterDefinition.buffer).setUint32(0xec, 9_043, true);
+const selectedBindAttackEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: bindAttackMonsterDefinition,
+    skillDefinitions: [enemyAiBindAttackDefinition],
+  }],
+});
+selectedBindAttackEngine.setRngState(21_900);
+selectedBindAttackEngine.enemies[0].counter = 1;
+selectedBindAttackEngine.enemies[1].counter = 99;
+selectedBindAttackEngine.resolveEnemyTurn();
+const selectedBindAttackState = selectedBindAttackEngine.snapshot();
+assert.equal(selectedBindAttackState.lastEnemyActions[0].skill.type, 63);
+assert.equal(selectedBindAttackState.lastEnemyActions[0].damage, 925);
+assert.equal(selectedBindAttackState.player.hp, 11_075);
+assert.equal(selectedBindAttackState.lastEnemySkill.targetMask, 0x12);
+assert.equal(selectedBindAttackState.lastEnemySkill.durationTurns, 2);
+assert.equal(selectedBindAttackState.lastEnemySkill.boundMask.toString(2)
+  .replaceAll('0', '').length, 2);
+assert.equal(selectedBindAttackState.party.slice(1, 5)
+  .filter((member) => member.bindTurns === selectedBindAttackState.lastEnemySkill.durationTurns).length, 2);
+const bindAttackTurnState = padLcgStep(padLcgStep(padLcgStep(
+  padLcgStep(21_900).state,
+).state).state).state;
+assert.equal(selectedBindAttackState.rngState, bindAttackTurnState);
+const rejectedBindAttackEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: bindAttackMonsterDefinition,
+    skillDefinitions: [enemyAiBindAttackDefinition],
+  }],
+});
+rejectedBindAttackEngine.party.slice(1, 5).forEach((member) => {
+  member.bindTurns = 5;
+});
+rejectedBindAttackEngine.setRngState(21_900);
+assert.equal(rejectedBindAttackEngine.takeEnemySkill(0), null);
+assert.equal(rejectedBindAttackEngine.rng.state, 21_900);
 const randomPartyBindMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(randomPartyBindMonsterDefinition.buffer).setUint32(0xec, 9_023, true);
 const selectedRandomPartyBindEngine = new PuzzleEngine({
