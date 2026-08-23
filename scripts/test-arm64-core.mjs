@@ -327,6 +327,30 @@ if (runtime.exports.arm64_get_vector_lo(1) !== 0x0000020100000201n ||
 }
 
 runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0xe0, 0x87, 0x03, 0x6f, // mvni v0.8h, #127 (exact post-touch frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.trace(5);
+if (BigInt.asUintN(64, runtime.exports.arm64_get_vector_lo(0)) !== 0xff80ff80ff80ff80n ||
+    BigInt.asUintN(64, runtime.exports.arm64_get_vector_hi(0)) !== 0xff80ff80ff80ff80n) {
+  throw new Error('NEON MVNI 8H semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x41, 0xb4, 0x00, 0x2f, // bic v1.4h, #2, lsl #8
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(1, 0x1234ffff0201abcdn);
+runtime.exports.arm64_set_vector_hi(1, 0xffffffffffffffffn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(1) !== 0x1034fdff0001a9cdn ||
+    runtime.exports.arm64_get_vector_hi(1) !== 0n) {
+  throw new Error('NEON BIC 4H shifted-immediate semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
   0x01, 0xe4, 0x00, 0x6f, // movi v1.2d, #0
   0x20, 0x00, 0x66, 0x9e, // fmov x0, d1
   0xc0, 0x03, 0x5f, 0xd6, // ret
@@ -574,6 +598,119 @@ runtime.trace(5);
 if (runtime.exports.arm64_get_vector_lo(24) !== 0x01e5016000e90072n ||
     runtime.exports.arm64_get_vector_hi(24) !== 0x01e5016000e90072n) {
   throw new Error('NEON MLA 8H semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x80, 0x96, 0x67, 0x2e, // mls v0.4h, v20.4h, v7.4h (exact post-touch frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(20, 0x0005000400030002n);
+runtime.exports.arm64_set_vector_lo(7, 0x0011000d000b0007n);
+runtime.exports.arm64_set_vector_lo(0, 0x0190012c00c80064n);
+runtime.exports.arm64_set_vector_hi(0, 0xffffffffffffffffn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(0) !== 0x013b00f800a70056n ||
+    runtime.exports.arm64_get_vector_hi(0) !== 0n) {
+  throw new Error('NEON MLS 4H semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x17, 0x10, 0x34, 0x2e, // uaddw v23.8h, v0.8h, v20.8b (exact post-touch frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(0, 0x0100010001000100n);
+runtime.exports.arm64_set_vector_hi(0, 0x0100010001000100n);
+runtime.exports.arm64_set_vector_lo(20, 0x0807060504030201n);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(23) !== 0x0104010301020101n ||
+    runtime.exports.arm64_get_vector_hi(23) !== 0x0108010701060105n) {
+  throw new Error('NEON UADDW 8H semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x83, 0x30, 0x25, 0x4e, // ssubw2 v3.8h, v4.8h, v5.16b
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(4, 0x1000100010001000n);
+runtime.exports.arm64_set_vector_hi(4, 0x1000100010001000n);
+runtime.exports.arm64_set_vector_hi(5, 0x040302017f80feffn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(3) !== 0x0f81108010021001n ||
+    runtime.exports.arm64_get_vector_hi(3) !== 0x0ffc0ffd0ffe0fffn) {
+  throw new Error('NEON SSUBW2 8H semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x74, 0xc2, 0x61, 0x0e, // smull v20.4s, v19.4h, v1.4h
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(19, 0xfffb0004fffd0002n);
+runtime.exports.arm64_set_vector_lo(1, 0xffeffff3000b0007n);
+runtime.trace(5);
+if (BigInt.asUintN(64, runtime.exports.arm64_get_vector_lo(20)) !== 0xffffffdf0000000en ||
+    runtime.exports.arm64_get_vector_hi(20) !== 0x00000055ffffffccn) {
+  throw new Error('NEON SMULL 4S semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x54, 0xa2, 0x64, 0x0e, // smlsl v20.4s, v18.4h, v4.4h
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(20, 0x000000c800000064n);
+runtime.exports.arm64_set_vector_hi(20, 0x000001900000012cn);
+runtime.exports.arm64_set_vector_lo(18, 0x0005000400030002n);
+runtime.exports.arm64_set_vector_lo(4, 0x0011000d000b0007n);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(20) !== 0x000000a700000056n ||
+    runtime.exports.arm64_get_vector_hi(20) !== 0x0000013b000000f8n) {
+  throw new Error('NEON SMLSL 4S semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x94, 0x8e, 0x11, 0x0f, // rshrn v20.4h, v20.4s, #15
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(20, 0x0000400000003fffn);
+runtime.exports.arm64_set_vector_hi(20, 0x0000c0000000bfffn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(20) !== 0x0002000100010000n ||
+    runtime.exports.arm64_get_vector_hi(20) !== 0n) {
+  throw new Error('NEON RSHRN 4H semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x20, 0xb4, 0x62, 0x6e, // sqrdmulh v0.8h, v1.8h, v2.8h
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(1, 0x0001000100010001n);
+runtime.exports.arm64_set_vector_hi(1, 0x0001000100010001n);
+runtime.exports.arm64_set_vector_lo(2, 0x4000400040004000n);
+runtime.exports.arm64_set_vector_hi(2, 0x4000400040004000n);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(0) !== 0x0001000100010001n ||
+    runtime.exports.arm64_get_vector_hi(0) !== 0x0001000100010001n) {
+  throw new Error('NEON SQRDMULH 8H rounding semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x20, 0x28, 0x21, 0x2e, // sqxtun v0.8b, v1.8h
+  0x20, 0x28, 0x21, 0x6e, // sqxtun2 v0.16b, v1.8h
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(1, 0x00ff00010000ffffn);
+runtime.exports.arm64_set_vector_hi(1, 0x002a80007fff0100n);
+runtime.trace(6);
+if (BigInt.asUintN(64, runtime.exports.arm64_get_vector_lo(0)) !== 0x2a00ffffff010000n ||
+    BigInt.asUintN(64, runtime.exports.arm64_get_vector_hi(0)) !== 0x2a00ffffff010000n) {
+  throw new Error('NEON SQXTUN/SQXTUN2 byte semantics failed');
 }
 
 runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
@@ -1412,6 +1549,21 @@ const interleavedFour = runtime.readBytes(interleaveMemoryAddress, 64);
 if (runtime.exports.arm64_get_register(18) !== BigInt(interleaveMemoryAddress + 64) ||
     interleavedFour.some((value, index) => value !== ((index >> 5) * 8 + (index & 3)))) {
   throw new Error('NEON ST4 byte interleave semantics failed');
+}
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x73, 0x35, 0x20, 0x0d, // st4 {v19.b-v22.b}[5], [x11]
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_register(11, BigInt(interleaveMemoryAddress));
+for (let register = 19; register <= 22; register += 1) {
+  runtime.exports.arm64_set_vector_lo(register, BigInt(register - 18) << 40n);
+}
+runtime.trace(5);
+const singleInterleavedFour = runtime.readBytes(interleaveMemoryAddress, 4);
+if (singleInterleavedFour.some((value, index) => value !== index + 1)) {
+  throw new Error('NEON ST4 single-byte lane semantics failed');
 }
 
 runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([

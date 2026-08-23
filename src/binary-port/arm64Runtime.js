@@ -19,9 +19,10 @@ const DEFAULT_MEMORY_BIAS = 0x200000;
 const RETURN_SENTINEL = 0xffffffffffffffffn;
 // Keep the public Wasm URL versioned because a stale interpreter can accept
 // the APK bootstrap and then fail much later in a native frame callback. The
-// version identifies the decoder generation that includes the live NEG.2S,
-// USHL.2S, CCMP/CCMN, LDPSW, and scalar ADDP frame instructions.
-export const ARM64_CORE_SOURCE = '/wasm/arm64_core.wasm?v=20260824-frame17';
+// version identifies the decoder generation that includes the live post-touch
+// JPEG/NEON path as well as the earlier NEG.2S callback repair.
+export const ARM64_CORE_BUILD = '20260824-frame21';
+export const ARM64_CORE_SOURCE = `/wasm/arm64_core.wasm?v=${ARM64_CORE_BUILD}`;
 const R_AARCH64_RELATIVE = 1027;
 const R_AARCH64_ABS64 = 257;
 const R_AARCH64_GLOB_DAT = 1025;
