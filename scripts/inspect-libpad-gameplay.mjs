@@ -290,6 +290,23 @@ const LOCKED_SKYFALL_INSTRUCTION_ANCHORS = Object.freeze([
   [0x61b800, 0x6b20229f], // reject only the identical active mask
   [0x61b808, 0x14000205], // identical record returns the zero admission scale
 ]);
+const STICKY_BLIND_RANDOM_ENEMY_SKILL_TYPE = 97;
+const STICKY_BLIND_RANDOM_HANDLER = 0x62be50;
+const STICKY_BLIND_RANDOM_SETUP_HANDLER = 0x6218e0;
+const STICKY_BLIND_RANDOM_CONDITION_HANDLER = 0x61a630;
+const STICKY_BLIND_RANDOM_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x6218e0, 0xb94012a8], // load authored blind duration from definition +0x10
+  [0x6218f0, 0xb9067a68], // store duration at runtime +0x678
+  [0x6218f8, 0x2942aaa9], // load inclusive count range +0x14..+0x18
+  [0x621914, 0xb82b690c], // persist the shared-LCG count draw
+  [0x62192c, 0xb9067e68], // store selected count at runtime +0x67c
+  [0x621930, 0xf9400048], // begin the second shared-LCG setup draw
+  [0x62193c, 0xb82b6909], // persist that selection-seed draw
+  [0x621944, 0xb9068268], // store its high 16 bits at runtime +0x680
+  [0x621948, 0xb906867f], // clear the adjacent runtime control lane +0x684
+  [0x61a630, 0x52a7f008], // unconditional binary32 1.0 admission
+  [0x62be50, 0x900045e9], // shared post-effect dispatch tail
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -1226,6 +1243,31 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : lockedSkyfallConditionTarget === LOCKED_SKYFALL_CONDITION_HANDLER;
   const lockedSkyfallInstructionAnchorsMatch = restoredElf === null ? null
     : LOCKED_SKYFALL_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
+  const stickyBlindRandomDispatchTarget = resolveEnemySkillTarget(
+    STICKY_BLIND_RANDOM_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const stickyBlindRandomSetupTarget = resolveEnemySkillTarget(
+    STICKY_BLIND_RANDOM_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const stickyBlindRandomConditionTarget = resolveEnemySkillTarget(
+    STICKY_BLIND_RANDOM_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const stickyBlindRandomDispatchMatches = stickyBlindRandomDispatchTarget === null
+    ? null : stickyBlindRandomDispatchTarget === STICKY_BLIND_RANDOM_HANDLER;
+  const stickyBlindRandomSetupMatches = stickyBlindRandomSetupTarget === null
+    ? null : stickyBlindRandomSetupTarget === STICKY_BLIND_RANDOM_SETUP_HANDLER;
+  const stickyBlindRandomConditionMatches = stickyBlindRandomConditionTarget === null
+    ? null : stickyBlindRandomConditionTarget === STICKY_BLIND_RANDOM_CONDITION_HANDLER;
+  const stickyBlindRandomInstructionAnchorsMatch = restoredElf === null ? null
+    : STICKY_BLIND_RANDOM_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
@@ -2233,6 +2275,11 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       lockedSkyfallSetupMatches21_9: lockedSkyfallSetupMatches,
       lockedSkyfallConditionMatches21_9: lockedSkyfallConditionMatches,
       lockedSkyfallInstructionAnchorsMatch21_9: lockedSkyfallInstructionAnchorsMatch,
+      stickyBlindRandomDispatchMatches21_9: stickyBlindRandomDispatchMatches,
+      stickyBlindRandomSetupMatches21_9: stickyBlindRandomSetupMatches,
+      stickyBlindRandomConditionMatches21_9: stickyBlindRandomConditionMatches,
+      stickyBlindRandomInstructionAnchorsMatch21_9:
+        stickyBlindRandomInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -2771,6 +2818,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       lockedSkyfallInstructionAnchorsMatch21_9: lockedSkyfallInstructionAnchorsMatch,
       lockedSkyfallSemantics:
         'type 96 shares type 68 setup: +0x10 mask, one-LCG inclusive +0x14..+0x18 duration, and +0x1c chance at runtime +0x678..+0x680; execution installs a timed automatic lock-fall record with source flag zero, whose matches consume only the dedicated lock-fall LCG; condition ignores nonzero-source passive records and rejects an identical active enemy-skill mask while allowing a different mask',
+      stickyBlindRandomType: STICKY_BLIND_RANDOM_ENEMY_SKILL_TYPE,
+      stickyBlindRandomDispatchTarget: stickyBlindRandomDispatchTarget === null
+        ? null : hex(stickyBlindRandomDispatchTarget),
+      stickyBlindRandomDispatchMatches21_9: stickyBlindRandomDispatchMatches,
+      stickyBlindRandomSetupTarget: stickyBlindRandomSetupTarget === null
+        ? null : hex(stickyBlindRandomSetupTarget),
+      stickyBlindRandomSetupMatches21_9: stickyBlindRandomSetupMatches,
+      stickyBlindRandomConditionTarget: stickyBlindRandomConditionTarget === null
+        ? null : hex(stickyBlindRandomConditionTarget),
+      stickyBlindRandomConditionMatches21_9: stickyBlindRandomConditionMatches,
+      stickyBlindRandomInstructionAnchorsMatch21_9: stickyBlindRandomInstructionAnchorsMatch,
+      stickyBlindRandomSemantics:
+        'type 97 copies +0x10 duration, spends one shared-LCG draw on inclusive +0x14..+0x18 count, then a second shared draw whose high 16 bits become the private selection seed at runtime +0x680; its condition is unconditional and its table dispatch reaches the shared post-effect tail',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -3281,6 +3341,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || lockedSkyfallSetupMatches === false
     || lockedSkyfallConditionMatches === false
     || lockedSkyfallInstructionAnchorsMatch === false
+    || stickyBlindRandomDispatchMatches === false
+    || stickyBlindRandomSetupMatches === false
+    || stickyBlindRandomConditionMatches === false
+    || stickyBlindRandomInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

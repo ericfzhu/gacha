@@ -1223,6 +1223,27 @@ focused fixture, seed 21900 materializes four turns for a 100% Fire rule and
 ends the shared AI stream at 3803934822; subsequent Fire generation is locked
 through the separate lock-fall stream.
 
+Enemy skill type `97` applies sticky/super blind to a random subset of the
+current board. Its exact dispatch, setup, and condition targets are
+`0x62be50`, `0x6218e0`, and `0x61a630`; the independent data-pipeline parser
+names the same record `ESBlindStickyRandom`. Definition `+0x10` is the blind
+duration and `+0x14..+0x18` is the inclusive affected-count range.
+
+Setup copies duration to runtime `+0x678`, advances the shared LCG once to
+materialize the count at `+0x67c`, then advances it a second time and stores
+that state's high 16 bits at `+0x680` as the private selection seed. Runtime
+`+0x684` is explicitly cleared. Condition `0x61a630` admits unconditionally,
+and the dispatch table reaches the shared post-effect tail; the selected
+record's prepared runtime values drive the board presentation/effect path.
+
+The browser reuses the recovered forward private-seed shuffle contract and
+marks the selected cells with the existing `0x1000` sticky-blind flag plus its
+fresh/countdown state. Selection itself advances no shared RNG. With seed
+21900, the ordinary AI draw is followed by count and seed draws, producing
+count four, private seed 29441, and final shared state 1929471377. On the 6×5
+fixture, row-major coordinates `(2,5)`, `(3,4)`, `(4,0)`, and `(4,2)` become
+obscured for three turns and visibly render their countdowns.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

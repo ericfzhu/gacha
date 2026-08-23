@@ -64,6 +64,7 @@ export const PAD_ENEMY_SKILL_NATIVE_NO_EFFECT = 93;
 export const PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS = 94;
 export const PAD_ENEMY_SKILL_ENEMY_ESCAPE = 95;
 export const PAD_ENEMY_SKILL_LOCKED_SKYFALL = 96;
+export const PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM = 97;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -303,6 +304,20 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       durationMin,
       durationMax,
       chancePercent: definition.getInt32(0x1c, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM) {
+    requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    const countMin = definition.getInt32(0x14, true);
+    const countMax = definition.getInt32(0x18, true);
+    return Object.freeze({
+      type,
+      kind: 'stickyBlindRandom',
+      supported: countMax >= countMin,
+      durationTurns: definition.getInt32(0x10, true),
+      countMin,
+      countMax,
       attackWithSkillValue,
     });
   }
@@ -1220,6 +1235,22 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM) {
+    requireLength(monsterBytes, 0x684, 'PAD monster runtime');
+    return Object.freeze({
+      type,
+      kind: 'stickyBlindRandom',
+      supported: true,
+      durationTurns: monster.getInt32(0x678, true),
+      blindCount: monster.getInt32(0x67c, true),
+      selectionSeed: monster.getUint32(0x680, true) & 0xffff,
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -1931,6 +1962,27 @@ export function normalizePadEnemySkillRecord(record) {
         : { durationMin, durationMax }),
       chancePercent: Math.trunc(Number(record?.chancePercent) || 0),
       setupMaterialized: Boolean(record?.setupMaterialized || durationPresent),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM || record?.kind === 'stickyBlindRandom') {
+    const countMin = Math.trunc(Number(record?.countMin) || 0);
+    const countMax = Math.trunc(Number(record?.countMax) || 0);
+    const countPresent = record?.blindCount !== undefined && record?.blindCount !== null;
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM,
+      kind: 'stickyBlindRandom',
+      supported: record?.supported !== false && countMax >= countMin,
+      durationTurns: Math.trunc(Number(record?.durationTurns) || 0),
+      ...(countPresent
+        ? {
+          blindCount: Math.trunc(Number(record.blindCount) || 0),
+          selectionSeed: Math.trunc(Number(record?.selectionSeed) || 0) & 0xffff,
+        }
+        : { countMin, countMax }),
+      setupMaterialized: Boolean(record?.setupMaterialized || countPresent),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

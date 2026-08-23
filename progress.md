@@ -2,6 +2,23 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 type-97 random sticky blind
+
+- Recovered type `97` at dispatch/setup/condition `0x62be50`, `0x6218e0`, and
+  `0x61a630`; the independent parser corroborates it as
+  `ESBlindStickyRandom`.
+- Definition `+0x10` supplies duration and `+0x14..+0x18` the inclusive count
+  range. Setup spends one shared-LCG draw for count and a second whose high 16
+  bits become the private board-selection seed at runtime `+0x680`; condition
+  is unconditional.
+- Ported decoding, exact runtime materialization, private seeded board
+  selection, per-orb sticky-blind flags/countdowns, snapshots, and browser
+  rendering. Seed 21900 selects four cells for three turns at coordinates
+  `(2,5)`, `(3,4)`, `(4,0)`, `(4,2)` and ends shared state 1929471377.
+- Pure rules, exact tables plus eleven instruction anchors, focused Chromium,
+  and screenshot inspection pass without page errors. Next: run broad checks
+  and continue with fixed sticky-blind type `98`.
+
 ## 2026-08-24 type-96 locked skyfall
 
 - Recovered type `96` at dispatch/setup/condition `0x629f0c`, `0x6200a4`, and

@@ -53,6 +53,7 @@ import {
   PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS,
   PAD_ENEMY_SKILL_ENEMY_ESCAPE,
   PAD_ENEMY_SKILL_LOCKED_SKYFALL,
+  PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1594,6 +1595,16 @@ export class PuzzleEngine {
         setupMaterialized: true,
       });
     }
+    if (skill.supported && skill.kind === 'stickyBlindRandom' && !skill.setupMaterialized) {
+      const blindCount = this.rollEnemySkillDuration(skill.countMin, skill.countMax);
+      const selectionSeed = this.rng.nextUint16();
+      return Object.freeze({
+        ...record,
+        blindCount,
+        selectionSeed,
+        setupMaterialized: true,
+      });
+    }
     if (skill.supported && skill.kind === 'activeSkillSeal' && !skill.setupMaterialized) {
       return Object.freeze({
         ...record,
@@ -2134,6 +2145,26 @@ export class PuzzleEngine {
       this.message = 'The board was blinded.';
       return true;
     }
+    if (skill.supported && skill.kind === 'stickyBlindRandom') {
+      const candidates = [];
+      this.board.forEach((row, rowIndex) => row.forEach((orb, columnIndex) => {
+        candidates.push({ row: rowIndex, column: columnIndex });
+      }));
+      const selected = padShuffleLockDropCandidates(skill.selectionSeed, candidates)
+        .slice(0, Math.max(0, Math.min(candidates.length, skill.blindCount)));
+      selected.forEach(({ row, column }) => {
+        const orb = this.board[row][column];
+        orb.blockFlags = (Number(orb.blockFlags) >>> 0)
+          | PAD_BLOCK_BLIND_FLAG
+          | PAD_BLOCK_BLIND_FRESH_FLAG;
+        orb.blind = true;
+        orb.blindFresh = true;
+        orb.blindCountdown = Math.max(0, skill.durationTurns);
+      });
+      this.lastEnemySkill = Object.freeze({ ...skill, blindedOrbCount: selected.length });
+      this.message = `${selected.length} orb${selected.length === 1 ? '' : 's'} were obscured.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'clearPlayerBuffs') {
       // _doItetukuHadou clears both recovered sGAMEWORK positive-status lanes,
       // then type 6 invokes _applyLeaderSkill(false). Leader effects in this
@@ -2665,6 +2696,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS,
         PAD_ENEMY_SKILL_ENEMY_ESCAPE,
         PAD_ENEMY_SKILL_LOCKED_SKYFALL,
+        PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,

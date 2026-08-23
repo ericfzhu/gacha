@@ -17,6 +17,7 @@ import {
   PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS,
   PAD_ENEMY_SKILL_ENEMY_ESCAPE,
   PAD_ENEMY_SKILL_LOCKED_SKYFALL,
+  PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -179,6 +180,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS,
     PAD_ENEMY_SKILL_ENEMY_ESCAPE,
     PAD_ENEMY_SKILL_LOCKED_SKYFALL,
+    PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
     PAD_ENEMY_SKILL_DEFENSE_BOOST,
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -550,6 +552,10 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
       probabilityScale: identicalActiveRule ? 0 : 1,
       rngState,
     };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM) {
+    // 0x61a630 is the unconditional binary32 1.0 condition target.
+    return { eligible: true, probabilityScale: 1, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_BIND_LEADER_HELPER) {
     const party = Array.isArray(state.party) ? state.party : [];

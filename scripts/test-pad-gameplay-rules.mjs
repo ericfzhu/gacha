@@ -18,6 +18,7 @@ import {
   PAD_ENEMY_SKILL_LOCK_RANDOM_ORBS,
   PAD_ENEMY_SKILL_ENEMY_ESCAPE,
   PAD_ENEMY_SKILL_LOCKED_SKYFALL,
+  PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1138,6 +1139,40 @@ assert.deepEqual(decodePadEnemySkillRuntime(
   typeMask: 0b1,
   durationTurns: 4,
   chancePercent: 100,
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
+});
+const enemyAiStickyBlindRandomDefinition = enemyAiLockedSkyfallDefinition.slice();
+const enemyAiStickyBlindRandomView = new DataView(enemyAiStickyBlindRandomDefinition.buffer);
+enemyAiStickyBlindRandomView.setUint32(0x00, 9_077, true);
+enemyAiStickyBlindRandomView.setInt16(0x04, PAD_ENEMY_SKILL_STICKY_BLIND_RANDOM, true);
+enemyAiStickyBlindRandomView.setInt32(0x10, 3, true);
+enemyAiStickyBlindRandomView.setInt32(0x14, 2, true);
+enemyAiStickyBlindRandomView.setInt32(0x18, 4, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiStickyBlindRandomDefinition), {
+  type: 97,
+  kind: 'stickyBlindRandom',
+  supported: true,
+  durationTurns: 3,
+  countMin: 2,
+  countMax: 4,
+  attackWithSkillValue: 0,
+});
+const stickyBlindRandomRuntime = new Uint8Array(0x684);
+const stickyBlindRandomRuntimeView = new DataView(stickyBlindRandomRuntime.buffer);
+stickyBlindRandomRuntimeView.setInt32(0x678, 3, true);
+stickyBlindRandomRuntimeView.setInt32(0x67c, 4, true);
+stickyBlindRandomRuntimeView.setUint32(0x680, 29_441, true);
+assert.deepEqual(decodePadEnemySkillRuntime(
+  enemyAiStickyBlindRandomDefinition,
+  stickyBlindRandomRuntime,
+), {
+  type: 97,
+  kind: 'stickyBlindRandom',
+  supported: true,
+  durationTurns: 3,
+  blindCount: 4,
+  selectionSeed: 29_441,
   setupMaterialized: true,
   attackWithSkillValue: 0,
 });
@@ -4720,6 +4755,38 @@ const rejectedLockedSkyfallState = rejectedLockedSkyfallEngine.snapshot();
 assert.equal(rejectedLockedSkyfallState.lastEnemyActions[0].kind, 'attack');
 assert.equal(rejectedLockedSkyfallState.rngState, 21_900);
 assert.equal(rejectedLockedSkyfallState.lockFallRules.length, 1);
+
+const stickyBlindRandomMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(stickyBlindRandomMonsterDefinition.buffer).setUint32(0xec, 9_077, true);
+const selectedStickyBlindRandomEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: stickyBlindRandomMonsterDefinition,
+    skillDefinitions: [enemyAiStickyBlindRandomDefinition],
+  }],
+});
+selectedStickyBlindRandomEngine.setBoardFromCodes([
+  'RBRBHD', 'GLDHJG', 'HMGDGL', 'DLGHHJ', 'HJGGLD',
+]);
+selectedStickyBlindRandomEngine.enemies[0].counter = 1;
+selectedStickyBlindRandomEngine.enemies[1].counter = 99;
+selectedStickyBlindRandomEngine.setRngState(21_900);
+selectedStickyBlindRandomEngine.resolveEnemyTurn();
+const selectedStickyBlindRandomState = selectedStickyBlindRandomEngine.snapshot();
+assert.equal(selectedStickyBlindRandomState.lastEnemyActions[0].skill.type, 97);
+assert.equal(selectedStickyBlindRandomState.lastEnemyActions[0].skill.blindCount, 4);
+assert.equal(selectedStickyBlindRandomState.lastEnemyActions[0].skill.selectionSeed, 29_441);
+assert.equal(selectedStickyBlindRandomState.lastEnemySkill.blindedOrbCount, 4);
+assert.equal(selectedStickyBlindRandomState.rngState, padLcgStep(
+  padLcgStep(padLcgStep(21_900).state).state,
+).state);
+assert.deepEqual(selectedStickyBlindRandomState.boardState.flatMap((row, rowIndex) => (
+  row.map((orb, columnIndex) => ({ orb, row: rowIndex, column: columnIndex }))
+)).filter(({ orb }) => orb.blind).map(({ row, column }) => [row, column]), [
+  [2, 5], [3, 4], [4, 0], [4, 2],
+]);
+assert.equal(selectedStickyBlindRandomState.boardState[2][5].blindCountdown, 3);
+assert.equal(selectedStickyBlindRandomState.player.hp, 12_000);
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;
