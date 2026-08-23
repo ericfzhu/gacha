@@ -665,6 +665,25 @@ availability gate and execution spends the two persisted LCG advances of each
 random-color shuffle. The browser preserves these fixed/random paths, lock
 rejection, poison-family matching, accompanying-hit ordering, and selector RNG.
 
+Enemy skill type `5` is the classic whole-board blind. Its early dispatch
+entry targets `0x6286b4`, the no-parameter setup entry targets `0x6217c0`, and
+its AI condition targets `0x61b31c`. Execution calls `_doBlock2Black`
+(`0x625994`) across the fixed 16-by-16 backing grid. Each live cell receives
+classic-blind bit `0x4`; a newly covered cell also receives fresh bit `0x8`.
+For jammer, poison, mortal-poison, and bomb cells, the native helper also clears
+incompatible `0x28000` state and enhancement data.
+
+The condition inlines `_countBlackBlocks` (`0x618058`) and returns the binary32
+visible-cell fraction `1 - blackCount / (rows * columns)`. It consumes no RNG,
+so a fully covered board rejects the skill while a partially covered board
+proportionally scales only the selector's immediate chance. During movement,
+`_swapBlockMain` (`0x67a7a0`) clears bit `0x4` on both cells participating in
+each swap, revealing the held orb and every crossed orb; bit `0x8` remains a
+separate fresh marker. The browser keeps these bits distinct from black-fall
+blind `0x1000/0x10000`, renders no countdown for classic blind, and preserves
+the generic definition `+0x44` accompanying attack. The semantic label is also
+cross-checked against the independent [DadGuide raw enemy-skill parser](https://github.com/TsubakiBotPad/pad-data-pipeline/blob/master/etl/pad/raw/skills/enemy_skill_info.py#L609-L619).
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

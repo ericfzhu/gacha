@@ -1,4 +1,5 @@
 export const PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION = 4;
+export const PAD_ENEMY_SKILL_ENTIRE_BLIND = 5;
 export const PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS = 6;
 export const PAD_ENEMY_SKILL_HEAL_ENEMY = 7;
 export const PAD_ENEMY_SKILL_ADDITIONAL_ATTACK = 8;
@@ -113,6 +114,14 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       supported: true,
       sourceType: definition.getInt32(0x10, true),
       destinationType: definition.getInt32(0x14, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_ENTIRE_BLIND) {
+    return Object.freeze({
+      type,
+      kind: 'entireBlind',
+      supported: true,
       attackWithSkillValue,
     });
   }
@@ -729,6 +738,17 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_ENTIRE_BLIND) {
+    return Object.freeze({
+      type,
+      kind: 'entireBlind',
+      supported: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS) {
     return Object.freeze({
       type,
@@ -1045,6 +1065,16 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
 
 export function normalizePadEnemySkillRecord(record) {
   const type = Math.trunc(Number(record?.type));
+  if (type === PAD_ENEMY_SKILL_ENTIRE_BLIND || record?.kind === 'entireBlind') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_ENTIRE_BLIND,
+      kind: 'entireBlind',
+      supported: true,
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
   if (type === PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION || record?.kind === 'sourceOrbConversion') {
     return Object.freeze({
       type: PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,

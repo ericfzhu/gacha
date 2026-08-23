@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
   PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
+  PAD_ENEMY_SKILL_ENTIRE_BLIND,
   PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
   PAD_ENEMY_SKILL_HEAL_ENEMY,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
@@ -1482,6 +1483,65 @@ assert.equal(bindRuntimeEngine.party[5].bindTurns, 2);
 assert.equal(bindRuntimeEngine.lastEnemySkill.setupDurationTurns, 4);
 assert.equal(bindRuntimeEngine.lastEnemySkill.durationTurns, 2);
 assert.equal(bindRuntimeEngine.rng.state, padLcgStep(21_900).state);
+const enemyAiEntireBlindDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiEntireBlindView = new DataView(enemyAiEntireBlindDefinition.buffer);
+enemyAiEntireBlindView.setUint32(0x00, 9_041, true);
+enemyAiEntireBlindView.setInt16(0x04, PAD_ENEMY_SKILL_ENTIRE_BLIND, true);
+enemyAiEntireBlindView.setInt32(0x30, 10_000, true);
+enemyAiEntireBlindView.setInt32(0x34, 1_000, true);
+enemyAiEntireBlindView.setInt32(0x38, 100, true);
+enemyAiEntireBlindView.setInt32(0x40, 20, true);
+enemyAiEntireBlindView.setInt32(0x44, 50, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiEntireBlindDefinition), {
+  type: 5,
+  kind: 'entireBlind',
+  supported: true,
+  attackWithSkillValue: 50,
+});
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiEntireBlindDefinition, new Uint8Array(0x680)),
+  {
+    type: 5,
+    kind: 'entireBlind',
+    supported: true,
+    attackWithSkillValue: 50,
+  },
+);
+const directEntireBlindEngine = new PuzzleEngine({ seed: 21_900 });
+directEntireBlindEngine.setBoardFromCodes(['JBGHLD', 'BGLDHR', 'GLXHRB', 'LDHRBG', 'DHRBGL']);
+directEntireBlindEngine.setOrbState(0, 0, {
+  blockFlags: 0x28000,
+  enhancementPower: 2.5,
+  nail: true,
+});
+directEntireBlindEngine.setOrbState(0, 1, {
+  blockFlags: 0x11000,
+  blindCountdown: 1,
+});
+assert.equal(directEntireBlindEngine.applyEnemySkillDefinition(enemyAiEntireBlindDefinition), true);
+assert.equal(directEntireBlindEngine.lastEnemySkill.newlyBlinded, 30);
+assert.equal(directEntireBlindEngine.message, 'The board was blinded.');
+let directEntireBlindState = directEntireBlindEngine.snapshot();
+assert.equal(directEntireBlindState.boardState.flat().filter((orb) => orb.entireBlind).length, 30);
+assert.equal(directEntireBlindState.boardState.flat().filter((orb) => orb.blind).length, 30);
+assert(directEntireBlindState.boardState.flat().every((orb) => (orb.blockFlags & 0x0c) === 0x0c));
+assert(directEntireBlindState.boardState.flat().every((orb) => orb.blindCountdown === 0));
+assert.equal(directEntireBlindState.boardState[0][0].enhancementPower, 0);
+assert.equal(directEntireBlindState.boardState[0][0].nail, false);
+assert.equal(directEntireBlindState.boardState[0][0].blockFlags & 0x28000, 0);
+directEntireBlindEngine.advanceBlackOrbCountdowns();
+assert.equal(directEntireBlindEngine.snapshot().boardState.flat().filter((orb) => orb.entireBlind).length, 30);
+assert.equal(directEntireBlindEngine.snapshot().boardState[0][1].blockFlags, 0x100c);
+directEntireBlindEngine.advanceBlackOrbCountdowns();
+assert.equal(directEntireBlindEngine.snapshot().boardState[0][1].blockFlags, 0x0c);
+assert.equal(directEntireBlindEngine.snapshot().boardState[0][1].blind, true);
+directEntireBlindEngine.start();
+assert.equal(directEntireBlindEngine.startDrag(0, 0), true);
+assert.equal(directEntireBlindEngine.moveDrag(0, 1), true);
+directEntireBlindState = directEntireBlindEngine.snapshot();
+assert.equal(directEntireBlindState.boardState.flat().filter((orb) => orb.entireBlind).length, 28);
+assert.equal(directEntireBlindState.boardState[0][0].blockFlags & 0x04, 0);
+assert.equal(directEntireBlindState.boardState[0][1].blockFlags & 0x04, 0);
 const enemyAiRandomPartyBindDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiRandomPartyBindView = new DataView(enemyAiRandomPartyBindDefinition.buffer);
 enemyAiRandomPartyBindView.setUint32(0x00, 9_023, true);
@@ -3611,6 +3671,36 @@ const rejectedReviveEnemyEngine = new PuzzleEngine({
 rejectedReviveEnemyEngine.setRngState(21_900);
 assert.equal(rejectedReviveEnemyEngine.takeEnemySkill(0), null);
 assert.equal(rejectedReviveEnemyEngine.rng.state, 21_900);
+const entireBlindMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(entireBlindMonsterDefinition.buffer).setUint32(0xec, 9_041, true);
+const selectedEntireBlindEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: entireBlindMonsterDefinition,
+    skillDefinitions: [enemyAiEntireBlindDefinition],
+  }],
+});
+selectedEntireBlindEngine.setRngState(21_900);
+selectedEntireBlindEngine.enemies[0].counter = 1;
+selectedEntireBlindEngine.enemies[1].counter = 99;
+selectedEntireBlindEngine.resolveEnemyTurn();
+const selectedEntireBlindState = selectedEntireBlindEngine.snapshot();
+assert.equal(selectedEntireBlindState.lastEnemyActions[0].skill.type, 5);
+assert.equal(selectedEntireBlindState.lastEnemyActions[0].damage, 925);
+assert.equal(selectedEntireBlindState.player.hp, 11_075);
+assert.equal(selectedEntireBlindState.boardState.flat().filter((orb) => orb.entireBlind).length, 30);
+assert.equal(selectedEntireBlindState.rngState, padLcgStep(21_900).state);
+const rejectedEntireBlindEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: entireBlindMonsterDefinition,
+    skillDefinitions: [enemyAiEntireBlindDefinition],
+  }],
+});
+assert.equal(rejectedEntireBlindEngine.applyEnemySkillDefinition(enemyAiEntireBlindDefinition), true);
+rejectedEntireBlindEngine.setRngState(21_900);
+assert.equal(rejectedEntireBlindEngine.takeEnemySkill(0), null);
+assert.equal(rejectedEntireBlindEngine.rng.state, 21_900);
 const randomPartyBindMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(randomPartyBindMonsterDefinition.buffer).setUint32(0xec, 9_023, true);
 const selectedRandomPartyBindEngine = new PuzzleEngine({

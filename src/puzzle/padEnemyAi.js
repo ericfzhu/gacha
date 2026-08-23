@@ -1,6 +1,7 @@
 import { padLcgStep } from './padCoreRules.js';
 import {
   PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
+  PAD_ENEMY_SKILL_ENTIRE_BLIND,
   PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
   PAD_ENEMY_SKILL_HEAL_ENEMY,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
@@ -141,6 +142,7 @@ function normalizeDefinitionMap(definitions) {
 function isStaticallyEligible(definition, state) {
   if (!definition.effect.supported || ![
     PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
+    PAD_ENEMY_SKILL_ENTIRE_BLIND,
     PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
     PAD_ENEMY_SKILL_HEAL_ENEMY,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
@@ -196,6 +198,22 @@ function evaluateCondition(definition, state, rngState) {
   if (definition.effect.type === PAD_ENEMY_SKILL_BLACK_FALL) {
     const eligible = !state.blackFallActive;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_ENTIRE_BLIND) {
+    // Type 5's 0x61b31c callback inlines countBlackBlocks and returns the
+    // binary32 fraction of visible board cells. Native bit 0x4 is the classic
+    // per-cell black covering; the callback consumes no RNG of its own.
+    const boardCellCount = Math.max(0, Math.trunc(Number(state.boardCellCount) || 0));
+    const blackBlockCount = Math.max(
+      0,
+      Math.min(boardCellCount, Math.trunc(Number(state.blackBlockCount) || 0)),
+    );
+    const probabilityScale = boardCellCount > 0
+      ? Math.fround(Math.fround(1) - Math.fround(
+        Math.fround(blackBlockCount) / Math.fround(boardCellCount),
+      ))
+      : Math.fround(0);
+    return { eligible: probabilityScale > 0, probabilityScale, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS) {
     // Type 6's callback calls _getCountClearParams. For the two recovered
@@ -459,6 +477,8 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     party: Array.isArray(state.party) ? state.party : [],
     aiBudget: Math.max(0, Math.trunc(Number(state.aiBudget ?? monster.budgetCap) || 0)),
     blackFallActive: Boolean(state.blackFallActive),
+    boardCellCount: Math.max(0, Math.trunc(Number(state.boardCellCount) || 0)),
+    blackBlockCount: Math.max(0, Math.trunc(Number(state.blackBlockCount) || 0)),
     evaluateCondition: state.evaluateCondition,
   };
   let rngState = Number(state.rngState) >>> 0;

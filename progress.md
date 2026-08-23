@@ -2,6 +2,22 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 whole-board blind enemy skill
+
+- Recovered live enemy skill type `5`: early dispatch `0x6286b4`, generic
+  setup `0x6217c0`, and condition `0x61b31c`. Execution reaches
+  `_doBlock2Black` (`0x625994`); the condition inlines `_countBlackBlocks`
+  (`0x618058`) and returns the binary32 visible-board fraction without RNG.
+- Preserved native classic-blind bit `0x4` and new-cover bit `0x8` separately
+  from black-fall blind `0x1000/0x10000`. `_swapBlockMain` reveals both cells
+  used by each swap, so the held orb and crossed path uncover as the pointer
+  moves. Special jammer/poison/bomb cells also lose incompatible `0x28000`,
+  enhancement, and nail state as in the native helper.
+- Ported definition/runtime decoding, normalization, AI probability scaling,
+  direct and scheduled execution, generic `+0x44` attack composition, state
+  snapshots, rendering, native-address checks, and pure/browser fixtures.
+- Next: continue the remaining early live enemy-action table.
+
 ## 2026-08-23 attribute-gated inactivity enemy skill
 
 - Recovered live enemy skill type `16` as an inactivity/skip-turn record:

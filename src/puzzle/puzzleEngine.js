@@ -35,6 +35,7 @@ import {
 } from './padCoreRules.js';
 import {
   PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
+  PAD_ENEMY_SKILL_ENTIRE_BLIND,
   PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
   PAD_ENEMY_SKILL_HEAL_ENEMY,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
@@ -115,6 +116,8 @@ export const ORB_TYPES = Object.freeze([
 
 const NATURAL_ORB_TYPES = ORB_TYPES.slice(0, 6);
 const PAD_BLOCK_LOCKED_FLAG = 0x800;
+const PAD_BLOCK_ENTIRE_BLIND_FLAG = 0x4;
+const PAD_BLOCK_ENTIRE_BLIND_FRESH_FLAG = 0x8;
 const PAD_BLOCK_BLIND_FLAG = 0x1000;
 const PAD_BLOCK_COMBO_DROP_FLAG = 0x8000;
 const PAD_BLOCK_BLIND_FRESH_FLAG = 0x10000;
@@ -334,22 +337,32 @@ export class PuzzleEngine {
     let nail = state.nail === undefined
       ? (requestedBlockFlags & PAD_BLOCK_NAIL_FLAG) !== 0
       : Boolean(state.nail);
-    const blind = state.blind === undefined
+    const entireBlind = state.entireBlind === undefined
+      ? (requestedBlockFlags & PAD_BLOCK_ENTIRE_BLIND_FLAG) !== 0
+      : Boolean(state.entireBlind);
+    const blackFallBlind = state.blind === undefined
       ? (requestedBlockFlags & PAD_BLOCK_BLIND_FLAG) !== 0
-      : Boolean(state.blind);
-    const blindFresh = blind && (state.blindFresh === undefined
+      : Boolean(state.blind) && !entireBlind;
+    const blind = entireBlind || blackFallBlind;
+    const entireBlindFresh = entireBlind && (requestedBlockFlags
+      & PAD_BLOCK_ENTIRE_BLIND_FRESH_FLAG) !== 0;
+    const blackFallBlindFresh = blackFallBlind && (state.blindFresh === undefined
       ? (requestedBlockFlags & PAD_BLOCK_BLIND_FRESH_FLAG) !== 0
       : Boolean(state.blindFresh));
-    const blindCountdown = blind
+    const blindFresh = entireBlindFresh || blackFallBlindFresh;
+    const blindCountdown = blackFallBlind
       ? Math.max(0, Math.min(0x7f, Math.trunc(Number(state.blindCountdown) || 1)))
       : 0;
     let blockFlags = (requestedBlockFlags
-      & ~(PAD_BLOCK_LOCKED_FLAG | PAD_BLOCK_BLIND_FLAG | PAD_BLOCK_COMBO_DROP_FLAG
+      & ~(PAD_BLOCK_ENTIRE_BLIND_FLAG | PAD_BLOCK_ENTIRE_BLIND_FRESH_FLAG
+        | PAD_BLOCK_LOCKED_FLAG | PAD_BLOCK_BLIND_FLAG | PAD_BLOCK_COMBO_DROP_FLAG
         | PAD_BLOCK_BLIND_FRESH_FLAG | PAD_BLOCK_NAIL_FLAG | PAD_BLOCK_BURST_FLAG))
+      | (entireBlind ? PAD_BLOCK_ENTIRE_BLIND_FLAG : 0)
+      | (entireBlindFresh ? PAD_BLOCK_ENTIRE_BLIND_FRESH_FLAG : 0)
       | (locked ? PAD_BLOCK_LOCKED_FLAG : 0)
-      | (blind ? PAD_BLOCK_BLIND_FLAG : 0)
+      | (blackFallBlind ? PAD_BLOCK_BLIND_FLAG : 0)
       | ((requestedBlockFlags & PAD_BLOCK_COMBO_DROP_FLAG) !== 0 ? PAD_BLOCK_COMBO_DROP_FLAG : 0)
-      | (blindFresh ? PAD_BLOCK_BLIND_FRESH_FLAG : 0)
+      | (blackFallBlindFresh ? PAD_BLOCK_BLIND_FRESH_FLAG : 0)
       | (nail ? PAD_BLOCK_NAIL_FLAG : 0)
       | (thornActive ? PAD_BLOCK_BURST_FLAG : 0);
     const nativeType = ORB_TYPES.findIndex((candidate) => candidate.id === type);
@@ -423,6 +436,8 @@ export class PuzzleEngine {
         const damage = padThornDamage(this.player.maxHp, crossedOrb.thornPercent);
         this.lastThornDamage = Math.min(PAD_INT32_MAX, this.lastThornDamage + damage);
       }
+      this.revealEntireBlindOrb(this.board[fromRow][fromColumn]);
+      this.revealEntireBlindOrb(crossedOrb);
       [this.board[fromRow][fromColumn], this.board[nextRow][nextColumn]] = [this.board[nextRow][nextColumn], this.board[fromRow][fromColumn]];
       fromRow = nextRow;
       fromColumn = nextColumn;
@@ -1049,6 +1064,10 @@ export class PuzzleEngine {
       enemies: this.enemies.map((candidate) => ({ hp: candidate.hp })),
       aiBudget: pool.aiBudget,
       blackFallActive: Boolean(this.blackFallRule?.active),
+      boardCellCount: this.rows * this.columns,
+      blackBlockCount: this.board.reduce((total, row) => total + row.reduce((count, orb) => (
+        count + Number(((Number(orb?.blockFlags) >>> 0) & PAD_BLOCK_ENTIRE_BLIND_FLAG) !== 0)
+      ), 0), 0),
       rngState: this.rng.state,
       evaluateCondition: (definition, rngState) => {
         this.rng.setState(rngState);
@@ -1434,18 +1453,30 @@ export class PuzzleEngine {
     }
   }
 
+  revealEntireBlindOrb(orb) {
+    if (!orb) return false;
+    const flags = Number(orb.blockFlags) >>> 0;
+    if ((flags & PAD_BLOCK_ENTIRE_BLIND_FLAG) === 0) return false;
+    orb.blockFlags = flags & ~PAD_BLOCK_ENTIRE_BLIND_FLAG;
+    orb.blind = (orb.blockFlags & PAD_BLOCK_BLIND_FLAG) !== 0;
+    return true;
+  }
+
   advanceBlackOrbCountdowns() {
     this.board.forEach((row) => row.forEach((orb) => {
-      if (!orb.blind) return;
-      if (orb.blindFresh) {
-        orb.blindFresh = false;
-        orb.blockFlags = (Number(orb.blockFlags) >>> 0) & ~PAD_BLOCK_BLIND_FRESH_FLAG;
+      // Classic whole-board blind (bit 0x4) is movement-revealed and has no
+      // turn countdown. Only black-fall blind (bit 0x1000) advances here.
+      const flags = Number(orb.blockFlags) >>> 0;
+      if ((flags & PAD_BLOCK_BLIND_FLAG) === 0) return;
+      if ((flags & PAD_BLOCK_BLIND_FRESH_FLAG) !== 0) {
+        orb.blockFlags = flags & ~PAD_BLOCK_BLIND_FRESH_FLAG;
+        orb.blindFresh = (orb.blockFlags & PAD_BLOCK_ENTIRE_BLIND_FRESH_FLAG) !== 0;
         return;
       }
       orb.blindCountdown = Math.max(0, Math.trunc(Number(orb.blindCountdown) || 0) - 1);
       if (orb.blindCountdown === 0) {
-        orb.blind = false;
-        orb.blockFlags = (Number(orb.blockFlags) >>> 0) & ~PAD_BLOCK_BLIND_FLAG;
+        orb.blockFlags = flags & ~PAD_BLOCK_BLIND_FLAG;
+        orb.blind = (orb.blockFlags & PAD_BLOCK_ENTIRE_BLIND_FLAG) !== 0;
       }
     }));
   }
@@ -1558,6 +1589,33 @@ export class PuzzleEngine {
     const materialized = this.materializeEnemySkillRecord(record, enemyIndex);
     const skill = normalizePadEnemySkillRecord(materialized);
     this.lastEnemySkill = skill;
+    if (skill.supported && skill.kind === 'entireBlind') {
+      let newlyBlinded = 0;
+      this.board.forEach((row) => row.forEach((orb) => {
+        const flags = Number(orb.blockFlags) >>> 0;
+        if ((flags & PAD_BLOCK_ENTIRE_BLIND_FLAG) === 0) {
+          orb.blockFlags = flags
+            | PAD_BLOCK_ENTIRE_BLIND_FLAG
+            | PAD_BLOCK_ENTIRE_BLIND_FRESH_FLAG;
+          newlyBlinded += 1;
+        } else {
+          orb.blockFlags = flags | PAD_BLOCK_ENTIRE_BLIND_FLAG;
+        }
+        if (['jammer', 'poison', 'mortalPoison', 'bomb'].includes(orb.type)) {
+          // _doBlock2Black clears the same incompatible special-orb state as
+          // the native block-state helpers before installing classic blind.
+          orb.blockFlags &= ~PAD_BLOCK_SPECIAL_LOCK_CLEAR_FLAGS;
+          orb.enhancementPower = 0;
+          orb.enhanced = false;
+          orb.nail = false;
+        }
+        orb.blind = true;
+        orb.blindCountdown = 0;
+      }));
+      this.lastEnemySkill = Object.freeze({ ...skill, newlyBlinded });
+      this.message = 'The board was blinded.';
+      return true;
+    }
     if (skill.supported && skill.kind === 'clearPlayerBuffs') {
       // _doItetukuHadou clears both recovered sGAMEWORK positive-status lanes,
       // then type 6 invokes _applyLeaderSkill(false). Leader effects in this
@@ -1885,6 +1943,7 @@ export class PuzzleEngine {
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
       if (![
         PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
+        PAD_ENEMY_SKILL_ENTIRE_BLIND,
         PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
         PAD_ENEMY_SKILL_HEAL_ENEMY,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
@@ -1991,17 +2050,23 @@ export class PuzzleEngine {
         ? Boolean(orb.nail)
         : (sourceBlockFlags & PAD_BLOCK_NAIL_FLAG) !== 0
       : Boolean(state.nail);
-    const blind = state.blind === undefined
+    const entireBlind = state.entireBlind === undefined
+      ? state.blind === false
+        ? false
+        : (sourceBlockFlags & PAD_BLOCK_ENTIRE_BLIND_FLAG) !== 0
+      : Boolean(state.entireBlind);
+    const blackFallBlind = state.blind === undefined
+      ? (sourceBlockFlags & PAD_BLOCK_BLIND_FLAG) !== 0
+      : Boolean(state.blind) && !entireBlind;
+    const blind = entireBlind || blackFallBlind;
+    const blackFallBlindFresh = blackFallBlind && (state.blindFresh === undefined
       ? state.blockFlags === undefined
-        ? Boolean(orb.blind)
-        : (sourceBlockFlags & PAD_BLOCK_BLIND_FLAG) !== 0
-      : Boolean(state.blind);
-    const blindFresh = blind && (state.blindFresh === undefined
-      ? state.blockFlags === undefined
-        ? Boolean(orb.blindFresh)
+        ? (sourceBlockFlags & PAD_BLOCK_BLIND_FRESH_FLAG) !== 0
         : (sourceBlockFlags & PAD_BLOCK_BLIND_FRESH_FLAG) !== 0
       : Boolean(state.blindFresh));
-    const blindCountdown = blind
+    const blindFresh = ((sourceBlockFlags & PAD_BLOCK_ENTIRE_BLIND_FRESH_FLAG) !== 0)
+      || blackFallBlindFresh;
+    const blindCountdown = blackFallBlind
       ? Math.max(0, Math.min(0x7f, Math.trunc(Number(
         state.blindCountdown === undefined ? orb.blindCountdown || 1 : state.blindCountdown,
       ) || 0)))
@@ -2020,11 +2085,12 @@ export class PuzzleEngine {
         : (sourceBlockFlags & PAD_BLOCK_LOCKED_FLAG) !== 0
       : Boolean(state.locked);
     let blockFlags = (sourceBlockFlags
-      & ~(PAD_BLOCK_LOCKED_FLAG | PAD_BLOCK_BLIND_FLAG | PAD_BLOCK_BLIND_FRESH_FLAG
-        | PAD_BLOCK_NAIL_FLAG | PAD_BLOCK_BURST_FLAG))
+      & ~(PAD_BLOCK_ENTIRE_BLIND_FLAG | PAD_BLOCK_LOCKED_FLAG | PAD_BLOCK_BLIND_FLAG
+        | PAD_BLOCK_BLIND_FRESH_FLAG | PAD_BLOCK_NAIL_FLAG | PAD_BLOCK_BURST_FLAG))
+      | (entireBlind ? PAD_BLOCK_ENTIRE_BLIND_FLAG : 0)
       | (locked ? PAD_BLOCK_LOCKED_FLAG : 0)
-      | (blind ? PAD_BLOCK_BLIND_FLAG : 0)
-      | (blindFresh ? PAD_BLOCK_BLIND_FRESH_FLAG : 0)
+      | (blackFallBlind ? PAD_BLOCK_BLIND_FLAG : 0)
+      | (blackFallBlindFresh ? PAD_BLOCK_BLIND_FRESH_FLAG : 0)
       | (nail ? PAD_BLOCK_NAIL_FLAG : 0)
       | (thornActive ? PAD_BLOCK_BURST_FLAG : 0);
     if (specialType && blind) {
@@ -2446,8 +2512,13 @@ export class PuzzleEngine {
         code: ORB_BY_ID[orb.type].code,
         blockFlags: orb.blockFlags,
         comboDrop: (orb.blockFlags & PAD_BLOCK_COMBO_DROP_FLAG) !== 0,
-        blind: (orb.blockFlags & PAD_BLOCK_BLIND_FLAG) !== 0,
-        blindFresh: (orb.blockFlags & PAD_BLOCK_BLIND_FRESH_FLAG) !== 0,
+        entireBlind: (orb.blockFlags & PAD_BLOCK_ENTIRE_BLIND_FLAG) !== 0,
+        blind: (orb.blockFlags & (PAD_BLOCK_ENTIRE_BLIND_FLAG | PAD_BLOCK_BLIND_FLAG)) !== 0,
+        blindFresh: (orb.blockFlags & (
+          PAD_BLOCK_ENTIRE_BLIND_FLAG | PAD_BLOCK_BLIND_FLAG
+        )) !== 0 && (orb.blockFlags & (
+          PAD_BLOCK_ENTIRE_BLIND_FRESH_FLAG | PAD_BLOCK_BLIND_FRESH_FLAG
+        )) !== 0,
         blindCountdown: orb.blindCountdown,
         nail: (orb.blockFlags & PAD_BLOCK_NAIL_FLAG) !== 0,
         enhancementPower: orb.enhancementPower,

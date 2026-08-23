@@ -21,6 +21,10 @@ const SOURCE_ORB_CONVERSION_ENEMY_SKILL_TYPE = 4;
 const SOURCE_ORB_CONVERSION_HANDLER = 0x6292b4;
 const SOURCE_ORB_CONVERSION_SETUP_HANDLER = 0x61fee4;
 const SOURCE_ORB_CONVERSION_CONDITION_HANDLER = 0x61b2d8;
+const ENTIRE_BLIND_ENEMY_SKILL_TYPE = 5;
+const ENTIRE_BLIND_HANDLER = 0x6286b4;
+const ENTIRE_BLIND_SETUP_HANDLER = 0x6217c0;
+const ENTIRE_BLIND_CONDITION_HANDLER = 0x61b31c;
 const CLEAR_PLAYER_BUFFS_ENEMY_SKILL_TYPE = 6;
 const CLEAR_PLAYER_BUFFS_HANDLER = 0x6292e8;
 const CLEAR_PLAYER_BUFFS_SETUP_HANDLER = 0x6217c0;
@@ -213,6 +217,8 @@ const GAMEPLAY_SYMBOLS = Object.freeze([
   ['orb-state', 'checkLockFall', '_ZNK9cGAMEMAIN14_checkLockFallEP6sBLOCK', 0x626200],
   ['orb-state', 'checkPassiveSkill4Block', '_ZN9cGAMEMAIN24_checkPassiveSkill4BlockEP6sBLOCKb', 0x64131c],
   ['orb-state', 'doEntireBlack2', '_ZN9cGAMEMAIN15_doEntireBlack2EiPKtPK8sMONSTER', 0x627118],
+  ['orb-state', 'countBlackBlocks', '_ZNK9cGAMEMAIN17_countBlackBlocksEv', 0x618058],
+  ['orb-state', 'doBlock2Black', '_ZN9cGAMEMAIN14_doBlock2BlackEv', 0x625994],
   ['orb-state', 'doMakeInvDropEfc', '_ZN9cGAMEMAIN17_doMakeInvDropEfcEb', 0x627e58],
   ['orb-state', 'clearBlackFall', '_ZN9cGAMEMAIN15_clearBlackFallEv', 0x6b57a0],
   ['orb-state', 'incEneTurn', '_ZN9cGAMEMAIN11_incEneTurnEb', 0x677978],
@@ -362,6 +368,15 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     const entry = readUint16Virtual(restoredElf, restoredBytes, table + (type - 1) * 2);
     return base + entry * 4;
   };
+  const resolveEarlyEnemySkillTarget = (type) => {
+    if (!restoredElf) return null;
+    const entry = readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      EARLY_ENEMY_SKILL_DISPATCH_TABLE + (type - 5) * 2,
+    );
+    return EARLY_ENEMY_SKILL_DISPATCH_BASE + entry * 4;
+  };
   const sourceOrbConversionDispatchTarget = resolveEnemySkillTarget(
     SOURCE_ORB_CONVERSION_ENEMY_SKILL_TYPE,
     ENEMY_SKILL_DISPATCH_TABLE,
@@ -383,6 +398,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : sourceOrbConversionSetupTarget === SOURCE_ORB_CONVERSION_SETUP_HANDLER;
   const sourceOrbConversionConditionMatches = sourceOrbConversionConditionTarget === null
     ? null : sourceOrbConversionConditionTarget === SOURCE_ORB_CONVERSION_CONDITION_HANDLER;
+  const entireBlindDispatchTarget = resolveEarlyEnemySkillTarget(ENTIRE_BLIND_ENEMY_SKILL_TYPE);
+  const entireBlindSetupTarget = resolveEnemySkillTarget(
+    ENTIRE_BLIND_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const entireBlindConditionTarget = resolveEnemySkillTarget(
+    ENTIRE_BLIND_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const entireBlindDispatchMatches = entireBlindDispatchTarget === null
+    ? null : entireBlindDispatchTarget === ENTIRE_BLIND_HANDLER;
+  const entireBlindSetupMatches = entireBlindSetupTarget === null
+    ? null : entireBlindSetupTarget === ENTIRE_BLIND_SETUP_HANDLER;
+  const entireBlindConditionMatches = entireBlindConditionTarget === null
+    ? null : entireBlindConditionTarget === ENTIRE_BLIND_CONDITION_HANDLER;
   const clearPlayerBuffsDispatchTarget = resolveEnemySkillTarget(
     CLEAR_PLAYER_BUFFS_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1420,6 +1448,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       sourceOrbConversionDispatchMatches21_9: sourceOrbConversionDispatchMatches,
       sourceOrbConversionSetupMatches21_9: sourceOrbConversionSetupMatches,
       sourceOrbConversionConditionMatches21_9: sourceOrbConversionConditionMatches,
+      entireBlindDispatchMatches21_9: entireBlindDispatchMatches,
+      entireBlindSetupMatches21_9: entireBlindSetupMatches,
+      entireBlindConditionMatches21_9: entireBlindConditionMatches,
       clearPlayerBuffsDispatchMatches21_9: clearPlayerBuffsDispatchMatches,
       clearPlayerBuffsSetupMatches21_9: clearPlayerBuffsSetupMatches,
       clearPlayerBuffsConditionMatches21_9: clearPlayerBuffsConditionMatches,
@@ -1602,6 +1633,17 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       sourceOrbConversionConditionMatches21_9: sourceOrbConversionConditionMatches,
       sourceOrbConversionParameters:
         'definition +0x10/+0x14 -> sMONSTER+0x678/+0x67c source/destination; negative selects native random mode',
+      entireBlindType: ENTIRE_BLIND_ENEMY_SKILL_TYPE,
+      entireBlindDispatchTarget: entireBlindDispatchTarget === null
+        ? null : hex(entireBlindDispatchTarget),
+      entireBlindDispatchMatches21_9: entireBlindDispatchMatches,
+      entireBlindSetupTarget: entireBlindSetupTarget === null ? null : hex(entireBlindSetupTarget),
+      entireBlindSetupMatches21_9: entireBlindSetupMatches,
+      entireBlindConditionTarget: entireBlindConditionTarget === null
+        ? null : hex(entireBlindConditionTarget),
+      entireBlindConditionMatches21_9: entireBlindConditionMatches,
+      entireBlindSemantics:
+        'early dispatch calls doBlock2Black: classic blind bit 0x4 plus fresh bit 0x8; condition is binary32 visible-cell fraction; swapBlockMain reveals both swapped cells; +0x44 attack remains generic',
       clearPlayerBuffsType: CLEAR_PLAYER_BUFFS_ENEMY_SKILL_TYPE,
       clearPlayerBuffsDispatchTarget: clearPlayerBuffsDispatchTarget === null
         ? null : hex(clearPlayerBuffsDispatchTarget),
@@ -2062,6 +2104,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || sourceOrbConversionDispatchMatches === false
     || sourceOrbConversionSetupMatches === false
     || sourceOrbConversionConditionMatches === false
+    || entireBlindDispatchMatches === false
+    || entireBlindSetupMatches === false
+    || entireBlindConditionMatches === false
     || clearPlayerBuffsDispatchMatches === false
     || clearPlayerBuffsSetupMatches === false
     || clearPlayerBuffsConditionMatches === false
