@@ -2,6 +2,7 @@ import { padLcgStep } from './padCoreRules.js';
 import {
   PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
   PAD_ENEMY_SKILL_ENTIRE_BLIND,
+  PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT,
   PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
   PAD_ENEMY_SKILL_HEAL_ENEMY,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
@@ -143,6 +144,7 @@ function isStaticallyEligible(definition, state) {
   if (!definition.effect.supported || ![
     PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
     PAD_ENEMY_SKILL_ENTIRE_BLIND,
+    PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT,
     PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
     PAD_ENEMY_SKILL_HEAL_ENEMY,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
@@ -199,20 +201,23 @@ function evaluateCondition(definition, state, rngState) {
     const eligible = !state.blackFallActive;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
-  if (definition.effect.type === PAD_ENEMY_SKILL_ENTIRE_BLIND) {
-    // Type 5's 0x61b31c callback inlines countBlackBlocks and returns the
-    // binary32 fraction of visible board cells. Native bit 0x4 is the classic
-    // per-cell black covering; the callback consumes no RNG of its own.
+  if ([PAD_ENEMY_SKILL_ENTIRE_BLIND, PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT]
+    .includes(definition.effect.type)) {
+    // Type 5's 0x61b31c callback returns the binary32 visible-cell fraction.
+    // Type 62's 0x61ae4c callback scans the same bit 0x4 but returns exactly
+    // one whenever any cell is visible. Neither callback consumes RNG.
     const boardCellCount = Math.max(0, Math.trunc(Number(state.boardCellCount) || 0));
     const blackBlockCount = Math.max(
       0,
       Math.min(boardCellCount, Math.trunc(Number(state.blackBlockCount) || 0)),
     );
-    const probabilityScale = boardCellCount > 0
-      ? Math.fround(Math.fround(1) - Math.fround(
-        Math.fround(blackBlockCount) / Math.fround(boardCellCount),
-      ))
-      : Math.fround(0);
+    const probabilityScale = definition.effect.type === PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT
+      ? Math.fround(Number(boardCellCount > blackBlockCount))
+      : boardCellCount > 0
+        ? Math.fround(Math.fround(1) - Math.fround(
+          Math.fround(blackBlockCount) / Math.fround(boardCellCount),
+        ))
+        : Math.fround(0);
     return { eligible: probabilityScale > 0, probabilityScale, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS) {

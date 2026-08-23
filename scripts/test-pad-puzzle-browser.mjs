@@ -2419,10 +2419,21 @@ try {
     engine.startDrag(0, 0, 50, 475, 0.5, 0.5);
     engine.moveDrag(0, 1, 120, 475, 1.5, 0.5);
     const movedState = engine.snapshot();
-    engine.reset();
-    engine.start();
-    engine.applyEnemySkillDefinition(definition);
-    return { turnState, movedState, renderState: engine.snapshot() };
+    engine.drag = null;
+    const altDefinition = definition.slice();
+    const altView = new DataView(altDefinition.buffer);
+    altView.setUint32(0x00, 9_042, true);
+    altView.setInt16(0x04, 62, true);
+    altView.setInt32(0x10, 7, true);
+    monsterView.setUint32(0xec, 9_042, true);
+    engine.setEnemySkillQueue(0, []);
+    engine.setEnemyAiDefinitionPool(0, monsterDefinition, [altDefinition]);
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    const altState = engine.snapshot();
+    return { turnState, movedState, altState, renderState: altState };
   }) : null;
   if (entireBlindRenderState && (
     entireBlindRenderState.turnState?.lastEnemyActions?.[0]?.skill?.type !== 5
@@ -2434,8 +2445,13 @@ try {
       !orb.blind || (orb.blockFlags & 0x0c) !== 0x0c || orb.blindCountdown !== 0
     ))
     || entireBlindRenderState.movedState?.boardState?.flat()?.filter((orb) => orb.entireBlind).length !== 28
+    || entireBlindRenderState.altState?.lastEnemyActions?.[0]?.skill?.type !== 62
+    || entireBlindRenderState.altState?.lastEnemyActions?.[0]?.damage !== 925
+    || entireBlindRenderState.altState?.lastEnemySkill?.newlyBlinded !== 2
+    || entireBlindRenderState.altState?.player?.hp !== 10_150
+    || entireBlindRenderState.altState?.rngState !== 394_448_415
     || entireBlindRenderState.renderState?.boardState?.flat()?.filter((orb) => orb.entireBlind).length !== 30
-    || entireBlindRenderState.renderState?.message !== 'The board was blinded.'
+    || entireBlindRenderState.renderState?.message !== 'Enemies attacked for 925 damage.'
   )) throw new Error(`Entire-blind render-state mismatch: ${JSON.stringify(entireBlindRenderState)}`);
   if (entireBlindRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   const inactivityRenderState = renderInactivityState ? await page.evaluate(() => {

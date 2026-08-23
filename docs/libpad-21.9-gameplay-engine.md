@@ -684,6 +684,18 @@ blind `0x1000/0x10000`, renders no countdown for classic blind, and preserves
 the generic definition `+0x44` accompanying attack. The semantic label is also
 cross-checked against the independent [DadGuide raw enemy-skill parser](https://github.com/TsubakiBotPad/pad-data-pipeline/blob/master/etl/pad/raw/skills/enemy_skill_info.py#L609-L619).
 
+Type `62` is an alternate native route to the same classic whole-board blind,
+and the independent parser likewise models `ESBlind5` and `ESBlind62` as the
+same action. Type 62 uses early dispatch `0x6289b8`, setup `0x620154`, and
+condition `0x61ae4c`. Its setup copies definition `+0x10` to
+`sMONSTER+0x680` and initializes fixed `3.0`/`0.4` presentation lanes; its
+handler later inlines the same bit `0x4/0x8` board mutation and special-orb
+cleanup. Unlike type 5, its condition returns exactly binary32 1.0 whenever
+`blackCount < rows * columns`, otherwise zero. Thus a partially revealed board
+gets the full authored immediate chance for type 62, while type 5 scales that
+chance by the visible fraction. The port shares execution and movement reveal
+but preserves these distinct AI callbacks and raw type identities.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

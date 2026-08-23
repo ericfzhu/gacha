@@ -25,6 +25,10 @@ const ENTIRE_BLIND_ENEMY_SKILL_TYPE = 5;
 const ENTIRE_BLIND_HANDLER = 0x6286b4;
 const ENTIRE_BLIND_SETUP_HANDLER = 0x6217c0;
 const ENTIRE_BLIND_CONDITION_HANDLER = 0x61b31c;
+const ENTIRE_BLIND_ALT_ENEMY_SKILL_TYPE = 62;
+const ENTIRE_BLIND_ALT_HANDLER = 0x6289b8;
+const ENTIRE_BLIND_ALT_SETUP_HANDLER = 0x620154;
+const ENTIRE_BLIND_ALT_CONDITION_HANDLER = 0x61ae4c;
 const CLEAR_PLAYER_BUFFS_ENEMY_SKILL_TYPE = 6;
 const CLEAR_PLAYER_BUFFS_HANDLER = 0x6292e8;
 const CLEAR_PLAYER_BUFFS_SETUP_HANDLER = 0x6217c0;
@@ -411,6 +415,22 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : entireBlindSetupTarget === ENTIRE_BLIND_SETUP_HANDLER;
   const entireBlindConditionMatches = entireBlindConditionTarget === null
     ? null : entireBlindConditionTarget === ENTIRE_BLIND_CONDITION_HANDLER;
+  const entireBlindAltDispatchTarget = resolveEarlyEnemySkillTarget(
+    ENTIRE_BLIND_ALT_ENEMY_SKILL_TYPE,
+  );
+  const entireBlindAltSetupTarget = resolveEnemySkillTarget(
+    ENTIRE_BLIND_ALT_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const entireBlindAltConditionTarget = resolveEnemySkillTarget(
+    ENTIRE_BLIND_ALT_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const entireBlindAltDispatchMatches = entireBlindAltDispatchTarget === null
+    ? null : entireBlindAltDispatchTarget === ENTIRE_BLIND_ALT_HANDLER;
+  const entireBlindAltSetupMatches = entireBlindAltSetupTarget === null
+    ? null : entireBlindAltSetupTarget === ENTIRE_BLIND_ALT_SETUP_HANDLER;
+  const entireBlindAltConditionMatches = entireBlindAltConditionTarget === null
+    ? null : entireBlindAltConditionTarget === ENTIRE_BLIND_ALT_CONDITION_HANDLER;
   const clearPlayerBuffsDispatchTarget = resolveEnemySkillTarget(
     CLEAR_PLAYER_BUFFS_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -1451,6 +1471,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       entireBlindDispatchMatches21_9: entireBlindDispatchMatches,
       entireBlindSetupMatches21_9: entireBlindSetupMatches,
       entireBlindConditionMatches21_9: entireBlindConditionMatches,
+      entireBlindAltDispatchMatches21_9: entireBlindAltDispatchMatches,
+      entireBlindAltSetupMatches21_9: entireBlindAltSetupMatches,
+      entireBlindAltConditionMatches21_9: entireBlindAltConditionMatches,
       clearPlayerBuffsDispatchMatches21_9: clearPlayerBuffsDispatchMatches,
       clearPlayerBuffsSetupMatches21_9: clearPlayerBuffsSetupMatches,
       clearPlayerBuffsConditionMatches21_9: clearPlayerBuffsConditionMatches,
@@ -1644,6 +1667,18 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       entireBlindConditionMatches21_9: entireBlindConditionMatches,
       entireBlindSemantics:
         'early dispatch calls doBlock2Black: classic blind bit 0x4 plus fresh bit 0x8; condition is binary32 visible-cell fraction; swapBlockMain reveals both swapped cells; +0x44 attack remains generic',
+      entireBlindAltType: ENTIRE_BLIND_ALT_ENEMY_SKILL_TYPE,
+      entireBlindAltDispatchTarget: entireBlindAltDispatchTarget === null
+        ? null : hex(entireBlindAltDispatchTarget),
+      entireBlindAltDispatchMatches21_9: entireBlindAltDispatchMatches,
+      entireBlindAltSetupTarget: entireBlindAltSetupTarget === null
+        ? null : hex(entireBlindAltSetupTarget),
+      entireBlindAltSetupMatches21_9: entireBlindAltSetupMatches,
+      entireBlindAltConditionTarget: entireBlindAltConditionTarget === null
+        ? null : hex(entireBlindAltConditionTarget),
+      entireBlindAltConditionMatches21_9: entireBlindAltConditionMatches,
+      entireBlindAltSemantics:
+        'type 62 alternate presentation setup copies +0x10 to sMONSTER+0x680 and initializes 3.0/0.4 animation lanes; early handler inlines the same bit 0x4/0x8 board mutation; condition returns exactly 1.0 iff any board cell lacks bit 0x4',
       clearPlayerBuffsType: CLEAR_PLAYER_BUFFS_ENEMY_SKILL_TYPE,
       clearPlayerBuffsDispatchTarget: clearPlayerBuffsDispatchTarget === null
         ? null : hex(clearPlayerBuffsDispatchTarget),
@@ -2107,6 +2142,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || entireBlindDispatchMatches === false
     || entireBlindSetupMatches === false
     || entireBlindConditionMatches === false
+    || entireBlindAltDispatchMatches === false
+    || entireBlindAltSetupMatches === false
+    || entireBlindAltConditionMatches === false
     || clearPlayerBuffsDispatchMatches === false
     || clearPlayerBuffsSetupMatches === false
     || clearPlayerBuffsConditionMatches === false

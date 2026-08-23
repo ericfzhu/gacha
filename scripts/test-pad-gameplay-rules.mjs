@@ -3,6 +3,7 @@ import { PuzzleEngine } from '../src/puzzle/puzzleEngine.js';
 import {
   PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
   PAD_ENEMY_SKILL_ENTIRE_BLIND,
+  PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT,
   PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
   PAD_ENEMY_SKILL_HEAL_ENEMY,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
@@ -1507,6 +1508,33 @@ assert.deepEqual(
     attackWithSkillValue: 50,
   },
 );
+const enemyAiEntireBlindAltDefinition = enemyAiEntireBlindDefinition.slice();
+const enemyAiEntireBlindAltView = new DataView(enemyAiEntireBlindAltDefinition.buffer);
+enemyAiEntireBlindAltView.setUint32(0x00, 9_042, true);
+enemyAiEntireBlindAltView.setInt16(0x04, PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT, true);
+enemyAiEntireBlindAltView.setInt32(0x10, 7, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiEntireBlindAltDefinition), {
+  type: 62,
+  kind: 'entireBlind',
+  supported: true,
+  attackWithSkillValue: 50,
+});
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiEntireBlindAltDefinition, new Uint8Array(0x680)),
+  {
+    type: 62,
+    kind: 'entireBlind',
+    supported: true,
+    attackWithSkillValue: 50,
+  },
+);
+const directEntireBlindAltEngine = new PuzzleEngine({ seed: 21_900 });
+assert.equal(directEntireBlindAltEngine.applyEnemySkillDefinition(
+  enemyAiEntireBlindAltDefinition,
+), true);
+assert.equal(directEntireBlindAltEngine.lastEnemySkill.type, 62);
+assert.equal(directEntireBlindAltEngine.snapshot().boardState.flat()
+  .filter((orb) => orb.entireBlind).length, 30);
 const directEntireBlindEngine = new PuzzleEngine({ seed: 21_900 });
 directEntireBlindEngine.setBoardFromCodes(['JBGHLD', 'BGLDHR', 'GLXHRB', 'LDHRBG', 'DHRBGL']);
 directEntireBlindEngine.setOrbState(0, 0, {
@@ -3701,6 +3729,39 @@ assert.equal(rejectedEntireBlindEngine.applyEnemySkillDefinition(enemyAiEntireBl
 rejectedEntireBlindEngine.setRngState(21_900);
 assert.equal(rejectedEntireBlindEngine.takeEnemySkill(0), null);
 assert.equal(rejectedEntireBlindEngine.rng.state, 21_900);
+const partialEntireBlindMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(partialEntireBlindMonsterDefinition.buffer).setUint32(0xec, 9_041, true);
+const partialEntireBlindSelection = selectPadEnemyAiNew(
+  decodePadEnemyAiMonsterDefinition(partialEntireBlindMonsterDefinition),
+  [decodePadEnemyAiSkillDefinition(enemyAiEntireBlindDefinition)],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    boardCellCount: 30,
+    blackBlockCount: 15,
+    rngState: 21_900,
+  },
+);
+assert.equal(partialEntireBlindSelection.skillId, null);
+assert.equal(partialEntireBlindSelection.rngState, padLcgStep(21_900).state);
+const partialEntireBlindAltMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(partialEntireBlindAltMonsterDefinition.buffer).setUint32(0xec, 9_042, true);
+const partialEntireBlindAltSelection = selectPadEnemyAiNew(
+  decodePadEnemyAiMonsterDefinition(partialEntireBlindAltMonsterDefinition),
+  [decodePadEnemyAiSkillDefinition(enemyAiEntireBlindAltDefinition)],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    boardCellCount: 30,
+    blackBlockCount: 15,
+    rngState: 21_900,
+  },
+);
+assert.equal(partialEntireBlindAltSelection.skillId, 9_042);
+assert.equal(partialEntireBlindAltSelection.effect.type, 62);
+assert.equal(partialEntireBlindAltSelection.rngState, padLcgStep(21_900).state);
 const randomPartyBindMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(randomPartyBindMonsterDefinition.buffer).setUint32(0xec, 9_023, true);
 const selectedRandomPartyBindEngine = new PuzzleEngine({

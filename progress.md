@@ -2,6 +2,20 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-23 alternate whole-board blind enemy skill
+
+- Recovered type `62` as a second classic whole-board blind: early dispatch
+  `0x6289b8`, presentation setup `0x620154`, and condition `0x61ae4c`. The
+  handler inlines the same bit `0x4/0x8` board mutation as type 5.
+- Preserved its scheduler distinction: type 62 returns exactly 1.0 while any
+  cell is visible, whereas type 5 returns the proportional visible-cell
+  fraction. A seeded half-blind boundary test proves type 5 misses where type
+  62 selects without inventing condition RNG.
+- Ported raw identity through definition/runtime decoding, normalization, AI
+  admission, shared execution, exact table inspection, and focused browser
+  coverage that reveals two cells with input and re-blinds them via type 62.
+- Next: continue the adjacent live board-action table.
+
 ## 2026-08-23 whole-board blind enemy skill
 
 - Recovered live enemy skill type `5`: early dispatch `0x6286b4`, generic

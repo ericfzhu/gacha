@@ -1,5 +1,6 @@
 export const PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION = 4;
 export const PAD_ENEMY_SKILL_ENTIRE_BLIND = 5;
+export const PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT = 62;
 export const PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS = 6;
 export const PAD_ENEMY_SKILL_HEAL_ENEMY = 7;
 export const PAD_ENEMY_SKILL_ADDITIONAL_ATTACK = 8;
@@ -117,7 +118,7 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       attackWithSkillValue,
     });
   }
-  if (type === PAD_ENEMY_SKILL_ENTIRE_BLIND) {
+  if (type === PAD_ENEMY_SKILL_ENTIRE_BLIND || type === PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT) {
     return Object.freeze({
       type,
       kind: 'entireBlind',
@@ -738,7 +739,7 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
-  if (type === PAD_ENEMY_SKILL_ENTIRE_BLIND) {
+  if (type === PAD_ENEMY_SKILL_ENTIRE_BLIND || type === PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT) {
     return Object.freeze({
       type,
       kind: 'entireBlind',
@@ -1065,9 +1066,12 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
 
 export function normalizePadEnemySkillRecord(record) {
   const type = Math.trunc(Number(record?.type));
-  if (type === PAD_ENEMY_SKILL_ENTIRE_BLIND || record?.kind === 'entireBlind') {
+  if ([PAD_ENEMY_SKILL_ENTIRE_BLIND, PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT].includes(type)
+      || record?.kind === 'entireBlind') {
     return Object.freeze({
-      type: PAD_ENEMY_SKILL_ENTIRE_BLIND,
+      type: type === PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT
+        ? PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT
+        : PAD_ENEMY_SKILL_ENTIRE_BLIND,
       kind: 'entireBlind',
       supported: true,
       attackWithSkillValue: record?.attackWithSkillValue == null
