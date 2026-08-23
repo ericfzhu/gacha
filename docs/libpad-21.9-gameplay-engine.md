@@ -1419,6 +1419,28 @@ the replacement for later attacks. In the focused boundary fixture, 46,340 of
 92,000 HP is about 50.37%, narrows and rounds to 50, and therefore changes the
 enemy from a two-turn interval to one without advancing seed 21900.
 
+Enemy skill type `107` makes selected orb attributes temporarily unmatchable.
+Its dispatch, generic setup, and condition entries resolve to `0x62a358`,
+`0x6217c0`, and `0x61afac`; the independent parser identifies
+`ESAttributeBlock`. Definition `+0x10` is an unsigned low-ten-bit duration and
+`+0x14` is a raw low-16-bit orb-type mask. Execution first clears the related
+player-side status ids 87 through 96, then installs the duration with fresh bit
+`0x400` set and transition bit `0x800` clear at protected
+`sGAMEWORK+0x8763c`. The mask owner is at `+0x87640`. No RNG is consumed.
+
+During `_calcBlocks`, the native client loads each orb's signed type byte,
+computes `1 << type`, and sets its group field to no-match flag `0x80` when
+that bit intersects the active mask. Movement remains allowed; only grouping
+and erasure are disabled. `_checkBomb` explicitly tests mask bit 9 and skips
+bomb handling when it is set, so blocked bombs neither match nor detonate.
+`_incTurn` decrements the protected counter and clears the status on expiry,
+while condition `0x61afac` rejects a record whose duration is still active.
+The browser applies the same filter to match and bomb detection, renders a
+slash over affected orbs plus an `UNMATCH` status, and snapshots the mask and
+lifetime. In the focused mask `0x11` fixture, a Fire triplet is ignored while a
+Water triplet still matches; seed 21900 remains unchanged outside ordinary AI
+selection.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

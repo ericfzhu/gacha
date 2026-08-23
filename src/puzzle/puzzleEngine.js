@@ -63,6 +63,7 @@ import {
   PAD_ENEMY_SKILL_CLOUD,
   PAD_ENEMY_SKILL_RECOVERY_DEBUFF,
   PAD_ENEMY_SKILL_TURN_CHANGE,
+  PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -343,6 +344,7 @@ export class PuzzleEngine {
     this.forcedStart = null;
     this.cloud = null;
     this.recoveryDebuff = null;
+    this.attributeBlock = null;
     this.leaderSwapTurns = 0;
     this.leaderSwapIndex = null;
     this.enemySkillQueues.forEach((queue) => { queue.position = 0; });
@@ -686,7 +688,11 @@ export class PuzzleEngine {
   advancePhase() {
     if (this.phase === 'detect') {
       const matches = this.findMatches();
-      const bombResolution = findPadBombDetonations(this.board, matches);
+      const bombResolution = findPadBombDetonations(
+        this.board,
+        matches,
+        (cell) => this.matchableOrbType(cell),
+      );
       if (bombResolution.bombs.length) {
         const damage = padBombDamage(this.player.maxHp, bombResolution.bombs.length);
         this.lastBombDamage += damage;
@@ -855,7 +861,17 @@ export class PuzzleEngine {
   }
 
   findMatches() {
-    return findPadMatches(this.board);
+    return findPadMatches(this.board, (cell) => this.matchableOrbType(cell));
+  }
+
+  isOrbTypeBlocked(type) {
+    if (!this.attributeBlock || this.attributeBlock.turnsRemaining <= 0) return false;
+    const typeIndex = ORB_TYPES.findIndex((candidate) => candidate.id === type);
+    return typeIndex >= 0 && (this.attributeBlock.typeMask & (1 << typeIndex)) !== 0;
+  }
+
+  matchableOrbType(cell) {
+    return cell && !this.isOrbTypeBlocked(cell.type) ? cell.type : null;
   }
 
   collapseAndRefill() {
@@ -1152,6 +1168,7 @@ export class PuzzleEngine {
     this.advanceOrbSealTurns();
     this.advanceCloudTurns();
     this.advanceRecoveryDebuffTurns();
+    this.advanceAttributeBlockTurns();
     if (this.blackFallRule?.active && this.blackFallRule.turnsRemaining !== null) {
       this.blackFallRule.turnsRemaining = Math.max(0, this.blackFallRule.turnsRemaining - 1);
       if (this.blackFallRule.turnsRemaining === 0) this.blackFallRule.active = false;
@@ -1280,6 +1297,7 @@ export class PuzzleEngine {
       orbSealActive: this.orbSealColumnTurns > 0 || this.orbSealRowTurns > 0,
       forcedStartActive: Boolean(this.forcedStart),
       cloudActive: Boolean(this.cloud?.turnsRemaining > 0),
+      attributeBlockActive: Boolean(this.attributeBlock?.turnsRemaining > 0),
       playerRecovery: this.player.recovery,
       recoveryMultiplier: this.recoveryDebuff?.multiplier ?? 1,
       enemyAttribute: PAD_ATTRIBUTE_INDEX[enemy.attribute] ?? -1,
@@ -2419,6 +2437,23 @@ export class PuzzleEngine {
       this.message = `Recovery changed to ${skill.recoveryPercent}% for ${this.recoveryDebuff.turnsRemaining} turn${this.recoveryDebuff.turnsRemaining === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'attributeBlock') {
+      this.attributeBlock = {
+        turnsRemaining: Math.max(0, skill.durationTurns) & 0x3ff,
+        typeMask: skill.typeMask & 0xffff,
+      };
+      this.lastEnemySkill = Object.freeze({
+        ...skill,
+        durationTurns: this.attributeBlock.turnsRemaining,
+        typeMask: this.attributeBlock.typeMask,
+      });
+      const blockedTypes = ORB_TYPES
+        .filter((_, typeIndex) => (this.attributeBlock.typeMask & (1 << typeIndex)) !== 0)
+        .map((orb) => orb.label)
+        .join(', ');
+      this.message = `${blockedTypes || 'Selected orbs'} cannot be matched for ${this.attributeBlock.turnsRemaining} turn${this.attributeBlock.turnsRemaining === 1 ? '' : 's'}.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'clearPlayerBuffs') {
       // _doItetukuHadou clears both recovered sGAMEWORK positive-status lanes,
       // then type 6 invokes _applyLeaderSkill(false). Leader effects in this
@@ -2960,6 +2995,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_CLOUD,
         PAD_ENEMY_SKILL_RECOVERY_DEBUFF,
         PAD_ENEMY_SKILL_TURN_CHANGE,
+        PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK,
         PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
         PAD_ENEMY_SKILL_DEFENSE_BOOST,
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -3588,6 +3624,12 @@ export class PuzzleEngine {
     if (this.recoveryDebuff.turnsRemaining === 0) this.recoveryDebuff = null;
   }
 
+  advanceAttributeBlockTurns() {
+    if (!this.attributeBlock || this.attributeBlock.turnsRemaining <= 0) return;
+    this.attributeBlock.turnsRemaining = Math.max(0, this.attributeBlock.turnsRemaining - 1);
+    if (this.attributeBlock.turnsRemaining === 0) this.attributeBlock = null;
+  }
+
   snapshot() {
     return {
       coordinateSystem: `board origin top-left; rows 0-${this.rows - 1} downward; columns 0-${this.columns - 1} rightward`,
@@ -3633,6 +3675,7 @@ export class PuzzleEngine {
       forcedStart: this.forcedStart ? { ...this.forcedStart } : null,
       cloud: this.cloud ? { ...this.cloud } : null,
       recoveryDebuff: this.recoveryDebuff ? { ...this.recoveryDebuff } : null,
+      attributeBlock: this.attributeBlock ? { ...this.attributeBlock } : null,
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({
         code: ORB_BY_ID[orb.type].code,

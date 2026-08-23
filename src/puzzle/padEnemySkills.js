@@ -74,6 +74,7 @@ export const PAD_ENEMY_SKILL_FIXED_BOMBS = 103;
 export const PAD_ENEMY_SKILL_CLOUD = 104;
 export const PAD_ENEMY_SKILL_RECOVERY_DEBUFF = 105;
 export const PAD_ENEMY_SKILL_TURN_CHANGE = 106;
+export const PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK = 107;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -440,6 +441,17 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       passive: true,
       hpThresholdPercent: (definition.getInt32(0x10, true) << 16) >> 16,
       turnCounter: definition.getInt32(0x14, true) & 0xffff,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK) {
+    requireLength(definitionBytes, 0x18, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'attributeBlock',
+      supported: true,
+      durationTurns: definition.getInt32(0x10, true),
+      typeMask: definition.getInt32(0x14, true) & 0xffff,
       attackWithSkillValue,
     });
   }
@@ -1464,6 +1476,10 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
       setupMaterialized: true,
     });
   }
+  if (type === PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK) {
+    // Generic setup leaves both authored operands on the definition record.
+    return decodePadEnemySkillDefinition(definitionBytes);
+  }
   if (type === PAD_ENEMY_SKILL_DEFENSE_BOOST) {
     return Object.freeze({
       type,
@@ -2343,6 +2359,18 @@ export function normalizePadEnemySkillRecord(record) {
       hpThresholdPercent: (Math.trunc(Number(record?.hpThresholdPercent) || 0) << 16) >> 16,
       turnCounter: Math.trunc(Number(record?.turnCounter) || 0) & 0xffff,
       setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK || record?.kind === 'attributeBlock') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK,
+      kind: 'attributeBlock',
+      supported: record?.supported !== false,
+      durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)) & 0x3ff,
+      typeMask: Math.trunc(Number(record?.typeMask) || 0) & 0xffff,
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

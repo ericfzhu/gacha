@@ -487,6 +487,20 @@ function render(ctx, engine) {
     );
     playerStatusY += 12;
   }
+  if (engine.attributeBlock?.turnsRemaining > 0) {
+    const blockedTypes = ORB_TYPES
+      .filter((_, typeIndex) => (engine.attributeBlock.typeMask & (1 << typeIndex)) !== 0)
+      .map((orb) => orb.code)
+      .join('/');
+    ctx.fillStyle = '#ffcf8f';
+    ctx.font = '700 9px "Barlow Condensed", sans-serif';
+    ctx.fillText(
+      `UNMATCH ${blockedTypes || '—'} · ${engine.attributeBlock.turnsRemaining}T`,
+      434,
+      playerStatusY,
+    );
+    playerStatusY += 12;
+  }
   const activeSkyfallRules = Object.values(engine.skyfallRateRules || {}).filter(Boolean);
   if (activeSkyfallRules.length > 0) {
     const skyfallText = activeSkyfallRules.map((rule) => {
@@ -585,6 +599,19 @@ function render(ctx, engine) {
         board.cell * 0.386,
         forceStartAlpha,
       );
+      if (!isHeld && engine.isOrbTypeBlocked(orb.type)) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 239, 211, .94)';
+        ctx.shadowColor = 'rgba(50, 18, 12, .88)';
+        ctx.shadowBlur = 4;
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(x + board.cell * 0.28, y + board.cell * 0.72);
+        ctx.lineTo(x + board.cell * 0.72, y + board.cell * 0.28);
+        ctx.stroke();
+        ctx.restore();
+      }
     }
   }
 

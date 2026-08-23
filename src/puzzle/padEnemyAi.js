@@ -27,6 +27,7 @@ import {
   PAD_ENEMY_SKILL_CLOUD,
   PAD_ENEMY_SKILL_RECOVERY_DEBUFF,
   PAD_ENEMY_SKILL_TURN_CHANGE,
+  PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -199,6 +200,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_CLOUD,
     PAD_ENEMY_SKILL_RECOVERY_DEBUFF,
     PAD_ENEMY_SKILL_TURN_CHANGE,
+    PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
     PAD_ENEMY_SKILL_DEFENSE_BOOST,
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -608,6 +610,13 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
       || Number(state.recoveryMultiplier ?? 1) >= 1;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
+  if (definition.effect.type === PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK) {
+    // Type 107's 0x61afac condition rejects an already-active protected
+    // low-ten-bit counter and otherwise preserves the incoming 1.0 scale.
+    // It does not consume the gameplay RNG.
+    const eligible = !state.attributeBlockActive;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
   if (definition.effect.type === PAD_ENEMY_SKILL_BIND_LEADER_HELPER) {
     const party = Array.isArray(state.party) ? state.party : [];
     const eligible = (
@@ -732,6 +741,7 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     orbSealActive: Boolean(state.orbSealActive),
     forcedStartActive: Boolean(state.forcedStartActive),
     cloudActive: Boolean(state.cloudActive),
+    attributeBlockActive: Boolean(state.attributeBlockActive),
     playerRecovery: Math.max(0, Math.trunc(Number(state.playerRecovery) || 0)),
     recoveryMultiplier: Number(state.recoveryMultiplier ?? 1),
     scaledAttackGate: Math.trunc(Number(state.scaledAttackGate) || 0),

@@ -2,6 +2,22 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 type-107 unmatchable attributes
+
+- Recovered type `107` at dispatch/setup/condition `0x62a358`, `0x6217c0`, and
+  `0x61afac`; the independent parser corroborates `ESAttributeBlock`.
+- Execution clears conflicting player-side status ids 87 through 96, installs
+  unsigned `+0x10` in the protected low-ten-bit duration at
+  `sGAMEWORK+0x8763c`, and stores raw low-16-bit `+0x14` at `+0x87640`.
+  Setup and execution consume no RNG; the condition rejects an active copy.
+- `_calcBlocks` sets the native no-match flag on groups whose orb-type bit is
+  present. `_checkBomb` separately treats bit 9 as bomb suppression, and
+  `_incTurn` decrements and clears the status. Ported decode/runtime/state, AI
+  admission, filtered matching, blocked-bomb behavior, lifetime/reset/snapshot,
+  status text, and crossed-out affected orbs. Pure fixtures, forty-six ARM64
+  anchors, focused Chromium with original APK art, screenshot inspection, the
+  full native inspector, and production build pass. Next: type `108`.
+
 ## 2026-08-24 type-106 HP-triggered turn change
 
 - Recovered passive type `106` at dispatch/setup/condition `0x62be50`,

@@ -527,6 +527,58 @@ const TURN_CHANGE_INSTRUCTION_ANCHORS = Object.freeze([
   [0x640970, 0x79562a61], // load the unsigned replacement interval
   [0x640978, 0x97f3557e], // replace the live enemy attack counter
 ]);
+const ATTRIBUTE_BLOCK_ENEMY_SKILL_TYPE = 107;
+const ATTRIBUTE_BLOCK_HANDLER = 0x62a358;
+const ATTRIBUTE_BLOCK_SETUP_HANDLER = 0x6217c0;
+const ATTRIBUTE_BLOCK_CONDITION_HANDLER = 0x61afac;
+const ATTRIBUTE_BLOCK_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x62a358, 0xf9400288], // begin by loading shared game work
+  [0x62a364, 0x52800ae1], // clear conflicting player-side status id 87
+  [0x62a370, 0x97f3e9f0], // invoke the shared status clear owner
+  [0x62a418, 0x52800c01], // finish the consecutive clear range at id 96
+  [0x62a424, 0x97f3e9c3], // clear the final conflicting status
+  [0x62a42c, 0x528ec789], // address duration/status bits at +0x8763c
+  [0x62a434, 0x794022ab], // load unsigned authored +0x10 duration
+  [0x62a438, 0x7869690a], // load existing protected status bits
+  [0x62a43c, 0x1215114a], // preserve the high status bits
+  [0x62a440, 0x3300256a], // insert the duration into the low ten bits
+  [0x62a444, 0x3216014a], // set the fresh edge at bit 0x400
+  [0x62a448, 0x7829690a], // persist duration and fresh edge
+  [0x62a454, 0x1214794a], // clear transition bit 0x800
+  [0x62a458, 0x7829690a], // persist the active status word
+  [0x62a460, 0xb94016a1], // load authored +0x14 attribute mask
+  [0x62a464, 0x528ec815], // address mask owner at +0x87640
+  [0x62a470, 0x97f3bc08], // store the raw low-16-bit mask
+  [0x62a484, 0x97f3b5ef], // read the installed mask for presentation
+  [0x62a498, 0x78296900], // store its presentation copy at +0x8ab18
+  [0x61afac, 0x79410908], // condition loads status word relative +0x84
+  [0x61afb0, 0x375fb408], // transition bit 0x800 admits immediately
+  [0x61afb4, 0x531a6508], // expose the low-ten-bit counter
+  [0x61afb8, 0x13003d08], // sign-extend the shifted counter
+  [0x61afbc, 0x7101011f], // compare active duration with one
+  [0x61afc0, 0x540082ea], // reject an already-active status
+  [0x64e86c, 0x528ec789], // match calculation addresses duration
+  [0x64e874, 0x78696909], // load the protected status word
+  [0x64e880, 0x7100053f], // require at least one active turn
+  [0x64e8dc, 0xf9404668], // reload shared game work for mask lookup
+  [0x64e8e0, 0x528ec809], // address the mask owner at +0x87640
+  [0x64e8ec, 0x97f324d5], // read the active raw mask
+  [0x64e8f0, 0x39c002a8], // load the current orb type as signed byte
+  [0x64e8f8, 0x1ac82128], // calculate one bit shifted by orb type
+  [0x64e8fc, 0x0a080008], // intersect that bit with the active mask
+  [0x64e908, 0x52801008], // materialize native no-match flag 0x80
+  [0x64e90c, 0x79007aa8], // mark the orb group as unmatchable
+  [0x6764f0, 0x528ec789], // turn advance addresses the duration
+  [0x6764fc, 0x7940012a], // load its current status word
+  [0x676510, 0x51000548], // decrement the low-ten-bit duration
+  [0x67651c, 0x7900012a], // persist the decremented status word
+  [0x676538, 0x7100fd3f], // detect expiration after the decrement
+  [0x676544, 0x2a1f03e1], // request clearing on expiration
+  [0x66ab68, 0x528ec78a], // bomb check addresses the same duration
+  [0x66ab70, 0x786a692a], // load the active status word
+  [0x66ab90, 0x97f2b42c], // read its attribute mask
+  [0x66ab94, 0x37481bc0], // mask bit nine suppresses bomb handling
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -1673,6 +1725,31 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     : TURN_CHANGE_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
+  const attributeBlockDispatchTarget = resolveEnemySkillTarget(
+    ATTRIBUTE_BLOCK_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const attributeBlockSetupTarget = resolveEnemySkillTarget(
+    ATTRIBUTE_BLOCK_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const attributeBlockConditionTarget = resolveEnemySkillTarget(
+    ATTRIBUTE_BLOCK_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const attributeBlockDispatchMatches = attributeBlockDispatchTarget === null
+    ? null : attributeBlockDispatchTarget === ATTRIBUTE_BLOCK_HANDLER;
+  const attributeBlockSetupMatches = attributeBlockSetupTarget === null
+    ? null : attributeBlockSetupTarget === ATTRIBUTE_BLOCK_SETUP_HANDLER;
+  const attributeBlockConditionMatches = attributeBlockConditionTarget === null
+    ? null : attributeBlockConditionTarget === ATTRIBUTE_BLOCK_CONDITION_HANDLER;
+  const attributeBlockInstructionAnchorsMatch = restoredElf === null ? null
+    : ATTRIBUTE_BLOCK_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -2719,6 +2796,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       turnChangeSetupMatches21_9: turnChangeSetupMatches,
       turnChangeConditionMatches21_9: turnChangeConditionMatches,
       turnChangeInstructionAnchorsMatch21_9: turnChangeInstructionAnchorsMatch,
+      attributeBlockDispatchMatches21_9: attributeBlockDispatchMatches,
+      attributeBlockSetupMatches21_9: attributeBlockSetupMatches,
+      attributeBlockConditionMatches21_9: attributeBlockConditionMatches,
+      attributeBlockInstructionAnchorsMatch21_9: attributeBlockInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -3384,6 +3465,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       turnChangeInstructionAnchorsMatch21_9: turnChangeInstructionAnchorsMatch,
       turnChangeSemantics:
         'type 106 is a passive with no setup/execution RNG; the passive scanner truncates signed +0x10 HP threshold and unsigned +0x14 attack interval into sMONSTER+0xb10/+0xb14; _checkAnger rounds binary32(currentHp/maxHp*100), latches the passive once that value is at most a positive threshold, and resetEnemyAtkLeft then replaces the ordinary interval with +0xb14 permanently',
+      attributeBlockType: ATTRIBUTE_BLOCK_ENEMY_SKILL_TYPE,
+      attributeBlockDispatchTarget: attributeBlockDispatchTarget === null
+        ? null : hex(attributeBlockDispatchTarget),
+      attributeBlockDispatchMatches21_9: attributeBlockDispatchMatches,
+      attributeBlockSetupTarget: attributeBlockSetupTarget === null
+        ? null : hex(attributeBlockSetupTarget),
+      attributeBlockSetupMatches21_9: attributeBlockSetupMatches,
+      attributeBlockConditionTarget: attributeBlockConditionTarget === null
+        ? null : hex(attributeBlockConditionTarget),
+      attributeBlockConditionMatches21_9: attributeBlockConditionMatches,
+      attributeBlockInstructionAnchorsMatch21_9: attributeBlockInstructionAnchorsMatch,
+      attributeBlockSemantics:
+        'type 107 consumes no RNG; execution clears conflicting player-side status ids 87..96, installs unsigned +0x10 in the protected low-ten-bit duration at +0x8763c, and stores raw low-16-bit +0x14 at +0x87640; calcBlocks marks groups whose orb-type bit is set as unmatchable, bit 9 also suppresses bomb handling, incTurn decrements and clears the status, and the AI condition rejects an already-active duration',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -3934,6 +4028,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || turnChangeSetupMatches === false
     || turnChangeConditionMatches === false
     || turnChangeInstructionAnchorsMatch === false
+    || attributeBlockDispatchMatches === false
+    || attributeBlockSetupMatches === false
+    || attributeBlockConditionMatches === false
+    || attributeBlockInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

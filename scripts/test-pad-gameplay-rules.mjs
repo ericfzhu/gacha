@@ -28,6 +28,7 @@ import {
   PAD_ENEMY_SKILL_CLOUD,
   PAD_ENEMY_SKILL_RECOVERY_DEBUFF,
   PAD_ENEMY_SKILL_TURN_CHANGE,
+  PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -1443,6 +1444,28 @@ assert.deepEqual(
 assert.equal(padEnemyTurnChangeTriggered(46_340, 92_000, 50), true);
 assert.equal(padEnemyTurnChangeTriggered(46_461, 92_000, 50), false);
 assert.equal(padEnemyTurnChangeTriggered(1, 92_000, 0), false);
+const enemyAiAttributeBlockDefinition = enemyAiTurnChangeDefinition.slice();
+const enemyAiAttributeBlockView = new DataView(enemyAiAttributeBlockDefinition.buffer);
+enemyAiAttributeBlockView.setUint32(0x00, 9_087, true);
+enemyAiAttributeBlockView.setInt16(0x04, PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK, true);
+enemyAiAttributeBlockView.setInt32(0x10, 3, true);
+enemyAiAttributeBlockView.setInt32(0x14, 0x11, true);
+const expectedAttributeBlockDefinition = {
+  type: 107,
+  kind: 'attributeBlock',
+  supported: true,
+  durationTurns: 3,
+  typeMask: 0x11,
+  attackWithSkillValue: 0,
+};
+assert.deepEqual(
+  decodePadEnemySkillDefinition(enemyAiAttributeBlockDefinition),
+  expectedAttributeBlockDefinition,
+);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiAttributeBlockDefinition, new Uint8Array(0x680)),
+  expectedAttributeBlockDefinition,
+);
 assert.deepEqual(decodePadEnemySkillRuntime(
   enemyAiUnconditionalHealDefinition,
   healEnemyMonsterRuntime,
@@ -5627,6 +5650,104 @@ assert.equal(activeTurnChangeState.lastEnemyActions[0].damage, 1_850);
 assert.equal(activeTurnChangeState.enemies[0].counter, 1);
 assert.equal(activeTurnChangeState.enemies[0].turnChangeActive, true);
 assert.equal(activeTurnChangeState.rngState, 21_900);
+
+const directAttributeBlockEngine = new PuzzleEngine({ seed: 21_900 });
+directAttributeBlockEngine.setRngState(21_900);
+assert.equal(directAttributeBlockEngine.applyEnemySkillDefinition(
+  enemyAiAttributeBlockDefinition,
+), true);
+assert.deepEqual(directAttributeBlockEngine.snapshot().attributeBlock, {
+  turnsRemaining: 3,
+  typeMask: 0x11,
+});
+assert.equal(directAttributeBlockEngine.rng.state, 21_900);
+directAttributeBlockEngine.setBoardFromCodes([
+  'RRRBGH',
+  'BBBLDH',
+  'GLDHBR',
+  'LDHBRG',
+  'DHBRGL',
+]);
+const attributeBlockMatches = directAttributeBlockEngine.findMatches();
+assert.equal(attributeBlockMatches.length, 1);
+assert.equal(attributeBlockMatches[0].type, 'water');
+assert.equal(directAttributeBlockEngine.isOrbTypeBlocked('fire'), true);
+assert.equal(directAttributeBlockEngine.isOrbTypeBlocked('dark'), true);
+assert.equal(directAttributeBlockEngine.isOrbTypeBlocked('water'), false);
+directAttributeBlockEngine.advanceAttributeBlockTurns();
+directAttributeBlockEngine.advanceAttributeBlockTurns();
+assert.equal(directAttributeBlockEngine.snapshot().attributeBlock.turnsRemaining, 1);
+directAttributeBlockEngine.advanceAttributeBlockTurns();
+assert.equal(directAttributeBlockEngine.snapshot().attributeBlock, null);
+
+const blockedBombEngine = new PuzzleEngine({ seed: 21_900 });
+blockedBombEngine.setBoardFromCodes([
+  'RBGHLD',
+  'GLDBHR',
+  'BHXDGL',
+  'DLGRHB',
+  'HRBGLD',
+]);
+assert.equal(blockedBombEngine.applyEnemySkillRecord({
+  type: PAD_ENEMY_SKILL_ATTRIBUTE_BLOCK,
+  kind: 'attributeBlock',
+  supported: true,
+  durationTurns: 2,
+  typeMask: 1 << 9,
+  attackWithSkillValue: 0,
+}), true);
+blockedBombEngine.start();
+blockedBombEngine.phase = 'detect';
+blockedBombEngine.phaseTimer = 0;
+blockedBombEngine.advancePhase();
+assert.equal(blockedBombEngine.lastBombDamage, 0);
+assert.equal(blockedBombEngine.pendingBombCells.length, 0);
+
+const attributeBlockMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(attributeBlockMonsterDefinition.buffer).setUint32(0xec, 9_087, true);
+const selectedAttributeBlockEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: attributeBlockMonsterDefinition,
+    skillDefinitions: [enemyAiAttributeBlockDefinition],
+  }],
+});
+selectedAttributeBlockEngine.enemies[0].counter = 1;
+selectedAttributeBlockEngine.enemies[1].counter = 99;
+selectedAttributeBlockEngine.setRngState(21_900);
+selectedAttributeBlockEngine.resolveEnemyTurn();
+const selectedAttributeBlockState = selectedAttributeBlockEngine.snapshot();
+assert.equal(selectedAttributeBlockState.lastEnemyActions[0].skill.type, 107);
+assert.deepEqual(selectedAttributeBlockState.attributeBlock, {
+  turnsRemaining: 3,
+  typeMask: 0x11,
+});
+assert.equal(selectedAttributeBlockState.rngState, 394_448_415);
+assert.equal(selectedAttributeBlockState.player.hp, 12_000);
+assert.equal(
+  selectedAttributeBlockState.message,
+  'Fire, Dark cannot be matched for 3 turns.',
+);
+
+const rejectedAttributeBlockEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: attributeBlockMonsterDefinition,
+    skillDefinitions: [enemyAiAttributeBlockDefinition],
+  }],
+});
+rejectedAttributeBlockEngine.attributeBlock = { turnsRemaining: 2, typeMask: 0x02 };
+rejectedAttributeBlockEngine.enemies[0].counter = 1;
+rejectedAttributeBlockEngine.enemies[1].counter = 99;
+rejectedAttributeBlockEngine.setRngState(21_900);
+rejectedAttributeBlockEngine.resolveEnemyTurn();
+const rejectedAttributeBlockState = rejectedAttributeBlockEngine.snapshot();
+assert.equal(rejectedAttributeBlockState.lastEnemyActions[0].kind, 'attack');
+assert.equal(rejectedAttributeBlockState.rngState, 21_900);
+assert.deepEqual(rejectedAttributeBlockState.attributeBlock, {
+  turnsRemaining: 1,
+  typeMask: 0x02,
+});
 
 const exactDamageAbsorbEngine = new PuzzleEngine({ seed: 21_900 });
 exactDamageAbsorbEngine.enemies[0].hp = 50_000;
