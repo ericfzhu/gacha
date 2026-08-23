@@ -42,6 +42,7 @@ static uint64_t value_60_write_pc[64];
 static uint32_t value_60_write_register[64];
 static uint32_t value_60_write_index;
 static uint64_t first_x28_value_60_write_pc;
+static uint32_t diagnostics_enabled = 1;
 static uint64_t tracepoint_pc;
 static uint32_t module_trace_enabled;
 static uint64_t watchpoint_address;
@@ -58,6 +59,7 @@ static void copy_cpu_state(Arm64State *destination, const Arm64State *source) {
 }
 
 static void record_call(uint64_t pc, uint64_t target) {
+  if (!diagnostics_enabled) return;
   uint32_t slot = recent_call_index++ & (ARM64_RECENT_CALLS - 1);
   recent_call_pc[slot] = pc;
   recent_call_target[slot] = target;
@@ -220,8 +222,10 @@ static void write_register(uint32_t index, uint64_t value, int is_64, int use_sp
   if (!is_64) value = (uint32_t)value;
   if (index < 31) {
     cpu.x[index] = value;
-    register_write_pc[index] = cpu.pc >= 4 ? cpu.pc - 4 : 0;
-    if (value == 60) {
+    if (diagnostics_enabled) {
+      register_write_pc[index] = cpu.pc >= 4 ? cpu.pc - 4 : 0;
+    }
+    if (diagnostics_enabled && value == 60) {
       uint32_t slot = value_60_write_index++ & 63;
       value_60_write_pc[slot] = register_write_pc[index];
       value_60_write_register[slot] = index;
@@ -263,6 +267,178 @@ static int32_t fail(int32_t status, uint64_t address) {
   cpu.status = status;
   cpu.fault_address = address;
   return status;
+}
+
+/*
+ * The protected startup stream is overwhelmingly ordinary integer control
+ * flow and memory traffic. Keep its most common exact instruction families
+ * ahead of the much larger FP/NEON decoder so they do not traverse hundreds
+ * of unrelated masks on every guest step. The full handlers remain below as
+ * the canonical fallback for all less common forms.
+ */
+static int fast_integer_step(uint32_t instruction, uint64_t instruction_pc) {
+  uint32_t wide_class = instruction & UINT32_C(0x7f800000);
+  if (wide_class == UINT32_C(0x12800000) || wide_class == UINT32_C(0x52800000) || wide_class == UINT32_C(0x72800000)) {
+    uint32_t is_64 = instruction >> 31;
+    uint32_t halfword = (instruction >> 21) & 3;
+    uint32_t shift = halfword * 16;
+    uint32_t rd = instruction & 31;
+    if (!is_64 && halfword > 1) { fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc); return 1; }
+    uint64_t immediate = (uint64_t)((instruction >> 5) & 0xffff) << shift;
+    uint64_t value;
+    if (wide_class == UINT32_C(0x12800000)) value = ~immediate;
+    else if (wide_class == UINT32_C(0x52800000)) value = immediate;
+    else {
+      uint64_t mask = UINT64_C(0xffff) << shift;
+      value = (read_register(rd, 0) & ~mask) | immediate;
+    }
+    write_register(rd, value, is_64, 0);
+    return 1;
+  }
+
+  uint32_t adr_class = instruction & UINT32_C(0x9f000000);
+  if (adr_class == UINT32_C(0x10000000) || adr_class == UINT32_C(0x90000000)) {
+    uint64_t immediate = ((uint64_t)((instruction >> 5) & 0x7ffff) << 2) | ((instruction >> 29) & 3);
+    uint32_t rd = instruction & 31;
+    if (adr_class == UINT32_C(0x90000000)) {
+      immediate = sign_extend(immediate, 21) << 12;
+      write_register(rd, (instruction_pc & ~UINT64_C(0xfff)) + immediate, 1, 0);
+    } else {
+      write_register(rd, instruction_pc + sign_extend(immediate, 21), 1, 0);
+    }
+    return 1;
+  }
+
+  uint32_t branch_class = instruction & UINT32_C(0xfc000000);
+  if (branch_class == UINT32_C(0x14000000) || branch_class == UINT32_C(0x94000000)) {
+    uint64_t target = instruction_pc + (sign_extend(instruction & UINT32_C(0x03ffffff), 26) << 2);
+    if (branch_class == UINT32_C(0x94000000)) {
+      record_call(instruction_pc, target);
+      cpu.x[30] = cpu.pc;
+    }
+    cpu.pc = target;
+    return 1;
+  }
+
+  if ((instruction & UINT32_C(0xff000010)) == UINT32_C(0x54000000)) {
+    uint64_t offset = sign_extend((instruction >> 5) & 0x7ffff, 19) << 2;
+    if (condition_holds(instruction & 15)) cpu.pc = instruction_pc + offset;
+    return 1;
+  }
+
+  if ((instruction & UINT32_C(0x7e000000)) == UINT32_C(0x34000000)) {
+    uint32_t is_64 = instruction >> 31;
+    uint32_t nonzero = (instruction >> 24) & 1;
+    uint64_t value = read_register(instruction & 31, 0) & width_mask(is_64 ? 64 : 32);
+    uint64_t offset = sign_extend((instruction >> 5) & 0x7ffff, 19) << 2;
+    if ((value != 0) == nonzero) cpu.pc = instruction_pc + offset;
+    return 1;
+  }
+
+  if ((instruction & UINT32_C(0x7e000000)) == UINT32_C(0x36000000)) {
+    uint32_t nonzero = (instruction >> 24) & 1;
+    uint32_t bit = ((instruction >> 26) & 0x20) | ((instruction >> 19) & 0x1f);
+    uint64_t offset = sign_extend((instruction >> 5) & 0x3fff, 14) << 2;
+    if ((((read_register(instruction & 31, 0) >> bit) & 1) != 0) == nonzero) cpu.pc = instruction_pc + offset;
+    return 1;
+  }
+
+  uint32_t register_branch = instruction & UINT32_C(0xfffffc1f);
+  if (register_branch == UINT32_C(0xd61f0000) || register_branch == UINT32_C(0xd63f0000) || register_branch == UINT32_C(0xd65f0000)) {
+    uint64_t target = read_register((instruction >> 5) & 31, 0);
+    if (register_branch == UINT32_C(0xd63f0000)) {
+      record_call(instruction_pc, target);
+      cpu.x[30] = cpu.pc;
+    }
+    if (register_branch == UINT32_C(0xd65f0000) && target == UINT64_MAX) cpu.status = ARM64_STATUS_HALTED;
+    else cpu.pc = target;
+    return 1;
+  }
+
+  if ((instruction & UINT32_C(0x1f000000)) == UINT32_C(0x11000000)) {
+    uint32_t is_64 = instruction >> 31;
+    uint32_t subtract = (instruction >> 30) & 1;
+    uint32_t set_flags = (instruction >> 29) & 1;
+    uint32_t rn = (instruction >> 5) & 31;
+    uint32_t rd = instruction & 31;
+    uint64_t immediate = (instruction >> 10) & 0xfff;
+    if ((instruction >> 22) & 1) immediate <<= 12;
+    uint64_t left = read_register(rn, 1);
+    uint64_t result = subtract ? left - immediate : left + immediate;
+    if (set_flags) set_add_sub_flags(left, immediate, result, is_64 ? 64 : 32, subtract);
+    write_register(rd, result, is_64, set_flags ? 0 : 1);
+    return 1;
+  }
+
+  /* Integer load/store with unsigned scaled immediate. */
+  if (((instruction >> 26) & 1) == 0 && (instruction & UINT32_C(0x3b000000)) == UINT32_C(0x39000000)) {
+    uint32_t size_log2 = instruction >> 30;
+    uint32_t size = 1u << size_log2;
+    uint32_t operation = (instruction >> 22) & 3;
+    uint32_t rn = (instruction >> 5) & 31;
+    uint32_t rt = instruction & 31;
+    uint64_t address = read_register(rn, 1) + (uint64_t)((instruction >> 10) & 0xfff) * size;
+    if (!address_is_valid(address, size)) { fail(ARM64_FAULT_MEMORY, address); return 1; }
+    if (operation == 0) store_integer(address, read_register(rt, 0), size);
+    else if (operation == 1) write_register(rt, load_integer(address, size), size == 8, 0);
+    else {
+      if (size == 8 || (operation == 3 && size >= 4)) { fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc); return 1; }
+      write_register(rt, sign_extend(load_integer(address, size), size * 8), operation == 2, 0);
+    }
+    return 1;
+  }
+
+  /* Integer load/store with unscaled, unprivileged, pre-index or post-index immediate. */
+  if (((instruction >> 26) & 1) == 0 && (instruction & UINT32_C(0x3b200000)) == UINT32_C(0x38000000)) {
+    uint32_t size_log2 = instruction >> 30;
+    uint32_t size = 1u << size_log2;
+    uint32_t operation = (instruction >> 22) & 3;
+    int64_t offset = (int64_t)sign_extend((instruction >> 12) & 0x1ff, 9);
+    uint32_t mode = (instruction >> 10) & 3;
+    uint32_t rn = (instruction >> 5) & 31;
+    uint32_t rt = instruction & 31;
+    uint64_t base = read_register(rn, 1);
+    uint64_t address = mode == 1 ? base : base + offset;
+    if (!address_is_valid(address, size)) { fail(ARM64_FAULT_MEMORY, address); return 1; }
+    if (operation == 0) store_integer(address, read_register(rt, 0), size);
+    else if (operation == 1) write_register(rt, load_integer(address, size), size == 8, 0);
+    else {
+      if (size == 8 || (operation == 3 && size >= 4)) { fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc); return 1; }
+      write_register(rt, sign_extend(load_integer(address, size), size * 8), operation == 2, 0);
+    }
+    if (mode == 1 || mode == 3) write_register(rn, base + offset, 1, 1);
+    return 1;
+  }
+
+  /* LDP/STP offset, pre-index and post-index forms for integer registers. */
+  if ((instruction & UINT32_C(0x3a000000)) == UINT32_C(0x28000000) && ((instruction >> 26) & 1) == 0) {
+    uint32_t opc = instruction >> 30;
+    uint32_t signed_words = opc == 1;
+    uint32_t size = opc == 2 ? 8 : (opc == 0 || signed_words) ? 4 : 0;
+    uint32_t mode = (instruction >> 23) & 3;
+    uint32_t load = (instruction >> 22) & 1;
+    uint32_t rt2 = (instruction >> 10) & 31;
+    uint32_t rn = (instruction >> 5) & 31;
+    uint32_t rt = instruction & 31;
+    if (size == 0 || mode == 0 || (signed_words && !load)) { fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc); return 1; }
+    int64_t offset = (int64_t)sign_extend((instruction >> 15) & 0x7f, 7) * size;
+    uint64_t base = read_register(rn, 1);
+    uint64_t address = mode == 1 ? base : base + offset;
+    if (!address_is_valid(address, size * 2)) { fail(ARM64_FAULT_MEMORY, address); return 1; }
+    if (load) {
+      uint64_t first = load_integer(address, size);
+      uint64_t second = load_integer(address + size, size);
+      write_register(rt, signed_words ? sign_extend(first, 32) : first, size == 8 || signed_words, 0);
+      write_register(rt2, signed_words ? sign_extend(second, 32) : second, size == 8 || signed_words, 0);
+    } else {
+      store_integer(address, read_register(rt, 0), size);
+      store_integer(address + size, read_register(rt2, 0), size);
+    }
+    if (mode == 1 || mode == 3) write_register(rn, base + offset, 1, 1);
+    return 1;
+  }
+
+  return 0;
 }
 
 __attribute__((export_name("arm64_reset")))
@@ -411,6 +587,9 @@ uint32_t arm64_get_recent_value_60_write_register(uint32_t age) {
 __attribute__((export_name("arm64_get_first_x28_value_60_write_pc")))
 uint64_t arm64_get_first_x28_value_60_write_pc(void) { return first_x28_value_60_write_pc; }
 
+__attribute__((export_name("arm64_set_diagnostics")))
+void arm64_set_diagnostics(uint32_t enabled) { diagnostics_enabled = enabled != 0; }
+
 __attribute__((export_name("arm64_resume")))
 void arm64_resume(void) {
   if (cpu.status == ARM64_STATUS_SYSCALL || cpu.status == ARM64_STATUS_HOSTCALL ||
@@ -555,6 +734,8 @@ int32_t arm64_step(void) {
   if ((instruction & UINT32_C(0xffffffe0)) == UINT32_C(0xd50b7b20) ||
       (instruction & UINT32_C(0xffffffe0)) == UINT32_C(0xd50b7520) ||
       instruction == UINT32_C(0xd5033b9f) || instruction == UINT32_C(0xd5033fdf)) return cpu.status;
+
+  if (fast_integer_step(instruction, instruction_pc)) return cpu.status;
 
   /* Bit-preserving FMOV between general-purpose and scalar FP registers. */
   uint32_t fmov_class = instruction & UINT32_C(0xfffffc00);
@@ -1263,6 +1444,15 @@ int32_t arm64_step(void) {
     return cpu.status;
   }
 
+  /* Advanced SIMD scalar ADDP Dd, Vn.2D: wrapping pairwise 64-bit sum. */
+  if ((instruction & UINT32_C(0xfffffc00)) == UINT32_C(0x5ef1b800)) {
+    uint32_t rn = (instruction >> 5) & 31;
+    uint32_t rd = instruction & 31;
+    cpu.q_lo[rd] = cpu.q_lo[rn] + cpu.q_hi[rn];
+    cpu.q_hi[rd] = 0;
+    return cpu.status;
+  }
+
   /* NEON NEG Vd.2S/4S, Vn.2S/4S: wrapping two's-complement negation per lane. */
   if ((instruction & UINT32_C(0xbffffc00)) == UINT32_C(0x2ea0b800)) {
     uint32_t q = (instruction >> 30) & 1;
@@ -1565,14 +1755,15 @@ int32_t arm64_step(void) {
     return cpu.status;
   }
 
-  /* NEON USHL Vd.4S, Vn.4S, Vm.4S with signed per-lane shift counts. */
-  if ((instruction & UINT32_C(0xffe0fc00)) == UINT32_C(0x6ea04400)) {
+  /* NEON USHL Vd.2S/4S, Vn.2S/4S, Vm.2S/4S with signed per-lane shift counts. */
+  if ((instruction & UINT32_C(0xbfe0fc00)) == UINT32_C(0x2ea04400)) {
+    uint32_t q = (instruction >> 30) & 1;
     uint32_t rm = (instruction >> 16) & 31;
     uint32_t rn = (instruction >> 5) & 31;
     uint32_t rd = instruction & 31;
     uint64_t output_low = 0;
     uint64_t output_high = 0;
-    for (uint32_t lane = 0; lane < 4; lane++) {
+    for (uint32_t lane = 0; lane < (q ? 4u : 2u); lane++) {
       uint64_t source_half = lane < 2 ? cpu.q_lo[rn] : cpu.q_hi[rn];
       uint64_t shift_half = lane < 2 ? cpu.q_lo[rm] : cpu.q_hi[rm];
       uint32_t offset = (lane & 1) * 32;
@@ -1586,7 +1777,7 @@ int32_t arm64_step(void) {
       else output_high |= (uint64_t)result << offset;
     }
     cpu.q_lo[rd] = output_low;
-    cpu.q_hi[rd] = output_high;
+    cpu.q_hi[rd] = q ? output_high : 0;
     return cpu.status;
   }
 
@@ -1778,6 +1969,27 @@ int32_t arm64_step(void) {
     uint32_t rt = instruction & 31;
     uint64_t offset = sign_extend((instruction >> 5) & 0x3fff, 14) << 2;
     if ((((read_register(rt, 0) >> bit) & 1) != 0) == nonzero) cpu.pc = instruction_pc + offset;
+    return cpu.status;
+  }
+
+  /* Conditional compare immediate/register: CCMN and CCMP. */
+  uint32_t conditional_compare_class = instruction & UINT32_C(0x3fe00c10);
+  if (conditional_compare_class == UINT32_C(0x3a400800) ||
+      conditional_compare_class == UINT32_C(0x3a400000)) {
+    uint32_t is_64 = instruction >> 31;
+    uint32_t subtract = (instruction >> 30) & 1;
+    uint32_t rn = (instruction >> 5) & 31;
+    uint32_t condition = (instruction >> 12) & 15;
+    if (condition_holds(condition)) {
+      uint64_t right = conditional_compare_class == UINT32_C(0x3a400800)
+        ? (instruction >> 16) & 31
+        : read_register((instruction >> 16) & 31, 0);
+      uint64_t left = read_register(rn, 0);
+      uint64_t result = subtract ? left - right : left + right;
+      set_add_sub_flags(left, right, result, is_64 ? 64 : 32, subtract);
+    } else {
+      cpu.nzcv = (instruction & 15) << 28;
+    }
     return cpu.status;
   }
 
@@ -2303,20 +2515,23 @@ int32_t arm64_step(void) {
   /* LDP/STP offset, pre-index and post-index forms for integer registers. */
   if ((instruction & UINT32_C(0x3a000000)) == UINT32_C(0x28000000) && ((instruction >> 26) & 1) == 0) {
     uint32_t opc = instruction >> 30;
-    uint32_t size = opc == 2 ? 8 : opc == 0 ? 4 : 0;
+    uint32_t signed_words = opc == 1;
+    uint32_t size = opc == 2 ? 8 : (opc == 0 || signed_words) ? 4 : 0;
     uint32_t mode = (instruction >> 23) & 3;
     uint32_t load = (instruction >> 22) & 1;
     uint32_t rt2 = (instruction >> 10) & 31;
     uint32_t rn = (instruction >> 5) & 31;
     uint32_t rt = instruction & 31;
-    if (size == 0 || mode == 0) return fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc);
+    if (size == 0 || mode == 0 || (signed_words && !load)) return fail(ARM64_FAULT_UNKNOWN_INSTRUCTION, instruction_pc);
     int64_t offset = (int64_t)sign_extend((instruction >> 15) & 0x7f, 7) * size;
     uint64_t base = read_register(rn, 1);
     uint64_t address = mode == 1 ? base : base + offset;
     if (!address_is_valid(address, size * 2)) return fail(ARM64_FAULT_MEMORY, address);
     if (load) {
-      write_register(rt, load_integer(address, size), size == 8, 0);
-      write_register(rt2, load_integer(address + size, size), size == 8, 0);
+      uint64_t first = load_integer(address, size);
+      uint64_t second = load_integer(address + size, size);
+      write_register(rt, signed_words ? sign_extend(first, 32) : first, size == 8 || signed_words, 0);
+      write_register(rt2, signed_words ? sign_extend(second, 32) : second, size == 8 || signed_words, 0);
     } else {
       store_integer(address, read_register(rt, 0), size);
       store_integer(address + size, read_register(rt2, 0), size);

@@ -134,6 +134,7 @@ self.onmessage = async ({ data }) => {
       runtime.writeBytes(address, bytes);
     };
 
+    runtime.exports.arm64_set_diagnostics(0);
     runtime.reset(runtime.elfAddress(0x1bd0));
     runtime.exports.arm64_set_register(30, BigInt(constructorReturn));
     runtime.exports.arm64_set_tracepoint(0x44232a4n);
@@ -149,6 +150,7 @@ self.onmessage = async ({ data }) => {
       onProgress: progress('wrapper checks'),
     });
     if (wrapperRun.status !== 1 || wrapperRun.exited) throw new Error(`Protection wrapper did not return cleanly (CPU status ${wrapperRun.status}).`);
+    runtime.exports.arm64_set_diagnostics(1);
 
     linux.mountSharedObject('/data/app/jp.gungho.pad/lib/arm64/libopenal.so', runtimeFiles.libopenal, 0x3e00000);
     const openalObject = linux.findSharedObject('/data/app/jp.gungho.pad/lib/arm64/libopenal.so');

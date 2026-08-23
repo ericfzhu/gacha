@@ -225,6 +225,41 @@ runtime.exports.arm64_set_register(13, 0x12345678n);
 runtime.trace(4);
 if (runtime.exports.arm64_get_register(13) !== 0x78563412n) throw new Error('REV semantics failed');
 
+const conditionalCompareProbeAddress = extractProbeAddress + 0x10;
+runtime.loadBytes(conditionalCompareProbeAddress, new Uint8Array([
+  0x1a, 0x04, 0x80, 0x52, // mov w26, #0x20
+  0x1f, 0x04, 0x00, 0x71, // cmp w0, #1
+  0x44, 0x1b, 0x50, 0x7a, // ccmp w26, #0x10, #4, ne (exact native-frame fault opcode)
+  0x20, 0x00, 0x80, 0x52, // mov w0, #1
+  0x42, 0x00, 0x00, 0x54, // b.cs +8
+  0x00, 0x00, 0x80, 0x52, // mov w0, #0
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(conditionalCompareProbeAddress);
+runtime.exports.arm64_set_register(0, 0n);
+runtime.trace(10);
+if (runtime.exports.arm64_get_register(0) !== 1n) throw new Error('CCMP immediate true-condition semantics failed');
+runtime.reset(conditionalCompareProbeAddress);
+runtime.exports.arm64_set_register(0, 1n);
+runtime.trace(10);
+if (runtime.exports.arm64_get_register(0) !== 0n) throw new Error('CCMP immediate fallback-NZCV semantics failed');
+
+const signedPairProbeAddress = conditionalCompareProbeAddress + 0x20;
+const signedPairDataAddress = signedPairProbeAddress + 0x20;
+runtime.loadBytes(signedPairProbeAddress, new Uint8Array([
+  0x02, 0xd1, 0x42, 0x69, // ldpsw x2, x20, [x8, #20] (exact native-frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.loadBytes(signedPairDataAddress, new Uint8Array([
+  0x00, 0x00, 0x00, 0x80,
+  0xff, 0xff, 0xff, 0x7f,
+]));
+runtime.reset(signedPairProbeAddress);
+runtime.exports.arm64_set_register(8, BigInt(signedPairDataAddress - 20));
+runtime.trace(5);
+if (BigInt.asUintN(64, runtime.exports.arm64_get_register(2)) !== 0xffffffff80000000n ||
+    runtime.exports.arm64_get_register(20) !== 0x7fffffffn) throw new Error('LDPSW pair semantics failed');
+
 const signedBitfieldProbeAddress = divisionProbeAddress + 0x20;
 runtime.loadBytes(signedBitfieldProbeAddress, new Uint8Array([
   0x84, 0x7c, 0x7c, 0x93, // sbfiz x4, x4, #4, #32
@@ -644,6 +679,17 @@ if (runtime.exports.arm64_get_vector_lo(0) !== 10n ||
     runtime.exports.arm64_get_vector_hi(0) !== 0n) throw new Error('NEON ADDV 4S semantics failed');
 
 runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x00, 0xb8, 0xf1, 0x5e, // addp d0, v0.2d (exact native-frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(0, 0xfffffffffffffff0n);
+runtime.exports.arm64_set_vector_hi(0, 0x21n);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(0) !== 0x11n ||
+    runtime.exports.arm64_get_vector_hi(0) !== 0n) throw new Error('Advanced SIMD scalar ADDP 2D semantics failed');
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
   0x43, 0x98, 0xa0, 0x0e, // cmeq v3.2s, v2.2s, #0
   0x63, 0x58, 0x20, 0x2e, // mvn v3.8b, v3.8b
   0x43, 0x8c, 0xa0, 0x0e, // cmtst v3.2s, v2.2s, v0.2s
@@ -853,6 +899,18 @@ runtime.exports.arm64_set_vector_hi(2, 0x800000007fffffffn);
 runtime.trace(5);
 if (runtime.exports.arm64_get_vector_lo(2) !== 0x00000001ffffffffn ||
     runtime.exports.arm64_get_vector_hi(2) !== 0n) throw new Error('NEON NEG 2S semantics failed');
+
+runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
+  0x00, 0x44, 0xa2, 0x2e, // ushl v0.2s, v0.2s, v2.2s (exact native-frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]));
+runtime.reset(vectorZeroProbeAddress);
+runtime.exports.arm64_set_vector_lo(0, 0x000000f080000000n);
+runtime.exports.arm64_set_vector_hi(0, 0xffffffffffffffffn);
+runtime.exports.arm64_set_vector_lo(2, 0x00000004ffffffffn);
+runtime.trace(5);
+if (runtime.exports.arm64_get_vector_lo(0) !== 0x00000f0040000000n ||
+    runtime.exports.arm64_get_vector_hi(0) !== 0n) throw new Error('NEON USHL 2S semantics failed');
 
 runtime.loadBytes(vectorZeroProbeAddress, new Uint8Array([
   0x02, 0x3c, 0x04, 0x0e, // mov w2, v0.s[0]
