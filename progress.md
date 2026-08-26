@@ -2,6 +2,20 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-24 damage-immunity off
+
+- Recovered parameterless type `121` / `ESInvulnerableOff` at dispatch/setup/
+  condition `0x62a678`, `0x6217c0`, and `0x61afc8`.
+- Its AI condition admits the action only while protected signed-int16
+  `sMONSTER+0x9c0 >= 1`; execution zeroes both the immunity timer and neighboring
+  presentation controller before the native off animation.
+- The browser now decodes, selects, and executes immunity-off, rejects it while
+  already vulnerable without RNG use, and restores subsequent card damage.
+  Pure fixtures, production build, data checks, and 11 exact ARM64 anchors
+  pass. The focused Chromium command is prepared but its launch was blocked by
+  the Codex runtime usage limit; rerun that checkpoint before type `122`, then
+  continue to type `123` alternate immunity-on.
+
 ## 2026-08-24 remaining-enemy branch
 
 - Recovered type `120` / `ESBranchRemainingEnemies`. Ordinary dispatch/setup/

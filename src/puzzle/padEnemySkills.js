@@ -88,6 +88,7 @@ export const PAD_ENEMY_SKILL_BRANCH_ERASED_ATTRIBUTES = 117;
 export const PAD_ENEMY_SKILL_TYPE_RESIST = 118;
 export const PAD_ENEMY_SKILL_DAMAGE_IMMUNITY = 119;
 export const PAD_ENEMY_SKILL_BRANCH_REMAINING_ENEMIES = 120;
+export const PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_OFF = 121;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -739,6 +740,14 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       kind: 'branchRemainingEnemies',
       supported: true,
       controlFlow: true,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_OFF) {
+    return Object.freeze({
+      type,
+      kind: 'damageImmunityOff',
+      supported: true,
       attackWithSkillValue,
     });
   }
@@ -1898,6 +1907,9 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
   if (type === PAD_ENEMY_SKILL_BRANCH_REMAINING_ENEMIES) {
     return decodePadEnemySkillDefinition(definitionBytes);
   }
+  if (type === PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_OFF) {
+    return decodePadEnemySkillDefinition(definitionBytes);
+  }
   if (type === PAD_ENEMY_SKILL_RESOLVE) {
     requireLength(definitionBytes, 0x14, 'PAD enemy-skill definition');
     return Object.freeze({
@@ -2960,6 +2972,16 @@ export function normalizePadEnemySkillRecord(record) {
       controlFlow: true,
       branchValue: Math.trunc(Number(record?.branchValue) || 0) & 0xff,
       targetRound: Math.trunc(Number(record?.targetRound) || 0) & 0xff,
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_OFF || record?.kind === 'damageImmunityOff') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_OFF,
+      kind: 'damageImmunityOff',
+      supported: record?.supported !== false,
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

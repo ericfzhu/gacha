@@ -860,6 +860,23 @@ const REMAINING_ENEMIES_BRANCH_INSTRUCTION_ANCHORS = Object.freeze([
   [0x61a47c, 0x540006ed], // branch when remaining count is less than or equal
   [0x61a55c, 0x39405508], // load unsigned enemy_rnd destination at reference +5
 ]);
+const DAMAGE_IMMUNITY_OFF_ENEMY_SKILL_TYPE = 121;
+const DAMAGE_IMMUNITY_OFF_HANDLER = 0x62a678;
+const DAMAGE_IMMUNITY_OFF_SETUP_HANDLER = 0x6217c0;
+const DAMAGE_IMMUNITY_OFF_CONDITION_HANDLER = 0x61afc8;
+const DAMAGE_IMMUNITY_OFF_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x62a678, 0x91270260], // address protected immunity timer at +0x9c0
+  [0x62a67c, 0x2a1f03e1], // assign zero to the immunity timer
+  [0x62a684, 0x9126c260], // address neighboring presentation controller
+  [0x62a688, 0x2a1f03e1], // clear that controller too
+  [0x62a690, 0x79427e68], // begin the native immunity-off presentation setup
+  [0x61afc8, 0x912702a0], // condition addresses the same +0x9c0 timer
+  [0x61afcc, 0x97f44665], // read its protected value
+  [0x61afd0, 0x13003c08], // interpret the timer as signed int16
+  [0x61afd4, 0x7100051f], // compare active turns with one
+  [0x61afd8, 0x54ffb2ca], // active immunity preserves incoming condition scale
+  [0x61afdc, 0x14000410], // inactive immunity returns zero condition scale
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -2356,6 +2373,31 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     : REMAINING_ENEMIES_BRANCH_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
+  const damageImmunityOffDispatchTarget = resolveEnemySkillTarget(
+    DAMAGE_IMMUNITY_OFF_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const damageImmunityOffSetupTarget = resolveEnemySkillTarget(
+    DAMAGE_IMMUNITY_OFF_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const damageImmunityOffConditionTarget = resolveEnemySkillTarget(
+    DAMAGE_IMMUNITY_OFF_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const damageImmunityOffDispatchMatches = damageImmunityOffDispatchTarget === null
+    ? null : damageImmunityOffDispatchTarget === DAMAGE_IMMUNITY_OFF_HANDLER;
+  const damageImmunityOffSetupMatches = damageImmunityOffSetupTarget === null
+    ? null : damageImmunityOffSetupTarget === DAMAGE_IMMUNITY_OFF_SETUP_HANDLER;
+  const damageImmunityOffConditionMatches = damageImmunityOffConditionTarget === null
+    ? null : damageImmunityOffConditionTarget === DAMAGE_IMMUNITY_OFF_CONDITION_HANDLER;
+  const damageImmunityOffInstructionAnchorsMatch = restoredElf === null ? null
+    : DAMAGE_IMMUNITY_OFF_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
     HEAL_PLAYER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -3461,6 +3503,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       remainingEnemiesBranchConditionMatches21_9: remainingEnemiesBranchConditionMatches,
       remainingEnemiesBranchInstructionAnchorsMatch21_9:
         remainingEnemiesBranchInstructionAnchorsMatch,
+      damageImmunityOffDispatchMatches21_9: damageImmunityOffDispatchMatches,
+      damageImmunityOffSetupMatches21_9: damageImmunityOffSetupMatches,
+      damageImmunityOffConditionMatches21_9: damageImmunityOffConditionMatches,
+      damageImmunityOffInstructionAnchorsMatch21_9: damageImmunityOffInstructionAnchorsMatch,
       sourceToJammerDispatchMatches21_9: sourceToJammerDispatchMatches,
       sourceToJammerSetupMatches21_9: sourceToJammerSetupMatches,
       sourceToJammerConditionMatches21_9: sourceToJammerConditionMatches,
@@ -4311,6 +4357,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
         remainingEnemiesBranchInstructionAnchorsMatch,
       remainingEnemiesBranchSemantics:
         'type 120 is an enemy-skill-list control record: ordinary dispatch/setup/condition are inert; parseFlowControl counts non-escaped monsters with positive protected HP, including the actor, and jumps to zero-based reference-slot enemy_rnd when remainingCount <= unsigned enemy_ai; it consumes no action or RNG',
+      damageImmunityOffType: DAMAGE_IMMUNITY_OFF_ENEMY_SKILL_TYPE,
+      damageImmunityOffDispatchTarget: damageImmunityOffDispatchTarget === null
+        ? null : hex(damageImmunityOffDispatchTarget),
+      damageImmunityOffDispatchMatches21_9: damageImmunityOffDispatchMatches,
+      damageImmunityOffSetupTarget: damageImmunityOffSetupTarget === null
+        ? null : hex(damageImmunityOffSetupTarget),
+      damageImmunityOffSetupMatches21_9: damageImmunityOffSetupMatches,
+      damageImmunityOffConditionTarget: damageImmunityOffConditionTarget === null
+        ? null : hex(damageImmunityOffConditionTarget),
+      damageImmunityOffConditionMatches21_9: damageImmunityOffConditionMatches,
+      damageImmunityOffInstructionAnchorsMatch21_9: damageImmunityOffInstructionAnchorsMatch,
+      damageImmunityOffSemantics:
+        'type 121 owns no authored parameters: its condition is eligible only while signed-int16 sMONSTER+0x9c0 is at least one, and execution assigns zero to both +0x9c0 immunity and +0x9b0 presentation controllers before the native off animation',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,

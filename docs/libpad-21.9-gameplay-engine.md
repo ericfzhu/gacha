@@ -1691,6 +1691,19 @@ external evaluator, which used equality. The browser queue mirrors the native
 inclusive comparison, consumes no action or RNG, and guards the same malformed
 control-flow cycles as types 113–117.
 
+Enemy skill type `121` is the parameterless immunity-off action. Its dispatch,
+generic setup, and condition targets are `0x62a678`, `0x6217c0`, and
+`0x61afc8`. The condition reads protected signed-int16 `sMONSTER+0x9c0` and
+preserves the incoming selection scale only when the timer is at least one;
+without active immunity, the action is ineligible and owns no RNG.
+
+Execution assigns zero to the `+0x9c0` immunity timer and the neighboring
+`+0x9b0` presentation controller before configuring the native off animation.
+The browser therefore makes subsequent card and nail damage effective
+immediately, preserves the parameterless definition/runtime shape, and allows
+new-AI selection only after the pre-action timer countdown still leaves a
+positive value.
+
 Enemy skill type `6` is the player-positive-status dispel. Its dispatch entry
 targets `0x6292e8`, its no-parameter setup entry targets `0x6217c0`, and its AI
 condition targets `0x61b404`. The handler calls `_doItetukuHadou`

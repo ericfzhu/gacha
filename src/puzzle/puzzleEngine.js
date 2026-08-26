@@ -78,6 +78,7 @@ import {
   PAD_ENEMY_SKILL_TYPE_RESIST,
   PAD_ENEMY_SKILL_DAMAGE_IMMUNITY,
   PAD_ENEMY_SKILL_BRANCH_REMAINING_ENEMIES,
+  PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_OFF,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -2891,6 +2892,13 @@ export class PuzzleEngine {
       this.message = `${enemy.name} is immune to damage for ${skill.durationTurns} turn${skill.durationTurns === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'damageImmunityOff') {
+      const enemy = this.enemies[Math.trunc(Number(enemyIndex))];
+      if (!enemy) return false;
+      enemy.damageImmunityTurns = 0;
+      this.message = `${enemy.name} is vulnerable to damage again.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'leaderSwap') {
       const selectedPartyIndex = Math.trunc(Number(skill.selectedPartyIndex));
       if (
@@ -3313,6 +3321,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_TYPE_RESIST,
         PAD_ENEMY_SKILL_DAMAGE_IMMUNITY,
         PAD_ENEMY_SKILL_BRANCH_REMAINING_ENEMIES,
+        PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_OFF,
         PAD_ENEMY_SKILL_RESOLVE,
         PAD_ENEMY_SKILL_DAMAGE_SHIELD,
         PAD_ENEMY_SKILL_LEADER_SWAP,

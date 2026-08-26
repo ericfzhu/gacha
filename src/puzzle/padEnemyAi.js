@@ -49,6 +49,7 @@ import {
   PAD_ENEMY_SKILL_DAMAGE_VOID,
   PAD_ENEMY_SKILL_DAMAGE_SHIELD,
   PAD_ENEMY_SKILL_DAMAGE_IMMUNITY,
+  PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_OFF,
   PAD_ENEMY_SKILL_LEADER_SWAP,
   PAD_ENEMY_SKILL_NORMAL_ATTACK,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
@@ -229,6 +230,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_DAMAGE_VOID,
     PAD_ENEMY_SKILL_DAMAGE_SHIELD,
     PAD_ENEMY_SKILL_DAMAGE_IMMUNITY,
+    PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_OFF,
     PAD_ENEMY_SKILL_LEADER_SWAP,
     PAD_ENEMY_SKILL_NORMAL_ATTACK,
     PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
@@ -474,6 +476,12 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
     // Type 119's 0x61a670 condition reads protected signed-int16
     // sMONSTER+0x9c0 and admits the record only while it is below one.
     const eligible = state.enemyDamageImmunityTurns <= 0;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_OFF) {
+    // Type 121's 0x61afc8 condition is the inverse of type 119: it preserves
+    // the incoming scale only while protected signed-int16 +0x9c0 is active.
+    const eligible = state.enemyDamageImmunityTurns >= 1;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_LEADER_SWAP) {
