@@ -1,4 +1,4 @@
-import { Arm64Runtime, LIBPAD_CONSTRUCTOR_ADDRESS } from './arm64Runtime.js';
+import { ARM64_CORE_BUILD, Arm64Runtime, LIBPAD_CONSTRUCTOR_ADDRESS } from './arm64Runtime.js';
 import { VirtualLinux } from './virtualLinux.js';
 import { VirtualJni } from './virtualJni.js';
 import { Gles1Renderer } from './gles1Renderer.js';
@@ -26,6 +26,262 @@ async function loadAndroidStub(name) {
   const response = await fetch(`/android-stubs/${name}`);
   if (!response.ok) throw new Error(`Unable to load browser Android ABI image ${name} (${response.status}).`);
   return new Uint8Array(await response.arrayBuffer());
+}
+
+const RESTORED_CACHE_DATABASE = 'gacha-pad-binary-port';
+const RESTORED_CACHE_VERSION = 1;
+const RESTORED_CACHE_STORE = 'restored-elfs';
+// The first cache format only persisted the restored ELF file.  A protected
+// load also creates executable decoded-module mappings and mutates the loaded
+// wrapper/data segments, so keep those artifacts under a distinct key until
+// the complete warm-load snapshot is available.
+const RESTORED_CACHE_SCHEMA = 'protected-snapshot-v2';
+
+async function restoredCacheKey(runtimeFiles) {
+  if (!globalThis.crypto?.subtle || !runtimeFiles?.libpad) return null;
+  const inputs = [
+    ['libpad', runtimeFiles.libpad],
+    ['lib6dba', runtimeFiles.lib6dba],
+    ['libopenal', runtimeFiles.libopenal],
+    ['protection', runtimeFiles.protectionData],
+    ...(runtimeFiles.extraFiles || [])
+      .slice()
+      .sort((left, right) => left.name.localeCompare(right.name))
+      .map((entry) => [`extra:${entry.name}`, entry.bytes]),
+  ];
+  const hashes = await Promise.all(inputs.map(async ([name, bytes]) => {
+    const digest = bytes
+      ? await crypto.subtle.digest('SHA-256', bytes)
+      : null;
+    const value = digest
+      ? Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+      : 'none';
+    return `${name}=${value}`;
+  }));
+  return `${ARM64_CORE_BUILD}:${RESTORED_CACHE_SCHEMA}:${hashes.join(';')}`;
+}
+
+function captureElfSegments(runtime, elf, address) {
+  return elf.loadSegments.map((segment) => ({
+    virtualAddress: segment.virtualAddress,
+    memorySize: segment.memorySize,
+    bytes: runtime.readBytes(address + segment.virtualAddress, segment.memorySize).buffer,
+  }));
+}
+
+function restoreElfSegments(runtime, elf, address, segments) {
+  if (!Array.isArray(segments) || segments.length !== elf.loadSegments.length) {
+    throw new Error('Restored protected snapshot is missing ELF segment state.');
+  }
+  for (const [index, segment] of elf.loadSegments.entries()) {
+    const saved = segments[index];
+    if (!saved || saved.virtualAddress !== segment.virtualAddress || saved.memorySize !== segment.memorySize ||
+        !saved.bytes || saved.bytes.byteLength < segment.memorySize) {
+      throw new Error(`Restored protected snapshot has an invalid ELF segment ${index}.`);
+    }
+    runtime.writeBytes(address + segment.virtualAddress, new Uint8Array(saved.bytes, 0, segment.memorySize));
+  }
+}
+
+function restoreProtectedMappings(runtime, linux, mappings) {
+  if (!Array.isArray(mappings) || !mappings.length) {
+    throw new Error('Restored protected snapshot has no decoded mappings.');
+  }
+  for (const saved of mappings) {
+    const address = Number(saved?.address);
+    const length = Number(saved?.length);
+    if (!Number.isSafeInteger(address) || !Number.isSafeInteger(length) || address < 0 || length <= 0 ||
+        !saved.bytes || saved.bytes.byteLength < length || !linux.isAddressRangeAvailable(address, length)) {
+      throw new Error(`Restored protected snapshot has an invalid mapping at 0x${address.toString(16)}.`);
+    }
+    runtime.ensureCapacity(address + length);
+    runtime.writeBytes(address, new Uint8Array(saved.bytes, 0, length));
+    const mapping = {
+      address,
+      length,
+      protection: Number(saved.protection) || 0,
+      fd: Number(saved.fd ?? -1),
+      fileOffset: Number(saved.fileOffset ?? 0),
+    };
+    if (saved.executable) Object.defineProperty(mapping, 'executableBytes', {
+      value: runtime.readBytes(address, length),
+      writable: true,
+      configurable: true,
+      enumerable: false,
+    });
+    linux.mappings.push(mapping);
+    linux.nextMapAddress = Math.max(linux.nextMapAddress, address + length + 0x1000);
+  }
+}
+
+function captureHostState(runtime, linux) {
+  return {
+    bridges: [...linux.hostBridges.entries()],
+    compatibilitySymbols: [...linux.compatibilitySymbols],
+    compatibilityData: [...linux.compatibilityData.entries()].map(([name, address]) => {
+      const size = name === 'in6addr_any' ? 16 : 8;
+      return {
+        name,
+        address,
+        size,
+        bytes: runtime.readBytes(address, size).buffer,
+        openSlKind: linux.openSlInterfaceNames.get(address) ?? null,
+      };
+    }),
+    hostStrings: [...linux.hostStrings.entries()].map(([value, address]) => ({ value, address })),
+    nextHostBridgeAddress: linux.nextHostBridgeAddress,
+    nextHostDataAddress: linux.nextHostDataAddress,
+  };
+}
+
+function restoreHostState(runtime, linux, state) {
+  if (!state || !Array.isArray(state.bridges) || !Array.isArray(state.compatibilitySymbols) ||
+      !Array.isArray(state.compatibilityData) || !Array.isArray(state.hostStrings)) {
+    throw new Error('Restored protected snapshot is missing host bridge state.');
+  }
+  for (const [name, rawAddress] of state.bridges) {
+    const address = Number(rawAddress);
+    if (!name || !Number.isSafeInteger(address) || address < 0x7c00000 || address + 8 > 0x7c10000) {
+      throw new Error(`Restored protected snapshot has an invalid host bridge at 0x${address.toString(16)}.`);
+    }
+    linux.hostBridges.set(name, address);
+    linux.hostBridgeNames.set(address, name);
+    runtime.writeBytes(address, new Uint8Array([
+      0x00, 0x00, 0x20, 0xd4, // brk #0
+      0xc0, 0x03, 0x5f, 0xd6, // ret
+    ]));
+  }
+  for (const name of state.compatibilitySymbols) {
+    if (!name) continue;
+    linux.compatibilitySymbols.add(name);
+    if (!linux.hostImports.has(name)) {
+      linux.registerHostImport(name, (snapshot) => linux.hostCompatibilityCall(name, snapshot));
+    }
+  }
+  for (const saved of state.compatibilityData) {
+    const address = Number(saved?.address);
+    const size = Number(saved?.size);
+    if (!saved?.name || !Number.isSafeInteger(address) || !Number.isSafeInteger(size) || size <= 0 ||
+        !saved.bytes || saved.bytes.byteLength < size || address < 0x7c20000 || address + size > 0x7e00000) {
+      throw new Error(`Restored protected snapshot has invalid compatibility data for ${saved?.name ?? 'unknown'}.`);
+    }
+    linux.compatibilityData.set(saved.name, address);
+    if (saved.openSlKind) linux.openSlInterfaceNames.set(address, saved.openSlKind);
+    runtime.writeBytes(address, new Uint8Array(saved.bytes, 0, size));
+  }
+  for (const saved of state.hostStrings) {
+    const address = Number(saved?.address);
+    if (typeof saved?.value !== 'string' || !Number.isSafeInteger(address) ||
+        address < 0x7c20000 || address >= 0x7e00000) {
+      throw new Error('Restored protected snapshot has invalid host string state.');
+    }
+    linux.hostStrings.set(saved.value, address);
+    runtime.writeBytes(address, new TextEncoder().encode(`${saved.value}\0`));
+  }
+  linux.nextHostBridgeAddress = Math.max(
+    Number(state.nextHostBridgeAddress) || linux.nextHostBridgeAddress,
+    ...[...linux.hostBridges.values()].map((address) => address + 8),
+  );
+  linux.nextHostDataAddress = Math.max(
+    Number(state.nextHostDataAddress) || linux.nextHostDataAddress,
+    ...[...linux.compatibilityData.values()].map((address) => address + 8),
+    ...state.hostStrings.map(({ address }) => Number(address) + 8),
+  );
+}
+
+function hasBytePayload(value, minimum = 1) {
+  return Boolean(value && (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) && value.byteLength >= minimum);
+}
+
+function isRestoredSnapshot(value) {
+  if (!value || value.schema !== RESTORED_CACHE_SCHEMA || !hasBytePayload(value.bytes) ||
+      !Array.isArray(value.mappings) || !value.mappings.length ||
+      !Array.isArray(value.wrapperSegments) || !Array.isArray(value.padSegments) ||
+      !value.hostState || !Array.isArray(value.hostState.bridges) ||
+      !Array.isArray(value.hostState.compatibilitySymbols) ||
+      !Array.isArray(value.hostState.compatibilityData) ||
+      !Array.isArray(value.hostState.hostStrings)) return false;
+  const ranges = [];
+  for (const mapping of value.mappings) {
+    const address = Number(mapping?.address);
+    const length = Number(mapping?.length);
+    if (!Number.isSafeInteger(address) || !Number.isSafeInteger(length) || address < 0 ||
+        length <= 0 || address + length > 0x40000000 || !hasBytePayload(mapping?.bytes, length)) return false;
+    ranges.push([address, address + length]);
+  }
+  ranges.sort(([left], [right]) => left - right);
+  for (let index = 1; index < ranges.length; index += 1) {
+    if (ranges[index][0] < ranges[index - 1][1]) return false;
+  }
+  for (const segments of [value.wrapperSegments, value.padSegments]) {
+    if (!segments.length) return false;
+    for (const segment of segments) {
+      if (!Number.isSafeInteger(Number(segment?.virtualAddress)) ||
+          !Number.isSafeInteger(Number(segment?.memorySize)) || Number(segment.memorySize) <= 0 ||
+          !hasBytePayload(segment?.bytes, Number(segment.memorySize))) return false;
+    }
+  }
+  return true;
+}
+
+function openRestoredCache() {
+  if (!globalThis.indexedDB) return null;
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(RESTORED_CACHE_DATABASE, RESTORED_CACHE_VERSION);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(RESTORED_CACHE_STORE)) {
+        request.result.createObjectStore(RESTORED_CACHE_STORE);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error('Unable to open restored ELF cache.'));
+    request.onblocked = () => reject(new Error('Restored ELF cache is blocked by another browser context.'));
+  });
+}
+
+async function readRestoredCache(key) {
+  if (!key) return null;
+  let database;
+  try {
+    database = await openRestoredCache();
+    if (!database) return null;
+    const value = await new Promise((resolve, reject) => {
+      const request = database.transaction(RESTORED_CACHE_STORE, 'readonly')
+        .objectStore(RESTORED_CACHE_STORE).get(key);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error || new Error('Unable to read restored ELF cache.'));
+    });
+    return value?.bytes ? value : null;
+  } catch {
+    return null;
+  } finally {
+    database?.close();
+  }
+}
+
+async function writeRestoredCache(key, value) {
+  if (!key || !value?.bytes) return { ok: false, error: 'cache key or bytes unavailable' };
+  let database;
+  try {
+    database = await openRestoredCache();
+    if (!database) return { ok: false, error: 'IndexedDB unavailable' };
+    await new Promise((resolve, reject) => {
+      const transaction = database.transaction(RESTORED_CACHE_STORE, 'readwrite');
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error || new Error('Unable to write restored ELF cache.'));
+      transaction.onabort = () => reject(transaction.error || new Error('Restored ELF cache transaction aborted.'));
+      const request = transaction.objectStore(RESTORED_CACHE_STORE).put(value, key);
+      request.onerror = () => reject(request.error || new Error('Unable to write restored ELF cache.'));
+    });
+    return { ok: true, error: null };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+    };
+  } finally {
+    database?.close();
+  }
 }
 
 self.onmessage = async ({ data }) => {
@@ -103,12 +359,34 @@ self.onmessage = async ({ data }) => {
   try {
     const { sourceName, runtimeFiles } = data;
     self.postMessage({ type: 'progress', instructions: 0, phase: 'mapping apk' });
+    self.postMessage({ type: 'progress', instructions: 0, phase: 'checking restored ELF cache' });
+    let restoredKey = null;
+    let cachedRestore = null;
+    try {
+      restoredKey = await restoredCacheKey(runtimeFiles);
+      cachedRestore = await readRestoredCache(restoredKey);
+    } catch {
+      restoredKey = null;
+      cachedRestore = null;
+    }
+    const cacheHit = isRestoredSnapshot(cachedRestore);
+    self.postMessage({
+      type: 'progress',
+      instructions: 0,
+      phase: restoredKey
+        ? `restored ELF cache ${cacheHit ? 'hit' : 'miss'}`
+        : 'restored ELF cache unavailable',
+    });
+    if (cacheHit) {
+      self.postMessage({ type: 'progress', instructions: 0, phase: 'using cached restored ELF' });
+    }
     const probeRuntime = await Arm64Runtime.create();
     const elf = probeRuntime.loadElf(runtimeFiles.libpad);
     const probe = probeRuntime.runLibpadProbe(true);
     const constructor = probeRuntime.runToFirstSyscall();
     const runtime = await Arm64Runtime.create();
     runtime.loadElf(runtimeFiles.lib6dba);
+    if (cacheHit) restoreElfSegments(runtime, runtime.loadedElf, runtime.loadBias, cachedRestore.wrapperSegments);
     const wrapperPath = '/data/app/jp.gungho.pad/lib/arm64/lib__6dba__.so';
     const padPath = '/data/app/jp.gungho.pad/lib/arm64/libpad.so';
     const renderer = data.canvas ? new Gles1Renderer(data.canvas, runtime, {
@@ -116,6 +394,13 @@ self.onmessage = async ({ data }) => {
       height: data.height || 560,
     }) : null;
     const linux = new VirtualLinux(runtime, { libraryPath: wrapperPath, graphicsBridge: renderer });
+    if (cacheHit) {
+      restoreHostState(runtime, linux, cachedRestore.hostState);
+      // VirtualLinux links the initially loaded wrapper during construction;
+      // refresh those relocations after restoring the exact cold-load bridge
+      // addresses so cached pointers continue to target the same host ABI.
+      linux.linkElf(runtime.loadedElf, runtime.loadBias);
+    }
     linux.mount(wrapperPath, runtimeFiles.lib6dba);
     linux.mount(padPath, runtimeFiles.libpad);
     linux.mount('/data/user/0/jp.gungho.pad/lib/libpad.so', runtimeFiles.libpad);
@@ -145,27 +430,43 @@ self.onmessage = async ({ data }) => {
       runtime.writeBytes(address, bytes);
     };
 
-    runtime.exports.arm64_set_diagnostics(0);
-    runtime.reset(runtime.elfAddress(0x1bd0));
-    runtime.exports.arm64_set_register(30, BigInt(constructorReturn));
-    runtime.exports.arm64_set_tracepoint(0x44232a4n);
-    const wrapperToGate = await linux.runAsync(800_000_000, 10_000, {
-      instructionsPerYield: PROTECTED_PROGRESS_INTERVAL,
-      onProgress: progress('wrapper'),
-    });
-    if (wrapperToGate.status !== 4) throw new Error(`Protection wrapper stopped before its verified Android gate (CPU status ${wrapperToGate.status}).`);
-    writeU32(0x443c1c0, 1);
-    runtime.exports.arm64_resume();
-    const wrapperRun = await linux.runAsync(800_000_000, 10_000, {
-      instructionsPerYield: PROTECTED_PROGRESS_INTERVAL,
-      onProgress: progress('wrapper checks'),
-    });
-    if (wrapperRun.status !== 1 || wrapperRun.exited) throw new Error(`Protection wrapper did not return cleanly (CPU status ${wrapperRun.status}).`);
-    // The protected module pass is a pure guest execution phase.  Keep the
-    // interpreter's optional call/register history off while it runs; that
-    // history is only used to explain host events and faults, not by the
-    // native code itself.  Re-enable it before JNI/lifecycle callbacks.
-    runtime.exports.arm64_set_diagnostics(0);
+    let wrapperToGate = {
+      status: 1,
+      instructions: 0,
+      syscalls: 0,
+      hostcalls: 0,
+      exited: false,
+    };
+    let wrapperRun = {
+      status: 1,
+      instructions: 0,
+      syscalls: 0,
+      hostcalls: 0,
+      exited: false,
+    };
+    if (!cacheHit) {
+      runtime.exports.arm64_set_diagnostics(0);
+      runtime.reset(runtime.elfAddress(0x1bd0));
+      runtime.exports.arm64_set_register(30, BigInt(constructorReturn));
+      runtime.exports.arm64_set_tracepoint(0x44232a4n);
+      wrapperToGate = await linux.runAsync(800_000_000, 10_000, {
+        instructionsPerYield: PROTECTED_PROGRESS_INTERVAL,
+        onProgress: progress('wrapper'),
+      });
+      if (wrapperToGate.status !== 4) throw new Error(`Protection wrapper stopped before its verified Android gate (CPU status ${wrapperToGate.status}).`);
+      writeU32(0x443c1c0, 1);
+      runtime.exports.arm64_resume();
+      wrapperRun = await linux.runAsync(800_000_000, 10_000, {
+        instructionsPerYield: PROTECTED_PROGRESS_INTERVAL,
+        onProgress: progress('wrapper checks'),
+      });
+      if (wrapperRun.status !== 1 || wrapperRun.exited) throw new Error(`Protection wrapper did not return cleanly (CPU status ${wrapperRun.status}).`);
+      // The protected module pass is a pure guest execution phase.  Keep the
+      // interpreter's optional call/register history off while it runs; that
+      // history is only used to explain host events and faults, not by the
+      // native code itself.  Re-enable it before JNI/lifecycle callbacks.
+      runtime.exports.arm64_set_diagnostics(0);
+    }
 
     linux.mountSharedObject('/data/app/jp.gungho.pad/lib/arm64/libopenal.so', runtimeFiles.libopenal, 0x3e00000);
     const openalObject = linux.findSharedObject('/data/app/jp.gungho.pad/lib/arm64/libopenal.so');
@@ -181,14 +482,26 @@ self.onmessage = async ({ data }) => {
       }
     }
 
-    linux.mountSharedObject(padPath, runtimeFiles.libpad, 0x2000000);
+    const padBytes = cacheHit ? new Uint8Array(cachedRestore.bytes) : runtimeFiles.libpad;
+    if (cacheHit) {
+      // The cache stores the post-protection ELF image, including restored
+      // text and the relocation state used by the fixed browser load address.
+      // Keep both Android-visible paths in sync before mounting the object.
+      linux.mount(padPath, padBytes);
+      linux.mount('/data/user/0/jp.gungho.pad/lib/libpad.so', padBytes);
+    }
+    linux.mountSharedObject(padPath, padBytes, 0x2000000);
     const padObject = linux.findSharedObject(padPath);
+    if (cacheHit) {
+      restoreElfSegments(runtime, padObject.elf, padObject.address, cachedRestore.padSegments);
+      restoreProtectedMappings(runtime, linux, cachedRestore.mappings);
+    }
     const mappingsBeforePad = new Set(linux.mappings.map((mapping) => mapping.address));
-    runtime.reset(padObject.address + LIBPAD_CONSTRUCTOR_ADDRESS);
-    runtime.exports.arm64_set_register(30, BigInt(constructorReturn));
-    let padProtectionModule = 0;
+    let padProtectionModule = cacheHit ? 1 : 0;
     const padSecurityBypasses = new Set();
-    const padModules = [];
+    const padModules = cacheHit
+      ? (Array.isArray(cachedRestore.padModules) ? cachedRestore.padModules : [])
+      : [];
     const padDiscoveryObservations = [];
     const discoverPadProtectionModule = (event) => {
       if (padProtectionModule) return;
@@ -235,54 +548,96 @@ self.onmessage = async ({ data }) => {
         break;
       }
     };
-    linux.onEvent = discoverPadProtectionModule;
-    linux.onSlice = discoverPadProtectionModule;
-    runtime.exports.arm64_set_module_trace(1);
-    let padRun = await linux.runAsync(1_200_000_000, 10_000, {
-      instructionsPerSlice: PROTECTED_INSTRUCTIONS_PER_SLICE,
-      instructionsPerYield: PROTECTED_PROGRESS_INTERVAL,
-      onProgress: progress('PAD'),
-      onEvent: discoverPadProtectionModule,
-      onSlice: discoverPadProtectionModule,
-    });
-    while (padRun.status === 4 && padModules.length < 128) {
-      // Module trace stops before the first decoded module instruction. Patch
-      // security gates at that boundary, matching the synchronous inspector.
-      discoverPadProtectionModule();
-      const moduleType = Number(runtime.exports.arm64_get_register(22));
-      const moduleBase = Number(runtime.exports.arm64_get_register(27));
-      const securityOffsets = new Map([[0x20, 0x3a98], [0x54, 0x492c], [0x72, 0x45e8], [0xa4, 0x3250]]);
-      const securityOffset = securityOffsets.get(moduleType);
-      if (securityOffset && moduleBase) {
-        runtime.writeBytes(moduleBase + securityOffset, new Uint8Array([0x20, 0x00, 0x80, 0x52, 0xc0, 0x03, 0x5f, 0xd6]));
-        padSecurityBypasses.add(`${moduleType.toString(16)}:${moduleBase}`);
-      }
-      padModules.push({
-        type: moduleType,
-        base: moduleBase,
-        entry: Number(runtime.exports.arm64_get_register(6)),
-      });
-      runtime.exports.arm64_resume();
-      runtime.exports.arm64_step();
+    let padRun = {
+      status: 1,
+      instructions: 0,
+      syscalls: 0,
+      hostcalls: 0,
+      exited: false,
+    };
+    if (!cacheHit) {
+      runtime.reset(padObject.address + LIBPAD_CONSTRUCTOR_ADDRESS);
+      runtime.exports.arm64_set_register(30, BigInt(constructorReturn));
+      linux.onEvent = discoverPadProtectionModule;
+      linux.onSlice = discoverPadProtectionModule;
       runtime.exports.arm64_set_module_trace(1);
       padRun = await linux.runAsync(1_200_000_000, 10_000, {
         instructionsPerSlice: PROTECTED_INSTRUCTIONS_PER_SLICE,
         instructionsPerYield: PROTECTED_PROGRESS_INTERVAL,
-        onProgress: progress(`PAD module ${padModules.length + 1}`),
+        onProgress: progress('PAD'),
         onEvent: discoverPadProtectionModule,
         onSlice: discoverPadProtectionModule,
       });
+      while (padRun.status === 4 && padModules.length < 128) {
+        // Module trace stops before the first decoded module instruction. Patch
+        // security gates at that boundary, matching the synchronous inspector.
+        discoverPadProtectionModule();
+        const moduleType = Number(runtime.exports.arm64_get_register(22));
+        const moduleBase = Number(runtime.exports.arm64_get_register(27));
+        const securityOffsets = new Map([[0x20, 0x3a98], [0x54, 0x492c], [0x72, 0x45e8], [0xa4, 0x3250]]);
+        const securityOffset = securityOffsets.get(moduleType);
+        if (securityOffset && moduleBase) {
+          runtime.writeBytes(moduleBase + securityOffset, new Uint8Array([0x20, 0x00, 0x80, 0x52, 0xc0, 0x03, 0x5f, 0xd6]));
+          padSecurityBypasses.add(`${moduleType.toString(16)}:${moduleBase}`);
+        }
+        padModules.push({
+          type: moduleType,
+          base: moduleBase,
+          entry: Number(runtime.exports.arm64_get_register(6)),
+        });
+        runtime.exports.arm64_resume();
+        runtime.exports.arm64_step();
+        runtime.exports.arm64_set_module_trace(1);
+        padRun = await linux.runAsync(1_200_000_000, 10_000, {
+          instructionsPerSlice: PROTECTED_INSTRUCTIONS_PER_SLICE,
+          instructionsPerYield: PROTECTED_PROGRESS_INTERVAL,
+          onProgress: progress(`PAD module ${padModules.length + 1}`),
+          onEvent: discoverPadProtectionModule,
+          onSlice: discoverPadProtectionModule,
+        });
+      }
+      linux.onEvent = null;
+      linux.onSlice = null;
+      if (padRun.status !== 1 || padRun.exited || !padProtectionModule) {
+        throw new Error(
+          `PAD stopped before its discovered Android gate (CPU status ${padRun.status}; ` +
+          `decoder outputs ${JSON.stringify(padDiscoveryObservations)}).`,
+        );
+      }
     }
-    linux.onEvent = null;
-    linux.onSlice = null;
-    if (padRun.status !== 1 || padRun.exited || !padProtectionModule) {
-      throw new Error(
-        `PAD stopped before its discovered Android gate (CPU status ${padRun.status}; ` +
-        `decoder outputs ${JSON.stringify(padDiscoveryObservations)}).`,
-      );
-    }
+    // Capture the protector-created guest mappings before JNI/lifecycle code
+    // allocates any asset buffers.  These mappings contain the decoded module
+    // text that a restored ELF cache alone cannot reproduce on a warm load.
+    const protectedMappingSummaries = linux.mappings.map((mapping) => ({
+      address: mapping.address,
+      length: mapping.length,
+      protection: mapping.protection,
+      fd: mapping.fd,
+      fileOffset: mapping.fileOffset,
+      executable: Boolean(mapping.executableBytes),
+    }));
     runtime.exports.arm64_set_diagnostics(1);
     linux.refreshSharedObjectMetadata(padObject);
+    const snapshotWrapperSegments = !cacheHit
+      ? captureElfSegments(runtime, runtime.loadedElf, runtime.loadBias)
+      : null;
+    const snapshotPadSegments = !cacheHit
+      ? captureElfSegments(runtime, padObject.elf, padObject.address)
+      : null;
+    const snapshotHostState = !cacheHit
+      ? captureHostState(runtime, linux)
+      : null;
+    const snapshotMappings = !cacheHit
+      ? linux.mappings.map((mapping) => ({
+        address: mapping.address,
+        length: mapping.length,
+        protection: mapping.protection,
+        fd: mapping.fd,
+        fileOffset: mapping.fileOffset,
+        executable: Boolean(mapping.executableBytes),
+        bytes: runtime.readBytes(mapping.address, mapping.length).buffer,
+      }))
+      : null;
     const jniOnLoadAddress = linux.resolveSymbolAddress('JNI_OnLoad');
     const jniVersion = jniOnLoadAddress
       ? (() => {
@@ -359,9 +714,41 @@ self.onmessage = async ({ data }) => {
 
     const deepRun = {
       ...padRun,
+      events: padRun.events ?? [],
       instructions: wrapperToGate.instructions + wrapperRun.instructions + padRun.instructions,
       syscalls: wrapperToGate.syscalls + wrapperRun.syscalls + padRun.syscalls,
     };
+    if (!cacheHit && restoredKey && padObject.restoredBytes) {
+      self.postMessage({ type: 'progress', instructions: deepRun.instructions, phase: 'caching restored ELF' });
+      const cacheWrite = await writeRestoredCache(restoredKey, {
+        schema: RESTORED_CACHE_SCHEMA,
+        version: ARM64_CORE_BUILD,
+        sourceName,
+        bytes: padObject.restoredBytes.buffer.slice(
+          padObject.restoredBytes.byteOffset,
+          padObject.restoredBytes.byteOffset + padObject.restoredBytes.byteLength,
+        ),
+        deepInstructions: deepRun.instructions,
+        wrapperInstructions: wrapperToGate.instructions + wrapperRun.instructions,
+        padInstructions: padRun.instructions,
+        syscalls: deepRun.syscalls,
+        executableStages: linux.mappings.filter((mapping) => mapping.protection & 4).length,
+        wrapperSegments: snapshotWrapperSegments,
+        padSegments: snapshotPadSegments,
+        hostState: snapshotHostState,
+        mappings: snapshotMappings,
+        padModules,
+      });
+      if (!cacheWrite.ok) {
+        self.postMessage({
+          type: 'progress',
+          instructions: deepRun.instructions,
+          phase: `restored ELF cache unavailable: ${cacheWrite.error}`,
+        });
+      }
+    }
+    const cachedDeepInstructions = Number(cachedRestore?.deepInstructions) || 0;
+    const reportedDeepInstructions = cacheHit ? cachedDeepInstructions : deepRun.instructions;
     const custom = elf.customSections.find((section) => section.type === 0x80000000) || elf.customSections[0];
     const stateWrites = deepRun.events.filter((entry) => entry.name === 'write' && /^\d+\n\d+\n/.test(entry.text || ''));
     const finalState = stateWrites.at(-1)?.text?.split('\n')[0] || null;
@@ -380,23 +767,37 @@ self.onmessage = async ({ data }) => {
         constructorReached: constructor.reached && constructor.number === 56,
         constructorSteps: constructor.steps,
         firstPath: constructor.path,
-        decryptedModule: executableStages > 0,
-        deepInstructions: deepRun.instructions,
-        syscalls: deepRun.syscalls,
-        executableStages,
-        wrapperInstructions: wrapperToGate.instructions + wrapperRun.instructions,
-        padInstructions: padRun.instructions,
+        decryptedModule: cacheHit || executableStages > 0,
+        deepInstructions: reportedDeepInstructions,
+        protectedInstructionsThisRun: cacheHit ? 0 : deepRun.instructions,
+        protectedCacheHit: cacheHit,
+        syscalls: cacheHit ? Number(cachedRestore?.syscalls) || 0 : deepRun.syscalls,
+        executableStages: cacheHit
+          ? Number(cachedRestore?.executableStages) || 0
+          : executableStages,
+        wrapperInstructions: cacheHit
+          ? Number(cachedRestore?.wrapperInstructions) || 0
+          : wrapperToGate.instructions + wrapperRun.instructions,
+        padInstructions: cacheHit
+          ? Number(cachedRestore?.padInstructions) || 0
+          : padRun.instructions,
         jniCalls: jni.calls.length,
         nativeRegistrations: jni.nativeRegistrations.length,
         jniVersion: Number(jniVersion),
         decodedModules: padModules.map((module) => `0x${module.type.toString(16).padStart(2, '0')}`),
+        decodedModuleRecords: padModules,
+        protectedMappings: protectedMappingSummaries,
         securityBypasses: padSecurityBypasses.size,
         lifecycleExports: lifecycleNames.filter((name) => symbols[name]).length,
         firstFrameDrawCalls: renderer?.drawCalls ?? 0,
-        loadSequence: 'lib__6dba__.so → libopenal.so → libpad.so',
+        loadSequence: cacheHit
+          ? 'restored libpad.so cache → libopenal.so → JNI'
+          : 'lib__6dba__.so → libopenal.so → libpad.so',
         mountedRuntimeFiles,
         dependencyPath: null,
-        deepStatus: deepRun.exited
+        deepStatus: cacheHit
+          ? 'restored protected ELF cache hit'
+          : deepRun.exited
           ? `guest exit(${deepRun.exitCode})${finalState ? ` · protection state ${finalState}` : ''}`
           : `CPU status ${deepRun.status}`,
       },
