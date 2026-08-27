@@ -1012,10 +1012,12 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
 
 // _chooseEnemyAi's recovered jump table lives at VA/file 0xd3c8e2 and
 // dispatches types 1..92 to handlers in the 0x61e354..0x61f08c range. These
-// are the lanes whose target is the unconditional zero or one scale. Types
-// outside the table fall through to the common epilogue with its initialized
-// scale of one. Keeping the sets numeric avoids coupling this low-level table
-// to the much larger skill-definition constant list.
+// are the lanes whose target is the unconditional zero or one scale. A second
+// group targets the common epilogue directly; it still receives the fallback
+// pass's initialized scale of one, but keeping that group separate records the
+// native control-flow distinction. Types outside the table also fall through
+// to the same common epilogue. Keeping the sets numeric avoids coupling this
+// low-level table to the much larger skill-definition constant list.
 const LEGACY_FALLBACK_SCALE_ZERO_TYPES = new Set([
   ...Array.from({ length: 18 }, (_, index) => index + 21),
   47,
@@ -1037,6 +1039,33 @@ const LEGACY_FALLBACK_SCALE_ONE_TYPES = new Set([
   86,
   89,
   92,
+]);
+
+// These entries branch straight to 0x61f08c instead of the dedicated
+// 0x61ee9c constant-one handler. The common epilogue does not overwrite the
+// scale initialized at 0x61e418, so the fallback result is still exactly one.
+const LEGACY_FALLBACK_COMMON_ONE_TYPES = new Set([
+  7,
+  8,
+  9,
+  10,
+  11,
+  15,
+  16,
+  40,
+  41,
+  42,
+  43,
+  44,
+  45,
+  46,
+  51,
+  66,
+  72,
+  73,
+  82,
+  90,
+  91,
 ]);
 
 function normalizeLegacySelectorState(state, monster) {
@@ -1370,6 +1399,9 @@ function legacyFallbackBuiltinScale(definition, state) {
   }
   if (LEGACY_FALLBACK_SCALE_ONE_TYPES.has(type)) {
     return { scale: Math.fround(1), exact: true, mode: 'native-one' };
+  }
+  if (LEGACY_FALLBACK_COMMON_ONE_TYPES.has(type)) {
+    return { scale: Math.fround(1), exact: true, mode: 'native-common-one' };
   }
 
   // These handlers were recovered directly from their status loads in the

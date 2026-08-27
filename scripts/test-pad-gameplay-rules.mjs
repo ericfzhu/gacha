@@ -708,6 +708,34 @@ assert.equal(selectedLegacyFallback.fidelity, 'legacy-fallback-recovered');
 assert.equal(selectedLegacyFallback.legacyFallbackSelected, true);
 assert.equal(selectedLegacyFallback.legacyFallbackScale, 1);
 assert.equal(selectedLegacyFallback.legacyFallbackProbability, 10_000);
+// Type 82 is not handled by the dedicated 0x61ee9c constant-one routine in
+// the legacy jump table. Its entry branches directly to the common fallback
+// epilogue at 0x61f08c, which receives the pass's initialized scale of one.
+const legacyFallbackCommonOneDefinition = legacyFallbackType50Definition.slice();
+const legacyFallbackCommonOneView = new DataView(legacyFallbackCommonOneDefinition.buffer);
+legacyFallbackCommonOneView.setUint32(0x00, 9_012, true);
+legacyFallbackCommonOneView.setInt16(0x04, PAD_ENEMY_SKILL_NORMAL_ATTACK, true);
+legacyFallbackCommonOneView.setInt32(0x44, 50, true);
+const legacyFallbackCommonOneMonsterDefinition = legacyFallbackMonsterDefinition.slice();
+new DataView(legacyFallbackCommonOneMonsterDefinition.buffer).setUint32(0xec, 9_012, true);
+const selectedLegacyFallbackCommonOne = selectPadEnemyAiLegacy(
+  decodePadEnemyAiMonsterDefinition(legacyFallbackCommonOneMonsterDefinition),
+  [decodePadEnemyAiSkillDefinition(legacyFallbackCommonOneDefinition)],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    rngState: 21_900,
+  },
+);
+assert.equal(selectedLegacyFallbackCommonOne.skillId, 9_012);
+assert.equal(selectedLegacyFallbackCommonOne.effect.kind, 'normalAttack');
+assert.equal(selectedLegacyFallbackCommonOne.legacyFallbackType, PAD_ENEMY_SKILL_NORMAL_ATTACK);
+assert.equal(selectedLegacyFallbackCommonOne.legacyFallbackScale, 1);
+assert.equal(selectedLegacyFallbackCommonOne.legacyFallbackProbability, 10_000);
+assert.equal(selectedLegacyFallbackCommonOne.legacyFallbackApproximation, undefined);
+assert.equal(selectedLegacyFallbackCommonOne.fidelity, 'legacy-fallback-recovered');
+assert.equal(selectedLegacyFallbackCommonOne.rngState, 394_448_415);
 // Effect type 36 is a native ordinary-path transfer: it jumps to the fallback
 // pass immediately, so a later ordinary type-50 record must not win first.
 // In the fallback jump table the effect type itself is just a zero-scale lane.

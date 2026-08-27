@@ -77,6 +77,29 @@ const LEGACY_FALLBACK_SCALE_ONE_TYPES = Object.freeze([
   89,
   92,
 ]);
+const LEGACY_FALLBACK_COMMON_ONE_TYPES = Object.freeze([
+  7,
+  8,
+  9,
+  10,
+  11,
+  15,
+  16,
+  40,
+  41,
+  42,
+  43,
+  44,
+  45,
+  46,
+  51,
+  66,
+  72,
+  73,
+  82,
+  90,
+  91,
+]);
 const LEGACY_FALLBACK_INSTRUCTION_ANCHORS = Object.freeze([
   [0x61e408, 0x794faa68], // current budget gate
   [0x61e418, 0x52a7f008], // initialize fallback scale to 1.0
@@ -1813,16 +1836,25 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
   const legacyFallbackJumpTableMatches = restoredElf === null ? null
-    : [...LEGACY_FALLBACK_SCALE_ZERO_TYPES, ...LEGACY_FALLBACK_SCALE_ONE_TYPES].every((type) => {
+    : [
+      ...LEGACY_FALLBACK_SCALE_ZERO_TYPES,
+      ...LEGACY_FALLBACK_SCALE_ONE_TYPES,
+      ...LEGACY_FALLBACK_COMMON_ONE_TYPES,
+    ].every((type) => {
       const entry = readUint16Virtual(
         restoredElf,
         restoredBytes,
         LEGACY_FALLBACK_JUMP_TABLE + (type - 1) * 2,
       );
       const target = LEGACY_FALLBACK_DISPATCH_BASE + entry * 4;
-      return type === 50 || LEGACY_FALLBACK_SCALE_ONE_TYPES.includes(type)
-        ? target === 0x61ee9c
-        : target === 0x61e440;
+      const expectedTarget = LEGACY_FALLBACK_SCALE_ZERO_TYPES.includes(type)
+        ? 0x61e440
+        : LEGACY_FALLBACK_SCALE_ONE_TYPES.includes(type)
+          ? 0x61ee9c
+          : LEGACY_FALLBACK_COMMON_ONE_TYPES.includes(type)
+            ? LEGACY_FALLBACK_COMMON_EPILOGUE
+            : null;
+      return expectedTarget !== null && target === expectedTarget;
     });
   const normalAttackDispatchTarget = resolveEnemySkillTarget(
     NORMAL_ATTACK_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
@@ -5156,7 +5188,7 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       legacySelectorModeSwitchAnchorsMatch21_9: legacyEnemyAiModeSwitchAnchorsMatch,
       legacySelectorInstructionAnchorsMatch21_9: legacyEnemyAiInstructionAnchorsMatch,
       legacySelectorSemantics:
-        'chooseEnemyAi (0x61dd68) scans 64 slots in order after parseFlowControl; ordinary records use HP/maxHP, damaged-turn baseline +0x7c0/+0x7d0 (or a native no-damage status scan), signed +0x3c magnitude scaled by +0xe6 and rounded through izMathRound, then _chooseEnemyAiSub. Positive callback output is multiplied by factor0*factor1*slotChance/100000, capped at 10000, and compared with the shared +0x6a10 LCG. If ordinary selection fails, the 0x61e300 status/fallback pass rechecks budget, dispatches through the 0xd3c8e2 halfword table, and uses 0x61f08c: fcvtzs(float32(float32(int32(factor0*fallbackWeight))*scale)) > ((lcgStep(state)>>>16)*10000>>>16). Effect type 36 transfers from the ordinary pass; authored slot skill ID 36 is the fallback early-return sentinel. Types 21..38, 47, 49, and 69 resolve to zero, while 50, 76..81, 83..86, 89, and 92 resolve to one. Positive fallback weights consume one LCG step even at zero scale. Unnamed status lanes are explicit host-hook approximations.',
+        'chooseEnemyAi (0x61dd68) scans 64 slots in order after parseFlowControl; ordinary records use HP/maxHP, damaged-turn baseline +0x7c0/+0x7d0 (or a native no-damage status scan), signed +0x3c magnitude scaled by +0xe6 and rounded through izMathRound, then _chooseEnemyAiSub. Positive callback output is multiplied by factor0*factor1*slotChance/100000, capped at 10000, and compared with the shared +0x6a10 LCG. If ordinary selection fails, the 0x61e300 status/fallback pass rechecks budget, dispatches through the 0xd3c8e2 halfword table, and uses 0x61f08c: fcvtzs(float32(float32(int32(factor0*fallbackWeight))*scale)) > ((lcgStep(state)>>>16)*10000>>>16). Effect type 36 transfers from the ordinary pass; authored slot skill ID 36 is the fallback early-return sentinel. Types 21..38, 47, 49, and 69 resolve to zero; types 50, 76..81, 83..86, 89, and 92 use the dedicated one handler; and types 7..11, 15..16, 40..46, 51, 66, 72..73, 82, and 90..91 branch directly to the common epilogue with its initialized one scale. Positive fallback weights consume one LCG step even at zero scale. Unnamed status lanes are explicit host-hook approximations.',
       legacyFallbackJumpTableOffset: '0xd3c8e2',
       legacyFallbackDispatchBase: '0x61e354',
       legacyFallbackCommonEpilogue: '0x61f08c',
@@ -5164,6 +5196,7 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       legacyFallbackJumpTableMatches21_9: legacyFallbackJumpTableMatches,
       legacyFallbackScaleZeroTypes: LEGACY_FALLBACK_SCALE_ZERO_TYPES,
       legacyFallbackScaleOneTypes: LEGACY_FALLBACK_SCALE_ONE_TYPES,
+      legacyFallbackCommonOneTypes: LEGACY_FALLBACK_COMMON_ONE_TYPES,
     },
     symbols,
   };

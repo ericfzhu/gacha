@@ -2,6 +2,17 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-28 recovered common-epilogue fallback lanes
+
+- Parsed every entry in the restored 21.9 legacy fallback jump table. In
+  addition to the dedicated `0x61ee9c` constant-one handler, types 7–11,
+  15–16, 40–46, 51, 66, 72–73, 82, and 90–91 branch directly to the common
+  epilogue at `0x61f08c`, which preserves the fallback pass's initialized
+  one-scale value.
+- Added a separate exact `native-common-one` selector lane, extended the
+  static libpad inspector's jump-table proof, and added a type-82 normal-attack
+  fixture with the native RNG/budget result. The regular PAD rule suite passes.
+
 ## 2026-08-28 explicit leader-swap candidate metadata
 
 - Kept the native type-75 candidate count separate from its card/evolution

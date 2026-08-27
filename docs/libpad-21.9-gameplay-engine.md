@@ -696,8 +696,11 @@ There is no factor1 term and no 10,000 cap on this path. A positive fallback
 weight advances the shared LCG even when a status lane supplies a zero scale;
 weight zero does not consume a draw. In this pass authored slot skill ID 36 is
 the native early-return sentinel; effect type 36 itself is the recovered
-zero-scale lane. The recovered constant-one lanes include types 50, 76–81,
-83–86, 89, and 92. Types 21–38, 47, 49, and 69 resolve to the native zero lane. Exact
+zero-scale lane. The recovered dedicated constant-one lanes include types 50,
+76–81, 83–86, 89, and 92. Types 7–11, 15–16, 40–46, 51, 66, 72–73, 82, and
+90–91 branch directly to the common epilogue and therefore retain its
+initialized one scale. Types 21–38, 47, 49, and 69 resolve to the native zero
+lane. Exact
 status gates are available for combo absorb (67), inactivity presentation (70),
 damage void (71), damage shield (74), damage absorb (87), attribute absorb (53),
 awakening bind (88), and the candidate-count portion of leader swap (75) when
