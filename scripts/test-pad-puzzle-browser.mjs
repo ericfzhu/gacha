@@ -56,6 +56,7 @@ const renderDamageBranchState = process.argv.includes('--damage-branch-render');
 const renderErasedAttributeBranchState = process.argv.includes('--erased-attribute-branch-render');
 const renderTypeResistState = process.argv.includes('--type-resist-render');
 const renderDamageImmunityState = process.argv.includes('--damage-immunity-render');
+const renderDamageImmunityAltState = process.argv.includes('--damage-immunity-alt-render');
 const renderRemainingEnemiesBranchState = process.argv.includes('--remaining-enemies-branch-render');
 const renderDamageImmunityOffState = process.argv.includes('--damage-immunity-off-render');
 const renderAttributeResistState = process.argv.includes('--attribute-resist-render');
@@ -3624,6 +3625,51 @@ try {
     `Damage-immunity render-state mismatch: ${JSON.stringify(damageImmunityRenderState)}`,
   );
   if (damageImmunityRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
+  const damageImmunityAltRenderState = renderDamageImmunityAltState ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    const monsterDefinition = new Uint8Array(0x2ec);
+    const monsterView = new DataView(monsterDefinition.buffer);
+    monsterView.setUint8(0xe0, 1);
+    monsterView.setInt16(0xe2, 100, true);
+    monsterView.setInt16(0xe4, 10, true);
+    monsterView.setUint32(0xec, 9_123, true);
+    monsterView.setUint8(0xf0, 100);
+    const definition = new Uint8Array(0x48);
+    const view = new DataView(definition.buffer);
+    view.setUint32(0x00, 9_123, true);
+    view.setInt16(0x04, 123, true);
+    view.setInt32(0x10, 3, true);
+    view.setInt32(0x30, 10_000, true);
+    view.setInt32(0x34, 1_000, true);
+    view.setInt32(0x38, 100, true);
+    view.setInt32(0x40, 20, true);
+    view.setInt32(0x44, 0, true);
+    engine.reset();
+    engine.start();
+    engine.setEnemySkillQueue(0, []);
+    engine.setEnemyAiDefinitionPool(0, monsterDefinition, [definition]);
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    engine.enemies[1].hp = 0;
+    engine.comboCount = 1;
+    engine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+    engine.resolvePlayerTurn();
+    return engine.snapshot();
+  }) : null;
+  if (damageImmunityAltRenderState && (
+    damageImmunityAltRenderState.lastEnemyActions?.[0]?.skill?.type !== 123
+    || damageImmunityAltRenderState.lastEnemyActions?.[0]?.skill?.kind !== 'damageImmunityAlt'
+    || damageImmunityAltRenderState.enemies?.[0]?.damageImmunityTurns !== 3
+    || damageImmunityAltRenderState.enemies?.[0]?.damageImmunityPresentation !== 1
+    || damageImmunityAltRenderState.enemies?.[0]?.hp !== 92_000
+    || damageImmunityAltRenderState.lastDamage !== 0
+    || damageImmunityAltRenderState.rngState !== 394_448_415
+  )) throw new Error(
+    `Damage-immunity-alt render-state mismatch: ${JSON.stringify(damageImmunityAltRenderState)}`,
+  );
+  if (damageImmunityAltRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   const remainingEnemiesBranchRenderState = renderRemainingEnemiesBranchState
     ? await page.evaluate(() => {
       const makeDefinition = (skillId, type, parameter0 = 0, parameter1 = 0) => {

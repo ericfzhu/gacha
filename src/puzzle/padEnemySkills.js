@@ -93,6 +93,9 @@ export const PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_OFF = 121;
 // enemy count falls to its authored threshold.  It is a passive slot skill,
 // not a scheduled action.
 export const PAD_ENEMY_SKILL_REMAINING_ENEMIES_TURN_CHANGE = 122;
+// Type 123 shares type 119's immunity timer but selects the alternate native
+// presentation controller (+0x9b0 = 1) when it is applied.
+export const PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_ALT = 123;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -742,13 +745,21 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       attackWithSkillValue,
     });
   }
-  if (type === PAD_ENEMY_SKILL_DAMAGE_IMMUNITY) {
+  if (
+    type === PAD_ENEMY_SKILL_DAMAGE_IMMUNITY
+    || type === PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_ALT
+  ) {
     requireLength(definitionBytes, 0x14, 'PAD enemy-skill definition');
     return Object.freeze({
       type,
-      kind: 'damageImmunity',
+      kind: type === PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_ALT
+        ? 'damageImmunityAlt'
+        : 'damageImmunity',
       supported: true,
       durationTurns: Math.max(0, (definition.getInt32(0x10, true) << 16) >> 16),
+      ...(type === PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_ALT
+        ? { presentationControllerValue: 1 }
+        : {}),
       attackWithSkillValue,
     });
   }
@@ -1926,14 +1937,22 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
-  if (type === PAD_ENEMY_SKILL_DAMAGE_IMMUNITY) {
+  if (
+    type === PAD_ENEMY_SKILL_DAMAGE_IMMUNITY
+    || type === PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_ALT
+  ) {
     requireLength(definitionBytes, 0x14, 'PAD enemy-skill definition');
     return Object.freeze({
       type,
-      kind: 'damageImmunity',
+      kind: type === PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_ALT
+        ? 'damageImmunityAlt'
+        : 'damageImmunity',
       supported: true,
       durationTurns: Math.max(0, (definition.getInt32(0x10, true) << 16) >> 16),
       setupMaterialized: true,
+      ...(type === PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_ALT
+        ? { presentationControllerValue: 1 }
+        : {}),
       attackWithSkillValue: definitionBytes.byteLength
           >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
         ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
@@ -2994,6 +3013,22 @@ export function normalizePadEnemySkillRecord(record) {
       passive: true,
       monsterTypeMask: Math.trunc(Number(record?.monsterTypeMask) || 0) & 0xffff,
       damagePercent: Math.trunc(Number(record?.damagePercent) || 0) & 0xffff,
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_ALT || record?.kind === 'damageImmunityAlt') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_ALT,
+      kind: 'damageImmunityAlt',
+      supported: record?.supported !== false,
+      durationTurns: Math.max(
+        0,
+        (Math.trunc(Number(record?.durationTurns) || 0) << 16) >> 16,
+      ),
+      presentationControllerValue: 1,
       setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null

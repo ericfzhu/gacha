@@ -321,6 +321,9 @@ function drawEnemy(ctx, enemy, index, target, time) {
   if (Number(enemy.statusShieldTurns || 0) > 0) {
     enemyStatus.push(`IMMUNE ${enemy.statusShieldTurns}T`);
   }
+  if (Number(enemy.damageImmunityTurns || 0) > 0) {
+    enemyStatus.push(`DMG IMMUNE ${enemy.damageImmunityTurns}T`);
+  }
   if (Number(enemy.attributeAbsorbTurns || 0) > 0) {
     const attributes = ORB_TYPES.slice(0, 6)
       .filter((_, attributeIndex) => (enemy.attributeAbsorbMask & (1 << attributeIndex)) !== 0)

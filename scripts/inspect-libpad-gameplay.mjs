@@ -837,6 +837,18 @@ const DAMAGE_IMMUNITY_INSTRUCTION_ANCHORS = Object.freeze([
   [0x623c60, 0x7100051f], // compare timer with one
   [0x623c64, 0x9a9fb33b], // keep damage below one; otherwise select zero
 ]);
+const DAMAGE_IMMUNITY_ALT_ENEMY_SKILL_TYPE = 123;
+const DAMAGE_IMMUNITY_ALT_HANDLER = 0x62a6c4;
+const DAMAGE_IMMUNITY_ALT_SETUP_HANDLER = 0x6217c0;
+const DAMAGE_IMMUNITY_ALT_CONDITION_HANDLER = 0x61a670;
+const DAMAGE_IMMUNITY_ALT_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x62a6c4, 0xb94012a1], // load definition +0x10 duration directly
+  [0x62a6c8, 0x91270260], // address protected immunity timer at sMONSTER+0x9c0
+  [0x62a6d0, 0x9126c260], // address the neighboring presentation controller
+  [0x62a6d4, 0x52800021], // select alternate presentation value one
+  [0x62a6dc, 0x140005dd], // join the common enemy-skill epilogue
+  [0x61a670, 0x912702a0], // reuse type 119's +0x9c0 eligibility condition
+]);
 const REMAINING_ENEMIES_BRANCH_ENEMY_SKILL_TYPE = 120;
 const REMAINING_ENEMIES_BRANCH_HANDLER = 0x62be50;
 const REMAINING_ENEMIES_BRANCH_SETUP_HANDLER = 0x621c94;
@@ -2381,6 +2393,31 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     : DAMAGE_IMMUNITY_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
+  const damageImmunityAltDispatchTarget = resolveEnemySkillTarget(
+    DAMAGE_IMMUNITY_ALT_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const damageImmunityAltSetupTarget = resolveEnemySkillTarget(
+    DAMAGE_IMMUNITY_ALT_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const damageImmunityAltConditionTarget = resolveEnemySkillTarget(
+    DAMAGE_IMMUNITY_ALT_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const damageImmunityAltDispatchMatches = damageImmunityAltDispatchTarget === null
+    ? null : damageImmunityAltDispatchTarget === DAMAGE_IMMUNITY_ALT_HANDLER;
+  const damageImmunityAltSetupMatches = damageImmunityAltSetupTarget === null
+    ? null : damageImmunityAltSetupTarget === DAMAGE_IMMUNITY_ALT_SETUP_HANDLER;
+  const damageImmunityAltConditionMatches = damageImmunityAltConditionTarget === null
+    ? null : damageImmunityAltConditionTarget === DAMAGE_IMMUNITY_ALT_CONDITION_HANDLER;
+  const damageImmunityAltInstructionAnchorsMatch = restoredElf === null ? null
+    : DAMAGE_IMMUNITY_ALT_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const remainingEnemiesBranchDispatchTarget = resolveEnemySkillTarget(
     REMAINING_ENEMIES_BRANCH_ENEMY_SKILL_TYPE,
     ENEMY_SKILL_DISPATCH_TABLE,
@@ -3559,6 +3596,11 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       damageImmunitySetupMatches21_9: damageImmunitySetupMatches,
       damageImmunityConditionMatches21_9: damageImmunityConditionMatches,
       damageImmunityInstructionAnchorsMatch21_9: damageImmunityInstructionAnchorsMatch,
+      damageImmunityAltDispatchMatches21_9: damageImmunityAltDispatchMatches,
+      damageImmunityAltSetupMatches21_9: damageImmunityAltSetupMatches,
+      damageImmunityAltConditionMatches21_9: damageImmunityAltConditionMatches,
+      damageImmunityAltInstructionAnchorsMatch21_9:
+        damageImmunityAltInstructionAnchorsMatch,
       remainingEnemiesBranchDispatchMatches21_9: remainingEnemiesBranchDispatchMatches,
       remainingEnemiesBranchSetupMatches21_9: remainingEnemiesBranchSetupMatches,
       remainingEnemiesBranchConditionMatches21_9: remainingEnemiesBranchConditionMatches,
@@ -4404,6 +4446,20 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       damageImmunityInstructionAnchorsMatch21_9: damageImmunityInstructionAnchorsMatch,
       damageImmunitySemantics:
         'type 119 installs signed-low16 definition +0x10 in protected sMONSTER+0x9c0; its AI condition rejects reapplication while that timer is positive, and calcFinalDamage replaces the final signed damage lane with zero whenever the timer is at least one',
+      damageImmunityAltType: DAMAGE_IMMUNITY_ALT_ENEMY_SKILL_TYPE,
+      damageImmunityAltDispatchTarget: damageImmunityAltDispatchTarget === null
+        ? null : hex(damageImmunityAltDispatchTarget),
+      damageImmunityAltDispatchMatches21_9: damageImmunityAltDispatchMatches,
+      damageImmunityAltSetupTarget: damageImmunityAltSetupTarget === null
+        ? null : hex(damageImmunityAltSetupTarget),
+      damageImmunityAltSetupMatches21_9: damageImmunityAltSetupMatches,
+      damageImmunityAltConditionTarget: damageImmunityAltConditionTarget === null
+        ? null : hex(damageImmunityAltConditionTarget),
+      damageImmunityAltConditionMatches21_9: damageImmunityAltConditionMatches,
+      damageImmunityAltInstructionAnchorsMatch21_9:
+        damageImmunityAltInstructionAnchorsMatch,
+      damageImmunityAltSemantics:
+        'type 123 shares type 119\'s signed-low16 +0x10 immunity timer and 0x61a670 eligibility condition, but writes one (instead of zero) to the neighboring sMONSTER+0x9b0 presentation controller before joining the common enemy-skill epilogue',
       remainingEnemiesBranchType: REMAINING_ENEMIES_BRANCH_ENEMY_SKILL_TYPE,
       remainingEnemiesBranchDispatchTarget: remainingEnemiesBranchDispatchTarget === null
         ? null : hex(remainingEnemiesBranchDispatchTarget),
@@ -5049,6 +5105,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || erasedAttributeBranchSetupMatches === false
     || erasedAttributeBranchConditionMatches === false
     || erasedAttributeBranchInstructionAnchorsMatch === false
+    || damageImmunityAltDispatchMatches === false
+    || damageImmunityAltSetupMatches === false
+    || damageImmunityAltConditionMatches === false
+    || damageImmunityAltInstructionAnchorsMatch === false
     || sourceToJammerDispatchMatches === false
     || sourceToJammerSetupMatches === false
     || sourceToJammerConditionMatches === false

@@ -26,6 +26,19 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
   so the new query also invalidates browser/service-worker deployments that
   retained the older interpreter which reported `NEG V2.2S` (`0x2ea0b842`).
 
+## 2026-08-28 alternate damage-immunity-on (type 123)
+
+- Recovered native type `123` / the alternate `ESInvulnerableOn` path at
+  dispatch `0x62a6c4`, generic setup `0x6217c0`, and the shared active-timer
+  condition `0x61a670`. Its handler installs the signed-low16 `+0x10`
+  duration in `sMONSTER+0x9c0`, then writes `1` to the neighboring
+  presentation controller at `sMONSTER+0x9b0` (type `119` writes `0`).
+- The browser now decodes, selects, executes, snapshots, and displays type
+  `123` while preserving the same immunity damage gate and RNG behavior as
+  type `119`. Exact restored-binary anchors, pure fixtures, focused
+  Chromium, generic Playwright input/render, and production build checks
+  pass.
+
 ## 2026-08-24 damage-immunity off
 
 - Recovered parameterless type `121` / `ESInvulnerableOff` at dispatch/setup/
