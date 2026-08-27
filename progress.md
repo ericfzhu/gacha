@@ -2,6 +2,23 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-28 exact legacy board-count fallback gates
+
+- Recovered the shared legacy `0x61e6cc` fallback handler for source→jammer
+  (12), source→poison (56), and source→mortal-poison (58). It calls
+  `_countBlockType` (`0x65213c`) and admits the slot only when at least one
+  source cell is present; the fallback scale remains the common initialized
+  one, unlike the ordinary path's `count / 3` immediate-probability scale.
+- `PuzzleEngine.enemyAiState()` now publishes ten native board-type counts.
+  Source types 7 and 8 intentionally share the native poison-family count,
+  while bit-8-only mask queries remain distinct elsewhere in the engine.
+  Direct hosts that omit the array retain a playable result but receive an
+  explicit `legacyFallbackApproximation` diagnostic.
+- Added direct selector fixtures for positive/empty/missing board state and
+  browser fixtures for all three effect types plus the poison-family alias.
+  The restored inspector now validates their jump-table target and reports
+  `legacyFallbackBoardCountTypes`.
+
 ## 2026-08-28 exact legacy attack-boost and player-heal gates
 
 - Recovered the legacy fallback handlers for lone-enemy attack boost (17),

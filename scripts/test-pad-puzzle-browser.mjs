@@ -4240,6 +4240,29 @@ try {
       }, () => {
         engine.player.hp = 3_000;
       }),
+      sourceToJammerBoardCount: run(9_018, 12, (view) => {
+        view.setInt32(0x10, 0, true);
+      }, () => {
+        engine.setBoardFromCodes(Array(5).fill('RRRRRR'));
+      }),
+      sourceToJammerBoardEmpty: run(9_019, 12, (view) => {
+        view.setInt32(0x10, 0, true);
+      }, () => {
+        engine.setBoardFromCodes(Array(5).fill('BBBBBB'));
+      }),
+      sourceToPoisonBoardCount: run(9_020, 56, (view) => {
+        view.setInt32(0x10, 7, true);
+      }, () => {
+        // Native _countBlockType aliases poison and mortal poison for source
+        // 7, so both authored values should pass this fallback gate.
+        engine.setBoardFromCodes(Array(5).fill('MPMPMP'));
+      }),
+      sourceToMortalPoisonBoardCount: run(9_021, 58, (view) => {
+        view.setInt32(0x10, 8, true);
+      }, () => {
+        // Source 8 uses the same native poison-family alias as source 7.
+        engine.setBoardFromCodes(Array(5).fill('PMPMPM'));
+      }),
     };
   }) : null;
   const legacyFallbackGateExpected = {
@@ -4248,16 +4271,24 @@ try {
     damagedTurnAttackBoost: { id: 9_015, type: 19 },
     statusShield: { id: 9_016, type: 20 },
     playerHeal: { id: 9_017, type: 55 },
+    sourceToJammerBoardCount: { id: 9_018, type: 12 },
+    sourceToPoisonBoardCount: { id: 9_020, type: 56 },
+    sourceToMortalPoisonBoardCount: { id: 9_021, type: 58 },
   };
   if (legacyFallbackGatesRenderState) {
     for (const [name, expected] of Object.entries(legacyFallbackGateExpected)) {
       const result = legacyFallbackGatesRenderState[name];
       if (
         result?.skill?.id !== expected.id
-        || result?.skill?.type !== expected.type
-        || result?.rngState !== 394_448_415
-      ) throw new Error(`Legacy-fallback gate ${name} mismatch: ${JSON.stringify(result)}`);
+      || result?.skill?.type !== expected.type
+      || result?.rngState !== 394_448_415
+    ) throw new Error(`Legacy-fallback gate ${name} mismatch: ${JSON.stringify(result)}`);
     }
+    const emptyBoardCount = legacyFallbackGatesRenderState.sourceToJammerBoardEmpty;
+    if (emptyBoardCount?.skill?.id != null
+      || emptyBoardCount?.skill?.type != null
+      || emptyBoardCount?.rngState !== 394_448_415
+    ) throw new Error(`Legacy-fallback board-count rejection mismatch: ${JSON.stringify(emptyBoardCount)}`);
     if (legacyFallbackGatesRenderState.loneAttackBoost.enemy?.attackBoostTurns !== 3
       || legacyFallbackGatesRenderState.loneAttackBoost.enemy?.attackBoostPercent !== 200
       || legacyFallbackGatesRenderState.statusTriggeredAttackBoost.enemy?.attackBoostTurns !== 2

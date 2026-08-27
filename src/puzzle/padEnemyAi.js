@@ -1074,6 +1074,14 @@ const LEGACY_FALLBACK_COMMON_ONE_TYPES = new Set([
 // resulting fallback scale as exact.
 const LEGACY_FALLBACK_EFFECTIVE_ONE_TYPES = new Set([20]);
 
+// Types 12, 56, and 58 all share the recovered 0x61e6cc handler.  It calls
+// cGAMEMAIN::_countBlockType with the authored source type, then sends any
+// positive result through the common 0x61f08c epilogue.  The native helper
+// treats source types 7 and 8 as one poison family (both signed board values
+// satisfy its `type - 7 < 2` branch), so the browser state carries that alias
+// explicitly rather than confusing it with the bit-8-only mask query.
+const LEGACY_FALLBACK_BOARD_COUNT_TYPES = new Set([12, 56, 58]);
+
 function normalizeLegacySelectorState(state, monster) {
   const numeric = (value, fallback = 0) => {
     const candidate = Number(value);
@@ -1110,6 +1118,12 @@ function normalizeLegacySelectorState(state, monster) {
     && hasOwn('enemyTransientDebuffActive');
   const damagedTurnAttackBoostStatePresent = hasOwn('enemyAttackBoostTurns')
     && hasOwn('enemyDamagedTurnCount');
+  const boardTypeCountsStatePresent = hasOwn('boardTypeCounts')
+    && Array.isArray(state.boardTypeCounts)
+    && state.boardTypeCounts.length >= 10
+    && state.boardTypeCounts.slice(0, 10).every((count) => (
+      Number.isFinite(Number(count)) && Number(count) >= 0
+    ));
   return {
     currentHp: nonNegative(state.currentHp),
     maxHp: nonNegative(state.maxHp),
@@ -1177,6 +1191,10 @@ function normalizeLegacySelectorState(state, monster) {
     enemyAttackBoostStatePresent,
     attackBoostStatePresent,
     damagedTurnAttackBoostStatePresent,
+    boardTypeCounts: Array.from({ length: 10 }, (_, type) => (
+      nonNegative(state.boardTypeCounts?.[type])
+    )),
+    boardTypeCountsStatePresent,
     party: Array.isArray(state.party) ? state.party : [],
     aiBudget: nonNegative(state.aiBudget === undefined ? monster.budgetCap : state.aiBudget),
     blackFallActive: Boolean(state.blackFallActive),
@@ -1432,6 +1450,30 @@ function legacyFallbackBuiltinScale(definition, state) {
   }
   if (LEGACY_FALLBACK_EFFECTIVE_ONE_TYPES.has(type)) {
     return { scale: Math.fround(1), exact: true, mode: 'native-status-one' };
+  }
+
+  if (LEGACY_FALLBACK_BOARD_COUNT_TYPES.has(type)) {
+    // Direct hosts that do not expose the live board retain the historical
+    // initialized-one fallback so selection remains playable, but the result
+    // is explicitly approximate.  PuzzleEngine always supplies this array.
+    if (!state.boardTypeCountsStatePresent) {
+      return {
+        scale: Math.fround(1),
+        exact: false,
+        mode: 'native-board-count-missing-state',
+      };
+    }
+    const sourceType = Math.trunc(Number(definition.effect?.sourceType) || 0);
+    const countIndex = sourceType === 7 || sourceType === 8 ? 7 : sourceType;
+    const count = countIndex >= 0 && countIndex < state.boardTypeCounts.length
+      ? state.boardTypeCounts[countIndex]
+      : 0;
+    const eligible = count >= 1;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact: true,
+      mode: eligible ? 'native-board-count-positive' : 'native-board-count-empty',
+    };
   }
 
   // These handlers were recovered directly from their status loads in the

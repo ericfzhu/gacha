@@ -717,7 +717,11 @@ but report `legacyFallbackApproximation`. Leader swap without explicit
 `leaderSwapEligible` records (or an explicit `leaderSwapCandidateStatePresent`)
 remains playable through the same initialized-one fallback and retains that
 diagnostic; revive is exact under its explicit `unavailable` boundary described
-below.
+below. Types 12, 56, and 58 now use an exact positive-board-count gate when
+the host supplies `boardTypeCounts` (the ten native board-type counts). The
+native `_countBlockType` helper aliases source types 7 and 8 to the combined
+poison family for this test, so the browser exposes that alias in both slots;
+omitting the array remains a playable `legacyFallbackApproximation`.
 
 Hosts that have a fuller `sMONSTER`/`sGAMEWORK` model can provide
 `legacyFallbackCondition(definition, state, context)` or a
@@ -1942,7 +1946,12 @@ same `_doBlockSwap` with fixed destination type 6. The condition returns zero
 when no source orb exists and otherwise returns binary32
 `min(sourceCount / 3, 1)`, without condition-owned RNG. The port reuses the
 native numeric board and lock semantics rather than implementing jammer as a
-separate visual-only effect.
+separate visual-only effect. On the legacy fallback pass, the shared
+`0x61e6cc` handler calls `_countBlockType` (`0x65213c`) only as a positive
+gate; any source count selects with scale one, while an empty source rejects
+the slot after consuming its positive fallback-weight draw. `PuzzleEngine`
+publishes the exact ten-lane `boardTypeCounts` state, including the native
+poison-family alias for source 7/8.
 
 Enemy skill type `13` is the general random-party bind, distinct from the
 leader/helper-only type `54`. Its dispatch, setup, and AI condition targets are
@@ -2344,8 +2353,10 @@ The condition calls `_countBlockType` (`0x65213c`) and returns
 `min(sourceCellCount / 3, 1)` in binary32, or zero when no source cell exists.
 Consequently one source orb gives one-third of the authored immediate chance,
 two give two-thirds, and three or more give the full chance. Locks do not affect
-the count. The fallback path admits any positive count but does not scale its
-weight.
+the count. The fallback path now uses the same helper as an exact positive
+gate, admitting any positive count without scaling its weight. Source types 7
+and 8 both count the combined poison/mortal-poison family at this boundary;
+the compact browser `boardTypeCounts[7]` and `[8]` entries carry that alias.
 
 Execution calls `_doBlockSwap(int, int, bool, bool *)` at `0x6afa84`. It walks
 the whole board without consuming LCG state, rewrites every unlocked matching

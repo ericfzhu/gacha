@@ -1604,6 +1604,13 @@ export class PuzzleEngine {
       legacyFallbackScales: pool?.legacyFallbackScales,
       blackFallActive: Boolean(this.blackFallRule?.active),
       boardCellCount: this.rows * this.columns,
+      // The legacy 0x61e6cc fallback handler calls _countBlockType with the
+      // authored source type.  Native aliases poison and mortal-poison (7/8)
+      // into one family for this helper, while bit-8 masks remain distinct;
+      // expose both source slots with the helper's exact family semantics.
+      boardTypeCounts: Array.from({ length: 10 }, (_, type) => (
+        this.countBlockBits(1 << (type === 7 || type === 8 ? 7 : type))
+      )),
       blackBlockCount: this.board.reduce((total, row) => total + row.reduce((count, orb) => (
         count + Number(((Number(orb?.blockFlags) >>> 0) & PAD_BLOCK_ENTIRE_BLIND_FLAG) !== 0)
       ), 0), 0),

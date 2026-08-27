@@ -827,6 +827,86 @@ assert.equal(selectedLegacyFallbackPlayerHeal.skillId, 9_017);
 assert.equal(selectedLegacyFallbackPlayerHeal.legacyFallbackScale, 1);
 assert.equal(selectedLegacyFallbackPlayerHeal.legacyFallbackApproximation, undefined);
 assert.equal(selectedLegacyFallbackPlayerHeal.fidelity, 'legacy-fallback-recovered');
+// Types 12, 56, and 58 share the restored 0x61e6cc fallback handler.  The
+// native _countBlockType call is a positive gate only on this pass (unlike
+// the ordinary path's count/3 probability), and source 7/8 use one combined
+// poison-family count.
+const makeLegacyFallbackBoardSelection = (skillId, type, sourceType, boardTypeCounts) => {
+  const definition = legacyFallbackType50Definition.slice();
+  const view = new DataView(definition.buffer);
+  view.setUint32(0x00, skillId, true);
+  view.setInt16(0x04, type, true);
+  view.setInt32(0x10, sourceType, true);
+  const monsterDefinition = legacyFallbackMonsterDefinition.slice();
+  new DataView(monsterDefinition.buffer).setUint32(0xec, skillId, true);
+  return selectPadEnemyAiLegacy(
+    decodePadEnemyAiMonsterDefinition(monsterDefinition),
+    [decodePadEnemyAiSkillDefinition(definition)],
+    {
+      currentHp: 92_000,
+      maxHp: 92_000,
+      aiBudget: 100,
+      rngState: 21_900,
+      boardTypeCounts,
+    },
+  );
+};
+const selectedLegacyFallbackJammer = makeLegacyFallbackBoardSelection(
+  9_018,
+  PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
+  0,
+  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+);
+assert.equal(selectedLegacyFallbackJammer.skillId, 9_018);
+assert.equal(selectedLegacyFallbackJammer.effect.kind, 'sourceToJammer');
+assert.equal(selectedLegacyFallbackJammer.legacyFallbackScale, 1);
+assert.equal(selectedLegacyFallbackJammer.legacyFallbackProbability, 10_000);
+assert.equal(selectedLegacyFallbackJammer.legacyFallbackApproximation, undefined);
+assert.equal(selectedLegacyFallbackJammer.fidelity, 'legacy-fallback-recovered');
+const selectedLegacyFallbackPoison = makeLegacyFallbackBoardSelection(
+  9_019,
+  PAD_ENEMY_SKILL_SOURCE_TO_POISON,
+  7,
+  [0, 0, 0, 0, 0, 0, 0, 2, 0, 0],
+);
+assert.equal(selectedLegacyFallbackPoison.skillId, 9_019);
+assert.equal(selectedLegacyFallbackPoison.effect.kind, 'sourceToPoison');
+assert.equal(selectedLegacyFallbackPoison.effect.destinationType, 7);
+assert.equal(selectedLegacyFallbackPoison.legacyFallbackScale, 1);
+assert.equal(selectedLegacyFallbackPoison.legacyFallbackApproximation, undefined);
+const selectedLegacyFallbackMortalPoison = makeLegacyFallbackBoardSelection(
+  9_020,
+  PAD_ENEMY_SKILL_SOURCE_TO_MORTAL_POISON,
+  8,
+  [0, 0, 0, 0, 0, 0, 0, 2, 0, 0],
+);
+assert.equal(selectedLegacyFallbackMortalPoison.skillId, 9_020);
+assert.equal(selectedLegacyFallbackMortalPoison.effect.kind, 'sourceToPoison');
+assert.equal(selectedLegacyFallbackMortalPoison.effect.destinationType, 8);
+assert.equal(selectedLegacyFallbackMortalPoison.legacyFallbackScale, 1);
+assert.equal(selectedLegacyFallbackMortalPoison.legacyFallbackApproximation, undefined);
+const rejectedLegacyFallbackBoardCount = makeLegacyFallbackBoardSelection(
+  9_021,
+  PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
+  0,
+  Array(10).fill(0),
+);
+assert.equal(rejectedLegacyFallbackBoardCount.skillId, null);
+assert.equal(rejectedLegacyFallbackBoardCount.rngState, 394_448_415);
+assert.equal(rejectedLegacyFallbackBoardCount.legacyFallbackApproximation, undefined);
+assert.equal(rejectedLegacyFallbackBoardCount.fidelity, 'legacy-fallback-no-selection');
+// Omitted board state remains a visible, playable approximation for direct
+// hosts that have not connected their board model yet.
+const missingLegacyFallbackBoardCount = makeLegacyFallbackBoardSelection(
+  9_022,
+  PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
+  0,
+  undefined,
+);
+assert.equal(missingLegacyFallbackBoardCount.skillId, 9_022);
+assert.equal(missingLegacyFallbackBoardCount.legacyFallbackScale, 1);
+assert.equal(missingLegacyFallbackBoardCount.legacyFallbackApproximation, true);
+assert.deepEqual(missingLegacyFallbackBoardCount.approximateFallbackTypes, [12]);
 // Effect type 36 is a native ordinary-path transfer: it jumps to the fallback
 // pass immediately, so a later ordinary type-50 record must not win first.
 // In the fallback jump table the effect type itself is just a zero-scale lane.
