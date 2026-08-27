@@ -11,6 +11,13 @@ const SYSTEM_LIBRARIES = [
 
 let gameSession = null;
 
+// The ARM64 core stops synchronously for syscalls, host calls, and protected
+// module hand-offs.  The protected bootstrap therefore does not need a
+// 100,000-instruction host polling cadence; a larger slice keeps the hot loop
+// inside Wasm while retaining every observable boundary.
+const PROTECTED_INSTRUCTIONS_PER_SLICE = 5_000_000;
+const PROTECTED_PROGRESS_INTERVAL = 5_000_000;
+
 async function loadAndroidStub(name) {
   const response = await fetch(`/android-stubs/${name}`);
   if (!response.ok) throw new Error(`Unable to load browser Android ABI image ${name} (${response.status}).`);
@@ -139,14 +146,14 @@ self.onmessage = async ({ data }) => {
     runtime.exports.arm64_set_register(30, BigInt(constructorReturn));
     runtime.exports.arm64_set_tracepoint(0x44232a4n);
     const wrapperToGate = await linux.runAsync(800_000_000, 10_000, {
-      instructionsPerYield: 500_000,
+      instructionsPerYield: PROTECTED_PROGRESS_INTERVAL,
       onProgress: progress('wrapper'),
     });
     if (wrapperToGate.status !== 4) throw new Error(`Protection wrapper stopped before its verified Android gate (CPU status ${wrapperToGate.status}).`);
     writeU32(0x443c1c0, 1);
     runtime.exports.arm64_resume();
     const wrapperRun = await linux.runAsync(800_000_000, 10_000, {
-      instructionsPerYield: 500_000,
+      instructionsPerYield: PROTECTED_PROGRESS_INTERVAL,
       onProgress: progress('wrapper checks'),
     });
     if (wrapperRun.status !== 1 || wrapperRun.exited) throw new Error(`Protection wrapper did not return cleanly (CPU status ${wrapperRun.status}).`);
@@ -228,11 +235,8 @@ self.onmessage = async ({ data }) => {
     linux.onSlice = discoverPadProtectionModule;
     runtime.exports.arm64_set_module_trace(1);
     let padRun = await linux.runAsync(1_200_000_000, 10_000, {
-      // The Wasm core stops synchronously at a module tracepoint, so a small
-      // polling slice is unnecessary here.  Larger slices avoid tens of
-      // thousands of JS↔Wasm calls while preserving the exact trace boundary.
-      instructionsPerSlice: 100_000,
-      instructionsPerYield: 500_000,
+      instructionsPerSlice: PROTECTED_INSTRUCTIONS_PER_SLICE,
+      instructionsPerYield: PROTECTED_PROGRESS_INTERVAL,
       onProgress: progress('PAD'),
       onEvent: discoverPadProtectionModule,
       onSlice: discoverPadProtectionModule,
@@ -258,8 +262,8 @@ self.onmessage = async ({ data }) => {
       runtime.exports.arm64_step();
       runtime.exports.arm64_set_module_trace(1);
       padRun = await linux.runAsync(1_200_000_000, 10_000, {
-        instructionsPerSlice: 100_000,
-        instructionsPerYield: 500_000,
+        instructionsPerSlice: PROTECTED_INSTRUCTIONS_PER_SLICE,
+        instructionsPerYield: PROTECTED_PROGRESS_INTERVAL,
         onProgress: progress(`PAD module ${padModules.length + 1}`),
         onEvent: discoverPadProtectionModule,
         onSlice: discoverPadProtectionModule,
