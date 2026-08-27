@@ -2,6 +2,20 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-28 exact legacy revive-slot availability
+
+- Matched the native type-52 candidate predicate: an explicit unavailable
+  slot or non-positive HP is revivable, while the browser's distinct escaped
+  terminal state remains excluded.
+- Added `unavailable` to compact enemy state, snapshots, AI selector input, and
+  revive setup/execution. Unavailable enemies are also excluded from attacks,
+  enemy turns, passive counts, targeting, and victory checks until revival
+  clears the flag.
+- Legacy fallback diagnostics now mark type 52 exact when supplied enemy
+  records expose availability explicitly and approximate when the host omits
+  it. Added dead, unavailable-alive, missing-state, escaped, and engine-phase
+  fixtures; `npm run pad-rules:test` passes.
+
 ## 2026-08-28 exact legacy skyfall fallback gate
 
 - Confirmed the native type-68 status split: natural mask `0x03f` and hazard

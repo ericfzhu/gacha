@@ -928,6 +928,62 @@ assert.equal(missingLegacyFallbackSkyfall.legacyFallbackScale, 1);
 assert.equal(missingLegacyFallbackSkyfall.legacyFallbackApproximation, true);
 assert.deepEqual(missingLegacyFallbackSkyfall.approximateFallbackTypes, [68]);
 assert.equal(missingLegacyFallbackSkyfall.fidelity, 'legacy-fallback-approximate');
+const legacyFallbackReviveDefinition = legacyFallbackType50Definition.slice();
+const legacyFallbackReviveView = new DataView(legacyFallbackReviveDefinition.buffer);
+legacyFallbackReviveView.setUint32(0x00, 9_010, true);
+legacyFallbackReviveView.setInt16(0x04, PAD_ENEMY_SKILL_REVIVE_ENEMY, true);
+legacyFallbackReviveView.setInt32(0x10, 37, true);
+const legacyFallbackReviveMonsterDefinition = legacyFallbackMonsterDefinition.slice();
+new DataView(legacyFallbackReviveMonsterDefinition.buffer).setUint32(0xec, 9_010, true);
+const decodedLegacyFallbackRevive = decodePadEnemyAiSkillDefinition(
+  legacyFallbackReviveDefinition,
+);
+const unavailableLegacyFallbackRevive = selectPadEnemyAiLegacy(
+  decodePadEnemyAiMonsterDefinition(legacyFallbackReviveMonsterDefinition),
+  [decodedLegacyFallbackRevive],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    enemies: [{ hp: 5_000, escaped: false, unavailable: true }],
+    rngState: 21_900,
+  },
+);
+assert.equal(unavailableLegacyFallbackRevive.skillId, 9_010);
+assert.equal(unavailableLegacyFallbackRevive.legacyFallbackScale, 1);
+assert.equal(unavailableLegacyFallbackRevive.legacyFallbackApproximation, undefined);
+assert.equal(unavailableLegacyFallbackRevive.fidelity, 'legacy-fallback-recovered');
+const missingLegacyFallbackRevive = selectPadEnemyAiLegacy(
+  decodePadEnemyAiMonsterDefinition(legacyFallbackReviveMonsterDefinition),
+  [decodedLegacyFallbackRevive],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    enemies: [{ hp: 5_000, escaped: false }],
+    rngState: 21_900,
+  },
+);
+assert.equal(missingLegacyFallbackRevive.skillId, null);
+assert.equal(missingLegacyFallbackRevive.rngState, 394_448_415);
+assert.equal(missingLegacyFallbackRevive.legacyFallbackApproximation, true);
+assert.deepEqual(missingLegacyFallbackRevive.approximateFallbackTypes, [52]);
+assert.equal(missingLegacyFallbackRevive.fidelity, 'legacy-fallback-no-selection');
+const escapedLegacyFallbackRevive = selectPadEnemyAiLegacy(
+  decodePadEnemyAiMonsterDefinition(legacyFallbackReviveMonsterDefinition),
+  [decodedLegacyFallbackRevive],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    enemies: [{ hp: 0, escaped: true, unavailable: false }],
+    rngState: 21_900,
+  },
+);
+assert.equal(escapedLegacyFallbackRevive.skillId, null);
+assert.equal(escapedLegacyFallbackRevive.rngState, 394_448_415);
+assert.equal(escapedLegacyFallbackRevive.legacyFallbackApproximation, undefined);
+assert.equal(escapedLegacyFallbackRevive.fidelity, 'legacy-fallback-no-selection');
 const legacyFallbackAwakeningBindDefinition = legacyFallbackType50Definition.slice();
 const legacyFallbackAwakeningBindView = new DataView(
   legacyFallbackAwakeningBindDefinition.buffer,
@@ -8083,6 +8139,26 @@ assert.equal(
   selectedReviveEnemyEngine.rng.state,
   padLcgStep(padLcgStep(21_900).state).state,
 );
+const unavailableReviveEnemyEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: reviveEnemyMonsterDefinition,
+    skillDefinitions: [enemyAiReviveEnemyDefinition],
+  }],
+});
+unavailableReviveEnemyEngine.enemies[1].unavailable = true;
+unavailableReviveEnemyEngine.enemies[1].counter = 1;
+unavailableReviveEnemyEngine.enemies[0].counter = 1;
+unavailableReviveEnemyEngine.setRngState(21_900);
+unavailableReviveEnemyEngine.resolveEnemyTurn();
+const unavailableReviveEnemyState = unavailableReviveEnemyEngine.snapshot();
+assert.equal(unavailableReviveEnemyState.lastEnemyActions[0].skill.type, 52);
+assert.equal(unavailableReviveEnemyState.lastEnemyActions[0].skill.targetEnemyIndex, 1);
+assert.equal(unavailableReviveEnemyState.lastEnemySkill.revivedHp, 28_120);
+assert.equal(unavailableReviveEnemyState.enemies[1].hp, 28_120);
+assert.equal(unavailableReviveEnemyState.enemies[1].unavailable, false);
+assert.equal(unavailableReviveEnemyState.enemies[1].counter, 1);
+assert.equal(unavailableReviveEnemyEngine.rng.state, padLcgStep(padLcgStep(21_900).state).state);
 const rejectedReviveEnemyEngine = new PuzzleEngine({
   seed: 21_900,
   enemyAiPools: [{

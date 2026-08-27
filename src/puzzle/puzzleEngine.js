@@ -213,8 +213,8 @@ const PARTY = Object.freeze([
 ]);
 
 const ENEMY_TEMPLATE = Object.freeze([
-  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, aiUseCount: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0, damageAbsorbTurns: 0, damageAbsorbThreshold: 0, damageVoidTurns: 0, damageVoidThreshold: 0, damageShieldTurns: 0, damageShieldPercent: 0, damageImmunityTurns: 0, damageImmunityPresentation: 0 },
-  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, aiUseCount: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0, damageAbsorbTurns: 0, damageAbsorbThreshold: 0, damageVoidTurns: 0, damageVoidThreshold: 0, damageShieldTurns: 0, damageShieldPercent: 0, damageImmunityTurns: 0, damageImmunityPresentation: 0 },
+  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, aiUseCount: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0, damageAbsorbTurns: 0, damageAbsorbThreshold: 0, damageVoidTurns: 0, damageVoidThreshold: 0, damageShieldTurns: 0, damageShieldPercent: 0, damageImmunityTurns: 0, damageImmunityPresentation: 0, unavailable: false },
+  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, aiUseCount: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0, damageAbsorbTurns: 0, damageAbsorbThreshold: 0, damageVoidTurns: 0, damageVoidThreshold: 0, damageShieldTurns: 0, damageShieldPercent: 0, damageImmunityTurns: 0, damageImmunityPresentation: 0, unavailable: false },
 ]);
 
 function clamp(value, min, max) {
@@ -243,6 +243,19 @@ function copyEnemies() {
     remainingEnemiesTurnChangeActive: false,
     remainingEnemiesTurnChangeSkillId: null,
   }));
+}
+
+function isEnemyActive(enemy) {
+  return Boolean(enemy)
+    && !enemy.unavailable
+    && !enemy.escaped
+    && Number(enemy.hp) > 0;
+}
+
+function isEnemyReviveCandidate(enemy) {
+  return Boolean(enemy)
+    && !enemy.escaped
+    && (Boolean(enemy.unavailable) || Number(enemy.hp) <= 0);
 }
 
 export class PuzzleEngine {
@@ -706,7 +719,7 @@ export class PuzzleEngine {
   }
 
   selectEnemy(index) {
-    if (this.enemies[index]?.hp <= 0) return;
+    if (!isEnemyActive(this.enemies[index])) return;
     if (this.fixedTarget?.turnsRemaining > 0) return;
     if (this.manualTarget && this.targetEnemy === index) {
       this.manualTarget = false;
@@ -724,16 +737,16 @@ export class PuzzleEngine {
     addedMonsterTypeMask = 0,
   ) {
     if (this.fixedTarget?.turnsRemaining > 0) {
-      if (this.enemies[this.fixedTarget.enemyIndex]?.hp > 0) {
+      if (isEnemyActive(this.enemies[this.fixedTarget.enemyIndex])) {
         this.targetEnemy = this.fixedTarget.enemyIndex;
         return this.targetEnemy;
       }
       this.clearFixedTargetIfUnavailable();
     }
-    if (this.manualTarget && this.enemies[this.targetEnemy]?.hp > 0) return this.targetEnemy;
+    if (this.manualTarget && isEnemyActive(this.enemies[this.targetEnemy])) return this.targetEnemy;
     this.manualTarget = false;
     const candidates = this.enemies.map((enemy, index) => {
-      if (enemy.hp <= 0) return null;
+      if (!isEnemyActive(enemy)) return null;
       const attributeMultiplier = padAttributeMultiplier(attribute, enemy.attribute);
       const attributeIndex = PAD_ATTRIBUTE_INDEX[attribute];
       const nullified = Number(enemy.attributeNullifyTurns || 0) > 0
@@ -979,7 +992,7 @@ export class PuzzleEngine {
   }
 
   finishVictory() {
-    if (!this.enemies.every((enemy) => enemy.hp <= 0)) return false;
+    if (!this.enemies.every((enemy) => !isEnemyActive(enemy))) return false;
     this.mode = 'victory';
     this.phase = 'complete';
     this.message = `Victory in ${this.turn} turn${this.turn === 1 ? '' : 's'}!`;
@@ -1012,7 +1025,7 @@ export class PuzzleEngine {
   resolveNextEnemyDeathAction() {
     for (let enemyIndex = 0; enemyIndex < this.enemies.length; enemyIndex += 1) {
       const enemy = this.enemies[enemyIndex];
-      if (enemy.hp > 0 || enemy.deathResolved) continue;
+      if (enemy.unavailable || enemy.escaped || enemy.hp > 0 || enemy.deathResolved) continue;
       enemy.deathResolved = true;
       const pool = this.enemyAiPools[enemyIndex];
       if (!pool) continue;
@@ -1246,7 +1259,7 @@ export class PuzzleEngine {
           member.addedMonsterTypeMask,
         );
         this.enemies.forEach((enemy, enemyIndex) => {
-          if (enemy.hp <= 0 || (!isMassAttack && enemyIndex !== target)) return;
+          if (!isEnemyActive(enemy) || (!isMassAttack && enemyIndex !== target)) return;
           const attributeIndex = PAD_ATTRIBUTE_INDEX[lane.attribute];
           const nullified = Number(enemy.attributeNullifyTurns || 0) > 0
             && Number.isInteger(attributeIndex)
@@ -1316,7 +1329,7 @@ export class PuzzleEngine {
     let nailDamage = 0;
     if (this.turnNailCount > 0) {
       this.enemies.forEach((enemy, enemyIndex) => {
-        if (enemy.hp <= 0) return;
+        if (!isEnemyActive(enemy)) return;
         const damage = Number(enemy.damageImmunityTurns || 0) > 0
           ? 0
           : padNailDamage(enemy.maxHp, this.turnNailCount);
@@ -1327,9 +1340,9 @@ export class PuzzleEngine {
         }
       });
     }
-    if (this.manualTarget && this.enemies[this.targetEnemy]?.hp <= 0) {
+    if (this.manualTarget && !isEnemyActive(this.enemies[this.targetEnemy])) {
       this.manualTarget = false;
-      const nextAlive = this.enemies.findIndex((enemy) => enemy.hp > 0);
+      const nextAlive = this.enemies.findIndex((enemy) => isEnemyActive(enemy));
       if (nextAlive >= 0) this.targetEnemy = nextAlive;
     }
     this.clearFixedTargetIfUnavailable();
@@ -1371,7 +1384,7 @@ export class PuzzleEngine {
   resolveEnemyTurn() {
     let total = 0;
     this.lastEnemyActions = [];
-    const aliveAtTurnStart = this.enemies.map((enemy) => enemy.hp > 0);
+    const aliveAtTurnStart = this.enemies.map((enemy) => isEnemyActive(enemy));
     // Native _incEneTurn advances existing statuses before _setupEnemyAttack
     // admits monsters whose sMONSTER+0x120 counter has reached zero. Keeping
     // this order prevents a newly executed enemy skill from losing a turn
@@ -1405,7 +1418,7 @@ export class PuzzleEngine {
       if (this.blackFallRule.turnsRemaining === 0) this.blackFallRule.active = false;
     }
     this.enemies.forEach((enemy, index) => {
-      if (!aliveAtTurnStart[index] || enemy.hp <= 0) return;
+      if (!aliveAtTurnStart[index] || !isEnemyActive(enemy)) return;
       enemy.counter -= 1;
       if (enemy.counter <= 0) {
         enemy.counter = enemy.maxCounter;
@@ -1570,6 +1583,7 @@ export class PuzzleEngine {
       enemies: this.enemies.map((candidate) => ({
         hp: candidate.hp,
         escaped: Boolean(candidate.escaped),
+        unavailable: Boolean(candidate.unavailable),
       })),
       lockFallRules: this.lockFallRules.map((rule) => ({ ...rule })),
       aiBudget: pool?.aiBudget ?? 0,
@@ -1754,7 +1768,7 @@ export class PuzzleEngine {
         }
         if (skill.kind === 'branchRemainingEnemies') {
           const remainingEnemies = this.enemies.reduce((count, enemy) => (
-            count + Number(enemy.hp > 0 && !enemy.escaped)
+            count + Number(isEnemyActive(enemy))
           ), 0);
           queue.position = remainingEnemies <= skill.branchValue
             ? skill.targetRound
@@ -1973,7 +1987,7 @@ export class PuzzleEngine {
     if (skill.supported && skill.kind === 'reviveEnemy' && !skill.setupMaterialized) {
       const candidates = this.enemies
         .map((enemy, index) => ({ enemy, index }))
-        .filter(({ enemy }) => Number(enemy.hp) <= 0 && !enemy.escaped);
+        .filter(({ enemy }) => isEnemyReviveCandidate(enemy));
       if (candidates.length === 0) {
         return Object.freeze({
           ...record,
@@ -3297,12 +3311,13 @@ export class PuzzleEngine {
     }
     if (skill.supported && skill.kind === 'reviveEnemy') {
       const target = this.enemies[skill.targetEnemyIndex];
-      if (!target || target.hp > 0) return false;
+      if (!target || target.escaped || (!target.unavailable && target.hp > 0)) return false;
       const revivedHp = padEnemySkillReviveHp(target.maxHp, skill.revivePercent);
       target.hp = revivedHp;
       if (target.hp > 0) {
         target.deathResolved = false;
         target.escaped = false;
+        target.unavailable = false;
       }
       this.lastEnemySkill = Object.freeze({ ...skill, revivedHp: target.hp });
       if (target.hp > 0) {
@@ -3774,7 +3789,7 @@ export class PuzzleEngine {
   }
 
   updateEnemyTurnChangePassive(enemy) {
-    if (!enemy || enemy.turnChangeActive || !padEnemyTurnChangeTriggered(
+    if (!isEnemyActive(enemy) || enemy.turnChangeActive || !padEnemyTurnChangeTriggered(
       enemy.hp,
       enemy.maxHp,
       enemy.turnChangeThresholdPercent,
@@ -3786,16 +3801,13 @@ export class PuzzleEngine {
   }
 
   remainingEnemyCount() {
-    return this.enemies.reduce((count, candidate) => count + Number(
-      Number(candidate?.hp) > 0 && !candidate?.escaped,
-    ), 0);
+    return this.enemies.reduce((count, candidate) => count + Number(isEnemyActive(candidate)), 0);
   }
 
   updateEnemyRemainingEnemiesTurnChangePassive(enemy) {
     if (
       !enemy
-      || enemy.hp <= 0
-      || enemy.escaped
+      || !isEnemyActive(enemy)
       || enemy.remainingEnemiesTurnChangeActive
     ) return false;
     // _gamePhaseMove skips monsters carrying the native status-shield bit
@@ -4439,10 +4451,10 @@ export class PuzzleEngine {
   }
 
   clearFixedTargetIfUnavailable() {
-    if (!this.fixedTarget || this.enemies[this.fixedTarget.enemyIndex]?.hp > 0) return;
+    if (!this.fixedTarget || isEnemyActive(this.enemies[this.fixedTarget.enemyIndex])) return;
     this.fixedTarget = null;
     this.manualTarget = false;
-    const nextAlive = this.enemies.findIndex((enemy) => enemy.hp > 0);
+    const nextAlive = this.enemies.findIndex((enemy) => isEnemyActive(enemy));
     if (nextAlive >= 0) this.targetEnemy = nextAlive;
   }
 
@@ -4583,7 +4595,7 @@ export class PuzzleEngine {
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,
-      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, baseMaxCounter = maxCounter, deathResolved = false, escaped = false, scaledAttackGate = 0, aiUseCount = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0, damageAbsorbTurns = 0, damageAbsorbThreshold = 0, damageVoidTurns = 0, damageVoidThreshold = 0, damageShieldTurns = 0, damageShieldPercent = 0, damageImmunityTurns = 0, damageImmunityPresentation = 0, attributeResistPercentages = [100, 100, 100, 100, 100], typeDamagePercentages = Array(16).fill(100), resolveThresholdPercent = 0, turnChangeThresholdPercent = 0, turnChangeCounter = 0, turnChangeActive = false, remainingEnemiesTurnChangeThreshold = 0, remainingEnemiesTurnChangeCounter = 0, remainingEnemiesTurnChangeActive = false, remainingEnemiesTurnChangeSkillId = null }, index) => ({
+      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, baseMaxCounter = maxCounter, deathResolved = false, escaped = false, unavailable = false, scaledAttackGate = 0, aiUseCount = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0, damageAbsorbTurns = 0, damageAbsorbThreshold = 0, damageVoidTurns = 0, damageVoidThreshold = 0, damageShieldTurns = 0, damageShieldPercent = 0, damageImmunityTurns = 0, damageImmunityPresentation = 0, attributeResistPercentages = [100, 100, 100, 100, 100], typeDamagePercentages = Array(16).fill(100), resolveThresholdPercent = 0, turnChangeThresholdPercent = 0, turnChangeCounter = 0, turnChangeActive = false, remainingEnemiesTurnChangeThreshold = 0, remainingEnemiesTurnChangeCounter = 0, remainingEnemiesTurnChangeActive = false, remainingEnemiesTurnChangeSkillId = null }, index) => ({
         id,
         name,
         attribute,
@@ -4594,6 +4606,7 @@ export class PuzzleEngine {
         baseMaxCounter,
         deathResolved,
         escaped,
+        unavailable,
         scaledAttackGate,
         aiUseCount,
         attackBoostTurns,

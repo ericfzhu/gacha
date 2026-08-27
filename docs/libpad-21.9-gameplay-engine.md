@@ -2223,11 +2223,14 @@ max HP, converts both operands to binary64, computes `maxHP * percent / 100`,
 and calls `izMathRoundD` (`0x36b2ec`), whose half values round away from zero.
 The result is written back through the target's protected current-HP pair while
 the remainder of the handler restores its presentation state. The compact
-browser state has no separate unavailable-slot representation, so it uses
-`hp <= 0` as the candidate boundary and applies the same percentage and
-rounding path. Its enemy-phase loop also preserves the alive set captured at
-phase start, preventing a newly resurrected target from acting in that same
-phase.
+browser state exposes an optional `unavailable` flag on each enemy record and
+uses the same `unavailable || hp <= 0` candidate boundary when that flag is
+present. Legacy hosts that omit the flag retain the `hp <= 0` fallback and are
+marked approximate; the built-in engine initializes the flag explicitly for
+each compact slot. Escape remains a distinct terminal state and is excluded
+from revive candidates. Its enemy-phase loop also preserves the alive set
+captured at phase start, preventing a newly resurrected target from acting in
+that same phase.
 
 An immediate new-AI resurrection therefore consumes two ordinary RNG draws:
 one probability test and one target selection. A failed no-target condition

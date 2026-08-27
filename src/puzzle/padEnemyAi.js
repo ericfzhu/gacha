@@ -294,6 +294,15 @@ function isSupportedDefinition(definition) {
     && PAD_SUPPORTED_ENEMY_AI_TYPES.includes(definition.effect.type);
 }
 
+// Native type 52 treats an unavailable stage slot as revivable even when its
+// cached HP is still positive. `escaped` remains a distinct terminal removal
+// state in the browser model and is never offered as a revive target.
+function isPadReviveCandidate(enemy) {
+  return Boolean(enemy)
+    && !enemy.escaped
+    && (Boolean(enemy.unavailable) || Number(enemy.hp) <= 0);
+}
+
 function isStaticallyEligible(definition, state) {
   if (!isSupportedDefinition(definition)) return false;
   if (definition.budgetCost > state.aiBudget) return false;
@@ -615,9 +624,7 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_REVIVE_ENEMY) {
-    const eligible = state.enemies.some((enemy) => (
-      Number(enemy?.hp) <= 0 && !enemy?.escaped
-    ));
+    const eligible = state.enemies.some(isPadReviveCandidate);
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB) {
@@ -1019,6 +1026,11 @@ function normalizeLegacySelectorState(state, monster) {
     && hasOwn('skyfallNaturalMask');
   const skyfallHazardStatePresent = hasOwn('skyfallHazardTurns')
     && hasOwn('skyfallHazardMask');
+  const enemyRecords = Array.isArray(state.enemies) ? state.enemies : [];
+  const enemyAvailabilityStatePresent = enemyRecords.length > 0
+    && enemyRecords.every((enemy) => (
+      Boolean(enemy) && Object.prototype.hasOwnProperty.call(enemy, 'unavailable')
+    ));
   return {
     currentHp: nonNegative(state.currentHp),
     maxHp: nonNegative(state.maxHp),
@@ -1078,7 +1090,8 @@ function normalizeLegacySelectorState(state, monster) {
     skillSealTurns: integer(state.skillSealTurns),
     awakeningBindTurns: integer(state.awakeningBindTurns),
     enemyAttribute: integer(state.enemyAttribute, -1),
-    enemies: Array.isArray(state.enemies) ? state.enemies : [],
+    enemies: enemyRecords,
+    enemyAvailabilityStatePresent,
     party: Array.isArray(state.party) ? state.party : [],
     aiBudget: nonNegative(state.aiBudget === undefined ? monster.budgetCap : state.aiBudget),
     blackFallActive: Boolean(state.blackFallActive),
@@ -1425,13 +1438,17 @@ function legacyFallbackBuiltinScale(definition, state) {
     };
   }
   if (type === 52) {
-    const eligible = state.enemies.some((enemy) => (
-      Number(enemy?.hp) <= 0 && !enemy?.escaped
-    ));
+    const eligible = state.enemies.some(isPadReviveCandidate);
     return {
       scale: eligible ? Math.fround(1) : Math.fround(0),
-      exact: false,
-      mode: eligible ? 'revive-target-present' : 'revive-target-absent',
+      exact: state.enemyAvailabilityStatePresent,
+      mode: eligible
+        ? state.enemyAvailabilityStatePresent
+          ? 'revive-target-present'
+          : 'revive-target-present-missing-state'
+        : state.enemyAvailabilityStatePresent
+          ? 'revive-target-absent'
+          : 'revive-target-absent-missing-state',
     };
   }
   if (type === 53) {
