@@ -46,6 +46,7 @@ import {
   PAD_ENEMY_SKILL_BRANCH_REMAINING_ENEMIES,
   PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_OFF,
   PAD_ENEMY_SKILL_REMAINING_ENEMIES_TURN_CHANGE,
+  PAD_ENEMY_SKILL_NO_SKYFALL,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -383,6 +384,34 @@ assert.deepEqual(decodePadEnemySkillRuntime(blackFallSkillDefinition, blackFallM
   chanceBasisPoints: 7_500,
   packedDuration: 3,
   rawChance: 7_500,
+});
+const noSkyfallSkillDefinition = new Uint8Array(0x48);
+const noSkyfallSkillView = new DataView(noSkyfallSkillDefinition.buffer);
+noSkyfallSkillView.setInt16(0x04, PAD_ENEMY_SKILL_NO_SKYFALL, true);
+noSkyfallSkillView.setInt32(0x10, 0x1234, true);
+noSkyfallSkillView.setInt32(0x14, 3, true);
+noSkyfallSkillView.setInt32(0x44, 0, true);
+assert.deepEqual(decodePadEnemySkillDefinition(noSkyfallSkillDefinition), {
+  type: PAD_ENEMY_SKILL_NO_SKYFALL,
+  kind: 'noSkyfall',
+  supported: true,
+  nativeParameter0: 0x1234,
+  durationTurns: 3,
+  nativeStatusOffset: 0x7754,
+  attackWithSkillValue: 0,
+});
+assert.deepEqual(decodePadEnemySkillRuntime(
+  noSkyfallSkillDefinition,
+  new Uint8Array(0x680),
+), {
+  type: PAD_ENEMY_SKILL_NO_SKYFALL,
+  kind: 'noSkyfall',
+  supported: true,
+  nativeParameter0: 0x1234,
+  durationTurns: 3,
+  nativeStatusOffset: 0x7754,
+  setupMaterialized: true,
+  attackWithSkillValue: 0,
 });
 const boardSizeSkillDefinition = new Uint8Array(0x48);
 const boardSizeSkillView = new DataView(boardSizeSkillDefinition.buffer);
@@ -4304,6 +4333,77 @@ blackFallEngine.setOrbState(0, 0, {
 });
 assert.equal(blackFallEngine.board[0][0].blockFlags, 0x1000);
 assert.equal(blackFallEngine.board[0][0].enhancementPower, 0);
+
+const directNoSkyfallEngine = new PuzzleEngine({ seed: 21_900 });
+assert.equal(directNoSkyfallEngine.applyEnemySkillDefinition(noSkyfallSkillDefinition), true);
+assert.deepEqual(directNoSkyfallEngine.snapshot().noSkyfallRule, {
+  active: true,
+  turnsRemaining: 3,
+  skipInitialCountdown: true,
+});
+assert.equal(directNoSkyfallEngine.snapshot().lastEnemySkill.nativeStatusOffset, 0x7754);
+directNoSkyfallEngine.advanceNoSkyfallTurns();
+assert.equal(directNoSkyfallEngine.snapshot().noSkyfallRule.turnsRemaining, 2);
+directNoSkyfallEngine.advanceNoSkyfallTurns();
+directNoSkyfallEngine.advanceNoSkyfallTurns();
+assert.deepEqual(directNoSkyfallEngine.snapshot().noSkyfallRule, {
+  active: false,
+  turnsRemaining: 0,
+  skipInitialCountdown: true,
+});
+
+// Refill still consumes the normal drop path, but no-skyfall skips the
+// follow-up match scan that would otherwise turn a refill into another combo.
+const noSkyfallInputEngine = new PuzzleEngine({ seed: 21_900 });
+noSkyfallInputEngine.start();
+noSkyfallInputEngine.setBoardFromCodes([
+  'RRRDLG', 'BLGDHB', 'LGDBLR', 'DBHLGD', 'HBLGDB',
+]);
+noSkyfallInputEngine.applyEnemySkillDefinition(noSkyfallSkillDefinition);
+assert.equal(noSkyfallInputEngine.startDrag(0, 0), true);
+assert.equal(noSkyfallInputEngine.endDrag(), true);
+noSkyfallInputEngine.advancePhase();
+assert.equal(noSkyfallInputEngine.phase, 'clear');
+noSkyfallInputEngine.advancePhase();
+assert.equal(noSkyfallInputEngine.phase, 'fall');
+noSkyfallInputEngine.advancePhase();
+assert.equal(noSkyfallInputEngine.phase, 'attack');
+assert.equal(noSkyfallInputEngine.comboCount, 1);
+assert.equal(noSkyfallInputEngine.board.flat().length, 30);
+
+const noSkyfallAiDefinition = noSkyfallSkillDefinition.slice();
+const noSkyfallAiView = new DataView(noSkyfallAiDefinition.buffer);
+noSkyfallAiView.setUint32(0x00, 9_094, true);
+noSkyfallAiView.setInt32(0x30, 10_000, true);
+noSkyfallAiView.setInt32(0x34, 1_000, true);
+noSkyfallAiView.setInt32(0x38, 100, true);
+noSkyfallAiView.setInt32(0x40, 20, true);
+const noSkyfallAiMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(noSkyfallAiMonsterDefinition.buffer).setUint32(0xec, 9_094, true);
+const selectedNoSkyfallAi = selectPadEnemyAiNew(
+  decodePadEnemyAiMonsterDefinition(noSkyfallAiMonsterDefinition),
+  [decodePadEnemyAiSkillDefinition(noSkyfallAiDefinition)],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    noSkyfallTurns: 0,
+    rngState: 21_900,
+  },
+);
+assert.equal(selectedNoSkyfallAi.skillId, 9_094);
+const rejectedNoSkyfallAi = selectPadEnemyAiNew(
+  decodePadEnemyAiMonsterDefinition(noSkyfallAiMonsterDefinition),
+  [decodePadEnemyAiSkillDefinition(noSkyfallAiDefinition)],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    noSkyfallTurns: 2,
+    rngState: 21_900,
+  },
+);
+assert.equal(rejectedNoSkyfallAi.skillId, null);
 
 const scheduledSkillEngine = new PuzzleEngine({
   enemySkillQueues: [{ definitions: [authoredBlackFallDefinition] }],

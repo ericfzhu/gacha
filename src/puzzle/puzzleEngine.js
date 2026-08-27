@@ -82,6 +82,7 @@ import {
   PAD_ENEMY_SKILL_BRANCH_REMAINING_ENEMIES,
   PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_OFF,
   PAD_ENEMY_SKILL_REMAINING_ENEMIES_TURN_CHANGE,
+  PAD_ENEMY_SKILL_NO_SKYFALL,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -264,6 +265,7 @@ export class PuzzleEngine {
     passiveEnhancementFallsEnabled = true,
     lockFallRules = [],
     lockFallSeed = seed,
+    noSkyfallRule = null,
     enemySkillQueues = [],
     enemyAiPools = [],
     playerAuxiliaryBuffTurns = 0,
@@ -298,6 +300,7 @@ export class PuzzleEngine {
     this.passiveEnhancementFallsEnabled = Boolean(passiveEnhancementFallsEnabled);
     this.setLockFallRules(lockFallRules);
     this.lockFallSeed = Number(lockFallSeed) >>> 0;
+    this.setNoSkyfallRule(noSkyfallRule);
     this.enemySkillQueues = ENEMY_TEMPLATE.map(() => ({ records: [], position: 0, repeat: false }));
     if (!Array.isArray(enemySkillQueues)) throw new Error('PAD enemy skill queues must be an array.');
     enemySkillQueues.forEach((queue, enemyIndex) => {
@@ -914,8 +917,30 @@ export class PuzzleEngine {
     }
     if (this.phase === 'fall') {
       this.collapseAndRefill();
-      this.phase = 'detect';
-      this.phaseTimer = 0.28;
+      if (this.noSkyfallRule?.active) {
+        // Type 127 still collapses and refills the board, but its native
+        // _checkFalls path skips the follow-up skyfall match scan.  Resolve
+        // the matches from the user's move immediately after the refill.
+        if (this.turnMatches.length) {
+          this.resolvePlayerTurn();
+          this.phase = 'attack';
+          this.phaseTimer = 0.72;
+        } else {
+          this.applyPlayerHpResolution();
+          if (this.player.hp <= 0) {
+            this.mode = 'defeat';
+            this.phase = 'complete';
+            this.message = 'Defeat — bomb damage reduced party HP to zero.';
+            return;
+          }
+          this.phase = 'enemy';
+          this.phaseTimer = 0.42;
+          this.message = 'No skyfall — the turn advances after the refill.';
+        }
+      } else {
+        this.phase = 'detect';
+        this.phaseTimer = 0.28;
+      }
       return;
     }
     if (this.phase === 'attack') {
@@ -1027,9 +1052,10 @@ export class PuzzleEngine {
       for (let row = this.rows - 1; row >= 0; row -= 1) if (this.board[row][column]) survivors.push(this.board[row][column]);
       const missingCount = this.rows - survivors.length;
       const columnGenerated = Array.from({ length: missingCount }, (_, row) => {
-        const type = this.topLineDropTypes
-          ? this.topLineDropTypes[column]
-          : this.rng.spawnNewBlock(this.dropRates, this.faceTypes, this.skyfallExclusionMask);
+        const scriptedType = this.topLineDropTypes?.[column];
+        const type = scriptedType === undefined
+          ? this.rng.spawnNewBlock(this.dropRates, this.faceTypes, this.skyfallExclusionMask)
+          : scriptedType;
         const entry = { row, column, type };
         generated.push(entry);
         return entry;
@@ -1335,6 +1361,7 @@ export class PuzzleEngine {
     this.advanceEnemyDamageImmunityTurns();
     this.advanceLeaderSwapTurns();
     this.advanceSkyfallRateRules();
+    this.advanceNoSkyfallTurns();
     this.advanceLockFallRules();
     this.advanceMoveTimeReductionTurns();
     this.advanceBlackOrbCountdowns();
@@ -1466,6 +1493,9 @@ export class PuzzleEngine {
       skyfallNaturalMask: this.skyfallRateRules.natural?.typeMask || 0,
       skyfallHazardTurns: this.skyfallRateRules.hazard?.turnsRemaining || 0,
       skyfallHazardMask: this.skyfallRateRules.hazard?.typeMask || 0,
+      noSkyfallTurns: this.noSkyfallRule?.active
+        ? Math.max(0, this.noSkyfallRule.turnsRemaining || 0)
+        : 0,
       defenseBoostTurns: enemy.defenseBoostTurns,
       attributeNullifyTurns: enemy.attributeNullifyTurns,
       scaledAttackGate: enemy.scaledAttackGate,
@@ -2313,6 +2343,15 @@ export class PuzzleEngine {
     this.recomputeDropRates();
   }
 
+  advanceNoSkyfallTurns() {
+    if (!this.noSkyfallRule?.active) return;
+    this.noSkyfallRule.turnsRemaining = Math.max(
+      0,
+      Math.trunc(Number(this.noSkyfallRule.turnsRemaining) || 0) - 1,
+    );
+    if (this.noSkyfallRule.turnsRemaining === 0) this.noSkyfallRule.active = false;
+  }
+
   advanceLockFallRules() {
     this.lockFallRules = this.lockFallRules.filter((rule) => {
       if (rule.turnsRemaining == null) return true;
@@ -2519,6 +2558,32 @@ export class PuzzleEngine {
       active: rule.active === undefined ? turnsRemaining === null || turnsRemaining > 0 : Boolean(rule.active),
       chanceBasisPoints: (Number(rule.chanceBasisPoints) << 16) >> 16,
       turnsRemaining,
+      skipInitialCountdown: rule.skipInitialCountdown === undefined
+        ? true
+        : Boolean(rule.skipInitialCountdown),
+    };
+  }
+
+  setNoSkyfallRule(rule) {
+    if (rule === null || rule === undefined) {
+      this.noSkyfallRule = null;
+      return;
+    }
+    if (
+      rule.turnsRemaining !== undefined
+      && rule.turnsRemaining !== null
+      && (!Number.isInteger(Number(rule.turnsRemaining)) || Number(rule.turnsRemaining) < 0)
+    ) throw new Error('PAD no-skyfall rule requires a nonnegative integer turnsRemaining value.');
+    const turnsRemaining = rule.turnsRemaining === undefined || rule.turnsRemaining === null
+      ? 0
+      : Math.max(0, Math.trunc(Number(rule.turnsRemaining) || 0)) & 0x3ff;
+    this.noSkyfallRule = {
+      active: rule.active === undefined ? turnsRemaining > 0 : Boolean(rule.active),
+      turnsRemaining,
+      // The native +0x400 fresh bit keeps the newly installed counter from
+      // being consumed on the same enemy-action boundary.  The engine's
+      // action order provides that behavior; this flag is retained in the
+      // snapshot to make the native correspondence explicit.
       skipInitialCountdown: rule.skipInitialCountdown === undefined
         ? true
         : Boolean(rule.skipInitialCountdown),
@@ -3174,6 +3239,22 @@ export class PuzzleEngine {
       this.recomputeDropRates();
       this.message = `Selected orbs fall at ${skill.chancePercent}% for ${durationTurns} turn${durationTurns === 1 ? '' : 's'}.`;
       return naturalMask !== 0 || hazardMask !== 0;
+    }
+    if (skill.supported && skill.kind === 'noSkyfall') {
+      const durationTurns = Math.max(0, Math.trunc(Number(skill.durationTurns) || 0)) & 0x3ff;
+      this.setNoSkyfallRule({
+        active: durationTurns > 0,
+        turnsRemaining: durationTurns,
+      });
+      this.lastEnemySkill = Object.freeze({
+        ...skill,
+        durationTurns,
+        nativeStatusOffset: 0x7754,
+      });
+      this.message = durationTurns > 0
+        ? `No skyfall for ${durationTurns} turn${durationTurns === 1 ? '' : 's'}.`
+        : 'No-skyfall had no effect.';
+      return true;
     }
     if (skill.supported && skill.kind === 'lockedSkyfall') {
       const typeMask = Math.trunc(Number(skill.typeMask) || 0) & 0xffff;
@@ -4264,6 +4345,7 @@ export class PuzzleEngine {
       moveTimeSeconds: this.moveTime,
       moveTimeReduction: this.moveTimeReduction ? { ...this.moveTimeReduction } : null,
       blackFallRule: this.blackFallRule ? { ...this.blackFallRule } : null,
+      noSkyfallRule: this.noSkyfallRule ? { ...this.noSkyfallRule } : null,
       thornFallRule: this.thornFallRule ? { ...this.thornFallRule } : null,
       nailFallRule: this.nailFallRule ? { ...this.nailFallRule } : null,
       enhancedFallAwakenings: [...this.enhancedFallAwakenings],

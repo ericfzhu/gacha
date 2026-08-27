@@ -53,6 +53,7 @@ import {
   PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_ALT,
   PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_OFF,
   PAD_ENEMY_SKILL_REMAINING_ENEMIES_TURN_CHANGE,
+  PAD_ENEMY_SKILL_NO_SKYFALL,
   PAD_ENEMY_SKILL_LEADER_SWAP,
   PAD_ENEMY_SKILL_NORMAL_ATTACK,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
@@ -237,6 +238,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_ALT,
     PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_OFF,
     PAD_ENEMY_SKILL_REMAINING_ENEMIES_TURN_CHANGE,
+    PAD_ENEMY_SKILL_NO_SKYFALL,
     PAD_ENEMY_SKILL_LEADER_SWAP,
     PAD_ENEMY_SKILL_NORMAL_ATTACK,
     PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
@@ -298,6 +300,14 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_BLACK_FALL) {
     const eligible = !state.blackFallActive;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_NO_SKYFALL) {
+    // Native 0x61ba58 also gates on a monster-local presentation lane.  The
+    // gameplay-visible part of that predicate is the protected global
+    // no-skyfall counter: an already active counter rejects reapplication and
+    // consumes no LCG state.
+    const eligible = Math.max(0, Math.trunc(Number(state.noSkyfallTurns) || 0)) <= 0;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   if ([PAD_ENEMY_SKILL_ENTIRE_BLIND, PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT]
@@ -862,6 +872,7 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     party: Array.isArray(state.party) ? state.party : [],
     aiBudget: Math.max(0, Math.trunc(Number(state.aiBudget ?? monster.budgetCap) || 0)),
     blackFallActive: Boolean(state.blackFallActive),
+    noSkyfallTurns: Math.max(0, Math.trunc(Number(state.noSkyfallTurns) || 0)),
     boardCellCount: Math.max(0, Math.trunc(Number(state.boardCellCount) || 0)),
     blackBlockCount: Math.max(0, Math.trunc(Number(state.blackBlockCount) || 0)),
     evaluateCondition: state.evaluateCondition,

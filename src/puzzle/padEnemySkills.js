@@ -96,6 +96,10 @@ export const PAD_ENEMY_SKILL_REMAINING_ENEMIES_TURN_CHANGE = 122;
 // Type 123 shares type 119's immunity timer but selects the alternate native
 // presentation controller (+0x9b0 = 1) when it is applied.
 export const PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_ALT = 123;
+// Type 127 disables skyfall-generated matches for its authored duration.  The
+// native handler stores the duration in the protected low-ten-bit lane at
+// sGAMEWORK+0x7754 rather than in the acting monster's scratch record.
+export const PAD_ENEMY_SKILL_NO_SKYFALL = 127;
 // Type 126 changes the active board dimensions.  The native handler selects
 // one of the three supported PAD layouts from its second authored parameter:
 // 1 => 7×6, 2 => 5×4, and 3 => 6×5.
@@ -582,6 +586,22 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       durationTurns,
       boardSizeSelector,
       ...boardSize,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_NO_SKYFALL) {
+    requireLength(definitionBytes, 0x18, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'noSkyfall',
+      supported: true,
+      // TsubakiBotPad's type-127 parser names params[2] as turns.  In the
+      // native sENESKILLS record that is the signed +0x14 operand; +0x10 is
+      // retained for diagnostics because the dispatch does not use it for
+      // the gameplay counter.
+      nativeParameter0: definition.getInt32(0x10, true),
+      durationTurns: definition.getInt32(0x14, true),
+      nativeStatusOffset: 0x7754,
       attackWithSkillValue,
     });
   }
@@ -1797,6 +1817,26 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_NO_SKYFALL) {
+    // Unlike most modern timed skills, type 127 does not materialize its
+    // duration in sMONSTER+0x678.  _doEnemySkill writes the authored +0x14
+    // operand directly to sGAMEWORK+0x7754, so the definition remains the
+    // authoritative runtime record here.
+    requireLength(definitionBytes, 0x18, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'noSkyfall',
+      supported: true,
+      nativeParameter0: definition.getInt32(0x10, true),
+      durationTurns: definition.getInt32(0x14, true),
+      nativeStatusOffset: 0x7754,
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_BRANCH_COMBO) {
     // The branch operands belong to the monster's eight-byte skill-reference
     // slot, not the sENESKILLS definition or sMONSTER runtime scratch area.
@@ -2853,6 +2893,20 @@ export function normalizePadEnemySkillRecord(record) {
       durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)) & 0x3ff,
       boardSizeSelector,
       ...boardSize,
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_NO_SKYFALL || record?.kind === 'noSkyfall') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_NO_SKYFALL,
+      kind: 'noSkyfall',
+      supported: record?.supported !== false,
+      nativeParameter0: Math.trunc(Number(record?.nativeParameter0) || 0),
+      durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)) & 0x3ff,
+      nativeStatusOffset: 0x7754,
       setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null

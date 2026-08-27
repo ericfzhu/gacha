@@ -777,6 +777,26 @@ const BOARD_SIZE_CHANGE_INSTRUCTION_ANCHORS = Object.freeze([
   [0x678f04, 0x39c1ce62], // restore the base height from +0x73
   [0x678f10, 0x97f239f8], // call cGAMEMAIN::_chgBoardSizeTo for restore
 ]);
+const NO_SKYFALL_ENEMY_SKILL_TYPE = 127;
+const NO_SKYFALL_HANDLER = 0x62a7d4;
+const NO_SKYFALL_SETUP_HANDLER = 0x621a48;
+const NO_SKYFALL_CONDITION_HANDLER = 0x61ba58;
+const NO_SKYFALL_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x62a7d8, 0x79402ab5], // load authored duration operand +0x14
+  [0x62a7fc, 0xf8286a89], // clear native presentation controller state
+  [0x62a804, 0x528eea88], // address protected no-skyfall status +0x7754
+  [0x62a80c, 0x78686a89], // read the existing packed status word
+  [0x62a820, 0x330026a9], // insert duration into the low ten bits
+  [0x62a824, 0x32160129], // mark the status freshly applied (0x400)
+  [0x62a840, 0x52800a41], // schedule presentation effect 82
+  [0x61ba58, 0x79433908], // condition starts from monster-local gate
+  [0x61ba7c, 0x72003c1f], // reject an already-active global status
+  [0x6747b4, 0x528eea89], // _checkFalls addresses the same status lane
+  [0x6747c4, 0x531a6508], // sign-extend the packed low-ten-bit count
+  [0x6747cc, 0x7100051f], // compare active no-skyfall duration
+  [0x676c50, 0x528eea89], // _incTurn addresses the no-skyfall lane
+  [0x676c70, 0x51000548], // decrement its low-ten-bit duration
+]);
 const COMBO_BRANCH_ENEMY_SKILL_TYPE = 113;
 const COMBO_BRANCH_HANDLER = 0x62be50;
 const COMBO_BRANCH_SETUP_HANDLER = 0x621c94;
@@ -2280,6 +2300,31 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : boardSizeChangeConditionTarget === BOARD_SIZE_CHANGE_CONDITION_HANDLER;
   const boardSizeChangeInstructionAnchorsMatch = restoredElf === null ? null
     : BOARD_SIZE_CHANGE_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
+  const noSkyfallDispatchTarget = resolveEnemySkillTarget(
+    NO_SKYFALL_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const noSkyfallSetupTarget = resolveEnemySkillTarget(
+    NO_SKYFALL_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const noSkyfallConditionTarget = resolveEnemySkillTarget(
+    NO_SKYFALL_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const noSkyfallDispatchMatches = noSkyfallDispatchTarget === null
+    ? null : noSkyfallDispatchTarget === NO_SKYFALL_HANDLER;
+  const noSkyfallSetupMatches = noSkyfallSetupTarget === null
+    ? null : noSkyfallSetupTarget === NO_SKYFALL_SETUP_HANDLER;
+  const noSkyfallConditionMatches = noSkyfallConditionTarget === null
+    ? null : noSkyfallConditionTarget === NO_SKYFALL_CONDITION_HANDLER;
+  const noSkyfallInstructionAnchorsMatch = restoredElf === null ? null
+    : NO_SKYFALL_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
   const comboBranchDispatchTarget = resolveEnemySkillTarget(
@@ -4434,6 +4479,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       boardSizeChangeInstructionAnchorsMatch21_9: boardSizeChangeInstructionAnchorsMatch,
       boardSizeChangeSemantics:
         'type 126 selects 6x5 for selector 3, 5x4 for selector 2, and 7x6 otherwise; execution calls _chgBoardSizeTo, replaces the low-ten-bit duration at sGAMEWORK+0x77e0, sets fresh bit 0x400, and clears transition bit 0x800; condition requires the protected status gate and exact active board code 0x56/0x45/0x67; _doOnPostEnemyAttack skips the same-boundary decrement, then decrements and restores the base dimensions captured at +0x72/+0x73 when the signed count reaches the <=0x3f restore threshold',
+      noSkyfallType: NO_SKYFALL_ENEMY_SKILL_TYPE,
+      noSkyfallDispatchTarget: noSkyfallDispatchTarget === null
+        ? null : hex(noSkyfallDispatchTarget),
+      noSkyfallDispatchMatches21_9: noSkyfallDispatchMatches,
+      noSkyfallSetupTarget: noSkyfallSetupTarget === null
+        ? null : hex(noSkyfallSetupTarget),
+      noSkyfallSetupMatches21_9: noSkyfallSetupMatches,
+      noSkyfallConditionTarget: noSkyfallConditionTarget === null
+        ? null : hex(noSkyfallConditionTarget),
+      noSkyfallConditionMatches21_9: noSkyfallConditionMatches,
+      noSkyfallInstructionAnchorsMatch21_9: noSkyfallInstructionAnchorsMatch,
+      noSkyfallSemantics:
+        'type 127 is ESNoSkyfall: definition +0x14 is the duration, execution writes the low-ten-bit counter at sGAMEWORK+0x7754, sets fresh bit 0x400 and active marker +0x7758, schedules effect 82, and _checkFalls skips the follow-up skyfall match scan while _incTurn decrements the counter; no gameplay RNG is consumed',
       comboBranchType: COMBO_BRANCH_ENEMY_SKILL_TYPE,
       comboBranchDispatchTarget: comboBranchDispatchTarget === null
         ? null : hex(comboBranchDispatchTarget),

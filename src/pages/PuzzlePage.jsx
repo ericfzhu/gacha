@@ -562,6 +562,16 @@ function render(ctx, engine) {
     );
     playerStatusY += 12;
   }
+  if (engine.noSkyfallRule?.active && engine.noSkyfallRule.turnsRemaining > 0) {
+    ctx.fillStyle = '#d8c8ff';
+    ctx.font = '700 9px "Barlow Condensed", sans-serif';
+    ctx.fillText(
+      `NO SKYFALL · ${engine.noSkyfallRule.turnsRemaining}T`,
+      434,
+      playerStatusY,
+    );
+    playerStatusY += 12;
+  }
   if (engine.attributeBlock?.turnsRemaining > 0) {
     const blockedTypes = ORB_TYPES
       .filter((_, typeIndex) => (engine.attributeBlock.typeMask & (1 << typeIndex)) !== 0)

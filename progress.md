@@ -2,6 +2,17 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-28 no-skyfall action (type 127)
+
+- Confirmed the independent PAD parser's `ESNoSkyfall` mapping against native
+  dispatch `0x62a7d4`, setup `0x621a48`, and condition `0x61ba58`.
+- The browser now decodes the authored `+0x14` duration, models the protected
+  `sGAMEWORK+0x7754` low-ten-bit counter, rejects duplicate active AI rules,
+  and exposes the status in the snapshot/HUD.
+- During an active status, falls still refill the board but skip the next
+  skyfall match scan. Direct decoder, countdown, AI, input/cascade, and refill
+  fixtures pass; browser/build and exact-APK smoke checks remain next.
+
 ## 2026-08-28 board-size change (type 126)
 
 - Recovered native `ESChangeBoardSize` dispatch `0x62a7b4`, generic setup

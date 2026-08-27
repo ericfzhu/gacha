@@ -1576,6 +1576,26 @@ spinner/enhancement state instead of rerolling them. Zero-duration records are
 left active until the next post-enemy boundary, matching the native immediate
 restore path.
 
+Enemy skill type `127` is the native `ESNoSkyfall` action. Its dispatch is
+`0x62a7d4`, setup is `0x621a48`, and its new-AI condition is `0x61ba58`.
+The independent PAD parser confirms that the authored duration is parameter 2,
+which is the signed definition operand at `+0x14`; the other authored operand
+at `+0x10` is retained as a native diagnostic value. The dispatch writes that
+duration into the low ten bits of `sGAMEWORK+0x7754`, sets the fresh `0x400`
+bit, marks `sGAMEWORK+0x7758` active, and schedules presentation effect `82`.
+It does not use the monster's `+0x678` runtime duration slot or consume the
+gameplay LCG.
+
+`_checkFalls` tests the same low-ten-bit lane before taking its normal
+skyfall/cascade path. A no-skyfall turn therefore still collapses and refills
+the board, but skips the subsequent match scan that would turn newly fallen
+orbs into another combo. `_incTurn` decrements the lane at the next enemy
+boundary; the fresh bit preserves the full authored duration on the action that
+installed it. The browser exposes `noSkyfallRule` in snapshots and the HUD,
+rejects an already-active rule in new-AI selection, and applies this
+collapse-without-follow-up-scan behavior while leaving ordinary refill RNG
+unchanged.
+
 Enemy skill type `113` is a combo-dependent branch in a monster's enemy-skill
 list, not an executable attack. Its ordinary dispatch, setup, and condition
 table entries resolve to `0x62be50`, `0x621c94`, and `0x61c01c`. Those paths
