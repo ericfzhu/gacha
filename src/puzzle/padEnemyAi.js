@@ -1396,12 +1396,17 @@ function legacyFallbackBuiltinScale(definition, state) {
     };
   }
   if (type === 88) {
-    // 0x61ef78 compares the protected low-ten-bit status counter with 64;
-    // ordinary browser durations map directly to that lane.
-    const eligible = state.awakeningBindTurns <= 63;
+    // 0x61ef78 loads the packed low-ten-bit counter, shifts it left by six,
+    // sign-extends it back to an int16, and admits only values below 64. The
+    // engine stores the same signed ten-bit representation, but direct hosts
+    // may provide an unpacked integer, so reproduce the native pack/unpack
+    // boundary here as well.
+    const packed = Math.trunc(Number(state.awakeningBindTurns) || 0) & 0x3ff;
+    const nativeCounter = (packed << 22) >> 22;
+    const eligible = nativeCounter < 64;
     return {
       scale: eligible ? Math.fround(1) : Math.fround(0),
-      exact: false,
+      exact: true,
       mode: eligible ? 'awakening-bind-available' : 'awakening-bind-active',
     };
   }
@@ -1419,26 +1424,44 @@ function legacyFallbackBuiltinScale(definition, state) {
     const eligible = state.attributeAbsorbTurns <= 0;
     return {
       scale: eligible ? Math.fround(1) : Math.fround(0),
-      exact: false,
+      exact: true,
       mode: eligible ? 'attribute-absorb-inactive' : 'attribute-absorb-active',
     };
   }
   if (type === 54) {
     const targetFlags = Math.trunc(Number(definition.effect?.targetFlags) || 0) & 0x03;
     const party = Array.isArray(state.party) ? state.party : [];
-    const eligible = (
-      (targetFlags & 1) !== 0
-      && party[0]?.present !== false
-      && Number(party[0]?.bindTurns || 0) <= 0
-    ) || (
-      (targetFlags & 2) !== 0
-      && party[5]?.present !== false
-      && Number(party[5]?.bindTurns || 0) <= 0
-    );
+    const targetIndices = [];
+    if ((targetFlags & 1) !== 0) targetIndices.push(0);
+    if ((targetFlags & 2) !== 0) targetIndices.push(5);
+    // Native 0x61eaec initializes the scale to zero, increments its
+    // denominator once per requested leader/helper bit, and increments the
+    // numerator only for a present, currently unbound target. It then passes
+    // numerator / denominator (binary32) into the common fallback epilogue.
+    // A compact browser host can provide those same two party records. When a
+    // record is absent we retain the native zero contribution but mark the
+    // result approximate because the missing status lane is unknowable.
+    const eligibleCount = targetIndices.reduce((count, index) => {
+      const member = party[index];
+      return count + (
+        Boolean(member)
+        && member.present !== false
+        && Number(member.bindTurns || 0) <= 0
+          ? 1 : 0
+      );
+    }, 0);
+    const scale = targetIndices.length > 0
+      ? Math.fround(eligibleCount / targetIndices.length)
+      : Math.fround(0);
+    const complete = targetIndices.every((index) => Boolean(party[index]));
     return {
-      scale: eligible ? Math.fround(1) : Math.fround(0),
-      exact: false,
-      mode: eligible ? 'leader-helper-target-present' : 'leader-helper-target-absent',
+      scale,
+      exact: complete,
+      mode: targetIndices.length === 0
+        ? 'leader-helper-no-targets'
+        : complete
+          ? `leader-helper-${eligibleCount}/${targetIndices.length}`
+          : `leader-helper-${eligibleCount}/${targetIndices.length}-missing-state`,
     };
   }
   // Types whose handler still reads an unnamed global/status lane remain

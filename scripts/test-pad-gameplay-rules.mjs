@@ -818,6 +818,145 @@ const openLegacyFallback = selectPadEnemyAiLegacy(
 assert.equal(openLegacyFallback.skillId, 9_003);
 assert.equal(openLegacyFallback.rngState, 394_448_415);
 assert.equal(openLegacyFallback.fidelity, 'legacy-fallback-recovered');
+const legacyFallbackAttributeAbsorbDefinition = legacyFallbackType50Definition.slice();
+const legacyFallbackAttributeAbsorbView = new DataView(
+  legacyFallbackAttributeAbsorbDefinition.buffer,
+);
+legacyFallbackAttributeAbsorbView.setUint32(0x00, 9_006, true);
+legacyFallbackAttributeAbsorbView.setInt16(0x04, PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB, true);
+legacyFallbackAttributeAbsorbView.setInt32(0x10, 2, true);
+legacyFallbackAttributeAbsorbView.setInt32(0x14, 4, true);
+legacyFallbackAttributeAbsorbView.setUint32(0x18, 0x03, true);
+const legacyFallbackAttributeAbsorbMonsterDefinition = legacyFallbackMonsterDefinition.slice();
+new DataView(legacyFallbackAttributeAbsorbMonsterDefinition.buffer).setUint32(0xec, 9_006, true);
+const decodedLegacyFallbackAttributeAbsorb = decodePadEnemyAiSkillDefinition(
+  legacyFallbackAttributeAbsorbDefinition,
+);
+const blockedLegacyFallbackAttributeAbsorb = selectPadEnemyAiLegacy(
+  decodePadEnemyAiMonsterDefinition(legacyFallbackAttributeAbsorbMonsterDefinition),
+  [decodedLegacyFallbackAttributeAbsorb],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    attributeAbsorbTurns: 1,
+    rngState: 21_900,
+  },
+);
+assert.equal(blockedLegacyFallbackAttributeAbsorb.skillId, null);
+assert.equal(blockedLegacyFallbackAttributeAbsorb.rngState, 394_448_415);
+assert.equal(blockedLegacyFallbackAttributeAbsorb.legacyUnsupported, false);
+const openLegacyFallbackAttributeAbsorb = selectPadEnemyAiLegacy(
+  decodePadEnemyAiMonsterDefinition(legacyFallbackAttributeAbsorbMonsterDefinition),
+  [decodedLegacyFallbackAttributeAbsorb],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    attributeAbsorbTurns: 0,
+    rngState: 21_900,
+  },
+);
+assert.equal(openLegacyFallbackAttributeAbsorb.skillId, 9_006);
+assert.equal(openLegacyFallbackAttributeAbsorb.legacyFallbackScale, 1);
+assert.equal(openLegacyFallbackAttributeAbsorb.legacyFallbackProbability, 10_000);
+assert.equal(openLegacyFallbackAttributeAbsorb.fidelity, 'legacy-fallback-recovered');
+const legacyFallbackAwakeningBindDefinition = legacyFallbackType50Definition.slice();
+const legacyFallbackAwakeningBindView = new DataView(
+  legacyFallbackAwakeningBindDefinition.buffer,
+);
+legacyFallbackAwakeningBindView.setUint32(0x00, 9_007, true);
+legacyFallbackAwakeningBindView.setInt16(0x04, PAD_ENEMY_SKILL_AWAKENING_BIND, true);
+legacyFallbackAwakeningBindView.setInt32(0x10, 3, true);
+const legacyFallbackAwakeningBindMonsterDefinition = legacyFallbackMonsterDefinition.slice();
+new DataView(legacyFallbackAwakeningBindMonsterDefinition.buffer).setUint32(0xec, 9_007, true);
+const decodedLegacyFallbackAwakeningBind = decodePadEnemyAiSkillDefinition(
+  legacyFallbackAwakeningBindDefinition,
+);
+const blockedLegacyFallbackAwakeningBind = selectPadEnemyAiLegacy(
+  decodePadEnemyAiMonsterDefinition(legacyFallbackAwakeningBindMonsterDefinition),
+  [decodedLegacyFallbackAwakeningBind],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    awakeningBindTurns: 64,
+    rngState: 21_900,
+  },
+);
+assert.equal(blockedLegacyFallbackAwakeningBind.skillId, null);
+assert.equal(blockedLegacyFallbackAwakeningBind.rngState, 394_448_415);
+assert.equal(blockedLegacyFallbackAwakeningBind.legacyUnsupported, false);
+const openLegacyFallbackAwakeningBind = selectPadEnemyAiLegacy(
+  decodePadEnemyAiMonsterDefinition(legacyFallbackAwakeningBindMonsterDefinition),
+  [decodedLegacyFallbackAwakeningBind],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    awakeningBindTurns: 63,
+    rngState: 21_900,
+  },
+);
+assert.equal(openLegacyFallbackAwakeningBind.skillId, 9_007);
+assert.equal(openLegacyFallbackAwakeningBind.legacyFallbackScale, 1);
+assert.equal(openLegacyFallbackAwakeningBind.fidelity, 'legacy-fallback-recovered');
+const legacyFallbackBindLeaderHelperDefinition = legacyFallbackType50Definition.slice();
+const legacyFallbackBindLeaderHelperView = new DataView(
+  legacyFallbackBindLeaderHelperDefinition.buffer,
+);
+legacyFallbackBindLeaderHelperView.setUint32(0x00, 9_008, true);
+legacyFallbackBindLeaderHelperView.setInt16(0x04, PAD_ENEMY_SKILL_BIND_LEADER_HELPER, true);
+legacyFallbackBindLeaderHelperView.setUint8(0x10, 3);
+legacyFallbackBindLeaderHelperView.setInt32(0x14, 2, true);
+legacyFallbackBindLeaderHelperView.setInt32(0x18, 4, true);
+const legacyFallbackBindLeaderHelperMonsterDefinition = legacyFallbackMonsterDefinition.slice();
+const legacyFallbackBindLeaderHelperMonsterView = new DataView(
+  legacyFallbackBindLeaderHelperMonsterDefinition.buffer,
+);
+legacyFallbackBindLeaderHelperMonsterView.setUint32(0xec, 9_008, true);
+legacyFallbackBindLeaderHelperMonsterView.setUint8(0xf1, 2);
+const decodedLegacyFallbackBindLeaderHelper = decodePadEnemyAiSkillDefinition(
+  legacyFallbackBindLeaderHelperDefinition,
+);
+const fallbackPartyWithBoundHelper = Array.from({ length: 6 }, (_, index) => ({
+  present: true,
+  bindTurns: index === 5 ? 1 : 0,
+}));
+const blockedLegacyFallbackBindLeaderHelper = selectPadEnemyAiLegacy(
+  decodePadEnemyAiMonsterDefinition(legacyFallbackBindLeaderHelperMonsterDefinition),
+  [decodedLegacyFallbackBindLeaderHelper],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    party: fallbackPartyWithBoundHelper,
+    rngState: 21_900,
+  },
+);
+assert.equal(blockedLegacyFallbackBindLeaderHelper.skillId, 9_008);
+assert.equal(blockedLegacyFallbackBindLeaderHelper.legacyFallbackScale, 0.5);
+assert.equal(blockedLegacyFallbackBindLeaderHelper.legacyFallbackProbability, 10_000);
+assert.equal(blockedLegacyFallbackBindLeaderHelper.fidelity, 'legacy-fallback-recovered');
+const fullyBoundFallbackParty = fallbackPartyWithBoundHelper.map((member) => ({
+  ...member,
+  bindTurns: 1,
+}));
+const fullyBlockedLegacyFallbackBindLeaderHelper = selectPadEnemyAiLegacy(
+  decodePadEnemyAiMonsterDefinition(legacyFallbackBindLeaderHelperMonsterDefinition),
+  [decodedLegacyFallbackBindLeaderHelper],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    party: fullyBoundFallbackParty,
+    rngState: 21_900,
+  },
+);
+assert.equal(fullyBlockedLegacyFallbackBindLeaderHelper.skillId, null);
+assert.equal(fullyBlockedLegacyFallbackBindLeaderHelper.legacyFallbackScale, undefined);
+assert.equal(fullyBlockedLegacyFallbackBindLeaderHelper.rngState, 394_448_415);
+assert.equal(fullyBlockedLegacyFallbackBindLeaderHelper.legacyUnsupported, false);
 const legacyFallbackPresentationDefinition = legacyFallbackType50Definition.slice();
 const legacyFallbackPresentationView = new DataView(legacyFallbackPresentationDefinition.buffer);
 legacyFallbackPresentationView.setUint32(0x00, 9_004, true);

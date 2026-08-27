@@ -2,6 +2,44 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-28 legacy status/fallback selector
+
+- Recovered the second `_chooseEnemyAi` pass at `0x61e300`, including its
+  `0xd3c8e2` halfword dispatch table, status-scale lanes, budget-only gate,
+  and common `0x61f08c` arithmetic. The browser now applies the signed
+  `factor0 * fallbackWeight` product, binary32 scale/truncation, strict
+  greater-than LCG comparison, and per-positive-weight RNG consumption.
+- Added exact zero/one jump-table lanes, named status gates, explicit host
+  hooks/maps for still-unnamed `sMONSTER`/`sGAMEWORK` fields, diagnostics, and
+  direct/browser fixtures. Effect type 36 transfers into the fallback pass;
+  the separate fallback early-return sentinel is authored slot skill ID 36.
+- `pad-rules:test`, `wasm:test`, production build, restored `libpad` anchor and
+  jump-table inspection, focused browser render, and exact APK smoke all pass.
+  Current smoke reaches frame 199 / 21,766 draw calls with no callback/page
+  errors; absent private `data048.bin`/`data030.bin` remains the expected
+  post-startup boundary. Commit: `8cf3ac0` on `master`.
+- Next fidelity work: continue decoding unnamed fallback status lanes and
+  reduce the native constructor/dependency-scan startup cost without changing
+  protected execution semantics.
+
+## 2026-08-28 legacy fallback status ratios
+
+- Tightened the recovered fallback handlers for attribute absorb (53) and
+  awakening bind (88) to exact native status predicates, including the packed
+  signed-ten-bit awakening counter boundary used by `0x61ef78`.
+- Reconstructed bind-leader/helper (54) as the native eligible-target ratio,
+  rather than a boolean gate: requested leader/helper bits form the denominator
+  and present, unbound compact party records form the numerator. Missing party
+  records remain explicitly approximate instead of being treated as eligible.
+- Added deterministic selector fixtures for active/inactive attribute absorb,
+  the 64-turn awakening threshold, partial/full leader-helper eligibility,
+  native scale/probability metadata, and RNG consumption. Updated the gameplay
+  notes to distinguish these recovered lanes from still-unnamed fallback
+  handlers.
+- `npm run pad-rules:test` passes after the change. Browser/native smoke and
+  the remaining build/inspection checks are the next verification step before
+  the incremental master commit.
+
 ## 2026-08-28 legacy ordinary enemy selector
 
 - Recovered the legacy/new selector split from `_doEnemyAi` (`0x622544`):

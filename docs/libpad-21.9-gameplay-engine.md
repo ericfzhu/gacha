@@ -696,11 +696,12 @@ the native early-return sentinel; effect type 36 itself is the recovered
 zero-scale lane. The recovered constant-one lanes include types 50, 76–81,
 83–86, 89, and 92. Types 21–38, 47, 49, and 69 resolve to the native zero lane. Exact
 status gates are available for combo absorb (67), inactivity presentation (70),
-damage void (71), damage shield (74), damage absorb (87), and the candidate
-count portion of leader swap (75). Skyfall, leader swap, revive, attribute
-absorb, leader-helper, awakening-bind, and other lanes with unnamed native
-fields are playable through the same initialized-one fallback and report
-`legacyFallbackApproximation`.
+damage void (71), damage shield (74), damage absorb (87), attribute absorb (53),
+awakening bind (88), and the candidate-count portion of leader swap (75). The
+leader/helper lane (54) now reproduces the native eligible-target ratio when
+the compact party records are present. Skyfall, leader swap, revive, and other
+lanes with unnamed native fields are playable through the same initialized-one
+fallback and report `legacyFallbackApproximation`.
 
 Hosts that have a fuller `sMONSTER`/`sGAMEWORK` model can provide
 `legacyFallbackCondition(definition, state, context)` or a
