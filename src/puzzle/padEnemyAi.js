@@ -1068,6 +1068,12 @@ const LEGACY_FALLBACK_COMMON_ONE_TYPES = new Set([
   91,
 ]);
 
+// Type 20 has a small status-dependent handler at 0x61e9b8, but both its
+// active and inactive branches converge to a scale-one epilogue. Preserve
+// that control-flow distinction in the evidence model while treating the
+// resulting fallback scale as exact.
+const LEGACY_FALLBACK_EFFECTIVE_ONE_TYPES = new Set([20]);
+
 function normalizeLegacySelectorState(state, monster) {
   const numeric = (value, fallback = 0) => {
     const candidate = Number(value);
@@ -1084,10 +1090,26 @@ function normalizeLegacySelectorState(state, monster) {
   const skyfallHazardStatePresent = hasOwn('skyfallHazardTurns')
     && hasOwn('skyfallHazardMask');
   const enemyRecords = Array.isArray(state.enemies) ? state.enemies : [];
+  const enemyCountStatePresent = hasOwn('enemies')
+    && Array.isArray(state.enemies)
+    && enemyRecords.every((enemy) => (
+      Boolean(enemy)
+      && Object.prototype.hasOwnProperty.call(enemy, 'hp')
+      && Object.prototype.hasOwnProperty.call(enemy, 'escaped')
+      && Object.prototype.hasOwnProperty.call(enemy, 'unavailable')
+    ));
   const enemyAvailabilityStatePresent = enemyRecords.length > 0
     && enemyRecords.every((enemy) => (
       Boolean(enemy) && Object.prototype.hasOwnProperty.call(enemy, 'unavailable')
     ));
+  const playerHpStatePresent = hasOwn('playerCurrentHp') && hasOwn('playerMaxHp');
+  const enemyAttackBoostStatePresent = hasOwn('enemyAttackBoostTurns');
+  const attackBoostStatePresent = hasOwn('enemyAttackBoostTurns')
+    && hasOwn('playerAuxiliaryBuffTurns')
+    && hasOwn('playerAttackBoostTurns')
+    && hasOwn('enemyTransientDebuffActive');
+  const damagedTurnAttackBoostStatePresent = hasOwn('enemyAttackBoostTurns')
+    && hasOwn('enemyDamagedTurnCount');
   return {
     currentHp: nonNegative(state.currentHp),
     maxHp: nonNegative(state.maxHp),
@@ -1149,7 +1171,12 @@ function normalizeLegacySelectorState(state, monster) {
     awakeningBindTurns: integer(state.awakeningBindTurns),
     enemyAttribute: integer(state.enemyAttribute, -1),
     enemies: enemyRecords,
+    enemyCountStatePresent,
     enemyAvailabilityStatePresent,
+    playerHpStatePresent,
+    enemyAttackBoostStatePresent,
+    attackBoostStatePresent,
+    damagedTurnAttackBoostStatePresent,
     party: Array.isArray(state.party) ? state.party : [],
     aiBudget: nonNegative(state.aiBudget === undefined ? monster.budgetCap : state.aiBudget),
     blackFallActive: Boolean(state.blackFallActive),
@@ -1403,6 +1430,9 @@ function legacyFallbackBuiltinScale(definition, state) {
   if (LEGACY_FALLBACK_COMMON_ONE_TYPES.has(type)) {
     return { scale: Math.fround(1), exact: true, mode: 'native-common-one' };
   }
+  if (LEGACY_FALLBACK_EFFECTIVE_ONE_TYPES.has(type)) {
+    return { scale: Math.fround(1), exact: true, mode: 'native-status-one' };
+  }
 
   // These handlers were recovered directly from their status loads in the
   // 0x61e300 jump table. They gate reapplication while the corresponding
@@ -1475,6 +1505,51 @@ function legacyFallbackBuiltinScale(definition, state) {
       mode: eligible
         ? exact ? 'leader-swap-candidates' : 'leader-swap-candidates-missing-state'
         : exact ? 'leader-swap-unavailable' : 'leader-swap-unavailable-missing-state',
+    };
+  }
+  if (type === 17) {
+    const liveEnemyCount = state.enemies.filter((enemy) => (
+      Boolean(enemy)
+      && !enemy.escaped
+      && !enemy.unavailable
+      && Number(enemy.hp) > 0
+    )).length;
+    const eligible = state.enemyAttackBoostTurns <= 0 && liveEnemyCount === 1;
+    const exact = state.enemyCountStatePresent && state.enemyAttackBoostStatePresent;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact,
+      mode: eligible
+        ? exact ? 'lone-attack-boost-eligible' : 'lone-attack-boost-eligible-missing-state'
+        : exact ? 'lone-attack-boost-unavailable' : 'lone-attack-boost-unavailable-missing-state',
+    };
+  }
+  if (type === 18) {
+    const eligible = state.enemyAttackBoostTurns <= 0 && (
+      state.playerAuxiliaryBuffTurns > 0
+      || state.playerAttackBoostTurns > 0
+      || state.enemyTransientDebuffActive
+    );
+    const exact = state.attackBoostStatePresent;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact,
+      mode: eligible
+        ? exact ? 'status-attack-boost-eligible' : 'status-attack-boost-eligible-missing-state'
+        : exact ? 'status-attack-boost-unavailable' : 'status-attack-boost-unavailable-missing-state',
+    };
+  }
+  if (type === 19) {
+    const threshold = Math.trunc(Number(definition.effect?.damagedTurnThreshold) || 0);
+    const eligible = state.enemyAttackBoostTurns <= 0
+      && threshold <= state.enemyDamagedTurnCount;
+    const exact = state.damagedTurnAttackBoostStatePresent;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact,
+      mode: eligible
+        ? exact ? 'damaged-turn-attack-boost-eligible' : 'damaged-turn-attack-boost-eligible-missing-state'
+        : exact ? 'damaged-turn-attack-boost-unavailable' : 'damaged-turn-attack-boost-unavailable-missing-state',
     };
   }
   if (type === 87) {
@@ -1558,6 +1633,21 @@ function legacyFallbackBuiltinScale(definition, state) {
         : complete
           ? `leader-helper-${eligibleCount}/${targetIndices.length}`
           : `leader-helper-${eligibleCount}/${targetIndices.length}-missing-state`,
+    };
+  }
+  if (type === 55) {
+    const eligible = padEnemySkillPlayerHpCondition(
+      state.playerCurrentHp,
+      state.playerMaxHp,
+      definition.effect?.thresholdPercent,
+    );
+    const exact = state.playerHpStatePresent;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact,
+      mode: eligible
+        ? exact ? 'player-heal-eligible' : 'player-heal-eligible-missing-state'
+        : exact ? 'player-heal-unavailable' : 'player-heal-unavailable-missing-state',
     };
   }
   // Types whose handler still reads an unnamed global/status lane remain

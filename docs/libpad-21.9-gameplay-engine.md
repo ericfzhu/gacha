@@ -700,8 +700,11 @@ zero-scale lane. The recovered dedicated constant-one lanes include types 50,
 76–81, 83–86, 89, and 92. Types 7–11, 15–16, 40–46, 51, 66, 72–73, 82, and
 90–91 branch directly to the common epilogue and therefore retain its
 initialized one scale. Types 21–38, 47, 49, and 69 resolve to the native zero
-lane. Exact
-status gates are available for combo absorb (67), inactivity presentation (70),
+lane. Type 20 has a status-dependent handler whose active and inactive branches
+both converge to scale one. Exact
+status gates are available for the lone-enemy and status-triggered attack-boost
+variants (17–19) and player-HP heal (55) when their compact state fields are
+present, as well as combo absorb (67), inactivity presentation (70),
 damage void (71), damage shield (74), damage absorb (87), attribute absorb (53),
 awakening bind (88), and the candidate-count portion of leader swap (75) when
 its candidate metadata is explicit. The

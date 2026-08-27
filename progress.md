@@ -2,6 +2,20 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-28 exact legacy attack-boost and player-heal gates
+
+- Recovered the legacy fallback handlers for lone-enemy attack boost (17),
+  status-triggered attack boost (18), damaged-turn attack boost (19), and
+  player-HP heal (55). They now use the native state predicates and mark the
+  result exact only when the required compact counters/records are explicitly
+  supplied.
+- Type 20's status-dependent handler was also verified: its active and
+  inactive branches both converge to the initialized one scale, so it is now
+  an exact effective-one lane.
+- Added deterministic fallback fixtures for all five records, extended the
+  restored jump-table proof, and updated the native gameplay notes. The PAD
+  rule suite and restored inspector pass.
+
 ## 2026-08-28 recovered common-epilogue fallback lanes
 
 - Parsed every entry in the restored 21.9 legacy fallback jump table. In

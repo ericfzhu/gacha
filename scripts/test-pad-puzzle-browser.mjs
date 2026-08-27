@@ -68,6 +68,7 @@ const renderLeaderSwapState = process.argv.includes('--leader-swap-render');
 const renderLeaderAlterState = process.argv.includes('--leader-alter-render');
 const renderLegacyAiState = process.argv.includes('--legacy-ai-render');
 const renderLegacyFallbackState = process.argv.includes('--legacy-fallback-render');
+const renderLegacyFallbackGatesState = process.argv.includes('--legacy-fallback-gates-render');
 const renderNormalAttackState = process.argv.includes('--normal-attack-render');
 const renderMultiAttackState = process.argv.includes('--multi-attack-render');
 const renderReviveState = process.argv.includes('--revive-render');
@@ -4156,6 +4157,118 @@ try {
     || legacyFallbackRenderState.enemies?.[0]?.aiUseCount !== 1
   )) throw new Error(`Legacy-fallback render-state mismatch: ${JSON.stringify(legacyFallbackRenderState)}`);
   if (legacyFallbackRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
+  const legacyFallbackGatesRenderState = renderLegacyFallbackGatesState ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    const makeMonsterDefinition = (skillId) => {
+      const bytes = new Uint8Array(0x2ec);
+      const view = new DataView(bytes.buffer);
+      view.setUint8(0xe0, 0);
+      view.setInt16(0xe2, 100, true);
+      view.setInt16(0xe4, 10, true);
+      view.setInt16(0xe6, 100, true);
+      view.setUint32(0xec, skillId, true);
+      // +0xf0 is zero so the selector reaches the recovered fallback pass;
+      // +0xf1 enables the fallback lane without consuming an authored slot.
+      view.setUint8(0xf0, 0);
+      view.setUint8(0xf1, 1);
+      return bytes;
+    };
+    const makeDefinition = (skillId, type, configure = () => {}) => {
+      const bytes = new Uint8Array(0x48);
+      const view = new DataView(bytes.buffer);
+      view.setUint32(0x00, skillId, true);
+      view.setInt16(0x04, type, true);
+      view.setInt32(0x30, 10_000, true);
+      view.setInt32(0x34, 1_000, true);
+      view.setInt32(0x38, 100, true);
+      view.setInt32(0x40, 20, true);
+      view.setInt32(0x44, 0, true);
+      configure(view);
+      return bytes;
+    };
+    const run = (skillId, type, configure, configureEngine = () => {}) => {
+      engine.reset();
+      engine.start();
+      engine.setEnemySkillQueue(0, []);
+      engine.setEnemyAiDefinitionPool(
+        0,
+        makeMonsterDefinition(skillId),
+        [makeDefinition(skillId, type, configure)],
+      );
+      engine.setRngState(21_900);
+      engine.enemies[0].counter = 1;
+      engine.enemies[1].counter = 99;
+      engine.enemies[1].hp = 0;
+      configureEngine();
+      engine.resolveEnemyTurn();
+      const snapshot = engine.snapshot();
+      const action = snapshot.lastEnemyActions?.[0];
+      return {
+        skill: {
+          id: action?.skill?.skillId,
+          type: action?.skill?.type,
+        },
+        playerHp: snapshot.player?.hp,
+        enemy: snapshot.enemies?.[0],
+        rngState: snapshot.rngState,
+      };
+    };
+    return {
+      loneAttackBoost: run(9_013, 17, (view) => {
+        view.setInt32(0x14, 3, true);
+        view.setInt32(0x18, 200, true);
+      }),
+      statusTriggeredAttackBoost: run(9_014, 18, (view) => {
+        view.setInt32(0x10, 2, true);
+        view.setInt32(0x14, 250, true);
+      }, () => {
+        engine.playerAuxiliaryBuffTurns = 1;
+      }),
+      damagedTurnAttackBoost: run(9_015, 19, (view) => {
+        view.setInt32(0x10, 3, true);
+        view.setInt32(0x14, 4, true);
+        view.setInt32(0x18, 300, true);
+      }, () => {
+        engine.enemies[0].damagedTurnCount = 3;
+      }),
+      statusShield: run(9_016, 20, (view) => {
+        view.setInt32(0x10, 3, true);
+      }),
+      playerHeal: run(9_017, 55, (view) => {
+        view.setInt32(0x10, 25, true);
+        view.setInt32(0x14, 50, true);
+      }, () => {
+        engine.player.hp = 3_000;
+      }),
+    };
+  }) : null;
+  const legacyFallbackGateExpected = {
+    loneAttackBoost: { id: 9_013, type: 17 },
+    statusTriggeredAttackBoost: { id: 9_014, type: 18 },
+    damagedTurnAttackBoost: { id: 9_015, type: 19 },
+    statusShield: { id: 9_016, type: 20 },
+    playerHeal: { id: 9_017, type: 55 },
+  };
+  if (legacyFallbackGatesRenderState) {
+    for (const [name, expected] of Object.entries(legacyFallbackGateExpected)) {
+      const result = legacyFallbackGatesRenderState[name];
+      if (
+        result?.skill?.id !== expected.id
+        || result?.skill?.type !== expected.type
+        || result?.rngState !== 394_448_415
+      ) throw new Error(`Legacy-fallback gate ${name} mismatch: ${JSON.stringify(result)}`);
+    }
+    if (legacyFallbackGatesRenderState.loneAttackBoost.enemy?.attackBoostTurns !== 3
+      || legacyFallbackGatesRenderState.loneAttackBoost.enemy?.attackBoostPercent !== 200
+      || legacyFallbackGatesRenderState.statusTriggeredAttackBoost.enemy?.attackBoostTurns !== 2
+      || legacyFallbackGatesRenderState.statusTriggeredAttackBoost.enemy?.attackBoostPercent !== 250
+      || legacyFallbackGatesRenderState.damagedTurnAttackBoost.enemy?.attackBoostTurns !== 4
+      || legacyFallbackGatesRenderState.damagedTurnAttackBoost.enemy?.attackBoostPercent !== 300
+      || legacyFallbackGatesRenderState.statusShield.enemy?.statusShieldTurns !== 3
+      || legacyFallbackGatesRenderState.playerHeal.playerHp !== 9_000
+    ) throw new Error(`Legacy-fallback gate effect mismatch: ${JSON.stringify(legacyFallbackGatesRenderState)}`);
+  }
+  if (legacyFallbackGatesRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   const normalAttackRenderState = renderNormalAttackState ? await page.evaluate(() => {
     const engine = window.__puzzleGame;
     const monsterDefinition = new Uint8Array(0x2ec);
@@ -4866,7 +4979,10 @@ try {
   if (legacyFallbackRenderState) {
     await fs.writeFile(`${outputPath}.legacy-fallback.json`, JSON.stringify(legacyFallbackRenderState, null, 2));
   }
-  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, comboAbsorbRenderState, skyfallRateRenderState, deathCryRenderState, damageVoidRenderState, damageAbsorbRenderState, awakeningBindRenderState, skillDelayRenderState, presenceCheckRenderState, maskedRandomOrbChangeRenderState, nativeNoEffectRenderState, lockRandomOrbsRenderState, enemyEscapeRenderState, lockedSkyfallRenderState, stickyBlindRandomRenderState, stickyBlindFixedRenderState, orbSealColumnsRenderState, orbSealRowsRenderState, fixedStartRenderState, randomBombsRenderState, fixedBombsRenderState, cloudRenderState, recoveryDebuffRenderState, turnChangeRenderState, remainingEnemiesTurnChangeRenderState, attributeBlockRenderState, attackOrbChangeRenderState, randomSpinnersRenderState, fixedSpinnersRenderState, maxHpChangeRenderState, fixedTargetRenderState, boardSizeChangeRenderState, noSkyfallRenderState, comboBranchRenderState, attackAttributeBranchRenderState, skillUseBranchRenderState, damageBranchRenderState, erasedAttributeBranchRenderState, typeResistRenderState, damageImmunityRenderState, remainingEnemiesBranchRenderState, damageImmunityOffRenderState, attributeResistRenderState, resolveRenderState, damageShieldRenderState, leaderSwapRenderState, legacyAiRenderState, normalAttackRenderState, multiAttackRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, earlyPartyControlRenderState, bindAttackRenderState, randomSubBindRenderState, repeatAttackRenderState, entireBlindRenderState, inactivityRenderState, attackBoostRenderState, consoleMessages }, null, 2));
+  if (legacyFallbackGatesRenderState) {
+    await fs.writeFile(`${outputPath}.legacy-fallback-gates.json`, JSON.stringify(legacyFallbackGatesRenderState, null, 2));
+  }
+  await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, comboAbsorbRenderState, skyfallRateRenderState, deathCryRenderState, damageVoidRenderState, damageAbsorbRenderState, awakeningBindRenderState, skillDelayRenderState, presenceCheckRenderState, maskedRandomOrbChangeRenderState, nativeNoEffectRenderState, lockRandomOrbsRenderState, enemyEscapeRenderState, lockedSkyfallRenderState, stickyBlindRandomRenderState, stickyBlindFixedRenderState, orbSealColumnsRenderState, orbSealRowsRenderState, fixedStartRenderState, randomBombsRenderState, fixedBombsRenderState, cloudRenderState, recoveryDebuffRenderState, turnChangeRenderState, remainingEnemiesTurnChangeRenderState, attributeBlockRenderState, attackOrbChangeRenderState, randomSpinnersRenderState, fixedSpinnersRenderState, maxHpChangeRenderState, fixedTargetRenderState, boardSizeChangeRenderState, noSkyfallRenderState, comboBranchRenderState, attackAttributeBranchRenderState, skillUseBranchRenderState, damageBranchRenderState, erasedAttributeBranchRenderState, typeResistRenderState, damageImmunityRenderState, remainingEnemiesBranchRenderState, damageImmunityOffRenderState, attributeResistRenderState, resolveRenderState, damageShieldRenderState, leaderSwapRenderState, legacyAiRenderState, legacyFallbackGatesRenderState, normalAttackRenderState, multiAttackRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, earlyPartyControlRenderState, bindAttackRenderState, randomSubBindRenderState, repeatAttackRenderState, entireBlindRenderState, inactivityRenderState, attackBoostRenderState, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();
   process.stdout.write(`${JSON.stringify({ atlasStatus, dragPathLength: during.drag.pathLength, turn: after.turn, phase: after.phase, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, comboAbsorbRenderState, skyfallRateRenderState, deathCryRenderState, damageVoidRenderState, damageAbsorbRenderState, awakeningBindRenderState, skillDelayRenderState, presenceCheckRenderState, maskedRandomOrbChangeRenderState, nativeNoEffectRenderState, lockRandomOrbsRenderState, enemyEscapeRenderState, lockedSkyfallRenderState, stickyBlindRandomRenderState, stickyBlindFixedRenderState, orbSealColumnsRenderState, orbSealRowsRenderState, fixedStartRenderState, randomBombsRenderState, fixedBombsRenderState, cloudRenderState, recoveryDebuffRenderState, turnChangeRenderState, remainingEnemiesTurnChangeRenderState, attributeBlockRenderState, attackOrbChangeRenderState, randomSpinnersRenderState, fixedSpinnersRenderState, maxHpChangeRenderState, fixedTargetRenderState, boardSizeChangeRenderState, noSkyfallRenderState, comboBranchRenderState, attackAttributeBranchRenderState, skillUseBranchRenderState, damageBranchRenderState, erasedAttributeBranchRenderState, typeResistRenderState, damageImmunityRenderState, remainingEnemiesBranchRenderState, damageImmunityOffRenderState, attributeResistRenderState, resolveRenderState, damageShieldRenderState, leaderSwapRenderState, legacyAiRenderState, normalAttackRenderState, multiAttackRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, earlyPartyControlRenderState, bindAttackRenderState, randomSubBindRenderState, repeatAttackRenderState, entireBlindRenderState, inactivityRenderState, attackBoostRenderState, consoleMessages }, null, 2)}\n`);
 } finally {

@@ -736,6 +736,97 @@ assert.equal(selectedLegacyFallbackCommonOne.legacyFallbackProbability, 10_000);
 assert.equal(selectedLegacyFallbackCommonOne.legacyFallbackApproximation, undefined);
 assert.equal(selectedLegacyFallbackCommonOne.fidelity, 'legacy-fallback-recovered');
 assert.equal(selectedLegacyFallbackCommonOne.rngState, 394_448_415);
+const makeLegacyFallbackSelection = (skillId, type, configure = () => {}, state = {}) => {
+  const definition = legacyFallbackType50Definition.slice();
+  const definitionView = new DataView(definition.buffer);
+  definitionView.setUint32(0x00, skillId, true);
+  definitionView.setInt16(0x04, type, true);
+  configure(definitionView);
+  const monsterDefinition = legacyFallbackMonsterDefinition.slice();
+  new DataView(monsterDefinition.buffer).setUint32(0xec, skillId, true);
+  return selectPadEnemyAiLegacy(
+    decodePadEnemyAiMonsterDefinition(monsterDefinition),
+    [decodePadEnemyAiSkillDefinition(definition)],
+    {
+      currentHp: 92_000,
+      maxHp: 92_000,
+      aiBudget: 100,
+      rngState: 21_900,
+      playerCurrentHp: 12_000,
+      playerMaxHp: 92_000,
+      enemyAttackBoostTurns: 0,
+      enemyDamagedTurnCount: 3,
+      playerAuxiliaryBuffTurns: 1,
+      playerAttackBoostTurns: 0,
+      enemyTransientDebuffActive: false,
+      enemyStatusShieldTurns: 0,
+      enemies: [
+        { hp: 92_000, escaped: false, unavailable: false },
+        { hp: 0, escaped: false, unavailable: false },
+      ],
+      ...state,
+    },
+  );
+};
+const selectedLegacyFallbackLoneBoost = makeLegacyFallbackSelection(
+  9_013,
+  PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
+  (view) => {
+    view.setInt32(0x14, 3, true);
+    view.setInt32(0x18, 200, true);
+  },
+);
+assert.equal(selectedLegacyFallbackLoneBoost.skillId, 9_013);
+assert.equal(selectedLegacyFallbackLoneBoost.legacyFallbackScale, 1);
+assert.equal(selectedLegacyFallbackLoneBoost.legacyFallbackApproximation, undefined);
+assert.equal(selectedLegacyFallbackLoneBoost.fidelity, 'legacy-fallback-recovered');
+const selectedLegacyFallbackStatusBoost = makeLegacyFallbackSelection(
+  9_014,
+  PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
+  (view) => {
+    view.setInt32(0x10, 2, true);
+    view.setInt32(0x14, 250, true);
+  },
+);
+assert.equal(selectedLegacyFallbackStatusBoost.skillId, 9_014);
+assert.equal(selectedLegacyFallbackStatusBoost.legacyFallbackScale, 1);
+assert.equal(selectedLegacyFallbackStatusBoost.legacyFallbackApproximation, undefined);
+assert.equal(selectedLegacyFallbackStatusBoost.fidelity, 'legacy-fallback-recovered');
+const selectedLegacyFallbackDamagedBoost = makeLegacyFallbackSelection(
+  9_015,
+  PAD_ENEMY_SKILL_DAMAGED_TURN_ATTACK_BOOST,
+  (view) => {
+    view.setInt32(0x10, 3, true);
+    view.setInt32(0x14, 4, true);
+    view.setInt32(0x18, 300, true);
+  },
+);
+assert.equal(selectedLegacyFallbackDamagedBoost.skillId, 9_015);
+assert.equal(selectedLegacyFallbackDamagedBoost.legacyFallbackScale, 1);
+assert.equal(selectedLegacyFallbackDamagedBoost.legacyFallbackApproximation, undefined);
+assert.equal(selectedLegacyFallbackDamagedBoost.fidelity, 'legacy-fallback-recovered');
+const selectedLegacyFallbackStatusShield = makeLegacyFallbackSelection(
+  9_016,
+  PAD_ENEMY_SKILL_STATUS_SHIELD,
+  (view) => view.setInt32(0x10, 3, true),
+  { enemyStatusShieldTurns: 5 },
+);
+assert.equal(selectedLegacyFallbackStatusShield.skillId, 9_016);
+assert.equal(selectedLegacyFallbackStatusShield.legacyFallbackScale, 1);
+assert.equal(selectedLegacyFallbackStatusShield.legacyFallbackApproximation, undefined);
+assert.equal(selectedLegacyFallbackStatusShield.fidelity, 'legacy-fallback-recovered');
+const selectedLegacyFallbackPlayerHeal = makeLegacyFallbackSelection(
+  9_017,
+  PAD_ENEMY_SKILL_HEAL_PLAYER,
+  (view) => {
+    view.setInt32(0x10, 25, true);
+    view.setInt32(0x14, 50, true);
+  },
+);
+assert.equal(selectedLegacyFallbackPlayerHeal.skillId, 9_017);
+assert.equal(selectedLegacyFallbackPlayerHeal.legacyFallbackScale, 1);
+assert.equal(selectedLegacyFallbackPlayerHeal.legacyFallbackApproximation, undefined);
+assert.equal(selectedLegacyFallbackPlayerHeal.fidelity, 'legacy-fallback-recovered');
 // Effect type 36 is a native ordinary-path transfer: it jumps to the fallback
 // pass immediately, so a later ordinary type-50 record must not win first.
 // In the fallback jump table the effect type itself is just a zero-scale lane.
