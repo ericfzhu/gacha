@@ -70,6 +70,7 @@ import {
   PAD_ENEMY_SKILL_FIXED_SPINNERS,
   PAD_ENEMY_SKILL_MAX_HP_CHANGE,
   PAD_ENEMY_SKILL_FIXED_TARGET,
+  PAD_ENEMY_SKILL_BOARD_SIZE_CHANGE,
   PAD_ENEMY_SKILL_BRANCH_COMBO,
   PAD_ENEMY_SKILL_BRANCH_ATTACK_ATTRIBUTES,
   PAD_ENEMY_SKILL_BRANCH_SKILL_USE,
@@ -276,6 +277,8 @@ export class PuzzleEngine {
     this.seed = seed;
     this.baseMoveTime = Math.max(0, Number(moveTime) || 0);
     this.moveTime = this.baseMoveTime;
+    this.baseColumns = columns;
+    this.baseRows = rows;
     this.columns = columns;
     this.rows = rows;
     this.allowDiagonalMoves = Boolean(allowDiagonalMoves);
@@ -335,6 +338,9 @@ export class PuzzleEngine {
     this.rng = createPadRng(this.seed);
     this.lockFallRng = createPadRng(this.lockFallSeed);
     this.orbSerial = 0;
+    this.columns = this.baseColumns;
+    this.rows = this.baseRows;
+    this.boardCellArchive = new Map();
     this.mode = 'ready';
     this.phase = 'input';
     this.phaseTimer = 0;
@@ -376,6 +382,8 @@ export class PuzzleEngine {
     this.attributeBlock = null;
     this.maxHpChange = null;
     this.fixedTarget = null;
+    this.boardSizeChange = null;
+    this.boardSizeChangeSkipPostEnemyCountdown = false;
     this.leaderSwapTurns = 0;
     this.leaderSwapIndex = null;
     this.enemySkillQueues.forEach((queue) => { queue.position = 0; });
@@ -516,6 +524,79 @@ export class PuzzleEngine {
       this.dropRates,
       this.faceTypes,
     ).map((row) => row.map((type) => this.createOrb(ORB_TYPES[type]?.id || NATURAL_ORB_TYPES[0].id)));
+  }
+
+  // cGAMEMAIN::_chgBoardSizeTo keeps the native block table alive while the
+  // active width/height change.  Preserve cells outside a temporary layout so
+  // a later restore exposes the same orb objects (including locks, blinds,
+  // spinners, and enhancement flags) instead of silently rerolling them.
+  changeBoardSize(columns, rows, { reason = 'manual' } = {}) {
+    const nextColumns = Math.trunc(Number(columns));
+    const nextRows = Math.trunc(Number(rows));
+    if (![nextColumns, nextRows].every(Number.isInteger)
+      || nextColumns < 1 || nextColumns > 15
+      || nextRows < 1 || nextRows > 15) {
+      throw new RangeError('PAD board dimensions must be integers from 1 through 15.');
+    }
+    const oldColumns = this.columns;
+    const oldRows = this.rows;
+    if (!(this.boardCellArchive instanceof Map)) this.boardCellArchive = new Map();
+    this.board.forEach((row, rowIndex) => row.forEach((orb, columnIndex) => {
+      if (orb) this.boardCellArchive.set(`${rowIndex}:${columnIndex}`, orb);
+    }));
+
+    const nextBoard = Array.from({ length: nextRows }, (_, rowIndex) => (
+      Array.from({ length: nextColumns }, (_, columnIndex) => {
+        const key = `${rowIndex}:${columnIndex}`;
+        if (this.boardCellArchive.has(key)) return this.boardCellArchive.get(key);
+        const type = this.rng.spawnNewBlock(
+          this.dropRates,
+          this.faceTypes,
+          this.skyfallExclusionMask,
+        );
+        const orb = this.createOrb(ORB_TYPES[type]?.id || NATURAL_ORB_TYPES[0].id);
+        this.boardCellArchive.set(key, orb);
+        return orb;
+      })
+    ));
+
+    this.columns = nextColumns;
+    this.rows = nextRows;
+    this.board = nextBoard;
+    // A resize can happen at an enemy-action boundary, but a direct API call
+    // may arrive while the user is dragging.  Native board transitions cancel
+    // the in-flight pointer path; do the same so no stale coordinates escape.
+    this.drag = null;
+    this.pendingMatches = this.pendingMatches.filter(({ row, column }) => (
+      this.isCell(row, column)
+    ));
+    this.pendingBombCells = this.pendingBombCells.filter(({ row, column }) => (
+      this.isCell(row, column)
+    ));
+    this.turnMatches = this.turnMatches.filter(({ cells = [] }) => (
+      cells.every(({ row, column }) => this.isCell(row, column))
+    ));
+    this.orbSealColumnMask &= (1 << nextColumns) - 1;
+    this.orbSealRowMask &= (1 << nextRows) - 1;
+    if (this.forcedStart && !this.isCell(this.forcedStart.row, this.forcedStart.column)) {
+      this.forcedStart = null;
+    }
+    if (this.cloud) {
+      const height = Math.max(0, Math.min(nextRows, this.cloud.heightRows));
+      const width = Math.max(0, Math.min(nextColumns, this.cloud.widthColumns));
+      const row = Math.max(0, Math.min(nextRows - height, this.cloud.row));
+      const column = Math.max(0, Math.min(nextColumns - width, this.cloud.column));
+      this.cloud = { ...this.cloud, row, column, heightRows: height, widthColumns: width };
+    }
+    return Object.freeze({
+      reason,
+      changed: oldColumns !== nextColumns || oldRows !== nextRows,
+      oldColumns,
+      oldRows,
+      columns: nextColumns,
+      rows: nextRows,
+      boardSizeCode: ((nextRows << 4) | nextColumns) & 0xff,
+    });
   }
 
   startDrag(row, column, pointerX = 0, pointerY = 0, gridColumn = column + 0.5, gridRow = row + 0.5) {
@@ -1364,6 +1445,7 @@ export class PuzzleEngine {
     // newly applied status does not, so its authored count drops immediately.
     this.advanceSkillSealTurnsPostEnemyAttack();
     this.advanceAwakeningBindTurnsPostEnemyAttack();
+    this.advanceBoardSizeChangeTurnsPostEnemyAttack();
   }
 
   enemyAiState(enemyIndex, pool = this.enemyAiPools[enemyIndex]) {
@@ -1405,6 +1487,10 @@ export class PuzzleEngine {
       maxHpChangeParameter: this.maxHpChange?.parameter || 0,
       fixedTargetTurns: this.fixedTarget?.turnsRemaining || 0,
       fixedTargetEnemyIndex: this.fixedTarget?.enemyIndex ?? -1,
+      boardColumns: this.columns,
+      boardRows: this.rows,
+      boardSizeCode: ((this.rows << 4) | this.columns) & 0xff,
+      boardSizeChangeTurns: this.boardSizeChange?.turnsRemaining || 0,
       actingEnemyIndex: enemyIndex,
       playerRecovery: this.player.recovery,
       recoveryMultiplier: this.recoveryDebuff?.multiplier ?? 1,
@@ -2321,6 +2407,7 @@ export class PuzzleEngine {
     if (!Array.isArray(rows) || rows.length !== this.rows || rows.some((row) => typeof row !== 'string' || row.length !== this.columns)) {
       throw new Error(`Board must be ${this.rows} strings of ${this.columns} orb codes.`);
     }
+    this.boardCellArchive = new Map();
     this.board = rows.map((row) => [...row].map((code) => {
       const type = ORB_BY_CODE[code]?.id;
       if (!type) throw new Error(`Unknown orb code: ${code}`);
@@ -2713,6 +2800,36 @@ export class PuzzleEngine {
       this.message = this.fixedTarget
         ? `${this.enemies[target].name} fixed the party's target for ${turnsRemaining} turn${turnsRemaining === 1 ? '' : 's'}.`
         : 'The forced target had no effect.';
+      return true;
+    }
+    if (skill.supported && skill.kind === 'boardSizeChange') {
+      const durationTurns = Math.max(0, Math.trunc(Number(skill.durationTurns) || 0)) & 0x3ff;
+      const resized = this.changeBoardSize(skill.columns, skill.rows, {
+        reason: 'enemySkill',
+      });
+      // +0x72/+0x73 hold the dimensions captured at native game init, not the
+      // currently active temporary layout.  Reapplying a board skill therefore
+      // continues to restore the original board rather than the prior target.
+      // Keep a zero-turn status around until the next native post-enemy
+      // boundary.  The native handler still changes the board immediately;
+      // _doOnPostEnemyAttack then observes the zero low-ten-bit count and
+      // restores the base dimensions in that same boundary.
+      this.boardSizeChange = {
+        turnsRemaining: durationTurns,
+        boardSizeSelector: skill.boardSizeSelector,
+        columns: resized.columns,
+        rows: resized.rows,
+        boardSizeCode: resized.boardSizeCode,
+        restoreColumns: this.baseColumns,
+        restoreRows: this.baseRows,
+      };
+      this.boardSizeChangeSkipPostEnemyCountdown = true;
+      this.lastEnemySkill = Object.freeze({
+        ...skill,
+        durationTurns,
+        ...resized,
+      });
+      this.message = `Board changed to ${resized.columns} × ${resized.rows} for ${durationTurns} turn${durationTurns === 1 ? '' : 's'}.`;
       return true;
     }
     if (skill.supported && skill.kind === 'clearPlayerBuffs') {
@@ -4066,6 +4183,44 @@ export class PuzzleEngine {
     this.player.hp = Math.min(this.player.hp, this.player.maxHp);
   }
 
+  // The native board-size status lives in sGAMEWORK+0x77e0 and is consumed by
+  // _doOnPostEnemyAttack.  Type 126 sets bit 0x400 when it is applied, which
+  // skips the decrement for that same action boundary; subsequent enemy
+  // attacks consume one low-ten-bit turn and restore the saved base layout at
+  // zero.
+  advanceBoardSizeChangeTurnsPostEnemyAttack() {
+    const status = this.boardSizeChange;
+    if (this.boardSizeChangeSkipPostEnemyCountdown) {
+      this.boardSizeChangeSkipPostEnemyCountdown = false;
+      if (status && status.turnsRemaining <= 0) {
+        const restored = this.changeBoardSize(status.restoreColumns, status.restoreRows, {
+          reason: 'boardSizeRestore',
+        });
+        this.boardSizeChange = null;
+        this.message = `Board restored to ${restored.columns} × ${restored.rows}.`;
+      }
+      return;
+    }
+    if (!status) return;
+    if (status.turnsRemaining <= 0) {
+      const restored = this.changeBoardSize(status.restoreColumns, status.restoreRows, {
+        reason: 'boardSizeRestore',
+      });
+      this.boardSizeChange = null;
+      this.message = `Board restored to ${restored.columns} × ${restored.rows}.`;
+      return;
+    }
+    status.turnsRemaining = Math.max(0, status.turnsRemaining - 1);
+    if (status.turnsRemaining > 0) return;
+    const restoreColumns = status.restoreColumns;
+    const restoreRows = status.restoreRows;
+    this.boardSizeChange = null;
+    const restored = this.changeBoardSize(restoreColumns, restoreRows, {
+      reason: 'boardSizeRestore',
+    });
+    this.message = `Board restored to ${restored.columns} × ${restored.rows}.`;
+  }
+
   advanceFixedTargetTurns() {
     if (!this.fixedTarget || this.fixedTarget.turnsRemaining <= 0) return;
     this.fixedTarget.turnsRemaining = Math.max(0, this.fixedTarget.turnsRemaining - 1);
@@ -4084,6 +4239,7 @@ export class PuzzleEngine {
     return {
       coordinateSystem: `board origin top-left; rows 0-${this.rows - 1} downward; columns 0-${this.columns - 1} rightward`,
       boardDimensions: { rows: this.rows, columns: this.columns },
+      boardSizeCode: ((this.rows << 4) | this.columns) & 0xff,
       moveAdjacency: this.allowDiagonalMoves ? 'eight-way' : 'orthogonal',
       mode: this.mode,
       phase: this.phase,
@@ -4128,6 +4284,7 @@ export class PuzzleEngine {
       attributeBlock: this.attributeBlock ? { ...this.attributeBlock } : null,
       maxHpChange: this.maxHpChange ? { ...this.maxHpChange } : null,
       fixedTarget: this.fixedTarget ? { ...this.fixedTarget } : null,
+      boardSizeChange: this.boardSizeChange ? { ...this.boardSizeChange } : null,
       board: this.board.map((row) => row.map((orb) => ORB_BY_ID[orb.type].code).join('')),
       boardState: this.board.map((row) => row.map((orb) => ({
         code: ORB_BY_ID[orb.type].code,

@@ -34,6 +34,7 @@ import {
   PAD_ENEMY_SKILL_FIXED_SPINNERS,
   PAD_ENEMY_SKILL_MAX_HP_CHANGE,
   PAD_ENEMY_SKILL_FIXED_TARGET,
+  PAD_ENEMY_SKILL_BOARD_SIZE_CHANGE,
   PAD_ENEMY_SKILL_BRANCH_COMBO,
   PAD_ENEMY_SKILL_BRANCH_ATTACK_ATTRIBUTES,
   PAD_ENEMY_SKILL_BRANCH_SKILL_USE,
@@ -383,11 +384,40 @@ assert.deepEqual(decodePadEnemySkillRuntime(blackFallSkillDefinition, blackFallM
   packedDuration: 3,
   rawChance: 7_500,
 });
-new DataView(blackFallSkillDefinition.buffer).setInt16(4, 126, true);
-assert.deepEqual(decodePadEnemySkillRuntime(blackFallSkillDefinition, blackFallMonsterRuntime), {
-  type: 126,
-  kind: 'unsupported',
-  supported: false,
+const boardSizeSkillDefinition = new Uint8Array(0x48);
+const boardSizeSkillView = new DataView(boardSizeSkillDefinition.buffer);
+boardSizeSkillView.setInt16(0x04, PAD_ENEMY_SKILL_BOARD_SIZE_CHANGE, true);
+boardSizeSkillView.setInt32(0x10, 7, true);
+boardSizeSkillView.setInt32(0x14, 2, true);
+boardSizeSkillView.setInt32(0x18, 99, true);
+boardSizeSkillView.setInt32(0x44, 125, true);
+const boardSizeMonsterRuntime = new Uint8Array(0x684);
+const boardSizeMonsterView = new DataView(boardSizeMonsterRuntime.buffer);
+boardSizeMonsterView.setInt32(0x678, 9, true);
+boardSizeMonsterView.setInt32(0x67c, 2, true);
+boardSizeMonsterView.setInt32(0x680, 99, true);
+assert.deepEqual(decodePadEnemySkillDefinition(boardSizeSkillDefinition), {
+  type: PAD_ENEMY_SKILL_BOARD_SIZE_CHANGE,
+  kind: 'boardSizeChange',
+  supported: true,
+  durationTurns: 7,
+  boardSizeSelector: 2,
+  columns: 5,
+  rows: 4,
+  boardSizeCode: 0x45,
+  attackWithSkillValue: 125,
+});
+assert.deepEqual(decodePadEnemySkillRuntime(boardSizeSkillDefinition, boardSizeMonsterRuntime), {
+  type: PAD_ENEMY_SKILL_BOARD_SIZE_CHANGE,
+  kind: 'boardSizeChange',
+  supported: true,
+  durationTurns: 9,
+  boardSizeSelector: 2,
+  columns: 5,
+  rows: 4,
+  boardSizeCode: 0x45,
+  setupMaterialized: true,
+  attackWithSkillValue: 125,
 });
 new DataView(blackFallSkillDefinition.buffer).setInt16(4, PAD_ENEMY_SKILL_BLACK_FALL, true);
 const authoredBlackFallDefinition = new Uint8Array(0x48);
@@ -1658,6 +1688,65 @@ assert.deepEqual(
   decodePadEnemySkillRuntime(enemyAiFixedTargetDefinition, new Uint8Array(0x680)),
   expectedFixedTargetDefinition,
 );
+const enemyAiBoardSizeDefinition = enemyAiBlackFallDefinition.slice();
+const enemyAiBoardSizeView = new DataView(enemyAiBoardSizeDefinition.buffer);
+enemyAiBoardSizeView.setUint32(0x00, 9_093, true);
+enemyAiBoardSizeView.setInt16(0x04, PAD_ENEMY_SKILL_BOARD_SIZE_CHANGE, true);
+enemyAiBoardSizeView.setInt32(0x10, 7, true);
+enemyAiBoardSizeView.setInt32(0x14, 2, true);
+enemyAiBoardSizeView.setInt32(0x44, 125, true);
+const expectedBoardSizeDefinition = {
+  type: PAD_ENEMY_SKILL_BOARD_SIZE_CHANGE,
+  kind: 'boardSizeChange',
+  supported: true,
+  durationTurns: 7,
+  boardSizeSelector: 2,
+  columns: 5,
+  rows: 4,
+  boardSizeCode: 0x45,
+  attackWithSkillValue: 125,
+};
+assert.deepEqual(
+  decodePadEnemySkillDefinition(enemyAiBoardSizeDefinition),
+  expectedBoardSizeDefinition,
+);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiBoardSizeDefinition, boardSizeMonsterRuntime),
+  {
+    ...expectedBoardSizeDefinition,
+    durationTurns: 9,
+    setupMaterialized: true,
+  },
+);
+const boardSizeAiMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(boardSizeAiMonsterDefinition.buffer).setUint32(0xec, 9_093, true);
+const selectedBoardSizeAi = selectPadEnemyAiNew(
+  decodePadEnemyAiMonsterDefinition(boardSizeAiMonsterDefinition),
+  [decodePadEnemyAiSkillDefinition(enemyAiBoardSizeDefinition)],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    boardSizeCode: 0x45,
+    rngState: 21_900,
+  },
+);
+assert.equal(selectedBoardSizeAi.skillId, 9_093);
+assert.equal(selectedBoardSizeAi.effect.boardSizeCode, 0x45);
+assert.equal(selectedBoardSizeAi.rngState, 394_448_415);
+const blockedBoardSizeAi = selectPadEnemyAiNew(
+  decodePadEnemyAiMonsterDefinition(boardSizeAiMonsterDefinition),
+  [decodePadEnemyAiSkillDefinition(enemyAiBoardSizeDefinition)],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    boardSizeCode: 0x56,
+    rngState: 21_900,
+  },
+);
+assert.equal(blockedBoardSizeAi.skillId, null);
+assert.equal(blockedBoardSizeAi.rngState, 21_900);
 const enemyAiBranchComboDefinition = enemyAiFixedTargetDefinition.slice();
 const enemyAiBranchComboView = new DataView(enemyAiBranchComboDefinition.buffer);
 enemyAiBranchComboView.setUint32(0x00, 9_093, true);
@@ -6557,6 +6646,54 @@ directFixedTargetEngine.applyEnemySkillRecord(expectedFixedTargetDefinition, 1);
 directFixedTargetEngine.enemies[1].hp = 0;
 assert.notEqual(directFixedTargetEngine.chooseAttackTarget('fire', 1_000), 1);
 assert.equal(directFixedTargetEngine.snapshot().fixedTarget, null);
+
+const directBoardSizeEngine = new PuzzleEngine({ seed: 21_900 });
+directBoardSizeEngine.setBoardFromCodes([
+  'RBGHLD',
+  'GLDBHR',
+  'BHRDGL',
+  'DLGRHB',
+  'HRBGLD',
+]);
+const preservedBoardOrb = directBoardSizeEngine.board[4][5];
+directBoardSizeEngine.setRngState(21_900);
+assert.equal(directBoardSizeEngine.applyEnemySkillRecord(expectedBoardSizeDefinition), true);
+let directBoardSizeState = directBoardSizeEngine.snapshot();
+assert.deepEqual(directBoardSizeState.boardDimensions, { rows: 4, columns: 5 });
+assert.equal(directBoardSizeState.boardSizeCode, 0x45);
+assert.deepEqual(directBoardSizeState.boardSizeChange, {
+  turnsRemaining: 7,
+  boardSizeSelector: 2,
+  columns: 5,
+  rows: 4,
+  boardSizeCode: 0x45,
+  restoreColumns: 6,
+  restoreRows: 5,
+});
+assert.equal(directBoardSizeEngine.board.length, 4);
+assert.equal(directBoardSizeEngine.board[0].length, 5);
+// Type 126 sets the native skip bit, so its authored duration is not consumed
+// by the same post-enemy boundary that applied the skill.
+directBoardSizeEngine.advanceBoardSizeChangeTurnsPostEnemyAttack();
+assert.equal(directBoardSizeEngine.snapshot().boardSizeChange.turnsRemaining, 7);
+for (let index = 0; index < 7; index += 1) {
+  directBoardSizeEngine.advanceBoardSizeChangeTurnsPostEnemyAttack();
+}
+directBoardSizeState = directBoardSizeEngine.snapshot();
+assert.deepEqual(directBoardSizeState.boardDimensions, { rows: 5, columns: 6 });
+assert.equal(directBoardSizeState.boardSizeCode, 0x56);
+assert.equal(directBoardSizeState.boardSizeChange, null);
+assert.equal(directBoardSizeEngine.board[4][5], preservedBoardOrb);
+
+const zeroTurnBoardSizeEngine = new PuzzleEngine({ seed: 21_900 });
+assert.equal(zeroTurnBoardSizeEngine.applyEnemySkillRecord({
+  ...expectedBoardSizeDefinition,
+  durationTurns: 0,
+}), true);
+assert.deepEqual(zeroTurnBoardSizeEngine.snapshot().boardDimensions, { rows: 4, columns: 5 });
+zeroTurnBoardSizeEngine.advanceBoardSizeChangeTurnsPostEnemyAttack();
+assert.deepEqual(zeroTurnBoardSizeEngine.snapshot().boardDimensions, { rows: 5, columns: 6 });
+assert.equal(zeroTurnBoardSizeEngine.snapshot().boardSizeChange, null);
 
 const fixedTargetMonster0 = enemyAiMonsterDefinition.slice();
 const fixedTargetMonster1 = enemyAiMonsterDefinition.slice();

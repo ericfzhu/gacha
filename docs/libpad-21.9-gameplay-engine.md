@@ -154,8 +154,9 @@ Board dimensions are runtime state rather than a hard-coded 6-by-5 assumption.
 game-work offset `0x877f4`. The browser engine therefore accepts dimensions up
 to the native packed limit of 15 and passes them through input traversal,
 matching, skills, falls, refills, validation, and snapshots. The visible lab
-continues to start in the normal 6-by-5 layout and exposes the native 7-by-6
-layout through its board-size control.
+continues to start in the normal 6-by-5 layout and exposes the native 5-by-4
+and 7-by-6 layouts through its board-size control; type-126 skill transitions
+use the same live renderer and preserve the hidden backing cells for restore.
 
 Skyfall type selection is centralized in `_spawnNewBlock(uint32 &, uint32)` at
 `0x661978`. With no active drop-rate lanes it consumes one saved LCG step and
@@ -1551,6 +1552,29 @@ target, so another enemy can replace the lock. The browser preserves this
 replacement rule, disables manual retargeting while active, clears a dead
 target, renders the persistent target ring/status, and snapshots the remaining
 lifetime and enemy index.
+
+Enemy skill type `126` changes the active board layout. Its dispatch, generic
+setup, and condition entries resolve to `0x62a7b4`, `0x6217c0`, and `0x61a8f4`.
+The second authored parameter selects the native dimensions: selector `3`
+means six columns by five rows (`0x56`), selector `2` means five columns by
+four rows (`0x45`), and selector `1` (or any other value) means seven columns
+by six rows (`0x67`). The dispatch calls `cGAMEMAIN::_chgBoardSizeTo` only when
+the protected board-transition gate permits it, then replaces the low ten bits
+of `sGAMEWORK+0x77e0` with definition `+0x10`, sets fresh bit `0x400`, and
+clears transition bit `0x800`.
+
+The new-AI condition is intentionally an exact-layout predicate rather than an
+“already different” check: it requires the protected gate and compares the
+current low byte of `sGAMEWORK+0x77f4` against the selector's code (`0x56`,
+`0x45`, or `0x67`). `_doOnPostEnemyAttack` clears the fresh bit without
+decrementing on the same boundary that applied the skill; later enemy
+boundaries decrement the signed low-ten-bit count and restore the dimensions
+captured at `cGAMEMAIN::init` (`+0x72/+0x73`) once the count is at most `0x3f`.
+The browser keeps hidden cells in an archive while a temporary layout is
+active, so a restore exposes the original orb objects and their lock/blind/
+spinner/enhancement state instead of rerolling them. Zero-duration records are
+left active until the next post-enemy boundary, matching the native immediate
+restore path.
 
 Enemy skill type `113` is a combo-dependent branch in a monster's enemy-skill
 list, not an executable attack. Its ordinary dispatch, setup, and condition

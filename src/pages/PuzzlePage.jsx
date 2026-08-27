@@ -15,6 +15,7 @@ let activePadOrbAtlas = null;
 let activePadMonsterArt = [];
 
 const BOARD_PRESETS = Object.freeze({
+  compact: { columns: 5, rows: 4, label: '5 × 4' },
   normal: { columns: 6, rows: 5, label: '6 × 5' },
   expanded: { columns: 7, rows: 6, label: '7 × 6' },
 });
@@ -546,6 +547,16 @@ function render(ctx, engine) {
     ctx.font = '700 9px "Barlow Condensed", sans-serif';
     ctx.fillText(
       `TARGET ${enemy?.name?.toUpperCase() || engine.fixedTarget.enemyIndex} · ${engine.fixedTarget.turnsRemaining}T`,
+      434,
+      playerStatusY,
+    );
+    playerStatusY += 12;
+  }
+  if (engine.boardSizeChange?.turnsRemaining > 0) {
+    ctx.fillStyle = '#b7d8ff';
+    ctx.font = '700 9px "Barlow Condensed", sans-serif';
+    ctx.fillText(
+      `BOARD ${engine.columns}×${engine.rows} · ${engine.boardSizeChange.turnsRemaining}T`,
       434,
       playerStatusY,
     );

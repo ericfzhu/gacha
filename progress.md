@@ -2,6 +2,21 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-28 board-size change (type 126)
+
+- Recovered native `ESChangeBoardSize` dispatch `0x62a7b4`, generic setup
+  `0x6217c0`, exact-layout AI condition `0x61a8f4`, and the post-enemy expiry
+  path in `_doOnPostEnemyAttack`.
+- Selector `3` maps to 6×5 (`0x56`), selector `2` to 5×4 (`0x45`), and the
+  default branch to 7×6 (`0x67`). The browser now decodes authored/runtime
+  records, selects the native layout predicate, resizes the live matrix,
+  preserves hidden orb objects across temporary layouts, and restores the
+  base dimensions captured at initialization after the native fresh-bit skip
+  and low-ten-bit countdown.
+- Added direct, zero-duration, AI-selection, archive/restore, and native
+  instruction-anchor fixtures. Gameplay-rule tests, browser rendering, build,
+  and exact restored-APK smoke validation all pass for this increment.
+
 ## 2026-08-28 binary-port startup latency
 
 - Kept module tracepoints enabled for every protected hand-off (the exact

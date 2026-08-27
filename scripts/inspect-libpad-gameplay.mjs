@@ -738,6 +738,45 @@ const FIXED_TARGET_INSTRUCTION_ANCHORS = Object.freeze([
   [0x654620, 0x528ee809], // address the status when its target disappears
   [0x654630, 0x3216014a], // clear duration and mark the transition fresh
 ]);
+const BOARD_SIZE_CHANGE_ENEMY_SKILL_TYPE = 126;
+const BOARD_SIZE_CHANGE_HANDLER = 0x62a7b4;
+const BOARD_SIZE_CHANGE_SETUP_HANDLER = 0x6217c0;
+const BOARD_SIZE_CHANGE_CONDITION_HANDLER = 0x61a8f4;
+const BOARD_SIZE_CHANGE_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x62a7b4, 0xb94016a8], // load the authored board-size selector +0x14
+  [0x62a7b8, 0x71000d1f], // selector three chooses the 6x5 layout
+  [0x62a7c8, 0x52800082], // selector two supplies four rows
+  [0x62a7cc, 0x528000a1], // selector two supplies five columns
+  [0x62bba8, 0x528000a2], // default/selector one supplies five rows
+  [0x62bbac, 0x528000c1], // default/selector one supplies six columns
+  [0x62bbb4, 0x528000c2], // default branch supplies six rows
+  [0x62bbb8, 0x528000e1], // default branch supplies seven columns
+  [0x62bbcc, 0x38696908], // inspect board-transition status bit three
+  [0x62bbd0, 0x361800e8], // skip the redundant board resize when dimensions match
+  [0x62bbf0, 0x97f36ec0], // call cGAMEMAIN::_chgBoardSizeTo
+  [0x62bc2c, 0x7869690a], // load status word +0x77e0
+  [0x62bc34, 0x3300256a], // replace its low-ten-bit duration
+  [0x62bc38, 0x3216014a], // mark the freshly applied transition bit
+  [0x62bc48, 0x1214794a], // clear the transition-in-progress bit
+  [0x61a8f4, 0x79445108], // condition loads the protected board gate
+  [0x61a910, 0xb9401668], // condition loads selector +0x14
+  [0x61c1d4, 0x3941c288], // selector three checks active width six
+  [0x61c1e0, 0x3941c688], // selector three checks active height five
+  [0x61c1f0, 0x3941c288], // selector two checks active width five
+  [0x61c1fc, 0x3941c688], // selector two checks active height four
+  [0x61c21c, 0x12001c08], // selector three reads status code low byte
+  [0x61c220, 0x7101591f], // selector three requires board code 0x56
+  [0x61c23c, 0x12001c08], // selector two reads status code low byte
+  [0x61c240, 0x7101151f], // selector two requires board code 0x45
+  [0x678eb0, 0x7940012a], // post-enemy phase loads board status
+  [0x678ec4, 0x375000aa], // fresh bit skips the same-boundary decrement
+  [0x678ed8, 0x12157948], // clear the fresh bit after the boundary
+  [0x678eec, 0x78696909], // reread the remaining board duration
+  [0x678ef8, 0x7100fd3f], // restore once the low-ten-bit count is <= 63
+  [0x678f00, 0x39c1ca61], // restore the base width from +0x72
+  [0x678f04, 0x39c1ce62], // restore the base height from +0x73
+  [0x678f10, 0x97f239f8], // call cGAMEMAIN::_chgBoardSizeTo for restore
+]);
 const COMBO_BRANCH_ENEMY_SKILL_TYPE = 113;
 const COMBO_BRANCH_HANDLER = 0x62be50;
 const COMBO_BRANCH_SETUP_HANDLER = 0x621c94;
@@ -2216,6 +2255,31 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : fixedTargetConditionTarget === FIXED_TARGET_CONDITION_HANDLER;
   const fixedTargetInstructionAnchorsMatch = restoredElf === null ? null
     : FIXED_TARGET_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
+  const boardSizeChangeDispatchTarget = resolveEnemySkillTarget(
+    BOARD_SIZE_CHANGE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const boardSizeChangeSetupTarget = resolveEnemySkillTarget(
+    BOARD_SIZE_CHANGE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const boardSizeChangeConditionTarget = resolveEnemySkillTarget(
+    BOARD_SIZE_CHANGE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const boardSizeChangeDispatchMatches = boardSizeChangeDispatchTarget === null
+    ? null : boardSizeChangeDispatchTarget === BOARD_SIZE_CHANGE_HANDLER;
+  const boardSizeChangeSetupMatches = boardSizeChangeSetupTarget === null
+    ? null : boardSizeChangeSetupTarget === BOARD_SIZE_CHANGE_SETUP_HANDLER;
+  const boardSizeChangeConditionMatches = boardSizeChangeConditionTarget === null
+    ? null : boardSizeChangeConditionTarget === BOARD_SIZE_CHANGE_CONDITION_HANDLER;
+  const boardSizeChangeInstructionAnchorsMatch = restoredElf === null ? null
+    : BOARD_SIZE_CHANGE_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
   const comboBranchDispatchTarget = resolveEnemySkillTarget(
@@ -3725,7 +3789,11 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     layout: {
       boardColumnsOffset: 'cGAMEMAIN+0x70',
       boardRowsOffset: 'cGAMEMAIN+0x71',
+      boardBaseColumnsOffset: 'cGAMEMAIN+0x72',
+      boardBaseRowsOffset: 'cGAMEMAIN+0x73',
       diagonalModeOffset: 'cGAMEMAIN+0x75',
+      boardStatusDurationOffset: 'sGAMEWORK+0x77e0 (low 10 bits; fresh bit 0x400; transition bit 0x800)',
+      boardStatusCodeOffset: 'sGAMEWORK+0x77f4 (low byte rows<<4 | columns)',
       boardBackingIndex: 'column + (row << 4)',
       blockTypeOffset: 'sBLOCK+0x00 (signed byte)',
       blockFlagsOffset: 'sBLOCK+0x04 (uint32)',
@@ -4353,6 +4421,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       fixedTargetInstructionAnchorsMatch21_9: fixedTargetInstructionAnchorsMatch,
       fixedTargetSemantics:
         'type 112 installs low-ten-bit +0x10 duration at +0x87740 and the acting monster index at +0x87744, forcing ordinary card attacks to that live enemy; condition rejects only the same active target and permits a different actor to replace it, _calcCards clears the status when the target disappears, and _incEneTurn clears the published index on expiry; no RNG is consumed',
+      boardSizeChangeType: BOARD_SIZE_CHANGE_ENEMY_SKILL_TYPE,
+      boardSizeChangeDispatchTarget: boardSizeChangeDispatchTarget === null
+        ? null : hex(boardSizeChangeDispatchTarget),
+      boardSizeChangeDispatchMatches21_9: boardSizeChangeDispatchMatches,
+      boardSizeChangeSetupTarget: boardSizeChangeSetupTarget === null
+        ? null : hex(boardSizeChangeSetupTarget),
+      boardSizeChangeSetupMatches21_9: boardSizeChangeSetupMatches,
+      boardSizeChangeConditionTarget: boardSizeChangeConditionTarget === null
+        ? null : hex(boardSizeChangeConditionTarget),
+      boardSizeChangeConditionMatches21_9: boardSizeChangeConditionMatches,
+      boardSizeChangeInstructionAnchorsMatch21_9: boardSizeChangeInstructionAnchorsMatch,
+      boardSizeChangeSemantics:
+        'type 126 selects 6x5 for selector 3, 5x4 for selector 2, and 7x6 otherwise; execution calls _chgBoardSizeTo, replaces the low-ten-bit duration at sGAMEWORK+0x77e0, sets fresh bit 0x400, and clears transition bit 0x800; condition requires the protected status gate and exact active board code 0x56/0x45/0x67; _doOnPostEnemyAttack skips the same-boundary decrement, then decrements and restores the base dimensions captured at +0x72/+0x73 when the signed count reaches the <=0x3f restore threshold',
       comboBranchType: COMBO_BRANCH_ENEMY_SKILL_TYPE,
       comboBranchDispatchTarget: comboBranchDispatchTarget === null
         ? null : hex(comboBranchDispatchTarget),

@@ -96,6 +96,10 @@ export const PAD_ENEMY_SKILL_REMAINING_ENEMIES_TURN_CHANGE = 122;
 // Type 123 shares type 119's immunity timer but selects the alternate native
 // presentation controller (+0x9b0 = 1) when it is applied.
 export const PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_ALT = 123;
+// Type 126 changes the active board dimensions.  The native handler selects
+// one of the three supported PAD layouts from its second authored parameter:
+// 1 => 7×6, 2 => 5×4, and 3 => 6×5.
+export const PAD_ENEMY_SKILL_BOARD_SIZE_CHANGE = 126;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -141,6 +145,16 @@ function decodeBlackFallRuntime(type, packedDuration, rawChance) {
     packedDuration,
     rawChance,
   });
+}
+
+// _doEnemySkill's type-126 dispatch at 0x62a7b4 selects these dimensions from
+// sENESKILLS+0x14.  Its default branch is the 7×6 layout, matching native even
+// for an out-of-range selector.
+export function padEnemyBoardSizeFromSelector(selector) {
+  const value = Math.trunc(Number(selector) || 0);
+  if (value === 3) return Object.freeze({ columns: 6, rows: 5, boardSizeCode: 0x56 });
+  if (value === 2) return Object.freeze({ columns: 5, rows: 4, boardSizeCode: 0x45 });
+  return Object.freeze({ columns: 7, rows: 6, boardSizeCode: 0x67 });
 }
 
 // _setupEnemyAttackSub's type-128 entry at 0x6211a0 copies the first authored
@@ -553,6 +567,21 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       kind: 'fixedTarget',
       supported: true,
       durationTurns: definition.getInt32(0x10, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_BOARD_SIZE_CHANGE) {
+    requireLength(definitionBytes, 0x18, 'PAD enemy-skill definition');
+    const durationTurns = definition.getInt32(0x10, true);
+    const boardSizeSelector = definition.getInt32(0x14, true);
+    const boardSize = padEnemyBoardSizeFromSelector(boardSizeSelector);
+    return Object.freeze({
+      type,
+      kind: 'boardSizeChange',
+      supported: true,
+      durationTurns,
+      boardSizeSelector,
+      ...boardSize,
       attackWithSkillValue,
     });
   }
@@ -1750,6 +1779,24 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
   if (type === PAD_ENEMY_SKILL_FIXED_TARGET) {
     return decodePadEnemySkillDefinition(definitionBytes);
   }
+  if (type === PAD_ENEMY_SKILL_BOARD_SIZE_CHANGE) {
+    const durationTurns = monster.getInt32(0x678, true);
+    const boardSizeSelector = monster.getInt32(0x67c, true);
+    const boardSize = padEnemyBoardSizeFromSelector(boardSizeSelector);
+    return Object.freeze({
+      type,
+      kind: 'boardSizeChange',
+      supported: true,
+      durationTurns,
+      boardSizeSelector,
+      ...boardSize,
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_BRANCH_COMBO) {
     // The branch operands belong to the monster's eight-byte skill-reference
     // slot, not the sENESKILLS definition or sMONSTER runtime scratch area.
@@ -2791,6 +2838,22 @@ export function normalizePadEnemySkillRecord(record) {
       kind: 'fixedTarget',
       supported: record?.supported !== false,
       durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)) & 0x3ff,
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_BOARD_SIZE_CHANGE || record?.kind === 'boardSizeChange') {
+    const boardSizeSelector = Math.trunc(Number(record?.boardSizeSelector) || 0);
+    const boardSize = padEnemyBoardSizeFromSelector(boardSizeSelector);
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_BOARD_SIZE_CHANGE,
+      kind: 'boardSizeChange',
+      supported: record?.supported !== false,
+      durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)) & 0x3ff,
+      boardSizeSelector,
+      ...boardSize,
+      setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null
         : Math.trunc(Number(record.attackWithSkillValue)),

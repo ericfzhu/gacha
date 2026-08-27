@@ -33,6 +33,7 @@ import {
   PAD_ENEMY_SKILL_FIXED_SPINNERS,
   PAD_ENEMY_SKILL_MAX_HP_CHANGE,
   PAD_ENEMY_SKILL_FIXED_TARGET,
+  PAD_ENEMY_SKILL_BOARD_SIZE_CHANGE,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -216,6 +217,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_FIXED_SPINNERS,
     PAD_ENEMY_SKILL_MAX_HP_CHANGE,
     PAD_ENEMY_SKILL_FIXED_TARGET,
+    PAD_ENEMY_SKILL_BOARD_SIZE_CHANGE,
     PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
     PAD_ENEMY_SKILL_DEFENSE_BOOST,
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -656,6 +658,27 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
         !== Math.trunc(Number(state.actingEnemyIndex) || 0);
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
+  if (definition.effect.type === PAD_ENEMY_SKILL_BOARD_SIZE_CHANGE) {
+    // Type 126's 0x61a8f4 callback admits the skill only when the current
+    // native board-size code already equals its selector's target code:
+    // 0x67 (7×6), 0x45 (5×4), or 0x56 (6×5).  The preceding protected status
+    // gate is represented by the engine's current board-size state; no RNG is
+    // consumed by this callback.
+    const selector = Math.trunc(Number(definition.effect.boardSizeSelector) || 0);
+    const targetCode = selector === 3
+      ? 0x56
+      : selector === 2
+        ? 0x45
+        : selector === 1
+          ? 0x67
+          : 0;
+    const currentCode = state.boardSizeCode !== undefined
+      ? Math.trunc(Number(state.boardSizeCode) || 0) & 0xff
+      : ((Math.trunc(Number(state.boardRows) || 0) << 4)
+        | (Math.trunc(Number(state.boardColumns) || 0))) & 0xff;
+    const eligible = targetCode !== 0 && currentCode === targetCode;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
   if (definition.effect.type === PAD_ENEMY_SKILL_CLOUD) {
     const eligible = !state.cloudActive;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
@@ -766,6 +789,12 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     maxHpChangeParameter: Math.trunc(Number(state.maxHpChangeParameter) || 0),
     fixedTargetTurns: Math.max(0, Math.trunc(Number(state.fixedTargetTurns) || 0)),
     fixedTargetEnemyIndex: Math.trunc(Number(state.fixedTargetEnemyIndex) || 0),
+    boardColumns: Math.max(0, Math.trunc(Number(state.boardColumns) || 0)),
+    boardRows: Math.max(0, Math.trunc(Number(state.boardRows) || 0)),
+    boardSizeCode: state.boardSizeCode === undefined
+      ? ((Math.trunc(Number(state.boardRows) || 0) << 4)
+        | Math.trunc(Number(state.boardColumns) || 0)) & 0xff
+      : Math.trunc(Number(state.boardSizeCode) || 0) & 0xff,
     actingEnemyIndex: Math.trunc(Number(state.actingEnemyIndex) || 0),
     attributeAbsorbTurns: Math.max(0, Math.trunc(Number(state.attributeAbsorbTurns) || 0)),
     comboAbsorbTurns: Math.max(0, Math.trunc(Number(state.comboAbsorbTurns) || 0)),
