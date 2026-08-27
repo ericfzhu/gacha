@@ -303,6 +303,33 @@ function isPadReviveCandidate(enemy) {
     && (Boolean(enemy.unavailable) || Number(enemy.hp) <= 0);
 }
 
+const PAD_LEADER_SWAP_SUB_INDICES = Object.freeze([1, 2, 3, 4]);
+
+function hasPadLeaderSwapCandidateMetadata(party) {
+  return Array.isArray(party)
+    && PAD_LEADER_SWAP_SUB_INDICES.every((index) => (
+      Boolean(party[index])
+      && Object.prototype.hasOwnProperty.call(party[index], 'leaderSwapEligible')
+    ));
+}
+
+function padLeaderSwapCandidateStatePresent(state) {
+  return state?.leaderSwapCandidateStatePresent === true
+    || hasPadLeaderSwapCandidateMetadata(state?.party);
+}
+
+function padLeaderSwapCandidateCount(state) {
+  if (hasPadLeaderSwapCandidateMetadata(state?.party)) {
+    return PAD_LEADER_SWAP_SUB_INDICES.reduce((count, index) => {
+      const member = state.party[index];
+      return count + Number(
+        member.present !== false && Boolean(member.leaderSwapEligible),
+      );
+    }, 0);
+  }
+  return Math.max(0, Math.trunc(Number(state?.leaderSwapCandidateCount) || 0));
+}
+
 function isStaticallyEligible(definition, state) {
   if (!isSupportedDefinition(definition)) return false;
   if (definition.budgetCost > state.aiBudget) return false;
@@ -530,7 +557,7 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
   if (definition.effect.type === PAD_ENEMY_SKILL_LEADER_SWAP) {
     // 0x61ab74 calls the native changeable-sub counter and only checks whether
     // it is positive. Target selection belongs to setup and consumes RNG later.
-    const eligible = state.leaderSwapTurns <= 0 && state.leaderSwapCandidateCount > 0;
+    const eligible = state.leaderSwapTurns <= 0 && padLeaderSwapCandidateCount(state) > 0;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_LEADER_ALTER) {
@@ -861,8 +888,9 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     leaderSwapTurns: Math.max(0, Math.trunc(Number(state.leaderSwapTurns) || 0)),
     leaderSwapCandidateCount: Math.max(
       0,
-      Math.trunc(Number(state.leaderSwapCandidateCount) || 0),
+      padLeaderSwapCandidateCount(state),
     ),
+    leaderSwapCandidateStatePresent: padLeaderSwapCandidateStatePresent(state),
     leaderAlterTurns: Math.max(0, Math.trunc(Number(state.leaderAlterTurns) || 0)),
     leaderAlterTargetCardId: state.leaderAlterTargetCardId == null
       ? null
@@ -1053,7 +1081,8 @@ function normalizeLegacySelectorState(state, monster) {
     enemyDamageShieldTurns: nonNegative(state.enemyDamageShieldTurns),
     enemyDamageImmunityTurns: nonNegative(state.enemyDamageImmunityTurns),
     leaderSwapTurns: nonNegative(state.leaderSwapTurns),
-    leaderSwapCandidateCount: nonNegative(state.leaderSwapCandidateCount),
+    leaderSwapCandidateCount: nonNegative(padLeaderSwapCandidateCount(state)),
+    leaderSwapCandidateStatePresent: padLeaderSwapCandidateStatePresent(state),
     leaderAlterTurns: nonNegative(state.leaderAlterTurns),
     leaderAlterTargetCardId: state.leaderAlterTargetCardId == null
       ? null
@@ -1405,11 +1434,15 @@ function legacyFallbackBuiltinScale(definition, state) {
   if (type === 75) {
     // The helper at 0x322250 returns the count of currently changeable party
     // members. The compact state exposes the same count and active duration.
-    const eligible = state.leaderSwapTurns <= 0 && state.leaderSwapCandidateCount > 0;
+    const candidateCount = padLeaderSwapCandidateCount(state);
+    const exact = padLeaderSwapCandidateStatePresent(state);
+    const eligible = state.leaderSwapTurns <= 0 && candidateCount > 0;
     return {
       scale: eligible ? Math.fround(1) : Math.fround(0),
-      exact: false,
-      mode: eligible ? 'leader-swap-candidates' : 'leader-swap-unavailable',
+      exact,
+      mode: eligible
+        ? exact ? 'leader-swap-candidates' : 'leader-swap-candidates-missing-state'
+        : exact ? 'leader-swap-unavailable' : 'leader-swap-unavailable-missing-state',
     };
   }
   if (type === 87) {

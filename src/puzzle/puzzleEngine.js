@@ -1530,6 +1530,10 @@ export class PuzzleEngine {
       enemyDamageImmunityPresentation: enemy.damageImmunityPresentation,
       leaderSwapTurns: this.leaderSwapTurns,
       leaderSwapCandidateCount: this.leaderSwapCandidateIndices().length,
+      leaderSwapCandidateStatePresent: [1, 2, 3, 4].every((index) => (
+        Boolean(this.party[index])
+        && Object.prototype.hasOwnProperty.call(this.party[index], 'leaderSwapEligible')
+      )),
       leaderAlterTurns: this.leaderAlterRule?.active
         ? Math.max(0, Math.trunc(Number(this.leaderAlterRule.turnsRemaining) || 0))
         : 0,
@@ -1578,6 +1582,9 @@ export class PuzzleEngine {
       party: this.party.map((member) => ({
         present: member.present !== false,
         bindTurns: Math.max(0, Math.trunc(Number(member.bindTurns) || 0)),
+        ...(member.leaderSwapEligible === undefined ? {} : {
+          leaderSwapEligible: Boolean(member.leaderSwapEligible),
+        }),
         ...(member.cardId === undefined ? {} : { cardId: member.cardId }),
       })),
       enemies: this.enemies.map((candidate) => ({
@@ -2395,7 +2402,10 @@ export class PuzzleEngine {
 
   leaderSwapCandidateIndices() {
     return [1, 2, 3, 4].filter((index) => (
-      Boolean(this.party[index]) && this.party[index].present !== false
+      Boolean(this.party[index])
+      && this.party[index].present !== false
+      && (this.party[index].leaderSwapEligible === undefined
+        || Boolean(this.party[index].leaderSwapEligible))
     ));
   }
 
@@ -4573,7 +4583,7 @@ export class PuzzleEngine {
         attackBoostTurns: this.playerAttackBoostTurns,
       },
       player: { ...this.player },
-      party: this.party.map(({ id, cardId, name, attribute, secondaryAttribute, tertiaryAttribute, secondaryAttributeChanged = false, monsterTypes = [], addedMonsterTypeMask = 0, attack, recovery, damageCap, helper = false, leaderSkill = null, present = true, bindTurns = 0, bindResist = false, superBindResist = false }) => ({
+      party: this.party.map(({ id, cardId, name, attribute, secondaryAttribute, tertiaryAttribute, secondaryAttributeChanged = false, monsterTypes = [], addedMonsterTypeMask = 0, attack, recovery, damageCap, helper = false, leaderSkill = null, present = true, bindTurns = 0, bindResist = false, superBindResist = false, leaderSwapEligible }) => ({
         id,
         ...(cardId === undefined ? {} : { cardId }),
         name,
@@ -4590,6 +4600,7 @@ export class PuzzleEngine {
         leaderSkill,
         present,
         bindTurns,
+        ...(leaderSwapEligible === undefined ? {} : { leaderSwapEligible: Boolean(leaderSwapEligible) }),
         bindResist,
         superBindResist,
       })),

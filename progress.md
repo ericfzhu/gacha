@@ -2,6 +2,21 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-28 explicit leader-swap candidate metadata
+
+- Kept the native type-75 candidate count separate from its card/evolution
+  metadata boundary. Party records may now expose `leaderSwapEligible` for
+  sub indices 1–4, or a host may assert an already native-equivalent
+  `leaderSwapCandidateStatePresent` count.
+- New and legacy selectors derive the same candidate count from explicit flags;
+  missing metadata keeps the existing present-sub fallback but now reports
+  `legacyFallbackApproximation` instead of implying exact parity. The engine
+  carries the metadata through AI state and snapshots and honors ineligible
+  sub slots during setup.
+- Added exact, no-candidate, and missing-metadata fixtures. The updated
+  browser/engine checks are ready for the full verification pass before the
+  incremental master commit.
+
 ## 2026-08-28 exact legacy revive-slot availability
 
 - Matched the native type-52 candidate predicate: an explicit unavailable

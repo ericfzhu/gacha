@@ -700,15 +700,18 @@ zero-scale lane. The recovered constant-one lanes include types 50, 76–81,
 83–86, 89, and 92. Types 21–38, 47, 49, and 69 resolve to the native zero lane. Exact
 status gates are available for combo absorb (67), inactivity presentation (70),
 damage void (71), damage shield (74), damage absorb (87), attribute absorb (53),
-awakening bind (88), and the candidate-count portion of leader swap (75). The
+awakening bind (88), and the candidate-count portion of leader swap (75) when
+its candidate metadata is explicit. The
 leader/helper lane (54) now reproduces the native eligible-target ratio when
 the compact party records are present. Skyfall rate (68) is exact whenever the
 requested natural and/or hazard status records are supplied as explicit
 `skyfallNaturalTurns`/`skyfallNaturalMask` and
 `skyfallHazardTurns`/`skyfallHazardMask` pairs; omitted pairs remain playable
-but report `legacyFallbackApproximation`. Leader swap, revive, and other lanes
-with unnamed native fields use the same initialized-one fallback and retain
-that diagnostic.
+but report `legacyFallbackApproximation`. Leader swap without explicit
+`leaderSwapEligible` records (or an explicit `leaderSwapCandidateStatePresent`)
+remains playable through the same initialized-one fallback and retains that
+diagnostic; revive is exact under its explicit `unavailable` boundary described
+below.
 
 Hosts that have a fuller `sMONSTER`/`sGAMEWORK` model can provide
 `legacyFallbackCondition(definition, state, context)` or a
@@ -1006,9 +1009,14 @@ change controller, then `_doLeaderChange(sCARD*, int, bool)` exchanges that sub
 with party slot 0. Because leader skills are read from the current slot-0 card,
 the replacement card immediately becomes the leader for damage calculation.
 At expiry the same two slots are exchanged again, restoring the original
-order. The native candidate scan also consults card/evolution metadata not
-present in this compact browser party model; among represented records, the
-browser treats every present sub in indices 1–4 as changeable.
+order. The native candidate scan also consults card/evolution metadata. A
+browser party record may expose `leaderSwapEligible` for each sub index 1–4;
+when all four records are explicit, the selector derives the native candidate
+count from those flags and marks the gate exact. Hosts with only a precomputed
+`leaderSwapCandidateCount` can set `leaderSwapCandidateStatePresent` when that
+count came from a native-equivalent metadata scan. Without either form, the
+compact browser fallback treats every present sub in indices 1–4 as changeable
+but reports `legacyFallbackApproximation`.
 
 The browser reproduces the one-roll setup selection, refuses a second swap
 while one is active, changes slot-0 leader-skill output, counts down before the

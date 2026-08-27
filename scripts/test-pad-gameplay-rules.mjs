@@ -984,6 +984,72 @@ assert.equal(escapedLegacyFallbackRevive.skillId, null);
 assert.equal(escapedLegacyFallbackRevive.rngState, 394_448_415);
 assert.equal(escapedLegacyFallbackRevive.legacyFallbackApproximation, undefined);
 assert.equal(escapedLegacyFallbackRevive.fidelity, 'legacy-fallback-no-selection');
+const legacyFallbackLeaderSwapDefinition = legacyFallbackType50Definition.slice();
+const legacyFallbackLeaderSwapView = new DataView(legacyFallbackLeaderSwapDefinition.buffer);
+legacyFallbackLeaderSwapView.setUint32(0x00, 9_011, true);
+legacyFallbackLeaderSwapView.setInt16(0x04, PAD_ENEMY_SKILL_LEADER_SWAP, true);
+legacyFallbackLeaderSwapView.setInt32(0x10, 3, true);
+const legacyFallbackLeaderSwapMonsterDefinition = legacyFallbackMonsterDefinition.slice();
+new DataView(legacyFallbackLeaderSwapMonsterDefinition.buffer).setUint32(0xec, 9_011, true);
+const decodedLegacyFallbackLeaderSwap = decodePadEnemyAiSkillDefinition(
+  legacyFallbackLeaderSwapDefinition,
+);
+const exactLegacyFallbackLeaderSwap = selectPadEnemyAiLegacy(
+  decodePadEnemyAiMonsterDefinition(legacyFallbackLeaderSwapMonsterDefinition),
+  [decodedLegacyFallbackLeaderSwap],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    leaderSwapTurns: 0,
+    party: Array.from({ length: 6 }, (_, index) => ({
+      present: true,
+      leaderSwapEligible: index === 1 || index === 4,
+    })),
+    rngState: 21_900,
+  },
+);
+assert.equal(exactLegacyFallbackLeaderSwap.skillId, 9_011);
+assert.equal(exactLegacyFallbackLeaderSwap.legacyFallbackScale, 1);
+assert.equal(exactLegacyFallbackLeaderSwap.legacyFallbackApproximation, undefined);
+assert.equal(exactLegacyFallbackLeaderSwap.fidelity, 'legacy-fallback-recovered');
+const noCandidateLegacyFallbackLeaderSwap = selectPadEnemyAiLegacy(
+  decodePadEnemyAiMonsterDefinition(legacyFallbackLeaderSwapMonsterDefinition),
+  [decodedLegacyFallbackLeaderSwap],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    leaderSwapTurns: 0,
+    party: Array.from({ length: 6 }, () => ({
+      present: true,
+      leaderSwapEligible: false,
+    })),
+    rngState: 21_900,
+  },
+);
+assert.equal(noCandidateLegacyFallbackLeaderSwap.skillId, null);
+assert.equal(noCandidateLegacyFallbackLeaderSwap.rngState, 394_448_415);
+assert.equal(noCandidateLegacyFallbackLeaderSwap.legacyFallbackApproximation, undefined);
+assert.equal(noCandidateLegacyFallbackLeaderSwap.fidelity, 'legacy-fallback-no-selection');
+const missingLegacyFallbackLeaderSwap = selectPadEnemyAiLegacy(
+  decodePadEnemyAiMonsterDefinition(legacyFallbackLeaderSwapMonsterDefinition),
+  [decodedLegacyFallbackLeaderSwap],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    leaderSwapTurns: 0,
+    leaderSwapCandidateCount: 2,
+    party: Array.from({ length: 6 }, () => ({ present: true })),
+    rngState: 21_900,
+  },
+);
+assert.equal(missingLegacyFallbackLeaderSwap.skillId, 9_011);
+assert.equal(missingLegacyFallbackLeaderSwap.legacyFallbackScale, 1);
+assert.equal(missingLegacyFallbackLeaderSwap.legacyFallbackApproximation, true);
+assert.deepEqual(missingLegacyFallbackLeaderSwap.approximateFallbackTypes, [75]);
+assert.equal(missingLegacyFallbackLeaderSwap.fidelity, 'legacy-fallback-approximate');
 const legacyFallbackAwakeningBindDefinition = legacyFallbackType50Definition.slice();
 const legacyFallbackAwakeningBindView = new DataView(
   legacyFallbackAwakeningBindDefinition.buffer,
