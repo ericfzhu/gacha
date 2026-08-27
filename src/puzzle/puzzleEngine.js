@@ -158,6 +158,7 @@ import {
   decodePadEnemyAiMonsterDefinition,
   decodePadEnemyAiSkillDefinition,
   evaluatePadEnemyAiSub,
+  selectPadEnemyAiLegacy,
   selectPadEnemyAiNew,
 } from './padEnemyAi.js';
 
@@ -212,8 +213,8 @@ const PARTY = Object.freeze([
 ]);
 
 const ENEMY_TEMPLATE = Object.freeze([
-  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0, damageAbsorbTurns: 0, damageAbsorbThreshold: 0, damageVoidTurns: 0, damageVoidThreshold: 0, damageShieldTurns: 0, damageShieldPercent: 0, damageImmunityTurns: 0, damageImmunityPresentation: 0 },
-  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0, damageAbsorbTurns: 0, damageAbsorbThreshold: 0, damageVoidTurns: 0, damageVoidThreshold: 0, damageShieldTurns: 0, damageShieldPercent: 0, damageImmunityTurns: 0, damageImmunityPresentation: 0 },
+  { id: 'verdant-shell', name: 'Verdant Shell', attribute: 'wood', maxHp: 92000, defense: 120, attack: 1850, maxCounter: 2, scaledAttackGate: 0, aiUseCount: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0, damageAbsorbTurns: 0, damageAbsorbThreshold: 0, damageVoidTurns: 0, damageVoidThreshold: 0, damageShieldTurns: 0, damageShieldPercent: 0, damageImmunityTurns: 0, damageImmunityPresentation: 0 },
+  { id: 'umbra-eye', name: 'Umbra Eye', attribute: 'dark', maxHp: 76000, defense: 90, attack: 1450, maxCounter: 3, scaledAttackGate: 0, aiUseCount: 0, attackBoostTurns: 0, attackBoostPercent: 100, defenseBoostTurns: 0, defenseBoostAmount: 0, attributeNullifyTurns: 0, attributeNullifyMask: 0, damagedTurnCount: 0, transientDebuffActive: false, statusShieldTurns: 0, attributeAbsorbTurns: 0, attributeAbsorbMask: 0, comboAbsorbTurns: 0, comboAbsorbThreshold: 0, damageAbsorbTurns: 0, damageAbsorbThreshold: 0, damageVoidTurns: 0, damageVoidThreshold: 0, damageShieldTurns: 0, damageShieldPercent: 0, damageImmunityTurns: 0, damageImmunityPresentation: 0 },
 ]);
 
 function clamp(value, min, max) {
@@ -313,7 +314,12 @@ export class PuzzleEngine {
     if (!Array.isArray(enemyAiPools)) throw new Error('PAD enemy AI pools must be an array.');
     enemyAiPools.forEach((pool, enemyIndex) => {
       if (pool !== null && pool !== undefined) {
-        this.setEnemyAiDefinitionPool(enemyIndex, pool.monsterDefinition, pool.skillDefinitions);
+        this.setEnemyAiDefinitionPool(
+          enemyIndex,
+          pool.monsterDefinition,
+          pool.skillDefinitions,
+          pool,
+        );
       }
     });
     this.initialPlayerAuxiliaryBuffTurns = Math.max(
@@ -1527,6 +1533,7 @@ export class PuzzleEngine {
       defenseBoostTurns: enemy.defenseBoostTurns,
       attributeNullifyTurns: enemy.attributeNullifyTurns,
       scaledAttackGate: enemy.scaledAttackGate,
+      enemyAiUseCount: enemy.aiUseCount,
       enemyAttackBoostTurns: enemy.attackBoostTurns,
       enemyBaseAttack: enemy.attack,
       enemyDamagedTurnCount: enemy.damagedTurnCount,
@@ -1566,6 +1573,12 @@ export class PuzzleEngine {
       })),
       lockFallRules: this.lockFallRules.map((rule) => ({ ...rule })),
       aiBudget: pool?.aiBudget ?? 0,
+      // The native legacy selector's derived +0x7c0/+0x7d0 baseline (or its
+      // no-damage status-scan value) is not part of the compact enemy model.
+      // A host that has decoded it can provide a per-pool value; the selector
+      // otherwise reports that it inferred a playable fallback from current HP.
+      legacyConditionBase: pool?.legacyConditionBase,
+      legacyConditionForceOne: Boolean(pool?.legacyConditionForceOne),
       blackFallActive: Boolean(this.blackFallRule?.active),
       boardCellCount: this.rows * this.columns,
       blackBlockCount: this.board.reduce((total, row) => total + row.reduce((count, orb) => (
@@ -1757,13 +1770,23 @@ export class PuzzleEngine {
     const pool = this.enemyAiPools[enemyIndex];
     if (!pool) return null;
     if (pool.multiAttack) return this.takeEnemyMultiAttackSkill(enemyIndex, pool);
-    const selection = selectPadEnemyAiNew(
-      pool.monster,
-      pool.definitions,
-      this.enemyAiState(enemyIndex, pool),
-    );
+    const selection = pool.monster.usesNewAi
+      ? selectPadEnemyAiNew(
+        pool.monster,
+        pool.definitions,
+        this.enemyAiState(enemyIndex, pool),
+      )
+      : selectPadEnemyAiLegacy(
+        pool.monster,
+        pool.definitions,
+        this.enemyAiState(enemyIndex, pool),
+      );
     this.rng.setState(selection.rngState);
     pool.aiBudget = selection.aiBudget;
+    // _doEnemyAi increments +0x6c0 after the selector returns.  Keep the
+    // pre-increment value available to the next legacy type-47 callback.
+    const enemy = this.enemies[enemyIndex];
+    if (enemy) enemy.aiUseCount = (Math.trunc(Number(enemy.aiUseCount) || 0) + 1) >>> 0;
     if (selection.effect?.kind === 'multiAttack') {
       pool.multiAttack = {
         parentSkillId: selection.skillId,
@@ -3555,7 +3578,7 @@ export class PuzzleEngine {
     this.enemySkillQueues[index] = { records, position: 0, repeat: Boolean(repeat) };
   }
 
-  setEnemyAiDefinitionPool(enemyIndex, monsterDefinition, skillDefinitions) {
+  setEnemyAiDefinitionPool(enemyIndex, monsterDefinition, skillDefinitions, options = {}) {
     const index = Math.trunc(Number(enemyIndex));
     if (index < 0 || index >= ENEMY_TEMPLATE.length) {
       throw new RangeError(`PAD enemy index must be between 0 and ${ENEMY_TEMPLATE.length - 1}.`);
@@ -3566,14 +3589,13 @@ export class PuzzleEngine {
       return;
     }
     const monster = decodePadEnemyAiMonsterDefinition(monsterDefinition);
-    if (!monster.usesNewAi) throw new Error('PAD legacy enemy AI records are not implemented at this boundary.');
     if (!Array.isArray(skillDefinitions)) throw new TypeError('PAD enemy AI skill definitions must be an array.');
     const definitions = skillDefinitions.map((definition) => decodePadEnemyAiSkillDefinition(definition));
     const definitionsById = new Map(definitions.map((definition) => [definition.skillId, definition]));
     for (const slot of monster.slots) {
       const definition = definitionsById.get(slot.skillId);
       if (!definition) throw new Error(`PAD enemy AI slot ${slot.index} references missing skill ${slot.skillId}.`);
-      if (![
+      const unsupportedLegacyRecord = ![
         PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
         PAD_ENEMY_SKILL_ENTIRE_BLIND,
         PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT,
@@ -3666,7 +3688,12 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_POISON_MASK_SWAP_DIRECT,
         PAD_ENEMY_SKILL_BLOCK_MINUS,
         PAD_ENEMY_SKILL_BUR_DROP,
-      ].includes(definition.effect.type) || !definition.effect.supported) {
+      ].includes(definition.effect.type) || !definition.effect.supported;
+      // The legacy selector intentionally accepts undecoded status/fallback
+      // records so a whole APK pool can be loaded.  Its selection result
+      // reports those records as diagnostics.  Keep the stricter fail-fast
+      // contract for the recovered new-AI path.
+      if (unsupportedLegacyRecord && monster.usesNewAi) {
         throw new Error(`PAD enemy AI skill ${slot.skillId} uses an unsupported condition/effect type.`);
       }
     }
@@ -3676,6 +3703,12 @@ export class PuzzleEngine {
       definitionsById,
       aiBudget: monster.budgetCap,
       multiAttack: null,
+      ...(Number.isFinite(Number(options?.legacyConditionBase))
+        ? { legacyConditionBase: Number(options.legacyConditionBase) }
+        : {}),
+      ...(options?.legacyConditionForceOne
+        ? { legacyConditionForceOne: true }
+        : {}),
     };
     if (this.enemies) this.applyEnemyPassiveSkills(index);
   }
@@ -4540,7 +4573,7 @@ export class PuzzleEngine {
       })),
       targetEnemy: this.targetEnemy,
       manualTarget: this.manualTarget,
-      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, baseMaxCounter = maxCounter, deathResolved = false, escaped = false, scaledAttackGate = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0, damageAbsorbTurns = 0, damageAbsorbThreshold = 0, damageVoidTurns = 0, damageVoidThreshold = 0, damageShieldTurns = 0, damageShieldPercent = 0, damageImmunityTurns = 0, damageImmunityPresentation = 0, attributeResistPercentages = [100, 100, 100, 100, 100], typeDamagePercentages = Array(16).fill(100), resolveThresholdPercent = 0, turnChangeThresholdPercent = 0, turnChangeCounter = 0, turnChangeActive = false, remainingEnemiesTurnChangeThreshold = 0, remainingEnemiesTurnChangeCounter = 0, remainingEnemiesTurnChangeActive = false, remainingEnemiesTurnChangeSkillId = null }, index) => ({
+      enemies: this.enemies.map(({ id, name, attribute, hp, maxHp, counter, maxCounter, baseMaxCounter = maxCounter, deathResolved = false, escaped = false, scaledAttackGate = 0, aiUseCount = 0, attackBoostTurns = 0, attackBoostPercent = 100, defenseBoostTurns = 0, defenseBoostAmount = 0, attributeNullifyTurns = 0, attributeNullifyMask = 0, damagedTurnCount = 0, transientDebuffActive = false, statusShieldTurns = 0, attributeAbsorbTurns = 0, attributeAbsorbMask = 0, comboAbsorbTurns = 0, comboAbsorbThreshold = 0, damageAbsorbTurns = 0, damageAbsorbThreshold = 0, damageVoidTurns = 0, damageVoidThreshold = 0, damageShieldTurns = 0, damageShieldPercent = 0, damageImmunityTurns = 0, damageImmunityPresentation = 0, attributeResistPercentages = [100, 100, 100, 100, 100], typeDamagePercentages = Array(16).fill(100), resolveThresholdPercent = 0, turnChangeThresholdPercent = 0, turnChangeCounter = 0, turnChangeActive = false, remainingEnemiesTurnChangeThreshold = 0, remainingEnemiesTurnChangeCounter = 0, remainingEnemiesTurnChangeActive = false, remainingEnemiesTurnChangeSkillId = null }, index) => ({
         id,
         name,
         attribute,
@@ -4552,6 +4585,7 @@ export class PuzzleEngine {
         deathResolved,
         escaped,
         scaledAttackGate,
+        aiUseCount,
         attackBoostTurns,
         attackBoostPercent,
         defenseBoostTurns,

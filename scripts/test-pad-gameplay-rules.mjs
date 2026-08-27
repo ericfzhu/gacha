@@ -122,6 +122,7 @@ import {
 import {
   decodePadEnemyAiMonsterDefinition,
   decodePadEnemyAiSkillDefinition,
+  selectPadEnemyAiLegacy,
   selectPadEnemyAiNew,
 } from '../src/puzzle/padEnemyAi.js';
 import {
@@ -577,6 +578,114 @@ const blockedWeightedEnemyAi = selectPadEnemyAiNew(
 );
 assert.equal(blockedWeightedEnemyAi.skillId, null);
 assert.equal(blockedWeightedEnemyAi.rngState, 394_448_415);
+const legacyEnemyAiMonsterDefinition = enemyAiMonsterDefinition.slice();
+const legacyEnemyAiMonsterView = new DataView(legacyEnemyAiMonsterDefinition.buffer);
+legacyEnemyAiMonsterView.setUint8(0xe0, 0);
+legacyEnemyAiMonsterView.setInt16(0xe6, 100, true);
+const legacyEnemyAiSkillDefinition = enemyAiBlackFallDefinition.slice();
+const legacyEnemyAiSkillView = new DataView(legacyEnemyAiSkillDefinition.buffer);
+// Native legacy _chooseEnemyAi masks +0x3c with 0x3fff and uses bit 0x4000
+// as the ratio polarity.  The test supplies the recovered +0x7c0 baseline so
+// the ordinary branch is deterministic rather than relying on its browser
+// current-HP fallback.
+legacyEnemyAiSkillView.setInt32(0x3c, 1_000, true);
+const decodedLegacyEnemyAiMonster = decodePadEnemyAiMonsterDefinition(
+  legacyEnemyAiMonsterDefinition,
+);
+const decodedLegacyEnemyAiSkill = decodePadEnemyAiSkillDefinition(legacyEnemyAiSkillDefinition);
+assert.equal(decodedLegacyEnemyAiMonster.usesNewAi, false);
+assert.equal(decodedLegacyEnemyAiSkill.legacyConditionValue, 1_000);
+assert.equal(decodedLegacyEnemyAiSkill.legacyConditionMode, false);
+const selectedLegacyEnemyAi = selectPadEnemyAiLegacy(
+  decodedLegacyEnemyAiMonster,
+  [decodedLegacyEnemyAiSkill],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    rngState: 21_900,
+    legacyConditionBase: 1_000_000,
+  },
+);
+assert.equal(selectedLegacyEnemyAi.skillId, 9_001);
+assert.equal(selectedLegacyEnemyAi.effect.attackWithSkillValue, 50);
+assert.equal(selectedLegacyEnemyAi.rngState, 394_448_415);
+assert.equal(selectedLegacyEnemyAi.aiBudget, 80);
+const invertedLegacyEnemyAiSkillDefinition = legacyEnemyAiSkillDefinition.slice();
+const invertedLegacyEnemyAiSkillView = new DataView(invertedLegacyEnemyAiSkillDefinition.buffer);
+// Use the recovered preserve-incoming callback (types 9–11) so the polarity
+// bit is observable in the final immediate probability.  Black-fall/type-128
+// uses the constant-one callback and would intentionally ignore this scale.
+invertedLegacyEnemyAiSkillView.setInt16(0x04, 9, true);
+invertedLegacyEnemyAiSkillView.setInt32(0x18, 75, true);
+invertedLegacyEnemyAiSkillView.setInt32(0x3c, 0x4000 | 1_000, true);
+const invertedLegacyEnemyAi = selectPadEnemyAiLegacy(
+  decodedLegacyEnemyAiMonster,
+  [decodePadEnemyAiSkillDefinition(invertedLegacyEnemyAiSkillDefinition)],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    rngState: 21_900,
+    legacyConditionBase: 1_000_000,
+  },
+);
+assert.equal(invertedLegacyEnemyAi.skillId, null);
+assert.equal(invertedLegacyEnemyAi.rngState, 394_448_415);
+const inferredLegacyEnemyAi = selectPadEnemyAiLegacy(
+  decodedLegacyEnemyAiMonster,
+  [decodedLegacyEnemyAiSkill],
+  { currentHp: 92_000, maxHp: 92_000, aiBudget: 100, rngState: 21_900 },
+);
+assert.equal(inferredLegacyEnemyAi.skillId, 9_001);
+assert.equal(inferredLegacyEnemyAi.legacyConditionApproximation, true);
+const legacyFirstUseSkillDefinition = legacyEnemyAiSkillDefinition.slice();
+const legacyFirstUseSkillView = new DataView(legacyFirstUseSkillDefinition.buffer);
+legacyFirstUseSkillView.setInt16(0x04, 47, true);
+// Type 47 bypasses the authored HP threshold but still requires the budget
+// gate. Its native callback is one only while +0x6c0 is zero.
+legacyFirstUseSkillView.setInt32(0x38, 0, true);
+const firstUseLegacyEnemyAi = selectPadEnemyAiLegacy(
+  decodedLegacyEnemyAiMonster,
+  [decodePadEnemyAiSkillDefinition(legacyFirstUseSkillDefinition)],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    rngState: 21_900,
+    enemyAiUseCount: 0,
+    legacyConditionBase: 1_000_000,
+  },
+);
+assert.equal(firstUseLegacyEnemyAi.skillId, 9_001);
+assert.equal(firstUseLegacyEnemyAi.rngState, 394_448_415);
+const laterUseLegacyEnemyAi = selectPadEnemyAiLegacy(
+  decodedLegacyEnemyAiMonster,
+  [decodePadEnemyAiSkillDefinition(legacyFirstUseSkillDefinition)],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    rngState: 21_900,
+    enemyAiUseCount: 1,
+    legacyConditionBase: 1_000_000,
+  },
+);
+assert.equal(laterUseLegacyEnemyAi.skillId, null);
+assert.equal(laterUseLegacyEnemyAi.rngState, 21_900);
+const legacyEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: legacyEnemyAiMonsterDefinition,
+    skillDefinitions: [legacyEnemyAiSkillDefinition],
+    legacyConditionBase: 1_000_000,
+  }],
+});
+assert.equal(legacyEngine.enemyAiPools[0].monster.usesNewAi, false);
+const legacyEngineSkill = legacyEngine.takeEnemySkill(0);
+assert.equal(legacyEngineSkill.kind, 'blackFall');
+assert.equal(legacyEngine.enemies[0].aiUseCount, 1);
+assert.equal(legacyEngine.lastEnemySkill, null);
 const enemyAiBlockMinusDefinition = new Uint8Array(0x48);
 const enemyAiBlockMinusView = new DataView(enemyAiBlockMinusDefinition.buffer);
 enemyAiBlockMinusView.setUint32(0x00, 9_002, true);

@@ -17,6 +17,42 @@ const ENEMY_SKILL_SETUP_TABLE = 0xd3c99c;
 const ENEMY_SKILL_SETUP_BASE = 0x61fee4;
 const ENEMY_SKILL_CONDITION_TABLE = 0xd3c6fc;
 const ENEMY_SKILL_CONDITION_BASE = 0x61a630;
+const LEGACY_ENEMY_AI_MODE_SWITCH_ANCHORS = Object.freeze([
+  [0x622714, 0xf9410668], // _doEnemyAi loads the mounted sENEAIS definition
+  [0x622718, 0x39438108], // mode byte +0xe0
+  [0x62271c, 0x370000a8], // bit 0 selects chooseEnemyAiNew
+  [0x622720, 0xaa1403e0], // legacy selector receives this/monster
+  [0x622724, 0xaa1303e1],
+  [0x622728, 0x97f406de], // call cGAMEMAIN::_chooseEnemyAi
+]);
+const LEGACY_ENEMY_AI_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x61de6c, 0x1e601908], // current HP / maximum HP binary64 ratio
+  [0x61de74, 0xf943e269], // damaged-turn baseline at stack +0x48
+  [0x61e0b8, 0xf9410676], // mounted sENEAIS pointer
+  [0x61e0c4, 0xb9401101], // slot skill id at +0xec
+  [0x61e0f0, 0x4ea81d00], // pass HP ratio into parseFlowControl
+  [0x61e100, 0x31000c1f], // -3 enters the legacy fallback/status path
+  [0x61e12c, 0x79800b08], // signed skill type
+  [0x61e188, 0x794faa68], // current AI budget
+  [0x61e198, 0x79c1cec8], // legacy scale halfword +0xe6
+  [0x61e19c, 0xb9403f09], // authored condition operand +0x3c
+  [0x61e1a4, 0x12003539], // mask condition magnitude to 0x3fff
+  [0x61e1b0, 0x1e220100], // convert scaled magnitude to float32
+  [0x61e1c0, 0x97f40b48], // izMathRound after legacy-scale percentage
+  [0x61e1f4, 0x9b097d69], // multiply baseline by scaled condition
+  [0x61e204, 0x1e603941], // current HP / condition denominator
+  [0x61e208, 0x7212015f], // condition polarity bit 0x4000
+  [0x61e220, 0x97f3de2c], // cGAMEMAIN::_chooseEnemyAiSub
+  [0x61e258, 0x1e202008], // reject nonpositive callback scale
+  [0x61e268, 0x528d420c], // shared AI LCG offset +0x6a10
+  [0x61e278, 0x1b097d49], // factor0 * factor1 * slot chance
+  [0x61e2a4, 0x1e210800], // multiply callback scale by authored probability
+  [0x61e2b0, 0x1e215800], // cap immediate probability at 10,000
+  [0x61e2b4, 0x1e203820], // compare complement against the roll
+  [0x61e2d4, 0x1b0b354a], // native LCG multiply-add
+  [0x61e2dc, 0x5284e20d], // scale high 16 bits to 10,000
+  [0x61e2f4, 0x54ffed88], // failed immediate test advances to next slot
+]);
 const SOURCE_ORB_CONVERSION_ENEMY_SKILL_TYPE = 4;
 const SOURCE_ORB_CONVERSION_HANDLER = 0x6292b4;
 const SOURCE_ORB_CONVERSION_SETUP_HANDLER = 0x61fee4;
@@ -1726,6 +1762,14 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : leaderAlterConditionTarget === LEADER_ALTER_CONDITION_HANDLER;
   const leaderAlterInstructionAnchorsMatch = restoredElf === null ? null
     : LEADER_ALTER_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
+  const legacyEnemyAiModeSwitchAnchorsMatch = restoredElf === null ? null
+    : LEGACY_ENEMY_AI_MODE_SWITCH_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
+  const legacyEnemyAiInstructionAnchorsMatch = restoredElf === null ? null
+    : LEGACY_ENEMY_AI_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
   const normalAttackDispatchTarget = resolveEnemySkillTarget(
@@ -5055,7 +5099,12 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       slotFields: 'uint32 skill id, uint8 immediate chance, uint8 fallback weight',
       skillProbabilityOffsets: 'sENEMYSKILL+0x30/+0x34 (signed int32 factors)',
       skillHpThresholdOffset: 'sENEMYSKILL+0x38 (signed int32 percent)',
+      skillLegacyConditionOffset: 'sENEMYSKILL+0x3c (signed int32; low 14-bit magnitude, bit 0x4000 polarity)',
       skillBudgetCostOffset: 'sENEMYSKILL+0x40 (signed int32)',
+      legacySelectorModeSwitchAnchorsMatch21_9: legacyEnemyAiModeSwitchAnchorsMatch,
+      legacySelectorInstructionAnchorsMatch21_9: legacyEnemyAiInstructionAnchorsMatch,
+      legacySelectorSemantics:
+        'chooseEnemyAi (0x61dd68) scans 64 slots in order after parseFlowControl; ordinary records use HP/maxHP, damaged-turn baseline +0x7c0/+0x7d0 (or a native no-damage status scan), signed +0x3c magnitude scaled by +0xe6 and rounded through izMathRound, then _chooseEnemyAiSub. Positive callback output is multiplied by factor0*factor1*slotChance/100000, capped at 10000, and compared with the shared +0x6a10 LCG. Type 36 enters the separate status/fallback path, type 49 is rejected by the ordinary loop, and type 47 remains on the scalar path with its first-use callback; other flow-control returns are not claimed by the browser ordinary selector.',
     },
     symbols,
   };
@@ -5168,6 +5217,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || leaderAlterSetupMatches === false
     || leaderAlterConditionMatches === false
     || leaderAlterInstructionAnchorsMatch === false
+    || legacyEnemyAiModeSwitchAnchorsMatch === false
+    || legacyEnemyAiInstructionAnchorsMatch === false
     || normalAttackDispatchMatches === false
     || normalAttackSetupMatches === false
     || normalAttackConditionMatches === false

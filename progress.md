@@ -2,6 +2,35 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-28 legacy ordinary enemy selector
+
+- Recovered the legacy/new selector split from `_doEnemyAi` (`0x622544`):
+  definition byte `+0xe0` bit 0 selects `_chooseEnemyAiNew` or
+  `_chooseEnemyAi`.
+- Added `selectPadEnemyAiLegacy`. Its ordinary path scans the 64 slots in
+  native order, applies HP/budget/immediate gates, reconstructs the signed
+  `+0x3c` ratio operand with `+0xe6` binary32 scaling and `izMathRound`, calls
+  the recovered condition callback shape, and uses the native `+0x6a10` LCG.
+- Legacy pools can be loaded through `PuzzleEngine.setEnemyAiDefinitionPool`;
+  hosts may provide `legacyConditionBase` for the native damaged baseline.
+  The browser marks current-HP inference, unknown callbacks, and the native
+  status/fallback controller as diagnostics instead of silently fabricating
+  a selection.
+- Added direct selector/engine fixtures, 26 exact ARM64 ordinary-loop anchors,
+  mode-switch anchors, and evidence-bounded documentation. Browser render and
+  native smoke checks remain the next verification step.
+- Corrected the legacy type-47 boundary: it bypasses the HP/immediate-zero
+  gates, returns one only on the first `_doEnemyAi` use (`+0x6c0 == 0`), and
+  then follows the ordinary probability path. Added the optional
+  `legacyConditionForceOne` host capability for the native `>9998` callback
+  override and narrowed callback-shape claims to verified handlers.
+- Verification passed: `pad-rules:test`, `wasm:test`, production `vite build`,
+  and `libpad:inspect` all succeed. The focused browser fixture renders the
+  type-128 black-skyfall result with no page errors; the exact APK smoke reaches
+  the native game at frame 199 / 21,766 draw calls / 151.9M protected
+  instructions with no callback error. Its later black frame is the expected
+  missing private `data048.bin`/`data030.bin` boundary.
+
 ## 2026-08-28 leader alter (type 125)
 
 - Confirmed `ESLeaderAlter` against the exact native dispatch `0x62a6e0`,

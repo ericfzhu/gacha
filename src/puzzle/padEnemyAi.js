@@ -113,6 +113,11 @@ export const PAD_ENEMY_AI_SKILL_LAYOUT = Object.freeze({
   immediateFactor0Offset: 0x30,
   immediateFactor1Offset: 0x34,
   hpThresholdPercentOffset: 0x38,
+  // The legacy selector masks this signed field with 0x3fff and uses bit
+  // 0x4000 to choose whether the resulting ratio is inverted.  The native
+  // parser does not expose a semantic name for the operand, so keep the
+  // evidence-bounded "condition" wording in the browser API.
+  legacyConditionValueOffset: 0x3c,
   budgetCostOffset: 0x40,
 });
 
@@ -171,6 +176,13 @@ export function decodePadEnemyAiSkillDefinition(skillDefinition) {
       PAD_ENEMY_AI_SKILL_LAYOUT.hpThresholdPercentOffset,
       true,
     ),
+    legacyConditionValue: view.getInt32(
+      PAD_ENEMY_AI_SKILL_LAYOUT.legacyConditionValueOffset,
+      true,
+    ),
+    legacyConditionMode: (
+      view.getUint32(PAD_ENEMY_AI_SKILL_LAYOUT.legacyConditionValueOffset, true) & 0x4000
+    ) !== 0,
     budgetCost: view.getInt32(PAD_ENEMY_AI_SKILL_LAYOUT.budgetCostOffset, true),
     effect: decodePadEnemySkillDefinition(bytes),
   });
@@ -949,5 +961,411 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
     effect: selected?.effect ?? null,
     rngState,
     aiBudget: regeneratedBudget - (selected?.budgetCost || 0),
+  });
+}
+
+// The pre-21.9 selector (cGAMEMAIN::_chooseEnemyAi, 0x61dd68) shares the
+// table/record layout with the new selector, but its ordinary path has one
+// extra condition stage.  It derives a float32 scale from the protected
+// current HP, a monster-local damage baseline, and sENESKILLS+0x3c before
+// calling _chooseEnemyAiSub.  The status-aware fallback beginning at 0x61e300
+// is intentionally kept out of this function until its native state lanes
+// are decoded; callers receive an explicit diagnostic instead of a fabricated
+// selection.
+
+const LEGACY_SPECIAL_SELECTOR_TYPES = new Set([
+  // Type 36 jumps directly to the status/fallback selector.  Type 49 is
+  // rejected by the ordinary loop. Type 47 has a special first-use callback,
+  // but it still continues through the scalar path below.
+  36,
+  49,
+]);
+
+function normalizeLegacySelectorState(state, monster) {
+  const numeric = (value, fallback = 0) => {
+    const candidate = Number(value);
+    return Number.isFinite(candidate) ? candidate : fallback;
+  };
+  const integer = (value, fallback = 0) => Math.trunc(numeric(value, fallback));
+  const nonNegative = (value, fallback = 0) => Math.max(0, integer(value, fallback));
+  return {
+    currentHp: nonNegative(state.currentHp),
+    maxHp: nonNegative(state.maxHp),
+    playerCurrentHp: nonNegative(state.playerCurrentHp),
+    playerMaxHp: nonNegative(state.playerMaxHp),
+    maxHpChangeTurns: nonNegative(state.maxHpChangeTurns),
+    maxHpChangeParameter: integer(state.maxHpChangeParameter),
+    fixedTargetTurns: nonNegative(state.fixedTargetTurns),
+    fixedTargetEnemyIndex: integer(state.fixedTargetEnemyIndex),
+    boardColumns: nonNegative(state.boardColumns),
+    boardRows: nonNegative(state.boardRows),
+    boardSizeCode: state.boardSizeCode === undefined
+      ? ((nonNegative(state.boardRows) << 4) | nonNegative(state.boardColumns)) & 0xff
+      : integer(state.boardSizeCode) & 0xff,
+    actingEnemyIndex: integer(state.actingEnemyIndex),
+    attributeAbsorbTurns: nonNegative(state.attributeAbsorbTurns),
+    comboAbsorbTurns: nonNegative(state.comboAbsorbTurns),
+    enemyDamageAbsorbTurns: nonNegative(state.enemyDamageAbsorbTurns),
+    enemyDamageVoidTurns: nonNegative(state.enemyDamageVoidTurns),
+    enemyDamageShieldTurns: nonNegative(state.enemyDamageShieldTurns),
+    enemyDamageImmunityTurns: nonNegative(state.enemyDamageImmunityTurns),
+    leaderSwapTurns: nonNegative(state.leaderSwapTurns),
+    leaderSwapCandidateCount: nonNegative(state.leaderSwapCandidateCount),
+    leaderAlterTurns: nonNegative(state.leaderAlterTurns),
+    leaderAlterTargetCardId: state.leaderAlterTargetCardId == null
+      ? null
+      : integer(state.leaderAlterTargetCardId),
+    enemyInactivityPresentationActive: Boolean(state.enemyInactivityPresentationActive),
+    skyfallNaturalTurns: nonNegative(state.skyfallNaturalTurns),
+    skyfallNaturalMask: integer(state.skyfallNaturalMask) & 0x3f,
+    skyfallHazardTurns: nonNegative(state.skyfallHazardTurns),
+    skyfallHazardMask: integer(state.skyfallHazardMask) & 0x1c0,
+    lockFallRules: (Array.isArray(state.lockFallRules) ? state.lockFallRules : []).map((rule) => ({
+      typeMask: integer(rule?.typeMask) & 0xffff,
+      source: rule?.source == null ? null : String(rule.source),
+      turnsRemaining: rule?.turnsRemaining == null
+        ? null
+        : nonNegative(rule.turnsRemaining),
+    })),
+    orbSealActive: Boolean(state.orbSealActive),
+    forcedStartActive: Boolean(state.forcedStartActive),
+    cloudActive: Boolean(state.cloudActive),
+    attributeBlockActive: Boolean(state.attributeBlockActive),
+    playerRecovery: nonNegative(state.playerRecovery),
+    recoveryMultiplier: numeric(state.recoveryMultiplier, 1),
+    scaledAttackGate: integer(state.scaledAttackGate),
+    enemyAttackBoostTurns: nonNegative(state.enemyAttackBoostTurns),
+    enemyBaseAttack: nonNegative(state.enemyBaseAttack),
+    enemyDamagedTurnCount: Math.min(0xffff, nonNegative(state.enemyDamagedTurnCount)),
+    playerAuxiliaryBuffTurns: nonNegative(state.playerAuxiliaryBuffTurns),
+    playerAttackBoostTurns: nonNegative(state.playerAttackBoostTurns),
+    enemyTransientDebuffActive: Boolean(state.enemyTransientDebuffActive),
+    enemyStatusShieldTurns: nonNegative(state.enemyStatusShieldTurns),
+    moveTimeReductionTurns: nonNegative(state.moveTimeReductionTurns),
+    skillSealTurns: integer(state.skillSealTurns),
+    awakeningBindTurns: integer(state.awakeningBindTurns),
+    enemyAttribute: integer(state.enemyAttribute, -1),
+    enemies: Array.isArray(state.enemies) ? state.enemies : [],
+    party: Array.isArray(state.party) ? state.party : [],
+    aiBudget: nonNegative(state.aiBudget === undefined ? monster.budgetCap : state.aiBudget),
+    blackFallActive: Boolean(state.blackFallActive),
+    noSkyfallTurns: nonNegative(state.noSkyfallTurns),
+    boardCellCount: nonNegative(state.boardCellCount),
+    blackBlockCount: nonNegative(state.blackBlockCount),
+    // This is the derived native baseline: +0x7c0/+0x7d0 after damage, or a
+    // status-scan value on the no-damage path. Its semantic source is not
+    // recoverable from the public browser state, so callers can provide a
+    // per-monster value. The current HP fallback keeps legacy demos playable
+    // while the returned metadata makes the approximation visible.
+    legacyConditionBase: numeric(state.legacyConditionBase, NaN),
+    // Native chooseEnemyAiSub type 47 checks sMONSTER+0x6c0, which _doEnemyAi
+    // increments after each AI decision. Keep the lane optional so direct
+    // callers can reproduce either the first-use or subsequent-use result.
+    enemyAiUseCount: nonNegative(state.enemyAiUseCount),
+    // The native post-callback guard forces the condition result to 1.0 when
+    // the wave-record mode byte is not one and the scaled operand exceeds
+    // 9998. A host can expose that byte as this explicit capability flag.
+    legacyConditionForceOne: Boolean(state.legacyConditionForceOne),
+    evaluateCondition: state.evaluateCondition,
+  };
+}
+
+function roundNativeLegacyScale(rawValue, legacyScale) {
+  const raw = Math.max(0, rawValue | 0);
+  const scale = legacyScale | 0;
+  if (scale < 1) return raw;
+  // Native code converts the product and divisor through binary32 before
+  // izMathRound.  Legacy authored operands are non-negative, so floor(x+.5)
+  // matches the observed helper for every representable table value.
+  const scaled = Math.fround(Math.fround(Math.fround(raw) * Math.fround(scale)) / Math.fround(100));
+  return Math.max(0, Math.min(0x7fffffff, Math.floor(scaled + 0.5)));
+}
+
+function legacyConditionScale(definition, monster, state) {
+  const raw = Number(definition.legacyConditionValue) | 0;
+  const rawMagnitude = raw & 0x3fff;
+  if (rawMagnitude <= 0) {
+    return {
+      valid: false,
+      scale: 0,
+      reason: 'legacy-condition-value-zero',
+      raw,
+      rawMagnitude,
+      adjustedValue: 0,
+      approximate: false,
+    };
+  }
+  const adjustedValue = roundNativeLegacyScale(rawMagnitude, monster.legacyScale);
+  if (adjustedValue <= 0) {
+    return {
+      valid: false,
+      scale: 0,
+      reason: 'legacy-condition-value-rounded-zero',
+      raw,
+      rawMagnitude,
+      adjustedValue,
+      approximate: false,
+    };
+  }
+  const hasBase = Number.isFinite(state.legacyConditionBase)
+    && state.legacyConditionBase > 0;
+  const base = hasBase ? state.legacyConditionBase : Math.max(1, state.currentHp);
+  // The numerator is the protected current-HP value read from sMONSTER+0x3c
+  // / +0x4c.  It is not the authored +0x3c operand (that field is only used
+  // for the denominator and polarity bit).
+  const value = state.currentHp;
+  const denominator = Math.fround(Math.fround(base) * Math.fround(adjustedValue));
+  if (!(denominator > 0) || !Number.isFinite(denominator)) {
+    return {
+      valid: false,
+      scale: 0,
+      reason: 'legacy-condition-denominator-invalid',
+      raw,
+      rawMagnitude,
+      adjustedValue,
+      approximate: !hasBase,
+    };
+  }
+  const ratio = Math.fround(Math.fround(value) / denominator);
+  const scale = (raw & 0x4000) !== 0
+    ? ratio
+    : Math.fround(Math.fround(1) - ratio);
+  return {
+    valid: Number.isFinite(scale),
+    scale: Math.fround(scale),
+    raw,
+    rawMagnitude,
+    adjustedValue,
+    base,
+    value,
+    ratio,
+    approximate: !hasBase,
+    ...(hasBase ? {} : { reason: 'legacy-condition-base-inferred-from-current-hp' }),
+  };
+}
+
+// _chooseEnemyAiSub returns one of three shapes at the recovered callback
+// boundary: a constant 1.0 (0x61a630), the incoming scale unchanged
+// (0x61bb98), or a callback-local value multiplied by the incoming scale
+// (0x61c014).  Keep the table deliberately small and evidence-backed.  The
+// remaining handlers are evaluated with the same multiply convention but are
+// marked approximate by the caller until their status lanes are decoded.
+const LEGACY_CALLBACK_CONSTANT_TYPES = new Set([
+  // Direct 0x61a630 table targets.
+  40, 50, 66,
+  76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86,
+  89, 97, 98, 102, 103, 109, 110,
+  // These callbacks have an independently recovered eligibility predicate
+  // and return the native constant-one branch after it succeeds.
+  20, 125, 127, 128,
+]);
+
+const LEGACY_CALLBACK_PRESERVE_TYPES = new Set([
+  7, 9, 10, 11, 13, 14, 15,
+]);
+
+const LEGACY_CALLBACK_MULTIPLY_TYPES = new Set([
+  4, 5, 6, 8, 12, 56, 57, 58, 59, 60, 61, 62,
+]);
+
+function legacyCallbackScale(definition, conditionGate, incomingScale, state) {
+  if (!conditionGate.eligible) {
+    return { scale: 0, exact: true, mode: 'rejected' };
+  }
+  const type = definition.effect?.type;
+  const incoming = Math.fround(incomingScale);
+  if (type === 16) {
+    // 0x61acbc writes 1.0 for the water-attribute branch and 1.0 - s8 for
+    // every other attribute.  Unlike 0x61c014 this handler does not multiply
+    // a callback-local value by s8 a second time.
+    const scale = state.enemyAttribute === 1
+      ? Math.fround(1)
+      : Math.fround(Math.fround(1) - incoming);
+    return { scale, exact: true, mode: 'direct-complement' };
+  }
+  if (type === 47) {
+    // 0x61b54c returns the initialized 1.0 branch only while +0x6c0 is
+    // zero; subsequent _doEnemyAi calls arrive at the zero epilogue.
+    const scale = currentLegacyUseCount(state) === 0 ? Math.fround(1) : Math.fround(0);
+    return { scale, exact: true, mode: 'first-use-only' };
+  }
+  if (LEGACY_CALLBACK_CONSTANT_TYPES.has(type)) {
+    return { scale: Math.fround(1), exact: true, mode: 'constant-one' };
+  }
+  if (LEGACY_CALLBACK_PRESERVE_TYPES.has(type)) {
+    return { scale: incoming, exact: true, mode: 'preserve-incoming' };
+  }
+  const callbackScale = Number(conditionGate.probabilityScale);
+  const local = Number.isFinite(callbackScale) ? Math.fround(callbackScale) : 0;
+  if (LEGACY_CALLBACK_MULTIPLY_TYPES.has(type)) {
+    return {
+      scale: Math.fround(local * incoming),
+      exact: true,
+      mode: 'multiply-incoming',
+    };
+  }
+  return {
+    scale: Math.fround(local * incoming),
+    exact: false,
+    mode: 'multiply-incoming-approximation',
+  };
+}
+
+function currentLegacyUseCount(state) {
+  return Math.max(0, Math.trunc(Number(state.enemyAiUseCount) || 0));
+}
+
+function legacyResult(monster, current, rngState, selected, diagnostics = {}) {
+  const regeneratedBudget = Math.min(
+    monster.budgetCap,
+    Math.max(0, current.aiBudget + monster.budgetRegen),
+  );
+  return Object.freeze({
+    skillId: selected?.skillId ?? null,
+    effect: selected?.effect ?? null,
+    rngState,
+    aiBudget: regeneratedBudget - (selected?.budgetCost || 0),
+    aiMode: 'legacy',
+    fidelity: selected
+      ? diagnostics.legacyCallbackApproximation || diagnostics.legacyConditionApproximation
+        ? 'legacy-ordinary-approximate'
+        : 'legacy-ordinary-recovered'
+      : 'legacy-ordinary-no-selection',
+    ...diagnostics,
+  });
+}
+
+// Conservative implementation of the recovered ordinary branch.  It keeps
+// the native scan order, static HP/budget gates, +0x3c mode bit, float32
+// scaling, immediate probability arithmetic, and LCG comparison exact.  A
+// legacy pool with only status/fallback records is left unselected and marks
+// the undecoded path in the result rather than entering a guessed branch.
+export function selectPadEnemyAiLegacy(monster, definitions, state = {}) {
+  if (!monster || monster.usesNewAi) {
+    throw new Error('selectPadEnemyAiLegacy requires a legacy (mode bit 0 clear) monster definition.');
+  }
+  const definitionMap = normalizeDefinitionMap(definitions);
+  const current = normalizeLegacySelectorState(state, monster);
+  let rngState = Number(state.rngState) >>> 0;
+  let selected = null;
+  const unsupportedSkillIds = [];
+  const approximateCallbackTypes = new Set();
+  let sawFallback = false;
+  let sawControlFlow = false;
+  let sawUnsupportedRecord = false;
+  let sawLegacySpecial = false;
+  let sawConditionValueProblem = false;
+
+  for (const slot of monster.slots) {
+    const definition = definitionMap.get(slot.skillId);
+    if (!definition) continue;
+    // Legacy tables can contain records whose effect decoder is not complete
+    // yet.  Apply the recovered scalar gates before classifying such a record
+    // so the result reports it instead of failing the whole pool load.
+    const hpPercent = current.maxHp > 0 ? current.currentHp / current.maxHp * 100 : 0;
+    const type = definition.effect?.type;
+    // The native flag table marks legacy types 21..38 and 43..45 as scalar
+    // bypasses as well. Those records still remain unsupported here, but
+    // classifying them after the bypass preserves diagnostics even when the
+    // authored HP threshold would otherwise hide them.
+    const bypassScalarGates = type === 47
+      || (type >= 21 && type <= 38)
+      || (type >= 43 && type <= 45);
+    if (definition.budgetCost > current.aiBudget
+      || (!bypassScalarGates && hpPercent > definition.hpThresholdPercent)) {
+      continue;
+    }
+    if (definition.effect?.controlFlow) {
+      sawControlFlow = true;
+      sawUnsupportedRecord = true;
+      unsupportedSkillIds.push(slot.skillId);
+      continue;
+    }
+    if (LEGACY_SPECIAL_SELECTOR_TYPES.has(type)) {
+      sawLegacySpecial = true;
+      sawUnsupportedRecord = true;
+      unsupportedSkillIds.push(slot.skillId);
+      if (slot.fallbackWeight > 0) sawFallback = true;
+      continue;
+    }
+    if (!isSupportedDefinition(definition)) {
+      sawUnsupportedRecord = true;
+      unsupportedSkillIds.push(slot.skillId);
+      if (slot.fallbackWeight > 0) sawFallback = true;
+      continue;
+    }
+    if (slot.fallbackWeight > 0) sawFallback = true;
+    // Type 47 reaches the probability epilogue even when +0xf0 is zero; the
+    // resulting probability is still zero, so no LCG state is consumed.
+    if (slot.immediateChance === 0 && !bypassScalarGates) continue;
+    // Type 16 consumes the incoming legacy scale itself; evaluating it with
+    // the new-AI default scale would incorrectly reject every non-water
+    // monster.  The callback helper below applies its exact complement.
+    const conditionGate = type === 16
+      ? { eligible: true, probabilityScale: 1, rngState }
+      : evaluateCondition(definition, current, rngState, !bypassScalarGates);
+    rngState = conditionGate.rngState;
+    if (!conditionGate.eligible) continue;
+    const condition = legacyConditionScale(definition, monster, current);
+    if (!condition.valid || condition.scale <= 0) {
+      sawConditionValueProblem = true;
+      continue;
+    }
+    const callbackBase = legacyCallbackScale(
+      definition,
+      conditionGate,
+      condition.scale,
+      current,
+    );
+    const callback = current.legacyConditionForceOne && condition.adjustedValue > 9_998
+      ? { scale: Math.fround(1), exact: true, mode: 'native-large-condition-forced-one' }
+      : callbackBase;
+    if (!callback.exact) approximateCallbackTypes.add(type);
+    const effectiveScale = callback.scale;
+    if (effectiveScale <= 0) continue;
+    const probability = immediateProbability(definition, slot, effectiveScale);
+    if (probability <= 0) continue;
+    const roll = advanceRoll(rngState, 10_000);
+    rngState = roll.state;
+    if (Math.fround(10_000 - probability) <= roll.value) {
+      selected = definition;
+      break;
+    }
+  }
+
+  const diagnostics = {
+    legacyUnsupported: !selected && (
+      sawFallback
+      || sawControlFlow
+      || sawUnsupportedRecord
+      || sawConditionValueProblem
+    ),
+    ...(unsupportedSkillIds.length > 0 ? {
+      unsupportedSkillIds: Object.freeze([...new Set(unsupportedSkillIds)]),
+    } : {}),
+    ...(sawControlFlow ? { unsupportedReason: 'legacy-flow-control-not-decoded' } : {}),
+    ...(sawFallback && !sawControlFlow ? {
+      unsupportedReason: 'legacy-special-fallback-not-decoded',
+    } : {}),
+    ...(sawLegacySpecial && !sawFallback && !sawControlFlow ? {
+      unsupportedReason: 'legacy-special-selector-not-decoded',
+    } : {}),
+    ...(sawUnsupportedRecord && !sawFallback && !sawLegacySpecial && !sawControlFlow ? {
+      unsupportedReason: 'legacy-unsupported-record',
+    } : {}),
+    ...(sawConditionValueProblem && !sawFallback && !sawControlFlow ? {
+      unsupportedReason: 'legacy-condition-scale-rejected',
+    } : {}),
+    ...(approximateCallbackTypes.size > 0 ? {
+      legacyCallbackApproximation: true,
+      approximateCallbackTypes: Object.freeze([...approximateCallbackTypes]),
+    } : {}),
+  };
+  if (selected && !Number.isFinite(current.legacyConditionBase)) {
+    diagnostics.legacyConditionApproximation = true;
+  }
+  const result = legacyResult(monster, current, rngState, selected, diagnostics);
+  return Object.freeze({
+    ...result,
   });
 }

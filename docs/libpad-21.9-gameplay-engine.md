@@ -637,8 +637,45 @@ cap and the selected skill's cost is subtracted. For type 128,
 so an active copy cannot be selected again. `setEnemyAiDefinitionPool` wires
 this raw record path into enemy turns and reports the chosen skill ID, budget,
 and RNG state. Remaining condition callbacks, flow-control records other than
-types 113 through 117, and the rest of the legacy selector are rejected
+types 113 through 117, and the legacy status/fallback branch are rejected
 explicitly until decoded rather than approximated.
+
+### Recovered legacy enemy selector
+
+The mode bit at enemy-definition `+0xe0` is the selector boundary: `_doEnemyAi`
+(`0x622544`) tests bit 0 at `0x622718`, dispatching to `_chooseEnemyAiNew`
+(`0x61d450`) when set and `_chooseEnemyAi` (`0x61dd68`) when clear. The browser
+now exposes the ordinary legacy path as `selectPadEnemyAiLegacy`; it does not
+pretend that the separate status/fallback controller is decoded.
+
+For each nonempty legacy slot, the recovered loop first calls `_parseFlowControl`
+(`0x619ad0`). Return `-2` skips the slot, `-3` enters the native status/fallback
+branch, and a negative ordinary return continues through the scalar selector.
+The ordinary branch applies the signed HP threshold at `+0x38`, budget gate
+`+0x40`, and slot immediate byte `+0xf0`. Type 36 enters the native
+status/fallback branch, type 49 is rejected by this ordinary loop, and type 47
+bypasses the HP/immediate-zero gates before continuing through the scalar path.
+Its signed `+0x3c` operand is masked to
+`0x3fff`; the `+0xe6` percentage is applied through binary32 arithmetic and
+`izMathRound`, then protected current HP is divided by the damaged baseline
+(`+0x7c0/+0x7d0`, or a native no-damage status scan). The host-facing
+`legacyConditionBase` is this derived baseline (the `+0x7c0 / +0x7d0` quotient
+when damage history exists), not the raw protected counter. Bit `0x4000` selects
+the ratio polarity before `_chooseEnemyAiSub`.
+
+The callback result remains a binary32 scale. The browser keeps the recovered
+constant, preserve-incoming, multiply-incoming, and type-16 direct-complement
+forms; callbacks whose status lanes are not yet mapped carry
+`legacyCallbackApproximation` metadata. A positive scale multiplies the
+truncated `factor0 * factor1 * slotChance / 100000` probability, caps at 10,000,
+and compares its complement with the shared `+0x6a10` LCG exactly as the native
+loop. When `legacyConditionBase` is absent, the browser uses current HP only as
+an explicit approximation of the native no-damage status scan.
+When a host exposes a non-one legacy wave-mode byte, `legacyConditionForceOne`
+also mirrors the native `>9998` scaled-operand override that replaces the
+callback result with `1.0`.
+Undecoded flow-control/fallback records return diagnostics instead of a guessed
+skill, so loading a legacy pool cannot silently alter battle behavior.
 
 The selector does not reduce every condition callback to a boolean. In the
 immediate path at `0x61d844`, `_chooseEnemyAiSub` returns a binary32 multiplier;
