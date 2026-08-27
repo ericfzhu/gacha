@@ -939,6 +939,25 @@ in snapshots, and marks the temporary leader with `SWAP nT`. With seed 21900,
 the standard 100% AI draw followed by setup selects party index 4 and ends at
 RNG state `3803934822`.
 
+Enemy skill type `125` is the distinct `ESLeaderAlter` action ("Change leader to
+`[card id]` for `n` turns"). Its late dispatch target is `0x62a6e0`, setup is
+`0x620188`, and the new-AI condition is `0x61bae8`. The dispatch loads the
+unsigned low 16 bits of definition `+0x10`, adds the native `10000` bias, and
+writes that value to protected `sGAMEWORK+0x84780`; it writes definition `+0x14`
+to `sGAMEWORK+0x84770`, then enters the leader-change controller at `0x310dd0`.
+The setup path has no `sMONSTER+0x678` materialization: it schedules presentation
+effect `80` with coordinates from `sGAMEWORK+0x84860` and clears the transient
+leader-change presentation lanes before the common attack tail.
+
+The condition first rejects only an active status whose target lane equals the
+authored card id. An inactive status, or an active status targeting a different
+card, remains eligible and consumes no RNG at this boundary. The browser keeps
+the target card id and native status metadata in a `leaderAlterRule`, counts its
+duration across enemy turns, and does not reorder party slots (unlike type 75).
+When a caller supplies a matching `party[].cardId`, that card's leader skill is
+used for combat; otherwise the target remains explicitly unresolved while the
+native card database lookup is outside the compact browser model.
+
 Enemy skill type `82` is the explicit ordinary-attack record. The independent
 pad-rikuu parser likewise represents it as exactly one 100%-power hit. Its
 dispatch, setup, and condition entries target `0x62be50`, `0x621c94`, and

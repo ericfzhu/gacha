@@ -55,6 +55,7 @@ import {
   PAD_ENEMY_SKILL_REMAINING_ENEMIES_TURN_CHANGE,
   PAD_ENEMY_SKILL_NO_SKYFALL,
   PAD_ENEMY_SKILL_LEADER_SWAP,
+  PAD_ENEMY_SKILL_LEADER_ALTER,
   PAD_ENEMY_SKILL_NORMAL_ATTACK,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
@@ -240,6 +241,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_REMAINING_ENEMIES_TURN_CHANGE,
     PAD_ENEMY_SKILL_NO_SKYFALL,
     PAD_ENEMY_SKILL_LEADER_SWAP,
+    PAD_ENEMY_SKILL_LEADER_ALTER,
     PAD_ENEMY_SKILL_NORMAL_ATTACK,
     PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
     PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
@@ -508,6 +510,19 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
     // 0x61ab74 calls the native changeable-sub counter and only checks whether
     // it is positive. Target selection belongs to setup and consumes RNG later.
     const eligible = state.leaderSwapTurns <= 0 && state.leaderSwapCandidateCount > 0;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.type === PAD_ENEMY_SKILL_LEADER_ALTER) {
+    // 0x61bae8 first checks the active +0x84780 status lane.  No active
+    // leader-alter status admits the record; an active status is rejected
+    // only when its +0x84770 target card id matches this authored target.
+    // The condition itself does not consume the shared LCG state.
+    const activeTurns = Math.max(0, Math.trunc(Number(state.leaderAlterTurns) || 0));
+    const activeTarget = state.leaderAlterTargetCardId == null
+      ? null
+      : Math.trunc(Number(state.leaderAlterTargetCardId));
+    const targetCardId = Math.trunc(Number(definition.effect.targetCardId) || 0);
+    const eligible = activeTurns <= 0 || activeTarget !== targetCardId;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   if (definition.effect.type === PAD_ENEMY_SKILL_NORMAL_ATTACK) {
@@ -829,6 +844,10 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
       0,
       Math.trunc(Number(state.leaderSwapCandidateCount) || 0),
     ),
+    leaderAlterTurns: Math.max(0, Math.trunc(Number(state.leaderAlterTurns) || 0)),
+    leaderAlterTargetCardId: state.leaderAlterTargetCardId == null
+      ? null
+      : Math.trunc(Number(state.leaderAlterTargetCardId)),
     enemyInactivityPresentationActive: Boolean(state.enemyInactivityPresentationActive),
     skyfallNaturalTurns: Math.max(0, Math.trunc(Number(state.skyfallNaturalTurns) || 0)),
     skyfallNaturalMask: Math.trunc(Number(state.skyfallNaturalMask) || 0) & 0x3f,

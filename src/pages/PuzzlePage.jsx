@@ -379,21 +379,27 @@ function drawParty(ctx, engine) {
     ctx.fillStyle = gradient;
     ctx.fill();
     const swappedLeader = index === 0 && Number(engine.leaderSwapTurns || 0) > 0;
-    ctx.strokeStyle = swappedLeader ? '#f4c95d' : 'rgba(255,255,255,.24)';
-    ctx.lineWidth = swappedLeader ? 2 : 1;
+    const alteredLeader = index === 0 && Number(engine.leaderAlterTurns || 0) > 0;
+    const highlightedLeader = swappedLeader || alteredLeader;
+    ctx.strokeStyle = highlightedLeader ? '#f4c95d' : 'rgba(255,255,255,.24)';
+    ctx.lineWidth = highlightedLeader ? 2 : 1;
     ctx.stroke();
     ctx.lineWidth = 1;
     ctx.fillStyle = '#fff';
     ctx.font = '800 18px "Barlow Condensed", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(member.name[0], x, swappedLeader ? 315 : 309);
+    ctx.fillText(member.name[0], x, highlightedLeader ? 315 : 309);
     ctx.font = '600 9px "Noto Sans", sans-serif';
     ctx.fillStyle = '#dce4ef';
-    ctx.fillText(member.attack, x, swappedLeader ? 331 : 328);
+    ctx.fillText(member.attack, x, highlightedLeader ? 331 : 328);
     if (swappedLeader) {
       ctx.font = '800 8px "Barlow Condensed", sans-serif';
       ctx.fillStyle = '#fff0a6';
       ctx.fillText(`SWAP ${engine.leaderSwapTurns}T`, x, 295);
+    } else if (alteredLeader) {
+      ctx.font = '800 8px "Barlow Condensed", sans-serif';
+      ctx.fillStyle = '#fff0a6';
+      ctx.fillText(`LEAD #${engine.leaderAlterTargetCardId ?? '—'}`, x, 295);
     }
     if (Number(member.bindTurns || 0) > 0) {
       roundedRect(ctx, x - 29, 284, 58, 54, 12);
@@ -567,6 +573,16 @@ function render(ctx, engine) {
     ctx.font = '700 9px "Barlow Condensed", sans-serif';
     ctx.fillText(
       `NO SKYFALL · ${engine.noSkyfallRule.turnsRemaining}T`,
+      434,
+      playerStatusY,
+    );
+    playerStatusY += 12;
+  }
+  if (Number(engine.leaderAlterTurns || 0) > 0) {
+    ctx.fillStyle = '#ffe0a1';
+    ctx.font = '700 9px "Barlow Condensed", sans-serif';
+    ctx.fillText(
+      `LEADER #${engine.leaderAlterTargetCardId ?? '—'} · ${engine.leaderAlterTurns}T`,
       434,
       playerStatusY,
     );

@@ -122,6 +122,28 @@ const LEADER_SWAP_ENEMY_SKILL_TYPE = 75;
 const LEADER_SWAP_HANDLER = 0x629ad8;
 const LEADER_SWAP_SETUP_HANDLER = 0x620444;
 const LEADER_SWAP_CONDITION_HANDLER = 0x61ab74;
+const LEADER_ALTER_ENEMY_SKILL_TYPE = 125;
+const LEADER_ALTER_HANDLER = 0x62a6e0;
+const LEADER_ALTER_SETUP_HANDLER = 0x620188;
+const LEADER_ALTER_CONDITION_HANDLER = 0x61bae8;
+const LEADER_ALTER_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x62a6e4, 0x794022a9], // load unsigned duration operand params[1]
+  [0x62a704, 0x8b0b0280], // address protected +0x84780 status lane
+  [0x62a70c, 0x97f3bb61], // commit duration + native 10000 bias
+  [0x62a710, 0xb94016a1], // load target card id params[2]
+  [0x62a71c, 0x8b080280], // address protected +0x84770 target lane
+  [0x62a720, 0x97f3bb5c], // commit the target card id
+  [0x62a724, 0xaa1803e0], // enter the leader-change controller
+  [0x620188, 0xf9404488], // setup addresses shared game-work storage
+  [0x620198, 0x8b090109], // load presentation effect coordinates +0x84860
+  [0x6201b8, 0x1e3e1002], // use -1.0 presentation scale
+  [0x6201bc, 0x52800a01], // schedule leader-alter effect 80
+  [0x61bae8, 0x5288f008], // condition addresses +0x84780
+  [0x61baf8, 0x72003c1f], // reject only an active status lane
+  [0x61bb10, 0xb9401668], // load active target card id
+  [0x61bb14, 0x6b20211f], // compare authored and active target ids
+  [0x61bb1c, 0xb9000fff], // zero the condition scale for same-target reuse
+]);
 const NORMAL_ATTACK_ENEMY_SKILL_TYPE = 82;
 const NORMAL_ATTACK_HANDLER = 0x62be50;
 const NORMAL_ATTACK_SETUP_HANDLER = 0x621c94;
@@ -1687,6 +1709,25 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : leaderSwapSetupTarget === LEADER_SWAP_SETUP_HANDLER;
   const leaderSwapConditionMatches = leaderSwapConditionTarget === null
     ? null : leaderSwapConditionTarget === LEADER_SWAP_CONDITION_HANDLER;
+  const leaderAlterDispatchTarget = resolveEnemySkillTarget(
+    LEADER_ALTER_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const leaderAlterSetupTarget = resolveEnemySkillTarget(
+    LEADER_ALTER_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
+  );
+  const leaderAlterConditionTarget = resolveEnemySkillTarget(
+    LEADER_ALTER_ENEMY_SKILL_TYPE, ENEMY_SKILL_CONDITION_TABLE, ENEMY_SKILL_CONDITION_BASE,
+  );
+  const leaderAlterDispatchMatches = leaderAlterDispatchTarget === null
+    ? null : leaderAlterDispatchTarget === LEADER_ALTER_HANDLER;
+  const leaderAlterSetupMatches = leaderAlterSetupTarget === null
+    ? null : leaderAlterSetupTarget === LEADER_ALTER_SETUP_HANDLER;
+  const leaderAlterConditionMatches = leaderAlterConditionTarget === null
+    ? null : leaderAlterConditionTarget === LEADER_ALTER_CONDITION_HANDLER;
+  const leaderAlterInstructionAnchorsMatch = restoredElf === null ? null
+    : LEADER_ALTER_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
   const normalAttackDispatchTarget = resolveEnemySkillTarget(
     NORMAL_ATTACK_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -4106,6 +4147,19 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       leaderSwapConditionMatches21_9: leaderSwapConditionMatches,
       leaderSwapSemantics:
         'type 75: condition checks that the native changeable-sub count is positive; setup copies signed-int16 +0x10 turns to runtime +0x678, consumes one LCG roll, selects one eligible party index 1..4 by rank, and stores it at +0x67c; execution installs the global leader-change duration and selected index, swaps that sub with slot 0 through _doLeaderChange, and restores the original order on expiry',
+      leaderAlterType: LEADER_ALTER_ENEMY_SKILL_TYPE,
+      leaderAlterDispatchTarget: leaderAlterDispatchTarget === null
+        ? null : hex(leaderAlterDispatchTarget),
+      leaderAlterDispatchMatches21_9: leaderAlterDispatchMatches,
+      leaderAlterSetupTarget: leaderAlterSetupTarget === null
+        ? null : hex(leaderAlterSetupTarget),
+      leaderAlterSetupMatches21_9: leaderAlterSetupMatches,
+      leaderAlterConditionTarget: leaderAlterConditionTarget === null
+        ? null : hex(leaderAlterConditionTarget),
+      leaderAlterConditionMatches21_9: leaderAlterConditionMatches,
+      leaderAlterInstructionAnchorsMatch21_9: leaderAlterInstructionAnchorsMatch,
+      leaderAlterSemantics:
+        'type 125 is ESLeaderAlter: dispatch reads unsigned params[1] and writes duration+10000 to protected sGAMEWORK+0x84780, writes params[2] to +0x84770, then enters the leader-change controller; setup has no sMONSTER+0x678 scratch payload and schedules presentation effect 80 from +0x84860; the new-AI condition admits while +0x84780 is inactive or when the active target id differs, rejecting same-target reapplication without consuming RNG',
       normalAttackType: NORMAL_ATTACK_ENEMY_SKILL_TYPE,
       normalAttackDispatchTarget: normalAttackDispatchTarget === null
         ? null : hex(normalAttackDispatchTarget),
@@ -5110,6 +5164,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || leaderSwapDispatchMatches === false
     || leaderSwapSetupMatches === false
     || leaderSwapConditionMatches === false
+    || leaderAlterDispatchMatches === false
+    || leaderAlterSetupMatches === false
+    || leaderAlterConditionMatches === false
+    || leaderAlterInstructionAnchorsMatch === false
     || normalAttackDispatchMatches === false
     || normalAttackSetupMatches === false
     || normalAttackConditionMatches === false

@@ -2,6 +2,22 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-28 leader alter (type 125)
+
+- Confirmed `ESLeaderAlter` against the exact native dispatch `0x62a6e0`,
+  presentation setup `0x620188`, and same-target AI condition `0x61bae8`.
+- The browser decodes the unsigned-low16 duration and target card id, mirrors
+  native status writes (`+0x84780 = duration + 10000`, `+0x84770 = target`),
+  prevents a same-target reapplication without consuming RNG, and applies the
+  target card's leader skill when that card is present in the compact party
+  model. Unresolved card ids remain explicit and fall back to the current
+  leader instead of fabricating a card database entry.
+- Added a visible HUD/leader-card marker, direct decoder/AI/countdown fixtures,
+  native instruction-anchor checks, and a focused Chromium render fixture.
+  Gameplay rules, Wasm, build, browser input/render, and console checks pass;
+  the native phase-controller lifetime is still documented as an evidence-
+  bounded approximation.
+
 ## 2026-08-28 binary-port callback guard and startup pass
 
 - Added a startup capability probe for the exact native-frame `NEG V2.2S`

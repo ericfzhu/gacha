@@ -44,6 +44,11 @@ export const PAD_ENEMY_SKILL_ATTRIBUTE_RESIST = 72;
 export const PAD_ENEMY_SKILL_RESOLVE = 73;
 export const PAD_ENEMY_SKILL_DAMAGE_SHIELD = 74;
 export const PAD_ENEMY_SKILL_LEADER_SWAP = 75;
+// Type 125 changes the active leader to a card id for the authored duration.
+// Unlike type 75 it does not swap two party slots; the native handler writes
+// the duration/target into the protected game-work lanes at +0x84780/+0x84770
+// and lets the leader-change controller resolve the card presentation.
+export const PAD_ENEMY_SKILL_LEADER_ALTER = 125;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES_4 = 76;
 export const PAD_ENEMY_SKILL_VERTICAL_LINES = 77;
 export const PAD_ENEMY_SKILL_HORIZONTAL_LINES_4 = 78;
@@ -859,6 +864,23 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       supported: true,
       durationTurns: Math.max(0, (definition.getInt32(0x10, true) << 16) >> 16),
       selectedPartyIndex: null,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_LEADER_ALTER) {
+    requireLength(definitionBytes, 0x18, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'leaderAlter',
+      supported: true,
+      // _doEnemySkill loads params[1] with ldrh (not ldrsh), then adds the
+      // native 10000 status bias before writing +0x84780.
+      durationTurns: definition.getUint16(0x10, true),
+      targetCardId: definition.getUint32(0x14, true),
+      nativeStatusOffset: 0x84780,
+      nativeTargetOffset: 0x84770,
+      nativeDurationBias: 10_000,
+      nativeSetupEffectId: 80,
       attackWithSkillValue,
     });
   }
@@ -2097,6 +2119,17 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_LEADER_ALTER) {
+    // Type 125 has no sMONSTER scratch payload.  Its setup path writes the
+    // authored values directly to sGAMEWORK+0x84780/+0x84770 and launches
+    // presentation effect 80, so retain the definition as the runtime
+    // record while still requiring the normal native monster object shape.
+    requireLength(definitionBytes, 0x18, 'PAD enemy-skill definition');
+    return Object.freeze({
+      ...decodePadEnemySkillDefinition(definitionBytes),
+      setupMaterialized: true,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_NORMAL_ATTACK) {
     requireLength(monsterBytes, 0x674, 'PAD monster runtime');
     return Object.freeze({
@@ -3230,6 +3263,27 @@ export function normalizePadEnemySkillRecord(record) {
       supported: record?.supported !== false,
       durationTurns: Math.max(0, (Math.trunc(Number(record?.durationTurns) || 0) << 16) >> 16),
       selectedPartyIndex: Number.isInteger(selectedPartyIndex) ? selectedPartyIndex : null,
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_LEADER_ALTER || record?.kind === 'leaderAlter') {
+    const targetCardId = Number(record?.targetCardId);
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_LEADER_ALTER,
+      kind: 'leaderAlter',
+      supported: record?.supported !== false,
+      // The native dispatch consumes the low unsigned 16 bits of params[1].
+      durationTurns: Math.max(0, Math.trunc(Number(record?.durationTurns) || 0)) & 0xffff,
+      targetCardId: Number.isFinite(targetCardId)
+        ? Math.trunc(targetCardId) >>> 0
+        : 0,
+      nativeStatusOffset: 0x84780,
+      nativeTargetOffset: 0x84770,
+      nativeDurationBias: 10_000,
+      nativeSetupEffectId: 80,
       setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null

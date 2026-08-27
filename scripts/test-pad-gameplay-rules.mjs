@@ -66,6 +66,7 @@ import {
   PAD_ENEMY_SKILL_RESOLVE,
   PAD_ENEMY_SKILL_DAMAGE_SHIELD,
   PAD_ENEMY_SKILL_LEADER_SWAP,
+  PAD_ENEMY_SKILL_LEADER_ALTER,
   PAD_ENEMY_SKILL_NORMAL_ATTACK,
   PAD_ENEMY_SKILL_MULTI_ATTACK,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
@@ -3508,6 +3509,140 @@ assert.equal(directLeaderSwapEngine.leaderSwapIndex, null);
 assert.deepEqual(directLeaderSwapEngine.party.slice(0, 2).map(({ id }) => id), [
   'ember', 'marina',
 ]);
+const leaderAlterDefinition = enemyAiInactivityDefinition.slice();
+const leaderAlterView = new DataView(leaderAlterDefinition.buffer);
+leaderAlterView.setUint32(0x00, 9_055, true);
+leaderAlterView.setInt16(0x04, PAD_ENEMY_SKILL_LEADER_ALTER, true);
+leaderAlterView.setInt32(0x10, 4, true);
+leaderAlterView.setUint32(0x14, 777, true);
+leaderAlterView.setInt32(0x44, 0, true);
+assert.deepEqual(decodePadEnemySkillDefinition(leaderAlterDefinition), {
+  type: 125,
+  kind: 'leaderAlter',
+  supported: true,
+  durationTurns: 4,
+  targetCardId: 777,
+  nativeStatusOffset: 0x84780,
+  nativeTargetOffset: 0x84770,
+  nativeDurationBias: 10_000,
+  nativeSetupEffectId: 80,
+  attackWithSkillValue: 0,
+});
+assert.deepEqual(decodePadEnemySkillRuntime(
+  leaderAlterDefinition,
+  new Uint8Array(0x680),
+), {
+  type: 125,
+  kind: 'leaderAlter',
+  supported: true,
+  durationTurns: 4,
+  targetCardId: 777,
+  nativeStatusOffset: 0x84780,
+  nativeTargetOffset: 0x84770,
+  nativeDurationBias: 10_000,
+  nativeSetupEffectId: 80,
+  attackWithSkillValue: 0,
+  setupMaterialized: true,
+});
+const directLeaderAlterEngine = new PuzzleEngine({ seed: 21_900 });
+directLeaderAlterEngine.party[0].leaderSkill = null;
+directLeaderAlterEngine.party[2].cardId = 777;
+directLeaderAlterEngine.party[2].leaderSkill = {
+  type: 'comboAttack',
+  thresholds: [{ combos: 4, multiplier: 2 }],
+};
+const directLeaderAlterRng = directLeaderAlterEngine.rng.state;
+assert.equal(directLeaderAlterEngine.applyEnemySkillDefinition(leaderAlterDefinition), true);
+assert.equal(directLeaderAlterEngine.rng.state, directLeaderAlterRng);
+assert.deepEqual(directLeaderAlterEngine.party.map(({ id }) => id), [
+  'ember', 'marina', 'briar', 'sol', 'nyx', 'helper',
+]);
+assert.deepEqual(directLeaderAlterEngine.snapshot().leaderAlterRule, {
+  active: true,
+  turnsRemaining: 4,
+  targetCardId: 777,
+  targetResolved: true,
+  nativeStatusOffset: 0x84780,
+  nativeTargetOffset: 0x84770,
+  nativeDurationBias: 10_000,
+  nativeStatusValue: 10_004,
+  nativeSetupEffectId: 80,
+  skipInitialCountdown: true,
+});
+assert.equal(directLeaderAlterEngine.snapshot().lastEnemySkill.targetResolved, true);
+directLeaderAlterEngine.comboCount = 4;
+directLeaderAlterEngine.turnMatches = [];
+directLeaderAlterEngine.resolvePlayerTurn();
+assert.equal(directLeaderAlterEngine.lastLeaderMultiplier, 4);
+assert.equal(directLeaderAlterEngine.applyEnemySkillDefinition(leaderAlterDefinition), false);
+directLeaderAlterEngine.advanceLeaderAlterTurns();
+assert.equal(directLeaderAlterEngine.leaderAlterRule.turnsRemaining, 3);
+directLeaderAlterEngine.advanceLeaderAlterTurns();
+directLeaderAlterEngine.advanceLeaderAlterTurns();
+directLeaderAlterEngine.advanceLeaderAlterTurns();
+assert.deepEqual(directLeaderAlterEngine.snapshot().leaderAlterRule, {
+  active: false,
+  turnsRemaining: 0,
+  targetCardId: 777,
+  targetResolved: true,
+  nativeStatusOffset: 0x84780,
+  nativeTargetOffset: 0x84770,
+  nativeDurationBias: 10_000,
+  nativeStatusValue: 10_004,
+  nativeSetupEffectId: 80,
+  skipInitialCountdown: true,
+});
+const leaderAlterAiDefinition = leaderAlterDefinition.slice();
+const leaderAlterAiView = new DataView(leaderAlterAiDefinition.buffer);
+leaderAlterAiView.setInt32(0x30, 10_000, true);
+leaderAlterAiView.setInt32(0x34, 1_000, true);
+leaderAlterAiView.setInt32(0x38, 100, true);
+leaderAlterAiView.setInt32(0x40, 20, true);
+const leaderAlterMonsterDefinition = enemyAiMonsterDefinition.slice();
+const leaderAlterMonsterView = new DataView(leaderAlterMonsterDefinition.buffer);
+leaderAlterMonsterView.setUint32(0xec, 9_055, true);
+const leaderAlterMonster = decodePadEnemyAiMonsterDefinition(leaderAlterMonsterDefinition);
+const leaderAlterAi = decodePadEnemyAiSkillDefinition(leaderAlterAiDefinition);
+assert.equal(selectPadEnemyAiNew(
+  leaderAlterMonster,
+  [leaderAlterAi],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    leaderAlterTurns: 0,
+    leaderAlterTargetCardId: null,
+    rngState: 21_900,
+  },
+).skillId, 9_055);
+const leaderAlterSameTarget = selectPadEnemyAiNew(
+  leaderAlterMonster,
+  [leaderAlterAi],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    leaderAlterTurns: 2,
+    leaderAlterTargetCardId: 777,
+    rngState: 21_900,
+  },
+);
+assert.equal(leaderAlterSameTarget.skillId, null);
+assert.equal(leaderAlterSameTarget.rngState, 21_900);
+const leaderAlterDifferentTarget = selectPadEnemyAiNew(
+  leaderAlterMonster,
+  [leaderAlterAi],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    leaderAlterTurns: 2,
+    leaderAlterTargetCardId: 778,
+    rngState: 21_900,
+  },
+);
+assert.equal(leaderAlterDifferentTarget.skillId, 9_055);
+assert.equal(leaderAlterDifferentTarget.rngState, padLcgStep(21_900).state);
 const enemyAiNormalAttackDefinition = enemyAiInactivityDefinition.slice();
 const enemyAiNormalAttackView = new DataView(enemyAiNormalAttackDefinition.buffer);
 enemyAiNormalAttackView.setUint32(0x00, 9_060, true);

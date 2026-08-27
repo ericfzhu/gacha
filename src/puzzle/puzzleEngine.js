@@ -102,6 +102,7 @@ import {
   PAD_ENEMY_SKILL_RESOLVE,
   PAD_ENEMY_SKILL_DAMAGE_SHIELD,
   PAD_ENEMY_SKILL_LEADER_SWAP,
+  PAD_ENEMY_SKILL_LEADER_ALTER,
   PAD_ENEMY_SKILL_NORMAL_ATTACK,
   PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
   PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
@@ -389,6 +390,7 @@ export class PuzzleEngine {
     this.boardSizeChangeSkipPostEnemyCountdown = false;
     this.leaderSwapTurns = 0;
     this.leaderSwapIndex = null;
+    this.leaderAlterRule = null;
     this.enemySkillQueues.forEach((queue) => { queue.position = 0; });
     this.enemyAiPools.forEach((pool) => {
       if (pool) {
@@ -1130,9 +1132,28 @@ export class PuzzleEngine {
     });
   }
 
+  effectiveLeaderMember() {
+    const rule = this.leaderAlterRule;
+    if (rule?.active && rule.turnsRemaining > 0) {
+      const targetCardId = Number(rule.targetCardId);
+      const target = this.party.find((member) => (
+        member?.present !== false
+        && Number.isFinite(targetCardId)
+        && Number(member.cardId) === targetCardId
+      ));
+      // The APK can resolve a card id from its card database.  This small
+      // engine only has the party cards supplied by the caller, so an absent
+      // target remains observable as unresolved while the current leader
+      // continues to drive combat.
+      if (target) return target;
+    }
+    return this.party[0];
+  }
+
   resolvePlayerTurn() {
-    const leader = Number(this.party[0]?.bindTurns || 0) > 0
-      ? 1 : padComboLeaderMultiplier(this.comboCount, this.party[0]?.leaderSkill);
+    const leaderMember = this.effectiveLeaderMember();
+    const leader = Number(leaderMember?.bindTurns || 0) > 0
+      ? 1 : padComboLeaderMultiplier(this.comboCount, leaderMember?.leaderSkill);
     const helper = Number(this.party[5]?.bindTurns || 0) > 0
       ? 1 : padComboLeaderMultiplier(this.comboCount, this.party[5]?.leaderSkill);
     const leaderPair = leader * helper;
@@ -1360,6 +1381,7 @@ export class PuzzleEngine {
     this.advanceEnemyDamageShieldTurns();
     this.advanceEnemyDamageImmunityTurns();
     this.advanceLeaderSwapTurns();
+    this.advanceLeaderAlterTurns();
     this.advanceSkyfallRateRules();
     this.advanceNoSkyfallTurns();
     this.advanceLockFallRules();
@@ -1489,6 +1511,12 @@ export class PuzzleEngine {
       enemyDamageImmunityPresentation: enemy.damageImmunityPresentation,
       leaderSwapTurns: this.leaderSwapTurns,
       leaderSwapCandidateCount: this.leaderSwapCandidateIndices().length,
+      leaderAlterTurns: this.leaderAlterRule?.active
+        ? Math.max(0, Math.trunc(Number(this.leaderAlterRule.turnsRemaining) || 0))
+        : 0,
+      leaderAlterTargetCardId: this.leaderAlterRule?.active
+        ? this.leaderAlterRule.targetCardId
+        : null,
       skyfallNaturalTurns: this.skyfallRateRules.natural?.turnsRemaining || 0,
       skyfallNaturalMask: this.skyfallRateRules.natural?.typeMask || 0,
       skyfallHazardTurns: this.skyfallRateRules.hazard?.turnsRemaining || 0,
@@ -1530,6 +1558,7 @@ export class PuzzleEngine {
       party: this.party.map((member) => ({
         present: member.present !== false,
         bindTurns: Math.max(0, Math.trunc(Number(member.bindTurns) || 0)),
+        ...(member.cardId === undefined ? {} : { cardId: member.cardId }),
       })),
       enemies: this.enemies.map((candidate) => ({
         hp: candidate.hp,
@@ -1864,6 +1893,15 @@ export class PuzzleEngine {
       return Object.freeze({
         ...record,
         selectedPartyIndex,
+        setupMaterialized: true,
+      });
+    }
+    if (skill.supported && skill.kind === 'leaderAlter' && !skill.setupMaterialized) {
+      // Type 125's setup path writes the definition operands directly to the
+      // protected game-work lanes and consumes no gameplay RNG. Mark the
+      // record materialized without fabricating a party-card selection.
+      return Object.freeze({
+        ...record,
         setupMaterialized: true,
       });
     }
@@ -2331,6 +2369,17 @@ export class PuzzleEngine {
       [this.party[0], this.party[index]] = [this.party[index], this.party[0]];
     }
     this.leaderSwapIndex = null;
+  }
+
+  advanceLeaderAlterTurns() {
+    if (!this.leaderAlterRule?.active) return;
+    this.leaderAlterRule.turnsRemaining = Math.max(
+      0,
+      Math.trunc(Number(this.leaderAlterRule.turnsRemaining) || 0) - 1,
+    );
+    if (this.leaderAlterRule.turnsRemaining === 0) {
+      this.leaderAlterRule.active = false;
+    }
   }
 
   advanceSkyfallRateRules() {
@@ -3121,6 +3170,43 @@ export class PuzzleEngine {
       this.message = `${this.party[0].name} was swapped into the leader slot for ${this.leaderSwapTurns} turn${this.leaderSwapTurns === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'leaderAlter') {
+      const durationTurns = Math.max(0, Math.trunc(Number(skill.durationTurns) || 0)) & 0xffff;
+      const targetCardId = Math.trunc(Number(skill.targetCardId) || 0) >>> 0;
+      const active = this.leaderAlterRule?.active
+        && this.leaderAlterRule.turnsRemaining > 0;
+      if (durationTurns <= 0 || targetCardId === 0 || (
+        active && Number(this.leaderAlterRule.targetCardId) === targetCardId
+      )) return false;
+      const targetMember = this.party.find((member) => (
+        member?.present !== false && Number(member.cardId) === targetCardId
+      ));
+      this.leaderAlterRule = {
+        active: true,
+        turnsRemaining: durationTurns,
+        targetCardId,
+        targetResolved: Boolean(targetMember),
+        nativeStatusOffset: 0x84780,
+        nativeTargetOffset: 0x84770,
+        nativeDurationBias: 10_000,
+        nativeStatusValue: durationTurns + 10_000,
+        nativeSetupEffectId: 80,
+        // Setup is invoked after the turn's status-advance pass, so the
+        // newly installed duration survives until the next enemy boundary.
+        skipInitialCountdown: true,
+      };
+      this.lastEnemySkill = Object.freeze({
+        ...skill,
+        durationTurns,
+        targetCardId,
+        targetResolved: Boolean(targetMember),
+        nativeStatusValue: durationTurns + 10_000,
+      });
+      this.message = targetMember
+        ? `Leader changed to ${targetMember.name} for ${durationTurns} turn${durationTurns === 1 ? '' : 's'}.`
+        : `Leader changed to card #${targetCardId} for ${durationTurns} turn${durationTurns === 1 ? '' : 's'}.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'normalAttack') {
       this.message = 'Enemy performs a normal attack.';
       return true;
@@ -3546,6 +3632,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_RESOLVE,
         PAD_ENEMY_SKILL_DAMAGE_SHIELD,
         PAD_ENEMY_SKILL_LEADER_SWAP,
+        PAD_ENEMY_SKILL_LEADER_ALTER,
         PAD_ENEMY_SKILL_NORMAL_ATTACK,
         PAD_ENEMY_SKILL_LONE_ATTACK_BOOST,
         PAD_ENEMY_SKILL_STATUS_TRIGGERED_ATTACK_BOOST,
@@ -4346,6 +4433,7 @@ export class PuzzleEngine {
       moveTimeReduction: this.moveTimeReduction ? { ...this.moveTimeReduction } : null,
       blackFallRule: this.blackFallRule ? { ...this.blackFallRule } : null,
       noSkyfallRule: this.noSkyfallRule ? { ...this.noSkyfallRule } : null,
+      leaderAlterRule: this.leaderAlterRule ? { ...this.leaderAlterRule } : null,
       thornFallRule: this.thornFallRule ? { ...this.thornFallRule } : null,
       nailFallRule: this.nailFallRule ? { ...this.nailFallRule } : null,
       enhancedFallAwakenings: [...this.enhancedFallAwakenings],
@@ -4419,13 +4507,20 @@ export class PuzzleEngine {
       leaderPairMultiplier: this.lastLeaderMultiplier,
       leaderSwapTurns: this.leaderSwapTurns,
       leaderSwapIndex: this.leaderSwapIndex,
+      leaderAlterTurns: this.leaderAlterRule?.active
+        ? this.leaderAlterRule.turnsRemaining
+        : 0,
+      leaderAlterTargetCardId: this.leaderAlterRule?.active
+        ? this.leaderAlterRule.targetCardId
+        : null,
       nativePlayerBuffStatus: {
         auxiliaryTurns: this.playerAuxiliaryBuffTurns,
         attackBoostTurns: this.playerAttackBoostTurns,
       },
       player: { ...this.player },
-      party: this.party.map(({ id, name, attribute, secondaryAttribute, tertiaryAttribute, secondaryAttributeChanged = false, monsterTypes = [], addedMonsterTypeMask = 0, attack, recovery, damageCap, helper = false, leaderSkill = null, present = true, bindTurns = 0, bindResist = false, superBindResist = false }) => ({
+      party: this.party.map(({ id, cardId, name, attribute, secondaryAttribute, tertiaryAttribute, secondaryAttributeChanged = false, monsterTypes = [], addedMonsterTypeMask = 0, attack, recovery, damageCap, helper = false, leaderSkill = null, present = true, bindTurns = 0, bindResist = false, superBindResist = false }) => ({
         id,
+        ...(cardId === undefined ? {} : { cardId }),
         name,
         attribute,
         secondaryAttribute,
