@@ -150,7 +150,11 @@ self.onmessage = async ({ data }) => {
       onProgress: progress('wrapper checks'),
     });
     if (wrapperRun.status !== 1 || wrapperRun.exited) throw new Error(`Protection wrapper did not return cleanly (CPU status ${wrapperRun.status}).`);
-    runtime.exports.arm64_set_diagnostics(1);
+    // The protected module pass is a pure guest execution phase.  Keep the
+    // interpreter's optional call/register history off while it runs; that
+    // history is only used to explain host events and faults, not by the
+    // native code itself.  Re-enable it before JNI/lifecycle callbacks.
+    runtime.exports.arm64_set_diagnostics(0);
 
     linux.mountSharedObject('/data/app/jp.gungho.pad/lib/arm64/libopenal.so', runtimeFiles.libopenal, 0x3e00000);
     const openalObject = linux.findSharedObject('/data/app/jp.gungho.pad/lib/arm64/libopenal.so');
@@ -224,7 +228,10 @@ self.onmessage = async ({ data }) => {
     linux.onSlice = discoverPadProtectionModule;
     runtime.exports.arm64_set_module_trace(1);
     let padRun = await linux.runAsync(1_200_000_000, 10_000, {
-      instructionsPerSlice: 10_000,
+      // The Wasm core stops synchronously at a module tracepoint, so a small
+      // polling slice is unnecessary here.  Larger slices avoid tens of
+      // thousands of JS↔Wasm calls while preserving the exact trace boundary.
+      instructionsPerSlice: 100_000,
       instructionsPerYield: 500_000,
       onProgress: progress('PAD'),
       onEvent: discoverPadProtectionModule,
@@ -251,7 +258,7 @@ self.onmessage = async ({ data }) => {
       runtime.exports.arm64_step();
       runtime.exports.arm64_set_module_trace(1);
       padRun = await linux.runAsync(1_200_000_000, 10_000, {
-        instructionsPerSlice: 10_000,
+        instructionsPerSlice: 100_000,
         instructionsPerYield: 500_000,
         onProgress: progress(`PAD module ${padModules.length + 1}`),
         onEvent: discoverPadProtectionModule,
@@ -266,6 +273,7 @@ self.onmessage = async ({ data }) => {
         `decoder outputs ${JSON.stringify(padDiscoveryObservations)}).`,
       );
     }
+    runtime.exports.arm64_set_diagnostics(1);
     linux.refreshSharedObjectMetadata(padObject);
     const jniOnLoadAddress = linux.resolveSymbolAddress('JNI_OnLoad');
     const jniVersion = jniOnLoadAddress

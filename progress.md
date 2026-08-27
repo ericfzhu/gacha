@@ -2,6 +2,19 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-28 binary-port startup latency
+
+- Kept module tracepoints enabled for every protected hand-off (the exact
+  loader needs those pauses), but raised the host polling slice from 10,000
+  to 100,000 ARM64 instructions and disabled optional call/register history
+  during the protected pass. Diagnostics are restored before JNI and native
+  lifecycle callbacks, so crash/event reporting and gameplay behavior retain
+  their previous detail.
+- Exact APK Chromium smoke still reaches the authentic Japanese startup screen
+  with frame 199, 21,766 draw calls, 151,900,682 reported deep instructions,
+  and no callback/page errors; the measured loader boundary was about 71.5 s
+  on this host (down from about 72.9 s in the preceding run).
+
 ## 2026-08-28 remaining-enemy turn-change passive (type 122)
 
 - Recovered native type `122` / remaining-enemy turn-change passive. The
