@@ -89,6 +89,10 @@ export const PAD_ENEMY_SKILL_TYPE_RESIST = 118;
 export const PAD_ENEMY_SKILL_DAMAGE_IMMUNITY = 119;
 export const PAD_ENEMY_SKILL_BRANCH_REMAINING_ENEMIES = 120;
 export const PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_OFF = 121;
+// Native type 122 arms the acting monster's turn interval when the live
+// enemy count falls to its authored threshold.  It is a passive slot skill,
+// not a scheduled action.
+export const PAD_ENEMY_SKILL_REMAINING_ENEMIES_TURN_CHANGE = 122;
 export const PAD_ENEMY_SKILL_BLACK_FALL = 128;
 export const PAD_ENEMY_SKILL_BLOCK_MINUS = 151;
 export const PAD_ENEMY_SKILL_BUR_DROP = 153;
@@ -455,6 +459,20 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       passive: true,
       hpThresholdPercent: (definition.getInt32(0x10, true) << 16) >> 16,
       turnCounter: definition.getInt32(0x14, true) & 0xffff,
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_REMAINING_ENEMIES_TURN_CHANGE) {
+    requireLength(definitionBytes, 0x18, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'remainingEnemiesTurnChangePassive',
+      supported: true,
+      passive: true,
+      // _gamePhaseMove and _resetEnemyAtkLeft both use signed halfword
+      // loads for the threshold and replacement interval.
+      remainingEnemiesThreshold: (definition.getInt32(0x10, true) << 16) >> 16,
+      turnCounter: (definition.getInt32(0x14, true) << 16) >> 16,
       attackWithSkillValue,
     });
   }
@@ -1235,6 +1253,18 @@ export function padEnemyTurnChangeTriggered(currentHp, maxHp, thresholdPercent) 
   return rounded <= threshold;
 }
 
+// Type 122's _gamePhaseMove callback counts non-escaped monsters with
+// positive HP and arms the passive once that inclusive count is at or below
+// the signed halfword threshold.  It does not touch the shared RNG.
+export function padEnemyRemainingEnemiesTurnChangeTriggered(
+  remainingEnemies,
+  threshold,
+) {
+  const count = Math.trunc(Number(remainingEnemies) || 0);
+  const limit = (Math.trunc(Number(threshold) || 0) << 16) >> 16;
+  return count >= 1 && limit >= 1 && count <= limit;
+}
+
 // Type 111 stores percentage mode as (authored percent - 100), while a zero
 // percentage selects the authored absolute maximum-HP operand directly.
 export function padEnemySkillMaxHpParameter(maxHpPercent, fixedMaxHp) {
@@ -1660,6 +1690,12 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
     return decodePadEnemySkillDefinition(definitionBytes);
   }
   if (type === PAD_ENEMY_SKILL_TURN_CHANGE) {
+    return Object.freeze({
+      ...decodePadEnemySkillDefinition(definitionBytes),
+      setupMaterialized: true,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_REMAINING_ENEMIES_TURN_CHANGE) {
     return Object.freeze({
       ...decodePadEnemySkillDefinition(definitionBytes),
       setupMaterialized: true,
@@ -2634,6 +2670,24 @@ export function normalizePadEnemySkillRecord(record) {
       passive: true,
       hpThresholdPercent: (Math.trunc(Number(record?.hpThresholdPercent) || 0) << 16) >> 16,
       turnCounter: Math.trunc(Number(record?.turnCounter) || 0) & 0xffff,
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (
+    type === PAD_ENEMY_SKILL_REMAINING_ENEMIES_TURN_CHANGE
+    || record?.kind === 'remainingEnemiesTurnChangePassive'
+  ) {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_REMAINING_ENEMIES_TURN_CHANGE,
+      kind: 'remainingEnemiesTurnChangePassive',
+      supported: record?.supported !== false,
+      passive: true,
+      remainingEnemiesThreshold:
+        (Math.trunc(Number(record?.remainingEnemiesThreshold) || 0) << 16) >> 16,
+      turnCounter: (Math.trunc(Number(record?.turnCounter) || 0) << 16) >> 16,
       setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null

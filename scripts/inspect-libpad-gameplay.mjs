@@ -877,6 +877,39 @@ const DAMAGE_IMMUNITY_OFF_INSTRUCTION_ANCHORS = Object.freeze([
   [0x61afd8, 0x54ffb2ca], // active immunity preserves incoming condition scale
   [0x61afdc, 0x14000410], // inactive immunity returns zero condition scale
 ]);
+const REMAINING_ENEMIES_TURN_CHANGE_ENEMY_SKILL_TYPE = 122;
+const REMAINING_ENEMIES_TURN_CHANGE_HANDLER = 0x62be50;
+const REMAINING_ENEMIES_TURN_CHANGE_SETUP_HANDLER = 0x621c94;
+const REMAINING_ENEMIES_TURN_CHANGE_CONDITION_HANDLER = 0x61c01c;
+const REMAINING_ENEMIES_TURN_CHANGE_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x62dad8, 0xb9400348], // passive scanner loads the skill id into +0xb40
+  [0x62dadc, 0x79168268], // store the id in the alternate turn-change lane
+  [0x62dae0, 0xb94012e8], // load signed remaining-enemy threshold
+  [0x62dae4, 0x79168668], // store threshold at +0xb42
+  [0x62dae8, 0xb94016e8], // load signed replacement interval
+  [0x62daec, 0x79168a68], // store interval at +0xb44
+  [0x64097c, 0x79d68668], // reset checks the alternate threshold
+  [0x640988, 0x91268260], // reset reads the shared passive status word
+  [0x640990, 0x72001c1f], // require the latched status byte
+  [0x640998, 0x79d68a61], // reset loads signed +0xb44 interval
+  [0x6596e4, 0x721c001f], // anger presentation tests selector bit 0x10
+  [0x6596f0, 0x9a880128], // choose +0xb40 instead of +0xb12 skill id
+  [0x659748, 0x79d68ac1], // choose signed +0xb44 interval
+  [0x681964, 0x912d0517], // type-122 scan starts at +0xb41
+  [0x68199c, 0x39400108], // skip escaped/unavailable slots
+  [0x6819a4, 0xd12bdb20], // load protected HP low half
+  [0x6819b0, 0xd12c1b20], // load protected HP high half
+  [0x6819c0, 0xf100051f], // require positive protected HP
+  [0x6819c8, 0x78f76b08], // load signed threshold
+  [0x6819d0, 0x540003ab], // reject a threshold below one
+  [0x6819e4, 0x37280300], // status bit five suppresses activation
+  [0x6819f0, 0x370802a0], // status bit one suppresses activation
+  [0x6819f8, 0xb9401fe9], // load remaining active-enemy count
+  [0x681a00, 0x5400022c], // activate when count is at most threshold
+  [0x681a10, 0x2a080001], // latch status bits 0x11
+  [0x681a18, 0x97f29b2e], // persist the latched status
+  [0x681a38, 0x321e0001], // optionally latch status bit 0x4
+]);
 const BLACK_FALL_ENEMY_SKILL_TYPE = 128;
 const BLACK_FALL_HANDLER = 0x62a854;
 const BLACK_FALL_SETUP_HANDLER = 0x6211a0;
@@ -2396,6 +2429,34 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : damageImmunityOffConditionTarget === DAMAGE_IMMUNITY_OFF_CONDITION_HANDLER;
   const damageImmunityOffInstructionAnchorsMatch = restoredElf === null ? null
     : DAMAGE_IMMUNITY_OFF_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
+  const remainingEnemiesTurnChangeDispatchTarget = resolveEnemySkillTarget(
+    REMAINING_ENEMIES_TURN_CHANGE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_DISPATCH_TABLE,
+    ENEMY_SKILL_DISPATCH_BASE,
+  );
+  const remainingEnemiesTurnChangeSetupTarget = resolveEnemySkillTarget(
+    REMAINING_ENEMIES_TURN_CHANGE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const remainingEnemiesTurnChangeConditionTarget = resolveEnemySkillTarget(
+    REMAINING_ENEMIES_TURN_CHANGE_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const remainingEnemiesTurnChangeDispatchMatches =
+    remainingEnemiesTurnChangeDispatchTarget === null
+      ? null : remainingEnemiesTurnChangeDispatchTarget === REMAINING_ENEMIES_TURN_CHANGE_HANDLER;
+  const remainingEnemiesTurnChangeSetupMatches =
+    remainingEnemiesTurnChangeSetupTarget === null
+      ? null : remainingEnemiesTurnChangeSetupTarget === REMAINING_ENEMIES_TURN_CHANGE_SETUP_HANDLER;
+  const remainingEnemiesTurnChangeConditionMatches =
+    remainingEnemiesTurnChangeConditionTarget === null
+      ? null : remainingEnemiesTurnChangeConditionTarget === REMAINING_ENEMIES_TURN_CHANGE_CONDITION_HANDLER;
+  const remainingEnemiesTurnChangeInstructionAnchorsMatch = restoredElf === null ? null
+    : REMAINING_ENEMIES_TURN_CHANGE_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
   const healPlayerDispatchTarget = resolveEnemySkillTarget(
@@ -4370,6 +4431,26 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       damageImmunityOffInstructionAnchorsMatch21_9: damageImmunityOffInstructionAnchorsMatch,
       damageImmunityOffSemantics:
         'type 121 owns no authored parameters: its condition is eligible only while signed-int16 sMONSTER+0x9c0 is at least one, and execution assigns zero to both +0x9c0 immunity and +0x9b0 presentation controllers before the native off animation',
+      remainingEnemiesTurnChangeType: REMAINING_ENEMIES_TURN_CHANGE_ENEMY_SKILL_TYPE,
+      remainingEnemiesTurnChangeDispatchTarget:
+        remainingEnemiesTurnChangeDispatchTarget === null
+          ? null : hex(remainingEnemiesTurnChangeDispatchTarget),
+      remainingEnemiesTurnChangeDispatchMatches21_9:
+        remainingEnemiesTurnChangeDispatchMatches,
+      remainingEnemiesTurnChangeSetupTarget:
+        remainingEnemiesTurnChangeSetupTarget === null
+          ? null : hex(remainingEnemiesTurnChangeSetupTarget),
+      remainingEnemiesTurnChangeSetupMatches21_9:
+        remainingEnemiesTurnChangeSetupMatches,
+      remainingEnemiesTurnChangeConditionTarget:
+        remainingEnemiesTurnChangeConditionTarget === null
+          ? null : hex(remainingEnemiesTurnChangeConditionTarget),
+      remainingEnemiesTurnChangeConditionMatches21_9:
+        remainingEnemiesTurnChangeConditionMatches,
+      remainingEnemiesTurnChangeInstructionAnchorsMatch21_9:
+        remainingEnemiesTurnChangeInstructionAnchorsMatch,
+      remainingEnemiesTurnChangeSemantics:
+        'type 122 is an initialization-time passive: the scanner copies skill id, signed +0x10 remaining-enemy threshold, and signed +0x14 replacement interval into sMONSTER+0xb40/+0xb42/+0xb44; _gamePhaseMove skips escaped/unavailable and nonpositive-HP slots, rejects status bits 0x20/0x2, and latches status 0x11 when the inclusive live count is at most the positive threshold (optionally adding bit 0x4); resetEnemyAtkLeft and anger presentation then use +0xb44/+0xb40, with no RNG or ordinary enemy action consumed',
       earlyDefenseShieldSkills: earlyDefenseShieldTargets.map((entry) => ({
         type: entry.type,
         kind: entry.kind,
@@ -4920,6 +5001,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || turnChangeSetupMatches === false
     || turnChangeConditionMatches === false
     || turnChangeInstructionAnchorsMatch === false
+    || remainingEnemiesTurnChangeDispatchMatches === false
+    || remainingEnemiesTurnChangeSetupMatches === false
+    || remainingEnemiesTurnChangeConditionMatches === false
+    || remainingEnemiesTurnChangeInstructionAnchorsMatch === false
     || attributeBlockDispatchMatches === false
     || attributeBlockSetupMatches === false
     || attributeBlockConditionMatches === false

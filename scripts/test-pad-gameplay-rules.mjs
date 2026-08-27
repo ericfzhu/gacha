@@ -43,6 +43,7 @@ import {
   PAD_ENEMY_SKILL_DAMAGE_IMMUNITY,
   PAD_ENEMY_SKILL_BRANCH_REMAINING_ENEMIES,
   PAD_ENEMY_SKILL_DAMAGE_IMMUNITY_OFF,
+  PAD_ENEMY_SKILL_REMAINING_ENEMIES_TURN_CHANGE,
   PAD_ENEMY_SKILL_ADDITIONAL_ATTACK,
   PAD_ENEMY_SKILL_DEFENSE_BOOST,
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
@@ -110,6 +111,7 @@ import {
   padEnemySkillPlayerHpCondition,
   padEnemySkillReviveHp,
   padEnemyTurnChangeTriggered,
+  padEnemyRemainingEnemiesTurnChangeTriggered,
   padEnemySkillMaxHpParameter,
   padEnemySkillChangedMaxHp,
 } from '../src/puzzle/padEnemySkills.js';
@@ -1461,6 +1463,42 @@ assert.deepEqual(
 assert.equal(padEnemyTurnChangeTriggered(46_340, 92_000, 50), true);
 assert.equal(padEnemyTurnChangeTriggered(46_461, 92_000, 50), false);
 assert.equal(padEnemyTurnChangeTriggered(1, 92_000, 0), false);
+const enemyAiRemainingEnemiesTurnChangeDefinition = enemyAiTurnChangeDefinition.slice();
+const enemyAiRemainingEnemiesTurnChangeView = new DataView(
+  enemyAiRemainingEnemiesTurnChangeDefinition.buffer,
+);
+enemyAiRemainingEnemiesTurnChangeView.setUint32(0x00, 9_122, true);
+enemyAiRemainingEnemiesTurnChangeView.setInt16(
+  0x04,
+  PAD_ENEMY_SKILL_REMAINING_ENEMIES_TURN_CHANGE,
+  true,
+);
+enemyAiRemainingEnemiesTurnChangeView.setInt16(0x10, 1, true);
+enemyAiRemainingEnemiesTurnChangeView.setInt16(0x14, -2, true);
+const expectedRemainingEnemiesTurnChangeDefinition = {
+  type: 122,
+  kind: 'remainingEnemiesTurnChangePassive',
+  supported: true,
+  passive: true,
+  remainingEnemiesThreshold: 1,
+  turnCounter: -2,
+  attackWithSkillValue: 0,
+};
+assert.deepEqual(
+  decodePadEnemySkillDefinition(enemyAiRemainingEnemiesTurnChangeDefinition),
+  expectedRemainingEnemiesTurnChangeDefinition,
+);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(
+    enemyAiRemainingEnemiesTurnChangeDefinition,
+    new Uint8Array(0x680),
+  ),
+  { ...expectedRemainingEnemiesTurnChangeDefinition, setupMaterialized: true },
+);
+assert.equal(padEnemyRemainingEnemiesTurnChangeTriggered(2, 1), false);
+assert.equal(padEnemyRemainingEnemiesTurnChangeTriggered(1, 1), true);
+assert.equal(padEnemyRemainingEnemiesTurnChangeTriggered(0, 1), false);
+assert.equal(padEnemyRemainingEnemiesTurnChangeTriggered(1, 0), false);
 const enemyAiAttributeBlockDefinition = enemyAiTurnChangeDefinition.slice();
 const enemyAiAttributeBlockView = new DataView(enemyAiAttributeBlockDefinition.buffer);
 enemyAiAttributeBlockView.setUint32(0x00, 9_087, true);
@@ -6055,6 +6093,74 @@ assert.equal(activeTurnChangeState.lastEnemyActions[0].damage, 1_850);
 assert.equal(activeTurnChangeState.enemies[0].counter, 1);
 assert.equal(activeTurnChangeState.enemies[0].turnChangeActive, true);
 assert.equal(activeTurnChangeState.rngState, 21_900);
+
+const remainingEnemiesTurnChangeEngineDefinition =
+  enemyAiRemainingEnemiesTurnChangeDefinition.slice();
+new DataView(remainingEnemiesTurnChangeEngineDefinition.buffer).setInt16(0x14, 1, true);
+const remainingEnemiesTurnChangeMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(remainingEnemiesTurnChangeMonsterDefinition.buffer).setUint32(0xec, 9_122, true);
+const remainingEnemiesTurnChangeEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: remainingEnemiesTurnChangeMonsterDefinition,
+    skillDefinitions: [remainingEnemiesTurnChangeEngineDefinition],
+  }],
+});
+assert.equal(
+  remainingEnemiesTurnChangeEngine.enemies[0].remainingEnemiesTurnChangeThreshold,
+  1,
+);
+assert.equal(remainingEnemiesTurnChangeEngine.enemies[0].remainingEnemiesTurnChangeCounter, 1);
+assert.equal(remainingEnemiesTurnChangeEngine.enemies[0].remainingEnemiesTurnChangeActive, false);
+remainingEnemiesTurnChangeEngine.enemies[1].hp = 0;
+remainingEnemiesTurnChangeEngine.party.forEach((member, index) => {
+  member.bindTurns = index === 0 ? 0 : 1;
+});
+remainingEnemiesTurnChangeEngine.comboCount = 1;
+remainingEnemiesTurnChangeEngine.turnMatches = [{ type: 'fire', size: 3, enhancedCount: 0 }];
+remainingEnemiesTurnChangeEngine.setRngState(21_900);
+remainingEnemiesTurnChangeEngine.resolvePlayerTurn();
+const triggeredRemainingEnemiesTurnChangeState = remainingEnemiesTurnChangeEngine.snapshot();
+assert.equal(triggeredRemainingEnemiesTurnChangeState.lastDamage, 1_660);
+assert.equal(triggeredRemainingEnemiesTurnChangeState.enemies[0].hp, 90_340);
+assert.equal(
+  triggeredRemainingEnemiesTurnChangeState.enemies[0].remainingEnemiesTurnChangeActive,
+  true,
+);
+assert.equal(triggeredRemainingEnemiesTurnChangeState.enemies[0].turnChangeActive, true);
+assert.equal(triggeredRemainingEnemiesTurnChangeState.enemies[0].maxCounter, 1);
+assert.equal(triggeredRemainingEnemiesTurnChangeState.enemies[0].counter, 1);
+assert.equal(triggeredRemainingEnemiesTurnChangeState.enemies[0].remainingEnemiesTurnChangeSkillId, 9_122);
+assert.equal(triggeredRemainingEnemiesTurnChangeState.rngState, 21_900);
+remainingEnemiesTurnChangeEngine.enemies[0].remainingEnemiesTurnChangeThreshold = 2;
+assert.equal(
+  remainingEnemiesTurnChangeEngine.updateEnemyRemainingEnemiesTurnChangePassive(
+    remainingEnemiesTurnChangeEngine.enemies[0],
+  ),
+  false,
+);
+const shieldedRemainingEnemiesTurnChangeEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: remainingEnemiesTurnChangeMonsterDefinition,
+    skillDefinitions: [remainingEnemiesTurnChangeEngineDefinition],
+  }],
+});
+shieldedRemainingEnemiesTurnChangeEngine.enemies[1].hp = 0;
+shieldedRemainingEnemiesTurnChangeEngine.enemies[0].statusShieldTurns = 2;
+assert.equal(
+  shieldedRemainingEnemiesTurnChangeEngine.updateEnemyRemainingEnemiesTurnChangePassive(
+    shieldedRemainingEnemiesTurnChangeEngine.enemies[0],
+  ),
+  false,
+);
+assert.equal(
+  shieldedRemainingEnemiesTurnChangeEngine.enemies[0].remainingEnemiesTurnChangeActive,
+  false,
+);
+remainingEnemiesTurnChangeEngine.setEnemyAiDefinitionPool(0, null, []);
+assert.equal(remainingEnemiesTurnChangeEngine.enemies[0].remainingEnemiesTurnChangeThreshold, 0);
+assert.equal(remainingEnemiesTurnChangeEngine.enemies[0].remainingEnemiesTurnChangeActive, false);
 
 const directAttributeBlockEngine = new PuzzleEngine({ seed: 21_900 });
 directAttributeBlockEngine.setRngState(21_900);

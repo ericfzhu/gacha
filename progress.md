@@ -2,6 +2,23 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-28 remaining-enemy turn-change passive (type 122)
+
+- Recovered native type `122` / remaining-enemy turn-change passive. The
+  passive scanner copies the skill id, signed remaining-enemy threshold, and
+  signed replacement interval from definition `+0x00/+0x10/+0x14` into
+  `sMONSTER+0xb40/+0xb42/+0xb44`.
+- `_gamePhaseMove` scans non-escaped, positive-HP slots and activates the
+  passive inclusively when the live count is at most the positive threshold,
+  unless native status bits `0x20` or `0x2` suppress it. Activation latches
+  status `0x11` (and optional `0x4`), and the attack reset/presentation paths
+  then use the signed `+0xb44` interval and `+0xb40` skill id without RNG.
+- The browser now decodes, installs, snapshots, and renders type `122`,
+  replaces the acting enemy's counter after a player resolution, rejects dead
+  or escaped actors and status-shielded activation, and preserves the native
+  inclusive count boundary. Pure fixtures, the native inspector, focused
+  Chromium, and the generic input/render smoke test pass.
+
 ## 2026-08-24 damage-immunity off
 
 - Recovered parameterless type `121` / `ESInvulnerableOff` at dispatch/setup/
