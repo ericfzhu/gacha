@@ -2,6 +2,30 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-28 protected snapshot warm reload
+
+- Investigated the remaining multi-minute browser load after the exact native
+  path reached its authentic startup boundary. The cold pass interprets about
+  151.9 million protected ARM64 instructions; the earlier ELF-only cache was
+  insufficient because the protector also creates 120 decoded mappings,
+  mutates loaded wrapper/libpad data segments, and allocates compatibility
+  trampolines at fixed host addresses.
+- Added a versioned IndexedDB snapshot keyed by the ARM64 core build and the
+  selected native/runtime payload hashes. It stores the restored libpad ELF,
+  full wrapper/libpad load-segment state, decoded mapping bytes/protections,
+  compatibility handlers/data, and deterministic host bridge addresses. The
+  snapshot is accepted only after structural validation; unavailable or stale
+  cache records fall back to the evidence-backed cold interpreter.
+- Verified a fresh cold launch populates the snapshot, then a persistent
+  browser-profile warm launch reaches JNI, 199 frames, 21,766 translated
+  draws, and four touch callbacks in about 13 seconds wall time with zero
+  protected instructions interpreted on that load. The warm screenshot remains
+  the same offline native startup surface, and no callback/page errors occur.
+- The binary page now labels warm loads separately and explains the cold versus
+  cached startup behavior. Commit: pending after the final build, browser,
+  Wasm, and APK smoke checks. Snapshot implementation commit: `e4a616b` on
+  `master`; the page/documentation follow-up is the next incremental commit.
+
 ## 2026-08-28 legacy status/fallback selector
 
 - Recovered the second `_chooseEnemyAi` pass at `0x61e300`, including its

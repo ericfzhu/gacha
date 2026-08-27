@@ -16,7 +16,10 @@ lifecycle and input calls into the library.
 The APK copy is protected: most original `.text` is restored only after a chain
 of transient AArch64 modules runs. The browser harness now executes that chain,
 captures the restored 26 MiB ELF image, calls `JNI_OnLoad`, and drives the native
-surface/frame/touch exports. The restored image contains a 10,427,240-byte `.text`
+surface/frame/touch exports. After the first cold pass, the browser can persist a
+validated protected-load snapshot in IndexedDB and restore the decoded mappings,
+host trampolines, and mutated load segments on later loads. The restored image
+contains a 10,427,240-byte `.text`
 section and, unusually for a release build, thousands of named dynamic C++
 symbols. Those symbols provide reliable boundaries for the gameplay routines.
 
@@ -2757,7 +2760,15 @@ Cold startup still interprets 151,900,682 guest instructions. The protection
 wrapper contributes 151,793,049 of them; `libpad.so` contributes 107,633 before
 the native lifecycle begins. The page reports elapsed time, current instruction
 count, and decoder generation so this expected minute-scale bootstrap is not
-confused with a stalled or stale worker.
+confused with a stalled or stale worker. A successful cold load then stores a
+versioned snapshot keyed by the decoder build and the selected native/runtime
+payload hashes. It includes the restored ELF, full wrapper/libpad load-segment
+state, 120 protector-created mapping images, and the compatibility bridge state needed by
+the native callbacks. With the same browser profile and payload, a warm load
+skips the protected interpreter and reaches the same JNI/frame/touch boundary
+in seconds; the page labels this as a warm restored-ELF cache hit. If IndexedDB
+is unavailable or a record fails validation, the browser uses the full cold
+path instead.
 
 This is an account/server boundary, not a CPU-port failure: protection, JNI,
 lifecycle, rendering, frames, touch callbacks, private-file loading, and payload

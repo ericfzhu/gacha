@@ -91,7 +91,11 @@ function drawRuntimeLab(ctx, state) {
       ['Custom protected section', state.elf.customSectionBytes ? `${state.elf.customSectionBytes.toLocaleString()} bytes` : 'not found'],
       ['Resident probe', state.elf.probePassed ? 'executed from loaded image' : 'not executed'],
       ['Constructor boundary', state.elf.constructorReached ? `${state.elf.constructorSteps} instructions → openat(${state.elf.firstPath})` : 'not reached'],
-      ['Protected loader', state.elf.decryptedModule ? `${state.elf.deepInstructions.toLocaleString()} instructions · ${state.elf.syscalls} syscalls · ${state.elf.executableStages} stages` : 'not reached'],
+      ['Protected loader', state.elf.protectedCacheHit
+        ? `warm restored ELF cache · ${state.elf.protectedInstructionsThisRun.toLocaleString()} instructions this load`
+        : state.elf.decryptedModule
+          ? `${state.elf.deepInstructions.toLocaleString()} instructions · ${state.elf.syscalls} syscalls · ${state.elf.executableStages} stages`
+          : 'not reached'],
       ['Current boundary', state.elf.loadSequence ? `${state.elf.loadSequence} · ${state.elf.deepStatus}` : state.elf.dependencyPath ? `Android namespace needs ${state.elf.dependencyPath}` : state.elf.deepStatus],
     ];
     rows.forEach(([label, value], index) => {
@@ -387,7 +391,7 @@ export default function BinaryPortPage() {
               ? ' · private data048/data030 state not present; native client remains at its offline startup screen'
               : ''}
           </output>
-          <small className="binary-port-note">Cold binary startup interprets about 152 million protected ARM64 instructions and can take 1–2 minutes; /puzzle opens the fast reconstructed core.</small>
+          <small className="binary-port-note">Cold binary startup interprets about 152 million protected ARM64 instructions and can take 1–2 minutes; successful loads cache the restored ELF locally for fast reloads, and /puzzle opens the fast reconstructed core.</small>
         </div>
       </section>
     </main>
