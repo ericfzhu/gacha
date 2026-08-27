@@ -19,6 +19,13 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
   inclusive count boundary. Pure fixtures, the native inspector, focused
   Chromium, and the generic input/render smoke test pass.
 
+## 2026-08-28 Wasm cache generation
+
+- Bumped the public ARM64 core URL from `20260824-frame21` to
+  `20260828-frame22`. `Arm64Runtime.create` already uses `cache: 'no-store'`,
+  so the new query also invalidates browser/service-worker deployments that
+  retained the older interpreter which reported `NEG V2.2S` (`0x2ea0b842`).
+
 ## 2026-08-24 damage-immunity off
 
 - Recovered parameterless type `121` / `ESInvulnerableOff` at dispatch/setup/
