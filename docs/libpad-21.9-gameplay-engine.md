@@ -702,9 +702,13 @@ status gates are available for combo absorb (67), inactivity presentation (70),
 damage void (71), damage shield (74), damage absorb (87), attribute absorb (53),
 awakening bind (88), and the candidate-count portion of leader swap (75). The
 leader/helper lane (54) now reproduces the native eligible-target ratio when
-the compact party records are present. Skyfall, leader swap, revive, and other
-lanes with unnamed native fields are playable through the same initialized-one
-fallback and report `legacyFallbackApproximation`.
+the compact party records are present. Skyfall rate (68) is exact whenever the
+requested natural and/or hazard status records are supplied as explicit
+`skyfallNaturalTurns`/`skyfallNaturalMask` and
+`skyfallHazardTurns`/`skyfallHazardMask` pairs; omitted pairs remain playable
+but report `legacyFallbackApproximation`. Leader swap, revive, and other lanes
+with unnamed native fields use the same initialized-one fallback and retain
+that diagnostic.
 
 Hosts that have a fuller `sMONSTER`/`sGAMEWORK` model can provide
 `legacyFallbackCondition(definition, state, context)` or a

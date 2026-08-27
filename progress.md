@@ -2,6 +2,19 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-28 exact legacy skyfall fallback gate
+
+- Confirmed the native type-68 status split: natural mask `0x03f` and hazard
+  mask `0x1c0` are independent, and an active matching mask blocks
+  reapplication while a different mask remains eligible for replacement.
+- Added explicit presence tracking for the four browser state fields. The
+  fallback selector now reports an exact result when every requested category
+  has its turns/mask pair, while a missing unrequested category does not reduce
+  fidelity and a missing requested category is marked approximate.
+- Added deterministic fixtures for matching natural+hazard statuses, replacing
+  one category with a different mask, and omitted status state. `npm run
+  pad-rules:test` passes; the documentation now records the exactness boundary.
+
 ## 2026-08-28 protected snapshot warm reload
 
 - Investigated the remaining multi-minute browser load after the exact native

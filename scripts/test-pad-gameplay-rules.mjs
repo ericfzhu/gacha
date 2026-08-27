@@ -861,6 +861,73 @@ assert.equal(openLegacyFallbackAttributeAbsorb.skillId, 9_006);
 assert.equal(openLegacyFallbackAttributeAbsorb.legacyFallbackScale, 1);
 assert.equal(openLegacyFallbackAttributeAbsorb.legacyFallbackProbability, 10_000);
 assert.equal(openLegacyFallbackAttributeAbsorb.fidelity, 'legacy-fallback-recovered');
+const legacyFallbackSkyfallDefinition = legacyFallbackType50Definition.slice();
+const legacyFallbackSkyfallView = new DataView(legacyFallbackSkyfallDefinition.buffer);
+legacyFallbackSkyfallView.setUint32(0x00, 9_009, true);
+legacyFallbackSkyfallView.setInt16(0x04, PAD_ENEMY_SKILL_SKYFALL_RATE, true);
+legacyFallbackSkyfallView.setUint32(0x10, 0x81, true);
+legacyFallbackSkyfallView.setInt32(0x14, 2, true);
+legacyFallbackSkyfallView.setInt32(0x18, 4, true);
+legacyFallbackSkyfallView.setInt32(0x1c, 25, true);
+const legacyFallbackSkyfallMonsterDefinition = legacyFallbackMonsterDefinition.slice();
+new DataView(legacyFallbackSkyfallMonsterDefinition.buffer).setUint32(0xec, 9_009, true);
+const decodedLegacyFallbackSkyfall = decodePadEnemyAiSkillDefinition(
+  legacyFallbackSkyfallDefinition,
+);
+const blockedLegacyFallbackSkyfall = selectPadEnemyAiLegacy(
+  decodePadEnemyAiMonsterDefinition(legacyFallbackSkyfallMonsterDefinition),
+  [decodedLegacyFallbackSkyfall],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    skyfallNaturalTurns: 2,
+    skyfallNaturalMask: 0x01,
+    skyfallHazardTurns: 2,
+    skyfallHazardMask: 0x80,
+    rngState: 21_900,
+  },
+);
+assert.equal(blockedLegacyFallbackSkyfall.skillId, null);
+assert.equal(blockedLegacyFallbackSkyfall.rngState, 394_448_415);
+assert.equal(blockedLegacyFallbackSkyfall.legacyFallbackApproximation, undefined);
+assert.equal(blockedLegacyFallbackSkyfall.fidelity, 'legacy-fallback-no-selection');
+const replacedLegacyFallbackSkyfall = selectPadEnemyAiLegacy(
+  decodePadEnemyAiMonsterDefinition(legacyFallbackSkyfallMonsterDefinition),
+  [decodedLegacyFallbackSkyfall],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    skyfallNaturalTurns: 2,
+    skyfallNaturalMask: 0x01,
+    skyfallHazardTurns: 2,
+    skyfallHazardMask: 0x40,
+    rngState: 21_900,
+  },
+);
+assert.equal(replacedLegacyFallbackSkyfall.skillId, 9_009);
+assert.equal(replacedLegacyFallbackSkyfall.legacyFallbackScale, 1);
+assert.equal(replacedLegacyFallbackSkyfall.legacyFallbackProbability, 10_000);
+assert.equal(replacedLegacyFallbackSkyfall.legacyFallbackApproximation, undefined);
+assert.equal(replacedLegacyFallbackSkyfall.fidelity, 'legacy-fallback-recovered');
+const missingLegacyFallbackSkyfall = selectPadEnemyAiLegacy(
+  decodePadEnemyAiMonsterDefinition(legacyFallbackSkyfallMonsterDefinition),
+  [decodedLegacyFallbackSkyfall],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    skyfallNaturalTurns: 2,
+    skyfallNaturalMask: 0x01,
+    rngState: 21_900,
+  },
+);
+assert.equal(missingLegacyFallbackSkyfall.skillId, 9_009);
+assert.equal(missingLegacyFallbackSkyfall.legacyFallbackScale, 1);
+assert.equal(missingLegacyFallbackSkyfall.legacyFallbackApproximation, true);
+assert.deepEqual(missingLegacyFallbackSkyfall.approximateFallbackTypes, [68]);
+assert.equal(missingLegacyFallbackSkyfall.fidelity, 'legacy-fallback-approximate');
 const legacyFallbackAwakeningBindDefinition = legacyFallbackType50Definition.slice();
 const legacyFallbackAwakeningBindView = new DataView(
   legacyFallbackAwakeningBindDefinition.buffer,

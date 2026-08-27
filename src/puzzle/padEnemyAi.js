@@ -1011,6 +1011,14 @@ function normalizeLegacySelectorState(state, monster) {
   };
   const integer = (value, fallback = 0) => Math.trunc(numeric(value, fallback));
   const nonNegative = (value, fallback = 0) => Math.max(0, integer(value, fallback));
+  // Type 68 has two independent native status records. Keep presence separate
+  // from the normalized zero defaults so a direct host cannot accidentally
+  // claim exact parity simply by omitting the status fields.
+  const hasOwn = (key) => Object.prototype.hasOwnProperty.call(state, key);
+  const skyfallNaturalStatePresent = hasOwn('skyfallNaturalTurns')
+    && hasOwn('skyfallNaturalMask');
+  const skyfallHazardStatePresent = hasOwn('skyfallHazardTurns')
+    && hasOwn('skyfallHazardMask');
   return {
     currentHp: nonNegative(state.currentHp),
     maxHp: nonNegative(state.maxHp),
@@ -1041,8 +1049,10 @@ function normalizeLegacySelectorState(state, monster) {
     enemyInactivityPresentationActive: Boolean(state.enemyInactivityPresentationActive),
     skyfallNaturalTurns: nonNegative(state.skyfallNaturalTurns),
     skyfallNaturalMask: integer(state.skyfallNaturalMask) & 0x3f,
+    skyfallNaturalStatePresent,
     skyfallHazardTurns: nonNegative(state.skyfallHazardTurns),
     skyfallHazardMask: integer(state.skyfallHazardMask) & 0x1c0,
+    skyfallHazardStatePresent,
     lockFallRules: (Array.isArray(state.lockFallRules) ? state.lockFallRules : []).map((rule) => ({
       typeMask: integer(rule?.typeMask) & 0xffff,
       source: rule?.source == null ? null : String(rule.source),
@@ -1343,10 +1353,14 @@ function legacyFallbackBuiltinScale(definition, state) {
       state.skyfallHazardTurns <= 0 || hazardMask !== requestedHazardMask
     );
     const eligible = naturalEligible || hazardEligible;
+    const exact = (requestedNaturalMask === 0 || state.skyfallNaturalStatePresent)
+      && (requestedHazardMask === 0 || state.skyfallHazardStatePresent);
     return {
       scale: eligible ? Math.fround(1) : Math.fround(0),
-      exact: false,
-      mode: eligible ? 'skyfall-status-eligible' : 'skyfall-status-active',
+      exact,
+      mode: eligible
+        ? exact ? 'skyfall-status-eligible' : 'skyfall-status-eligible-missing-state'
+        : exact ? 'skyfall-status-active' : 'skyfall-status-active-missing-state',
     };
   }
   if (type === 70) {
