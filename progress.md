@@ -22,9 +22,9 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
   protected instructions interpreted on that load. The warm screenshot remains
   the same offline native startup surface, and no callback/page errors occur.
 - The binary page now labels warm loads separately and explains the cold versus
-  cached startup behavior. Commit: pending after the final build, browser,
-  Wasm, and APK smoke checks. Snapshot implementation commit: `e4a616b` on
-  `master`; the page/documentation follow-up is the next incremental commit.
+  cached startup behavior. Final build, browser, Wasm, and APK smoke checks
+  pass. Snapshot implementation commit: `e4a616b` and
+  page/documentation commit: `9c922b8`, both on `master`.
 
 ## 2026-08-28 legacy status/fallback selector
 
