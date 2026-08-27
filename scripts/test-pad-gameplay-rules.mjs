@@ -673,6 +673,184 @@ const laterUseLegacyEnemyAi = selectPadEnemyAiLegacy(
 );
 assert.equal(laterUseLegacyEnemyAi.skillId, null);
 assert.equal(laterUseLegacyEnemyAi.rngState, 21_900);
+const legacyFallbackMonsterDefinition = legacyEnemyAiMonsterDefinition.slice();
+const legacyFallbackMonsterView = new DataView(legacyFallbackMonsterDefinition.buffer);
+legacyFallbackMonsterView.setUint32(0xec, 9_002, true);
+legacyFallbackMonsterView.setUint8(0xf0, 0);
+legacyFallbackMonsterView.setUint8(0xf1, 1);
+const legacyFallbackType50Definition = enemyAiBlackFallDefinition.slice();
+const legacyFallbackType50View = new DataView(legacyFallbackType50Definition.buffer);
+legacyFallbackType50View.setUint32(0x00, 9_002, true);
+legacyFallbackType50View.setInt16(0x04, 50, true);
+legacyFallbackType50View.setInt32(0x10, 3, true);
+legacyFallbackType50View.setInt32(0x40, 20, true);
+const decodedLegacyFallbackMonster = decodePadEnemyAiMonsterDefinition(
+  legacyFallbackMonsterDefinition,
+);
+const decodedLegacyFallbackType50 = decodePadEnemyAiSkillDefinition(
+  legacyFallbackType50Definition,
+);
+const selectedLegacyFallback = selectPadEnemyAiLegacy(
+  decodedLegacyFallbackMonster,
+  [decodedLegacyFallbackType50],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    rngState: 21_900,
+  },
+);
+assert.equal(selectedLegacyFallback.skillId, 9_002);
+assert.equal(selectedLegacyFallback.effect.kind, 'currentHpGravity');
+assert.equal(selectedLegacyFallback.rngState, 394_448_415);
+assert.equal(selectedLegacyFallback.aiBudget, 80);
+assert.equal(selectedLegacyFallback.fidelity, 'legacy-fallback-recovered');
+assert.equal(selectedLegacyFallback.legacyFallbackSelected, true);
+assert.equal(selectedLegacyFallback.legacyFallbackScale, 1);
+assert.equal(selectedLegacyFallback.legacyFallbackProbability, 10_000);
+// Effect type 36 is a native ordinary-path transfer: it jumps to the fallback
+// pass immediately, so a later ordinary type-50 record must not win first.
+// In the fallback jump table the effect type itself is just a zero-scale lane.
+const legacyFallbackSentinelMonsterDefinition = legacyFallbackMonsterDefinition.slice();
+const legacyFallbackSentinelMonsterView = new DataView(
+  legacyFallbackSentinelMonsterDefinition.buffer,
+);
+legacyFallbackSentinelMonsterView.setUint32(0xec, 9_005, true);
+legacyFallbackSentinelMonsterView.setUint8(0xf0, 0);
+legacyFallbackSentinelMonsterView.setUint8(0xf1, 0);
+legacyFallbackSentinelMonsterView.setUint32(0xf4, 9_002, true);
+legacyFallbackSentinelMonsterView.setUint8(0xf8, 100);
+legacyFallbackSentinelMonsterView.setUint8(0xf9, 0);
+const legacyFallbackSentinelDefinition = legacyFallbackType50Definition.slice();
+const legacyFallbackSentinelView = new DataView(legacyFallbackSentinelDefinition.buffer);
+legacyFallbackSentinelView.setUint32(0x00, 9_005, true);
+legacyFallbackSentinelView.setInt16(0x04, 36, true);
+const legacyFallbackSentinel = selectPadEnemyAiLegacy(
+  decodePadEnemyAiMonsterDefinition(legacyFallbackSentinelMonsterDefinition),
+  [
+    decodePadEnemyAiSkillDefinition(legacyFallbackSentinelDefinition),
+    decodedLegacyFallbackType50,
+  ],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    rngState: 21_900,
+  },
+);
+assert.equal(legacyFallbackSentinel.skillId, null);
+assert.equal(legacyFallbackSentinel.rngState, 21_900);
+assert.equal(legacyFallbackSentinel.legacyFallbackAborted, undefined);
+assert.equal(legacyFallbackSentinel.legacyFallbackEncountered, true);
+assert.equal(legacyFallbackSentinel.legacyUnsupported, false);
+assert.equal(legacyFallbackSentinel.fidelity, 'legacy-fallback-no-selection');
+// The second pass has a separate hard sentinel: an authored slot skill ID of
+// 36 returns the top-level no-skill result before its effect is decoded.
+const legacyFallbackSkillIdSentinelMonsterDefinition = legacyFallbackSentinelMonsterDefinition.slice();
+const legacyFallbackSkillIdSentinelMonsterView = new DataView(
+  legacyFallbackSkillIdSentinelMonsterDefinition.buffer,
+);
+legacyFallbackSkillIdSentinelMonsterView.setUint32(0xf4, 36, true);
+const legacyFallbackSkillIdSentinelDefinition = legacyFallbackType50Definition.slice();
+const legacyFallbackSkillIdSentinelView = new DataView(
+  legacyFallbackSkillIdSentinelDefinition.buffer,
+);
+legacyFallbackSkillIdSentinelView.setUint32(0x00, 36, true);
+const legacyFallbackSkillIdSentinel = selectPadEnemyAiLegacy(
+  decodePadEnemyAiMonsterDefinition(legacyFallbackSkillIdSentinelMonsterDefinition),
+  [
+    decodePadEnemyAiSkillDefinition(legacyFallbackSentinelDefinition),
+    decodePadEnemyAiSkillDefinition(legacyFallbackSkillIdSentinelDefinition),
+  ],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    rngState: 21_900,
+  },
+);
+assert.equal(legacyFallbackSkillIdSentinel.skillId, null);
+assert.equal(legacyFallbackSkillIdSentinel.rngState, 21_900);
+assert.equal(legacyFallbackSkillIdSentinel.legacyFallbackAborted, true);
+assert.equal(legacyFallbackSkillIdSentinel.legacyUnsupported, false);
+assert.equal(legacyFallbackSkillIdSentinel.fidelity, 'legacy-fallback-no-selection');
+const legacyFallbackComboDefinition = legacyFallbackType50Definition.slice();
+const legacyFallbackComboView = new DataView(legacyFallbackComboDefinition.buffer);
+legacyFallbackComboView.setUint32(0x00, 9_003, true);
+legacyFallbackComboView.setInt16(0x04, PAD_ENEMY_SKILL_COMBO_ABSORB, true);
+legacyFallbackComboView.setInt32(0x10, 1, true);
+legacyFallbackComboView.setInt32(0x14, 1, true);
+legacyFallbackComboView.setInt32(0x18, 7, true);
+const legacyFallbackComboMonsterDefinition = legacyFallbackMonsterDefinition.slice();
+new DataView(legacyFallbackComboMonsterDefinition.buffer).setUint32(0xec, 9_003, true);
+const decodedLegacyFallbackCombo = decodePadEnemyAiSkillDefinition(legacyFallbackComboDefinition);
+const decodedLegacyFallbackComboMonster = decodePadEnemyAiMonsterDefinition(
+  legacyFallbackComboMonsterDefinition,
+);
+const blockedLegacyFallback = selectPadEnemyAiLegacy(
+  decodedLegacyFallbackComboMonster,
+  [decodedLegacyFallbackCombo],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    comboAbsorbTurns: 1,
+    rngState: 21_900,
+  },
+);
+assert.equal(blockedLegacyFallback.skillId, null);
+// A positive fallback weight still advances the native LCG when the status
+// lane supplies a zero scale.
+assert.equal(blockedLegacyFallback.rngState, 394_448_415);
+assert.equal(blockedLegacyFallback.fidelity, 'legacy-fallback-no-selection');
+assert.equal(blockedLegacyFallback.legacyUnsupported, false);
+const openLegacyFallback = selectPadEnemyAiLegacy(
+  decodedLegacyFallbackComboMonster,
+  [decodedLegacyFallbackCombo],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    comboAbsorbTurns: 0,
+    rngState: 21_900,
+  },
+);
+assert.equal(openLegacyFallback.skillId, 9_003);
+assert.equal(openLegacyFallback.rngState, 394_448_415);
+assert.equal(openLegacyFallback.fidelity, 'legacy-fallback-recovered');
+const legacyFallbackPresentationDefinition = legacyFallbackType50Definition.slice();
+const legacyFallbackPresentationView = new DataView(legacyFallbackPresentationDefinition.buffer);
+legacyFallbackPresentationView.setUint32(0x00, 9_004, true);
+legacyFallbackPresentationView.setInt16(0x04, PAD_ENEMY_SKILL_INACTIVITY_PRESENTATION, true);
+const legacyFallbackPresentationMonsterDefinition = legacyFallbackMonsterDefinition.slice();
+new DataView(legacyFallbackPresentationMonsterDefinition.buffer).setUint32(0xec, 9_004, true);
+const blockedLegacyFallbackPresentation = selectPadEnemyAiLegacy(
+  decodePadEnemyAiMonsterDefinition(legacyFallbackPresentationMonsterDefinition),
+  [decodePadEnemyAiSkillDefinition(legacyFallbackPresentationDefinition)],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    enemyInactivityPresentationActive: true,
+    rngState: 21_900,
+  },
+);
+assert.equal(blockedLegacyFallbackPresentation.skillId, null);
+assert.equal(blockedLegacyFallbackPresentation.rngState, 394_448_415);
+const hookedLegacyFallback = selectPadEnemyAiLegacy(
+  decodedLegacyFallbackMonster,
+  [decodedLegacyFallbackType50],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    rngState: 21_900,
+    legacyFallbackCondition: () => ({ scale: 2, exact: true, mode: 'test-hook' }),
+  },
+);
+assert.equal(hookedLegacyFallback.skillId, 9_002);
+assert.equal(hookedLegacyFallback.legacyFallbackScale, 2);
+assert.equal(hookedLegacyFallback.fidelity, 'legacy-fallback-recovered');
 const legacyEngine = new PuzzleEngine({
   seed: 21_900,
   enemyAiPools: [{

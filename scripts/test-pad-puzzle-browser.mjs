@@ -67,6 +67,7 @@ const renderDamageShieldState = process.argv.includes('--damage-shield-render');
 const renderLeaderSwapState = process.argv.includes('--leader-swap-render');
 const renderLeaderAlterState = process.argv.includes('--leader-alter-render');
 const renderLegacyAiState = process.argv.includes('--legacy-ai-render');
+const renderLegacyFallbackState = process.argv.includes('--legacy-fallback-render');
 const renderNormalAttackState = process.argv.includes('--normal-attack-render');
 const renderMultiAttackState = process.argv.includes('--multi-attack-render');
 const renderReviveState = process.argv.includes('--revive-render');
@@ -4115,6 +4116,46 @@ try {
     || legacyAiRenderState.message !== 'Black skyfall active for 3 turns.'
   )) throw new Error(`Legacy-AI render-state mismatch: ${JSON.stringify(legacyAiRenderState)}`);
   if (legacyAiRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
+  const legacyFallbackRenderState = renderLegacyFallbackState ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    const monsterDefinition = new Uint8Array(0x2ec);
+    const monsterView = new DataView(monsterDefinition.buffer);
+    monsterView.setUint8(0xe0, 0);
+    monsterView.setInt16(0xe2, 100, true);
+    monsterView.setInt16(0xe4, 10, true);
+    monsterView.setInt16(0xe6, 100, true);
+    monsterView.setUint32(0xec, 9_002, true);
+    // +0xf0 is zero, so the skill reaches only the recovered fallback pass;
+    // +0xf1 gives the native common epilogue a guaranteed test.
+    monsterView.setUint8(0xf0, 0);
+    monsterView.setUint8(0xf1, 1);
+    const definition = new Uint8Array(0x48);
+    const view = new DataView(definition.buffer);
+    view.setUint32(0x00, 9_002, true);
+    view.setInt16(0x04, 50, true);
+    view.setInt32(0x10, 3, true);
+    view.setInt32(0x30, 10_000, true);
+    view.setInt32(0x34, 1_000, true);
+    view.setInt32(0x38, 100, true);
+    view.setInt32(0x40, 20, true);
+    view.setInt32(0x44, 0, true);
+    engine.reset();
+    engine.start();
+    engine.setEnemySkillQueue(0, []);
+    engine.setEnemyAiDefinitionPool(0, monsterDefinition, [definition]);
+    engine.setRngState(21_900);
+    engine.enemies[0].counter = 1;
+    engine.enemies[1].counter = 99;
+    engine.resolveEnemyTurn();
+    return engine.snapshot();
+  }) : null;
+  if (legacyFallbackRenderState && (
+    legacyFallbackRenderState.lastEnemyActions?.[0]?.skill?.type !== 50
+    || legacyFallbackRenderState.rngState !== 394_448_415
+    || legacyFallbackRenderState.enemies?.[0]?.enemyAiBudget !== 80
+    || legacyFallbackRenderState.enemies?.[0]?.aiUseCount !== 1
+  )) throw new Error(`Legacy-fallback render-state mismatch: ${JSON.stringify(legacyFallbackRenderState)}`);
+  if (legacyFallbackRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   const normalAttackRenderState = renderNormalAttackState ? await page.evaluate(() => {
     const engine = window.__puzzleGame;
     const monsterDefinition = new Uint8Array(0x2ec);
@@ -4821,6 +4862,9 @@ try {
   }
   if (legacyAiRenderState) {
     await fs.writeFile(`${outputPath}.legacy-ai.json`, JSON.stringify(legacyAiRenderState, null, 2));
+  }
+  if (legacyFallbackRenderState) {
+    await fs.writeFile(`${outputPath}.legacy-fallback.json`, JSON.stringify(legacyFallbackRenderState, null, 2));
   }
   await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, comboAbsorbRenderState, skyfallRateRenderState, deathCryRenderState, damageVoidRenderState, damageAbsorbRenderState, awakeningBindRenderState, skillDelayRenderState, presenceCheckRenderState, maskedRandomOrbChangeRenderState, nativeNoEffectRenderState, lockRandomOrbsRenderState, enemyEscapeRenderState, lockedSkyfallRenderState, stickyBlindRandomRenderState, stickyBlindFixedRenderState, orbSealColumnsRenderState, orbSealRowsRenderState, fixedStartRenderState, randomBombsRenderState, fixedBombsRenderState, cloudRenderState, recoveryDebuffRenderState, turnChangeRenderState, remainingEnemiesTurnChangeRenderState, attributeBlockRenderState, attackOrbChangeRenderState, randomSpinnersRenderState, fixedSpinnersRenderState, maxHpChangeRenderState, fixedTargetRenderState, boardSizeChangeRenderState, noSkyfallRenderState, comboBranchRenderState, attackAttributeBranchRenderState, skillUseBranchRenderState, damageBranchRenderState, erasedAttributeBranchRenderState, typeResistRenderState, damageImmunityRenderState, remainingEnemiesBranchRenderState, damageImmunityOffRenderState, attributeResistRenderState, resolveRenderState, damageShieldRenderState, leaderSwapRenderState, legacyAiRenderState, normalAttackRenderState, multiAttackRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, earlyPartyControlRenderState, bindAttackRenderState, randomSubBindRenderState, repeatAttackRenderState, entireBlindRenderState, inactivityRenderState, attackBoostRenderState, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();

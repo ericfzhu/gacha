@@ -637,24 +637,28 @@ cap and the selected skill's cost is subtracted. For type 128,
 so an active copy cannot be selected again. `setEnemyAiDefinitionPool` wires
 this raw record path into enemy turns and reports the chosen skill ID, budget,
 and RNG state. Remaining condition callbacks, flow-control records other than
-types 113 through 117, and the legacy status/fallback branch are rejected
-explicitly until decoded rather than approximated.
+types 113 through 117 are rejected explicitly until decoded rather than
+approximated. The legacy status/fallback branch is documented and implemented
+below with explicit diagnostics for the remaining unnamed native fields.
 
 ### Recovered legacy enemy selector
 
 The mode bit at enemy-definition `+0xe0` is the selector boundary: `_doEnemyAi`
 (`0x622544`) tests bit 0 at `0x622718`, dispatching to `_chooseEnemyAiNew`
 (`0x61d450`) when set and `_chooseEnemyAi` (`0x61dd68`) when clear. The browser
-now exposes the ordinary legacy path as `selectPadEnemyAiLegacy`; it does not
-pretend that the separate status/fallback controller is decoded.
+now exposes the ordinary and status/fallback legacy paths as
+`selectPadEnemyAiLegacy`. The selector keeps the two native passes separate so
+their HP gates, status lanes, and RNG consumption cannot accidentally bleed
+together.
 
 For each nonempty legacy slot, the recovered loop first calls `_parseFlowControl`
 (`0x619ad0`). Return `-2` skips the slot, `-3` enters the native status/fallback
 branch, and a negative ordinary return continues through the scalar selector.
 The ordinary branch applies the signed HP threshold at `+0x38`, budget gate
-`+0x40`, and slot immediate byte `+0xf0`. Type 36 enters the native
-status/fallback branch, type 49 is rejected by this ordinary loop, and type 47
-bypasses the HP/immediate-zero gates before continuing through the scalar path.
+`+0x40`, and slot immediate byte `+0xf0`. Effect type 36 enters the native
+status/fallback branch before those ordinary gates, type 49 is rejected by this
+ordinary loop, and type 47 bypasses the HP/immediate-zero gates before
+continuing through the scalar path.
 Its signed `+0x3c` operand is masked to
 `0x3fff`; the `+0xe6` percentage is applied through binary32 arithmetic and
 `izMathRound`, then protected current HP is divided by the damaged baseline
@@ -674,17 +678,46 @@ an explicit approximation of the native no-damage status scan.
 When a host exposes a non-one legacy wave-mode byte, `legacyConditionForceOne`
 also mirrors the native `>9998` scaled-operand override that replaces the
 callback result with `1.0`.
-Undecoded flow-control/fallback records return diagnostics instead of a guessed
-skill, so loading a legacy pool cannot silently alter battle behavior.
+If no ordinary test succeeds, native starts a second scan at `0x61e300`. It
+rechecks only the budget gate (there is no HP threshold in this pass), dispatches
+the skill type through the recovered jump table at file/VA `0xd3c8e2`, and
+arrives at the common epilogue at `0x61f08c`. That epilogue uses exactly:
+
+```
+probability = fcvtzs(float32(float32(int32(factor0 * fallbackWeight)) * scale))
+roll = ((lcgStep(state) >>> 16) * 10000) >>> 16
+select when probability > roll
+```
+
+There is no factor1 term and no 10,000 cap on this path. A positive fallback
+weight advances the shared LCG even when a status lane supplies a zero scale;
+weight zero does not consume a draw. In this pass authored slot skill ID 36 is
+the native early-return sentinel; effect type 36 itself is the recovered
+zero-scale lane. The recovered constant-one lanes include types 50, 76–81,
+83–86, 89, and 92. Types 21–38, 47, 49, and 69 resolve to the native zero lane. Exact
+status gates are available for combo absorb (67), inactivity presentation (70),
+damage void (71), damage shield (74), damage absorb (87), and the candidate
+count portion of leader swap (75). Skyfall, leader swap, revive, attribute
+absorb, leader-helper, awakening-bind, and other lanes with unnamed native
+fields are playable through the same initialized-one fallback and report
+`legacyFallbackApproximation`.
+
+Hosts that have a fuller `sMONSTER`/`sGAMEWORK` model can provide
+`legacyFallbackCondition(definition, state, context)` or a
+`legacyFallbackScales` map keyed by skill ID or type. A hook may return a number,
+boolean, or `{ scale, exact, rngState, consumesRoll }`; the selector preserves
+the supplied scale and state while still applying the native fallback arithmetic.
+Results expose `legacyFallbackSelected`, `legacyFallbackType`,
+`legacyFallbackScale`, `legacyFallbackProbability`, and
+`legacyFallbackTypes` for replay/debug tooling. Unsupported decoded effects are
+never handed to the battle dispatcher, but their fallback draw and skill ID are
+reported so loading a legacy pool cannot silently alter RNG behavior.
 
 The selector does not reduce every condition callback to a boolean. In the
 immediate path at `0x61d844`, `_chooseEnemyAiSub` returns a binary32 multiplier;
 native multiplies the truncated authored probability by that value, clamps the
-result to 10,000, and then performs its LCG test. In the fallback path at
-`0x61d96c`, the same return is used only as a greater-than-zero eligibility
-gate. An eligible fallback retains its authored `sENEAI+5` weight without
-scaling. The browser selector exposes this as `probabilityScale` while keeping
-the already decoded condition-owned RNG state transitions intact.
+result to 10,000, and then performs its LCG test. The fallback path has its own
+scale arithmetic described above; it does not build a normalized weighted pool.
 
 Enemy skill type `4` is the general source-orb conversion. Dispatch targets
 `0x6292b4`, setup targets `0x61fee4`, and the AI condition targets `0x61b2d8`.

@@ -53,6 +53,42 @@ const LEGACY_ENEMY_AI_INSTRUCTION_ANCHORS = Object.freeze([
   [0x61e2dc, 0x5284e20d], // scale high 16 bits to 10,000
   [0x61e2f4, 0x54ffed88], // failed immediate test advances to next slot
 ]);
+const LEGACY_FALLBACK_JUMP_TABLE = 0xd3c8e2;
+const LEGACY_FALLBACK_DISPATCH_BASE = 0x61e354;
+const LEGACY_FALLBACK_COMMON_EPILOGUE = 0x61f08c;
+const LEGACY_FALLBACK_SCALE_ZERO_TYPES = Object.freeze([
+  ...Array.from({ length: 18 }, (_, index) => index + 21),
+  47,
+  49,
+  69,
+]);
+const LEGACY_FALLBACK_SCALE_ONE_TYPES = Object.freeze([
+  50,
+  76,
+  77,
+  78,
+  79,
+  80,
+  81,
+  83,
+  84,
+  85,
+  86,
+  89,
+  92,
+]);
+const LEGACY_FALLBACK_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x61e408, 0x794faa68], // current budget gate
+  [0x61e418, 0x52a7f008], // initialize fallback scale to 1.0
+  [0x61e420, 0x79c00ac8], // signed type dispatch operand
+  [0x61e430, 0x10fff929], // jump-table dispatch base
+  [0x61f08c, 0xb9805be8], // reload current slot index
+  [0x61f098, 0x34ff9709], // +0xf1 fallback-weight gate
+  [0x61f0b0, 0x1b097d49], // factor0 * fallback weight
+  [0x61f0d4, 0x1e210800], // condition scale multiplication
+  [0x61f0e0, 0x1e380009], // fcvtzs probability
+  [0x61f0e8, 0x6b4c413f], // compare probability with roll
+]);
 const SOURCE_ORB_CONVERSION_ENEMY_SKILL_TYPE = 4;
 const SOURCE_ORB_CONVERSION_HANDLER = 0x6292b4;
 const SOURCE_ORB_CONVERSION_SETUP_HANDLER = 0x61fee4;
@@ -1772,6 +1808,22 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     : LEGACY_ENEMY_AI_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
       readUint32Virtual(restoredElf, restoredBytes, address) === instruction
     ));
+  const legacyFallbackInstructionAnchorsMatch = restoredElf === null ? null
+    : LEGACY_FALLBACK_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
+  const legacyFallbackJumpTableMatches = restoredElf === null ? null
+    : [...LEGACY_FALLBACK_SCALE_ZERO_TYPES, ...LEGACY_FALLBACK_SCALE_ONE_TYPES].every((type) => {
+      const entry = readUint16Virtual(
+        restoredElf,
+        restoredBytes,
+        LEGACY_FALLBACK_JUMP_TABLE + (type - 1) * 2,
+      );
+      const target = LEGACY_FALLBACK_DISPATCH_BASE + entry * 4;
+      return type === 50 || LEGACY_FALLBACK_SCALE_ONE_TYPES.includes(type)
+        ? target === 0x61ee9c
+        : target === 0x61e440;
+    });
   const normalAttackDispatchTarget = resolveEnemySkillTarget(
     NORMAL_ATTACK_ENEMY_SKILL_TYPE, ENEMY_SKILL_DISPATCH_TABLE, ENEMY_SKILL_DISPATCH_BASE,
   );
@@ -5104,7 +5156,14 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       legacySelectorModeSwitchAnchorsMatch21_9: legacyEnemyAiModeSwitchAnchorsMatch,
       legacySelectorInstructionAnchorsMatch21_9: legacyEnemyAiInstructionAnchorsMatch,
       legacySelectorSemantics:
-        'chooseEnemyAi (0x61dd68) scans 64 slots in order after parseFlowControl; ordinary records use HP/maxHP, damaged-turn baseline +0x7c0/+0x7d0 (or a native no-damage status scan), signed +0x3c magnitude scaled by +0xe6 and rounded through izMathRound, then _chooseEnemyAiSub. Positive callback output is multiplied by factor0*factor1*slotChance/100000, capped at 10000, and compared with the shared +0x6a10 LCG. Type 36 enters the separate status/fallback path, type 49 is rejected by the ordinary loop, and type 47 remains on the scalar path with its first-use callback; other flow-control returns are not claimed by the browser ordinary selector.',
+        'chooseEnemyAi (0x61dd68) scans 64 slots in order after parseFlowControl; ordinary records use HP/maxHP, damaged-turn baseline +0x7c0/+0x7d0 (or a native no-damage status scan), signed +0x3c magnitude scaled by +0xe6 and rounded through izMathRound, then _chooseEnemyAiSub. Positive callback output is multiplied by factor0*factor1*slotChance/100000, capped at 10000, and compared with the shared +0x6a10 LCG. If ordinary selection fails, the 0x61e300 status/fallback pass rechecks budget, dispatches through the 0xd3c8e2 halfword table, and uses 0x61f08c: fcvtzs(float32(float32(int32(factor0*fallbackWeight))*scale)) > ((lcgStep(state)>>>16)*10000>>>16). Effect type 36 transfers from the ordinary pass; authored slot skill ID 36 is the fallback early-return sentinel. Types 21..38, 47, 49, and 69 resolve to zero, while 50, 76..81, 83..86, 89, and 92 resolve to one. Positive fallback weights consume one LCG step even at zero scale. Unnamed status lanes are explicit host-hook approximations.',
+      legacyFallbackJumpTableOffset: '0xd3c8e2',
+      legacyFallbackDispatchBase: '0x61e354',
+      legacyFallbackCommonEpilogue: '0x61f08c',
+      legacyFallbackInstructionAnchorsMatch21_9: legacyFallbackInstructionAnchorsMatch,
+      legacyFallbackJumpTableMatches21_9: legacyFallbackJumpTableMatches,
+      legacyFallbackScaleZeroTypes: LEGACY_FALLBACK_SCALE_ZERO_TYPES,
+      legacyFallbackScaleOneTypes: LEGACY_FALLBACK_SCALE_ONE_TYPES,
     },
     symbols,
   };
@@ -5219,6 +5278,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || leaderAlterInstructionAnchorsMatch === false
     || legacyEnemyAiModeSwitchAnchorsMatch === false
     || legacyEnemyAiInstructionAnchorsMatch === false
+    || legacyFallbackInstructionAnchorsMatch === false
+    || legacyFallbackJumpTableMatches === false
     || normalAttackDispatchMatches === false
     || normalAttackSetupMatches === false
     || normalAttackConditionMatches === false

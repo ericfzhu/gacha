@@ -966,19 +966,42 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
 
 // The pre-21.9 selector (cGAMEMAIN::_chooseEnemyAi, 0x61dd68) shares the
 // table/record layout with the new selector, but its ordinary path has one
-// extra condition stage.  It derives a float32 scale from the protected
+// extra condition stage. It derives a float32 scale from the protected
 // current HP, a monster-local damage baseline, and sENESKILLS+0x3c before
-// calling _chooseEnemyAiSub.  The status-aware fallback beginning at 0x61e300
-// is intentionally kept out of this function until its native state lanes
-// are decoded; callers receive an explicit diagnostic instead of a fabricated
-// selection.
+// calling _chooseEnemyAiSub. If that pass does not return a skill, native
+// enters a second 64-slot status/fallback pass at 0x61e300. The recovered
+// fallback epilogue at 0x61f08c is deliberately kept separate from the
+// ordinary probability helper: it multiplies only factor0 by +0xf1, converts
+// the product through binary32, truncates with fcvtzs, and advances the shared
+// LCG for every positive fallback weight.
 
-const LEGACY_SPECIAL_SELECTOR_TYPES = new Set([
-  // Type 36 jumps directly to the status/fallback selector.  Type 49 is
-  // rejected by the ordinary loop. Type 47 has a special first-use callback,
-  // but it still continues through the scalar path below.
-  36,
+// _chooseEnemyAi's recovered jump table lives at VA/file 0xd3c8e2 and
+// dispatches types 1..92 to handlers in the 0x61e354..0x61f08c range. These
+// are the lanes whose target is the unconditional zero or one scale. Types
+// outside the table fall through to the common epilogue with its initialized
+// scale of one. Keeping the sets numeric avoids coupling this low-level table
+// to the much larger skill-definition constant list.
+const LEGACY_FALLBACK_SCALE_ZERO_TYPES = new Set([
+  ...Array.from({ length: 18 }, (_, index) => index + 21),
+  47,
   49,
+  69,
+]);
+
+const LEGACY_FALLBACK_SCALE_ONE_TYPES = new Set([
+  50,
+  76,
+  77,
+  78,
+  79,
+  80,
+  81,
+  83,
+  84,
+  85,
+  86,
+  89,
+  92,
 ]);
 
 function normalizeLegacySelectorState(state, monster) {
@@ -1066,6 +1089,19 @@ function normalizeLegacySelectorState(state, monster) {
     // the wave-record mode byte is not one and the scaled operand exceeds
     // 9998. A host can expose that byte as this explicit capability flag.
     legacyConditionForceOne: Boolean(state.legacyConditionForceOne),
+    // The status/fallback pass contains a handful of native lanes whose
+    // backing sMONSTER/sGAMEWORK fields are not represented in the compact
+    // browser state yet. Keep the hook and optional per-skill/type scale map
+    // intact so a host with those fields can provide the native result
+    // without replacing the selector.
+    legacyFallbackCondition: typeof state.legacyFallbackCondition === 'function'
+      ? state.legacyFallbackCondition
+      : null,
+    legacyFallbackScales: state.legacyFallbackScales instanceof Map
+      || (state.legacyFallbackScales
+        && typeof state.legacyFallbackScales === 'object')
+      ? state.legacyFallbackScales
+      : null,
     evaluateCondition: state.evaluateCondition,
   };
 }
@@ -1211,6 +1247,340 @@ function legacyCallbackScale(definition, conditionGate, incomingScale, state) {
   };
 }
 
+function normalizeLegacyFallbackScaleResult(result, defaultMode = 'host') {
+  if (result === undefined || result === null) return null;
+  if (typeof result === 'boolean') {
+    return {
+      scale: result ? Math.fround(1) : Math.fround(0),
+      exact: true,
+      mode: result ? `${defaultMode}-eligible` : `${defaultMode}-rejected`,
+      consumesRoll: true,
+    };
+  }
+  if (typeof result === 'number') {
+    return {
+      scale: Math.fround(result),
+      exact: true,
+      mode: defaultMode,
+      consumesRoll: true,
+    };
+  }
+  if (typeof result !== 'object') return null;
+  const eligible = result.eligible === undefined ? true : Boolean(result.eligible);
+  const rawScale = result.scale ?? result.probabilityScale ?? (eligible ? 1 : 0);
+  const scale = Number(rawScale);
+  if (!Number.isFinite(scale)) {
+    return {
+      scale: Math.fround(0),
+      exact: false,
+      mode: result.mode || `${defaultMode}-invalid`,
+      consumesRoll: result.consumesRoll !== false,
+      invalid: true,
+    };
+  }
+  return {
+    scale: Math.fround(scale),
+    exact: result.exact === undefined ? true : Boolean(result.exact),
+    mode: result.mode || defaultMode,
+    consumesRoll: result.consumesRoll !== false,
+    ...(result.rngState === undefined ? {} : {
+      rngState: Number(result.rngState) >>> 0,
+    }),
+    ...(result.reason ? { reason: String(result.reason) } : {}),
+  };
+}
+
+function readLegacyFallbackScaleSource(source, definition, state, context, mode) {
+  const value = typeof source === 'function'
+    ? source(definition, state, context)
+    : source;
+  return normalizeLegacyFallbackScaleResult(value, mode);
+}
+
+function lookupLegacyFallbackScale(table, definition, type) {
+  if (!table) return undefined;
+  if (table instanceof Map) {
+    if (table.has(definition.skillId)) return table.get(definition.skillId);
+    if (table.has(type)) return table.get(type);
+    return undefined;
+  }
+  if (Object.prototype.hasOwnProperty.call(table, definition.skillId)) {
+    return table[definition.skillId];
+  }
+  if (Object.prototype.hasOwnProperty.call(table, type)) return table[type];
+  return undefined;
+}
+
+function legacyFallbackBuiltinScale(definition, state) {
+  const type = Number(definition.effect?.type);
+  if (LEGACY_FALLBACK_SCALE_ZERO_TYPES.has(type)) {
+    return { scale: Math.fround(0), exact: true, mode: 'native-zero' };
+  }
+  if (LEGACY_FALLBACK_SCALE_ONE_TYPES.has(type)) {
+    return { scale: Math.fround(1), exact: true, mode: 'native-one' };
+  }
+
+  // These handlers were recovered directly from their status loads in the
+  // 0x61e300 jump table. They gate reapplication while the corresponding
+  // protected status is active, then continue through the common epilogue.
+  if (type === 67) {
+    const eligible = state.comboAbsorbTurns <= 0;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact: true,
+      mode: eligible ? 'combo-absorb-inactive' : 'combo-absorb-active',
+    };
+  }
+  if (type === 68) {
+    const naturalMask = state.skyfallNaturalMask & 0x3f;
+    const hazardMask = state.skyfallHazardMask & 0x1c0;
+    const requestedNaturalMask = Math.trunc(Number(definition.effect?.typeMask) || 0) & 0x3f;
+    const requestedHazardMask = Math.trunc(Number(definition.effect?.typeMask) || 0) & 0x1c0;
+    const naturalEligible = requestedNaturalMask !== 0 && (
+      state.skyfallNaturalTurns <= 0 || naturalMask !== requestedNaturalMask
+    );
+    const hazardEligible = requestedHazardMask !== 0 && (
+      state.skyfallHazardTurns <= 0 || hazardMask !== requestedHazardMask
+    );
+    const eligible = naturalEligible || hazardEligible;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact: false,
+      mode: eligible ? 'skyfall-status-eligible' : 'skyfall-status-active',
+    };
+  }
+  if (type === 70) {
+    const eligible = !state.enemyInactivityPresentationActive;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact: true,
+      mode: eligible ? 'inactivity-presentation-inactive' : 'inactivity-presentation-active',
+    };
+  }
+  if (type === 71) {
+    // 0x61ef24 selects zero when protected +0x8d0 is positive, one otherwise.
+    const eligible = state.enemyDamageVoidTurns <= 0;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact: true,
+      mode: eligible ? 'damage-void-inactive' : 'damage-void-active',
+    };
+  }
+  if (type === 74) {
+    // 0x61ef2c is the same reapplication gate for protected +0x940.
+    const eligible = state.enemyDamageShieldTurns <= 0;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact: true,
+      mode: eligible ? 'damage-shield-inactive' : 'damage-shield-active',
+    };
+  }
+  if (type === 75) {
+    // The helper at 0x322250 returns the count of currently changeable party
+    // members. The compact state exposes the same count and active duration.
+    const eligible = state.leaderSwapTurns <= 0 && state.leaderSwapCandidateCount > 0;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact: false,
+      mode: eligible ? 'leader-swap-candidates' : 'leader-swap-unavailable',
+    };
+  }
+  if (type === 87) {
+    // 0x61ef64 reads protected +0x960 and reaches one only while it is below
+    // one. This is the native damage-absorb reapplication gate.
+    const eligible = state.enemyDamageAbsorbTurns <= 0;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact: true,
+      mode: eligible ? 'damage-absorb-inactive' : 'damage-absorb-active',
+    };
+  }
+  if (type === 88) {
+    // 0x61ef78 compares the protected low-ten-bit status counter with 64;
+    // ordinary browser durations map directly to that lane.
+    const eligible = state.awakeningBindTurns <= 63;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact: false,
+      mode: eligible ? 'awakening-bind-available' : 'awakening-bind-active',
+    };
+  }
+  if (type === 52) {
+    const eligible = state.enemies.some((enemy) => (
+      Number(enemy?.hp) <= 0 && !enemy?.escaped
+    ));
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact: false,
+      mode: eligible ? 'revive-target-present' : 'revive-target-absent',
+    };
+  }
+  if (type === 53) {
+    const eligible = state.attributeAbsorbTurns <= 0;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact: false,
+      mode: eligible ? 'attribute-absorb-inactive' : 'attribute-absorb-active',
+    };
+  }
+  if (type === 54) {
+    const targetFlags = Math.trunc(Number(definition.effect?.targetFlags) || 0) & 0x03;
+    const party = Array.isArray(state.party) ? state.party : [];
+    const eligible = (
+      (targetFlags & 1) !== 0
+      && party[0]?.present !== false
+      && Number(party[0]?.bindTurns || 0) <= 0
+    ) || (
+      (targetFlags & 2) !== 0
+      && party[5]?.present !== false
+      && Number(party[5]?.bindTurns || 0) <= 0
+    );
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact: false,
+      mode: eligible ? 'leader-helper-target-present' : 'leader-helper-target-absent',
+    };
+  }
+  // Types whose handler still reads an unnamed global/status lane remain
+  // playable with the native-initialized one scale. The result reports this
+  // as approximate and a host can override it through the hook/map above.
+  return { scale: Math.fround(1), exact: false, mode: 'native-default-one' };
+}
+
+function legacyFallbackConditionScale(definition, slot, monster, state, rngState) {
+  const type = Number(definition.effect?.type);
+  const context = Object.freeze({
+    definition,
+    slot,
+    monster,
+    type,
+    fallbackWeight: slot.fallbackWeight,
+    rngState,
+  });
+  if (typeof state.legacyFallbackCondition === 'function') {
+    const custom = readLegacyFallbackScaleSource(
+      state.legacyFallbackCondition,
+      definition,
+      state,
+      context,
+      'host-fallback-condition',
+    );
+    if (custom) return custom;
+  }
+  const configured = lookupLegacyFallbackScale(state.legacyFallbackScales, definition, type);
+  if (configured !== undefined) {
+    const mapped = readLegacyFallbackScaleSource(
+      configured,
+      definition,
+      state,
+      context,
+      'configured-fallback-scale',
+    );
+    if (mapped) return mapped;
+  }
+  return legacyFallbackBuiltinScale(definition, state);
+}
+
+function legacyFallbackProbability(definition, slot, conditionScale) {
+  // Native 0x61f08c performs a signed 32-bit multiply, converts that result
+  // to binary32, multiplies the condition scale in binary32, and truncates
+  // toward zero with fcvtzs. It does not cap the result at 10000.
+  const product = Math.imul(
+    Math.trunc(Number(definition.immediateFactor0) || 0),
+    Math.trunc(Number(slot.fallbackWeight) || 0),
+  );
+  const scaled = Math.fround(Math.fround(product) * Math.fround(conditionScale));
+  if (!Number.isFinite(scaled)) return scaled > 0 ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
+  return Math.trunc(scaled);
+}
+
+function selectLegacyFallback(monster, candidates, state, current, rngState) {
+  let selected = null;
+  let selectedScale = null;
+  let selectedType = null;
+  let selectedProbability = null;
+  let fallbackRngState = rngState;
+  let fallbackAborted = false;
+  let fallbackUnsupported = false;
+  let fallbackApproximation = false;
+  let fallbackConsumedRoll = false;
+  const approximateTypes = new Set();
+  const fallbackTypes = new Set();
+  const unsupportedSkillIds = [];
+
+  for (const candidate of candidates) {
+    const { slot, definition } = candidate;
+    const type = Number(definition.effect?.type);
+    // The second pass compares the slot's authored skill ID (not the effect
+    // type) with 36 and returns the top-level no-skill result immediately.
+    // Effect type 36 itself is a normal jump-table lane and resolves through
+    // the constant-zero handler below.
+    if (definition.skillId === 36) {
+      fallbackAborted = true;
+      break;
+    }
+    if (definition.effect?.controlFlow) {
+      fallbackUnsupported = true;
+      unsupportedSkillIds.push(definition.skillId);
+      continue;
+    }
+    if (definition.budgetCost > current.aiBudget) continue;
+    const fallbackWeight = Math.trunc(Number(slot.fallbackWeight) || 0);
+    if (fallbackWeight <= 0) continue;
+    fallbackTypes.add(type);
+    const condition = legacyFallbackConditionScale(
+      definition,
+      slot,
+      monster,
+      current,
+      fallbackRngState,
+    );
+    if (condition.rngState !== undefined) fallbackRngState = condition.rngState;
+    if (!condition.exact) {
+      fallbackApproximation = true;
+      approximateTypes.add(type);
+    }
+    const probability = legacyFallbackProbability(definition, slot, condition.scale);
+    if (condition.invalid) fallbackUnsupported = true;
+    if (condition.consumesRoll !== false) {
+      const roll = advanceRoll(fallbackRngState, 10_000);
+      fallbackRngState = roll.state;
+      fallbackConsumedRoll = true;
+      // Native selects when probability is strictly greater than the 0..9999
+      // roll (the branch is `if (probability <= roll) continue`).
+      if (probability <= roll.value) continue;
+    }
+    if (!isSupportedDefinition(definition)) {
+      // Returning an undecoded effect would make PuzzleEngine dispatch a
+      // record it cannot execute. Keep the native RNG decision visible while
+      // leaving the selection unresolved and reporting the unsupported id.
+      fallbackUnsupported = true;
+      unsupportedSkillIds.push(definition.skillId);
+      continue;
+    }
+    selected = definition;
+    selectedScale = condition.scale;
+    selectedType = type;
+    selectedProbability = probability;
+    break;
+  }
+
+  return {
+    selected,
+    selectedScale,
+    selectedType,
+    selectedProbability,
+    rngState: fallbackRngState,
+    fallbackAborted,
+    fallbackUnsupported,
+    fallbackApproximation,
+    fallbackConsumedRoll,
+    fallbackTypes,
+    approximateTypes,
+    unsupportedSkillIds,
+  };
+}
+
 function currentLegacyUseCount(state) {
   return Math.max(0, Math.trunc(Number(state.enemyAiUseCount) || 0));
 }
@@ -1227,19 +1597,26 @@ function legacyResult(monster, current, rngState, selected, diagnostics = {}) {
     aiBudget: regeneratedBudget - (selected?.budgetCost || 0),
     aiMode: 'legacy',
     fidelity: selected
-      ? diagnostics.legacyCallbackApproximation || diagnostics.legacyConditionApproximation
-        ? 'legacy-ordinary-approximate'
-        : 'legacy-ordinary-recovered'
-      : 'legacy-ordinary-no-selection',
+      ? diagnostics.legacyFallbackSelected
+        ? diagnostics.legacyFallbackApproximation
+          ? 'legacy-fallback-approximate'
+          : 'legacy-fallback-recovered'
+        : diagnostics.legacyCallbackApproximation || diagnostics.legacyConditionApproximation
+          ? 'legacy-ordinary-approximate'
+          : 'legacy-ordinary-recovered'
+      : diagnostics.legacyFallbackEncountered || diagnostics.legacyFallbackAborted
+        ? 'legacy-fallback-no-selection'
+        : 'legacy-ordinary-no-selection',
     ...diagnostics,
   });
 }
 
-// Conservative implementation of the recovered ordinary branch.  It keeps
-// the native scan order, static HP/budget gates, +0x3c mode bit, float32
-// scaling, immediate probability arithmetic, and LCG comparison exact.  A
-// legacy pool with only status/fallback records is left unselected and marks
-// the undecoded path in the result rather than entering a guessed branch.
+// Conservative implementation of the recovered ordinary and fallback
+// branches. It keeps the native scan order, static HP/budget gates, +0x3c
+// mode bit, float32 scaling, immediate probability arithmetic, fallback
+// factor/weight arithmetic, and LCG comparisons exact. Status lanes that do
+// not yet have a named browser field use the explicit hook/map above and are
+// marked approximate when the native-initialized scale is used.
 export function selectPadEnemyAiLegacy(monster, definitions, state = {}) {
   if (!monster || monster.usesNewAi) {
     throw new Error('selectPadEnemyAiLegacy requires a legacy (mode bit 0 clear) monster definition.');
@@ -1250,11 +1627,19 @@ export function selectPadEnemyAiLegacy(monster, definitions, state = {}) {
   let selected = null;
   const unsupportedSkillIds = [];
   const approximateCallbackTypes = new Set();
-  let sawFallback = false;
+  // The native fallback pass always restarts at slot zero. Build its complete
+  // decoded view before the ordinary scan so an early effect-type-36 transfer
+  // can force that pass without losing the slots that follow it.
+  const fallbackCandidates = [];
+  for (const slot of monster.slots) {
+    const definition = definitionMap.get(slot.skillId);
+    if (definition) fallbackCandidates.push({ slot, definition });
+  }
+  let sawFallback = fallbackCandidates.some(({ slot }) => slot.fallbackWeight > 0);
   let sawControlFlow = false;
   let sawUnsupportedRecord = false;
-  let sawLegacySpecial = false;
   let sawConditionValueProblem = false;
+  let forceFallback = false;
 
   for (const slot of monster.slots) {
     const definition = definitionMap.get(slot.skillId);
@@ -1271,6 +1656,18 @@ export function selectPadEnemyAiLegacy(monster, definitions, state = {}) {
     const bypassScalarGates = type === 47
       || (type >= 21 && type <= 38)
       || (type >= 43 && type <= 45);
+    // The native effect-type-36 branch is reached before the ordinary
+    // budget/HP gates and jumps directly to 0x61e300. Effect type 49 is
+    // likewise omitted from the ordinary probability path. Keep those
+    // control transfers ahead of the local gates so a later ordinary record
+    // cannot win first.
+    if (type === 36) {
+      forceFallback = true;
+      break;
+    }
+    if (type === 49) {
+      continue;
+    }
     if (definition.budgetCost > current.aiBudget
       || (!bypassScalarGates && hpPercent > definition.hpThresholdPercent)) {
       continue;
@@ -1281,20 +1678,11 @@ export function selectPadEnemyAiLegacy(monster, definitions, state = {}) {
       unsupportedSkillIds.push(slot.skillId);
       continue;
     }
-    if (LEGACY_SPECIAL_SELECTOR_TYPES.has(type)) {
-      sawLegacySpecial = true;
-      sawUnsupportedRecord = true;
-      unsupportedSkillIds.push(slot.skillId);
-      if (slot.fallbackWeight > 0) sawFallback = true;
-      continue;
-    }
     if (!isSupportedDefinition(definition)) {
       sawUnsupportedRecord = true;
       unsupportedSkillIds.push(slot.skillId);
-      if (slot.fallbackWeight > 0) sawFallback = true;
       continue;
     }
-    if (slot.fallbackWeight > 0) sawFallback = true;
     // Type 47 reaches the probability epilogue even when +0xf0 is zero; the
     // resulting probability is still zero, so no LCG state is consumed.
     if (slot.immediateChance === 0 && !bypassScalarGates) continue;
@@ -1333,35 +1721,86 @@ export function selectPadEnemyAiLegacy(monster, definitions, state = {}) {
     }
   }
 
+  let fallbackSelection = {
+    selected: null,
+    selectedScale: null,
+    selectedType: null,
+    selectedProbability: null,
+    rngState,
+    fallbackAborted: false,
+    fallbackUnsupported: false,
+    fallbackApproximation: false,
+    fallbackConsumedRoll: false,
+    fallbackTypes: new Set(),
+    approximateTypes: new Set(),
+    unsupportedSkillIds: [],
+  };
+  if (!selected && (forceFallback || fallbackCandidates.length > 0)) {
+    fallbackSelection = selectLegacyFallback(
+      monster,
+      fallbackCandidates,
+      current,
+      current,
+      rngState,
+    );
+    rngState = fallbackSelection.rngState;
+    selected = fallbackSelection.selected;
+    if (fallbackSelection.fallbackUnsupported) sawUnsupportedRecord = true;
+    unsupportedSkillIds.push(...fallbackSelection.unsupportedSkillIds);
+  }
+
+  const unsupportedReason = sawControlFlow
+    ? 'legacy-flow-control-not-decoded'
+    : fallbackSelection.fallbackAborted
+      ? 'legacy-fallback-skill-id36-sentinel'
+      : fallbackSelection.fallbackUnsupported
+        ? 'legacy-fallback-unsupported-record'
+        : sawUnsupportedRecord && !sawFallback
+          ? 'legacy-unsupported-record'
+          : sawConditionValueProblem && !sawFallback
+            ? 'legacy-condition-scale-rejected'
+            : null;
   const diagnostics = {
     legacyUnsupported: !selected && (
-      sawFallback
-      || sawControlFlow
+      sawControlFlow
       || sawUnsupportedRecord
       || sawConditionValueProblem
+      || fallbackSelection.fallbackUnsupported
     ),
+    ...(sawFallback || forceFallback || fallbackSelection.fallbackAborted ? {
+      legacyFallbackEncountered: true,
+    } : {}),
+    ...(fallbackSelection.fallbackAborted ? {
+      legacyFallbackAborted: true,
+    } : {}),
+    ...(fallbackSelection.fallbackUnsupported ? {
+      legacyFallbackUnsupported: true,
+    } : {}),
+    ...(fallbackSelection.fallbackApproximation ? {
+      legacyFallbackApproximation: true,
+      approximateFallbackTypes: Object.freeze([
+        ...fallbackSelection.approximateTypes,
+      ]),
+    } : {}),
+    ...(fallbackSelection.fallbackTypes.size > 0 ? {
+      legacyFallbackTypes: Object.freeze([...fallbackSelection.fallbackTypes]),
+    } : {}),
+    ...(fallbackSelection.selected ? {
+      legacyFallbackSelected: true,
+      legacyFallbackType: fallbackSelection.selectedType,
+      legacyFallbackScale: fallbackSelection.selectedScale,
+      legacyFallbackProbability: fallbackSelection.selectedProbability,
+    } : {}),
     ...(unsupportedSkillIds.length > 0 ? {
       unsupportedSkillIds: Object.freeze([...new Set(unsupportedSkillIds)]),
     } : {}),
-    ...(sawControlFlow ? { unsupportedReason: 'legacy-flow-control-not-decoded' } : {}),
-    ...(sawFallback && !sawControlFlow ? {
-      unsupportedReason: 'legacy-special-fallback-not-decoded',
-    } : {}),
-    ...(sawLegacySpecial && !sawFallback && !sawControlFlow ? {
-      unsupportedReason: 'legacy-special-selector-not-decoded',
-    } : {}),
-    ...(sawUnsupportedRecord && !sawFallback && !sawLegacySpecial && !sawControlFlow ? {
-      unsupportedReason: 'legacy-unsupported-record',
-    } : {}),
-    ...(sawConditionValueProblem && !sawFallback && !sawControlFlow ? {
-      unsupportedReason: 'legacy-condition-scale-rejected',
-    } : {}),
+    ...(unsupportedReason ? { unsupportedReason } : {}),
     ...(approximateCallbackTypes.size > 0 ? {
       legacyCallbackApproximation: true,
       approximateCallbackTypes: Object.freeze([...approximateCallbackTypes]),
     } : {}),
   };
-  if (selected && !Number.isFinite(current.legacyConditionBase)) {
+  if (selected && !fallbackSelection.selected && !Number.isFinite(current.legacyConditionBase)) {
     diagnostics.legacyConditionApproximation = true;
   }
   const result = legacyResult(monster, current, rngState, selected, diagnostics);

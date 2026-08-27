@@ -1579,6 +1579,8 @@ export class PuzzleEngine {
       // otherwise reports that it inferred a playable fallback from current HP.
       legacyConditionBase: pool?.legacyConditionBase,
       legacyConditionForceOne: Boolean(pool?.legacyConditionForceOne),
+      legacyFallbackCondition: pool?.legacyFallbackCondition,
+      legacyFallbackScales: pool?.legacyFallbackScales,
       blackFallActive: Boolean(this.blackFallRule?.active),
       boardCellCount: this.rows * this.columns,
       blackBlockCount: this.board.reduce((total, row) => total + row.reduce((count, orb) => (
@@ -3708,6 +3710,14 @@ export class PuzzleEngine {
         : {}),
       ...(options?.legacyConditionForceOne
         ? { legacyConditionForceOne: true }
+        : {}),
+      ...(typeof options?.legacyFallbackCondition === 'function'
+        ? { legacyFallbackCondition: options.legacyFallbackCondition }
+        : {}),
+      ...(options?.legacyFallbackScales instanceof Map
+        || (options?.legacyFallbackScales
+          && typeof options.legacyFallbackScales === 'object')
+        ? { legacyFallbackScales: options.legacyFallbackScales }
         : {}),
     };
     if (this.enemies) this.applyEnemyPassiveSkills(index);
