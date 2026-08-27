@@ -67,6 +67,8 @@ if (sha256 !== '785ffa641837c528864cfbeb9716e340c9d948ba3a37bca3193b5cd32dda89d8
 
 const runtime = await Arm64Runtime.create(wasm);
 const elf = runtime.loadElf(libpad);
+const featureProbe = runtime.runCoreFeatureProbe();
+if (!featureProbe.passed) throw new Error(`ARM64 capability probe failed: ${JSON.stringify(featureProbe, (_, value) => typeof value === 'bigint' ? value.toString() : value)}`);
 const result = runtime.runLibpadProbe(true);
 
 const allocatorLinux = new VirtualLinux(runtime, { mmapBase: 0x5ff0000 });
@@ -1739,6 +1741,7 @@ console.log(JSON.stringify({
   fileBytes: libpad.length,
   loadSegments: elf.loadSegments.length,
   customSectionBytes: elf.customSections[0].size,
+  featureProbe,
   probe: result,
   addressHelperInstructions: addressHelperTrace.length,
   nestedHelperInstructions: imageBaseTrace.length,
@@ -1752,4 +1755,4 @@ console.log(JSON.stringify({
     svcAddress: `0x${syscall.svcAddress.toString(16)}`,
     path: firstSyscallPath,
   },
-}, null, 2));
+}, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2));

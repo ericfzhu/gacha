@@ -142,8 +142,9 @@ export default function BinaryPortPage() {
     Arm64Runtime.create().then((runtime) => {
       if (disposed) return;
       runtimeRef.current = runtime;
+      const coreFeatureProbe = runtime.coreFeatureProbe;
       const probe = runtime.runLibpadProbe();
-      setState({ phase: probe.passed ? 'wasm ready' : 'probe failed', probe, elf: null, error: null });
+      setState({ phase: probe.passed ? 'wasm ready' : 'probe failed', probe, coreFeatureProbe, elf: null, error: null });
     }).catch((error) => {
       if (!disposed) setState({ phase: 'error', probe: null, elf: null, error: error.message });
     });
@@ -386,7 +387,7 @@ export default function BinaryPortPage() {
               ? ' · private data048/data030 state not present; native client remains at its offline startup screen'
               : ''}
           </output>
-          <small className="binary-port-note">First load interprets about 152 million protected ARM64 instructions and can take over a minute.</small>
+          <small className="binary-port-note">Cold binary startup interprets about 152 million protected ARM64 instructions and can take 1–2 minutes; /puzzle opens the fast reconstructed core.</small>
         </div>
       </section>
     </main>

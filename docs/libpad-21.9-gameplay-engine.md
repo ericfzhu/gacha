@@ -2655,6 +2655,14 @@ narrowing and multiply-high, saturating narrow, modified-immediate, and
 single-lane structure-store families used by these routines. A clean Chromium
 run reaches frame 199 and 21,766 translated draws after four touch callbacks.
 
+The public ARM64 core is now served as `20260828-frame23`. It performs a
+two-instruction capability check for the exact `NEG V2.2S` opcode that
+previously produced the guest-callback banner; an old cached core is rejected
+before the protected pass begins with a reload hint. The imported linear-memory
+size is cached inside the interpreter and refreshed after host growth, and the
+protected worker batches 50 million instructions per Wasm call while retaining
+all module tracepoint and syscall interruptions.
+
 Cold startup still interprets 151,900,682 guest instructions. The protection
 wrapper contributes 151,793,049 of them; `libpad.so` contributes 107,633 before
 the native lifecycle begins. The page reports elapsed time, current instruction

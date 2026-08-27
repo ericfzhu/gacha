@@ -8,6 +8,11 @@ export const LIBPAD_PROBE_BYTES = new Uint8Array([
   0x20, 0x1c, 0x80, 0x52, // mov w0, #0xe1
   0xc0, 0x03, 0x5f, 0xd6, // ret
 ]);
+const CORE_FEATURE_PROBE_ADDRESS = 0x200000;
+const CORE_FEATURE_PROBE_BYTES = new Uint8Array([
+  0x42, 0xb8, 0xa0, 0x2e, // neg v2.2s, v2.2s (native frame fault opcode)
+  0xc0, 0x03, 0x5f, 0xd6, // ret
+]);
 
 const PAGE_BYTES = 65536;
 const DEFAULT_MEMORY_PAGES = 768;
@@ -21,7 +26,7 @@ const RETURN_SENTINEL = 0xffffffffffffffffn;
 // the APK bootstrap and then fail much later in a native frame callback. The
 // version identifies the decoder generation that includes the live post-touch
 // JPEG/NEON path as well as the earlier NEG.2S callback repair.
-export const ARM64_CORE_BUILD = '20260828-frame22';
+export const ARM64_CORE_BUILD = '20260828-frame23';
 export const ARM64_CORE_SOURCE = `/wasm/arm64_core.wasm?v=${ARM64_CORE_BUILD}`;
 const R_AARCH64_RELATIVE = 1027;
 const R_AARCH64_ABS64 = 257;
@@ -43,7 +48,17 @@ export class Arm64Runtime {
       })
       : source;
     const result = await WebAssembly.instantiate(bytes, { env: { memory } });
-    return new Arm64Runtime(result.instance, memory);
+    const runtime = new Arm64Runtime(result.instance, memory);
+    const featureProbe = runtime.runCoreFeatureProbe();
+    runtime.coreFeatureProbe = featureProbe;
+    if (!featureProbe.passed) {
+      throw new Error(
+        `ARM64 Wasm core ${ARM64_CORE_BUILD} failed the NEON NEG.2S capability check ` +
+        `(status ${featureProbe.status}, instruction ${featureProbe.instruction}); ` +
+        'reload this page to replace a stale cached core.',
+      );
+    }
+    return runtime;
   }
 
   constructor(instance, memory, memoryBias = DEFAULT_MEMORY_BIAS) {
@@ -54,6 +69,7 @@ export class Arm64Runtime {
     this.loadBias = 0;
     this.loadedElf = null;
     this.exports.arm64_set_memory_bias(memoryBias);
+    this.exports.arm64_set_memory_bytes?.(BigInt(this.memory.buffer.byteLength));
   }
 
   ensureCapacity(guestEnd) {
@@ -63,6 +79,7 @@ export class Arm64Runtime {
     const growth = Math.ceil((required - current) / PAGE_BYTES);
     try {
       this.memory.grow(growth);
+      this.exports.arm64_set_memory_bytes?.(BigInt(this.memory.buffer.byteLength));
     } catch (error) {
       const caller = new Error().stack?.split('\n').slice(2, 8).join(' <- ') ?? '';
       throw new Error(
@@ -172,6 +189,26 @@ export class Arm64Runtime {
       x0: Number(this.exports.arm64_get_register(0)),
       steps: Number(this.exports.arm64_get_steps()),
       status: this.exports.arm64_get_status(),
+      trace,
+    };
+  }
+
+  runCoreFeatureProbe() {
+    this.loadBytes(CORE_FEATURE_PROBE_ADDRESS, CORE_FEATURE_PROBE_BYTES);
+    this.reset(CORE_FEATURE_PROBE_ADDRESS);
+    this.exports.arm64_set_vector_lo(2, 0xffffffff00000001n);
+    this.exports.arm64_set_vector_hi(2, 0x800000007fffffffn);
+    const trace = this.trace(4);
+    const status = Number(this.exports.arm64_get_status());
+    const vectorLow = this.exports.arm64_get_vector_lo(2);
+    const vectorHigh = this.exports.arm64_get_vector_hi(2);
+    return {
+      passed: status === ARM64_STATUS.HALTED &&
+        vectorLow === 0x00000001ffffffffn && vectorHigh === 0n,
+      status,
+      instruction: `0x${(Number(this.exports.arm64_get_last_instruction()) >>> 0).toString(16).padStart(8, '0')}`,
+      vectorLow,
+      vectorHigh,
       trace,
     };
   }

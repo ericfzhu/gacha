@@ -51,6 +51,14 @@ static uint64_t watchpoint_value;
 static uint32_t watchpoint_size;
 static uint32_t watchpoint_loads;
 static uint64_t watchpoint_length;
+/*
+ * The imported linear memory is grown by the JavaScript runtime, not by the
+ * guest.  Cache its current byte length so every guest load/store does not
+ * have to issue a memory.size instruction.  The host refreshes this value
+ * immediately after each grow; the fallback keeps the standalone core probes
+ * safe before the first host refresh.
+ */
+static uint64_t cached_memory_bytes;
 
 static void copy_cpu_state(Arm64State *destination, const Arm64State *source) {
   uint8_t *output = (uint8_t *)destination;
@@ -201,7 +209,9 @@ static int decode_logical_immediate(uint32_t instruction, uint32_t bits, uint64_
 }
 
 static uint64_t memory_bytes(void) {
-  return (uint64_t)__builtin_wasm_memory_size(0) * UINT64_C(65536);
+  return cached_memory_bytes
+    ? cached_memory_bytes
+    : (uint64_t)__builtin_wasm_memory_size(0) * UINT64_C(65536);
 }
 
 static int address_is_valid(uint64_t address, uint32_t size) {
@@ -517,6 +527,9 @@ uint32_t arm64_get_watchpoint_is_load(void) { return watchpoint_loads; }
 
 __attribute__((export_name("arm64_set_memory_bias")))
 void arm64_set_memory_bias(uint32_t bias) { cpu.memory_bias = bias; }
+
+__attribute__((export_name("arm64_set_memory_bytes")))
+void arm64_set_memory_bytes(uint64_t bytes) { cached_memory_bytes = bytes; }
 
 __attribute__((export_name("arm64_set_register")))
 void arm64_set_register(uint32_t index, uint64_t value) {

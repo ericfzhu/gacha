@@ -15,7 +15,11 @@ let gameSession = null;
 // module hand-offs.  The protected bootstrap therefore does not need a
 // 100,000-instruction host polling cadence; a larger slice keeps the hot loop
 // inside Wasm while retaining every observable boundary.
-const PROTECTED_INSTRUCTIONS_PER_SLICE = 5_000_000;
+// Keep each protected pass inside Wasm long enough to amortize the worker ↔
+// Wasm boundary.  The worker remains isolated from the UI thread, so a larger
+// slice does not block canvas input; module tracepoints and syscalls still
+// interrupt the run immediately when they are reached.
+const PROTECTED_INSTRUCTIONS_PER_SLICE = 50_000_000;
 const PROTECTED_PROGRESS_INTERVAL = 5_000_000;
 
 async function loadAndroidStub(name) {

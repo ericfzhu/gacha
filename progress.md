@@ -2,6 +2,21 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-28 binary-port callback guard and startup pass
+
+- Added a startup capability probe for the exact native-frame `NEG V2.2S`
+  opcode (`0x2ea0b842`). A stale Wasm core now fails immediately with a
+  cache/reload instruction instead of running the protected loader for minutes
+  before reporting the old guest-callback fault.
+- Cached the imported Wasm linear-memory size in the interpreter and refresh it
+  after host growth, removing a `memory.size` query from every guest load/store.
+- Bumped the public core URL to `20260828-frame23`; the protected worker keeps
+  50M-instruction slices and retains tracepoint/syscall interruption semantics.
+- Exact APK smoke reaches `native game running` with frame 199, 21,766 draw
+  calls, 151,900,682 protected instructions, and no callback/page errors. The
+  authentic first screen is visible; the later black frame is the expected
+  missing-private-data boundary (`data048.bin` / `data030.bin`).
+
 ## 2026-08-28 no-skyfall action (type 127)
 
 - Confirmed the independent PAD parser's `ESNoSkyfall` mapping against native
