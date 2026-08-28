@@ -611,6 +611,42 @@ assert.equal(selectedLegacyEnemyAi.skillId, 9_001);
 assert.equal(selectedLegacyEnemyAi.effect.attackWithSkillValue, 50);
 assert.equal(selectedLegacyEnemyAi.rngState, 394_448_415);
 assert.equal(selectedLegacyEnemyAi.aiBudget, 80);
+const legacyClearPlayerBuffsDefinition = legacyEnemyAiSkillDefinition.slice();
+new DataView(legacyClearPlayerBuffsDefinition.buffer).setInt16(
+  0x04,
+  PAD_ENEMY_SKILL_CLEAR_PLAYER_BUFFS,
+  true,
+);
+const selectedLegacyClearPlayerBuffs = selectPadEnemyAiLegacy(
+  decodedLegacyEnemyAiMonster,
+  [decodePadEnemyAiSkillDefinition(legacyClearPlayerBuffsDefinition)],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    rngState: 21_900,
+    legacyConditionBase: 1_000_000,
+    clearableBuffCount: 2,
+  },
+);
+assert.equal(selectedLegacyClearPlayerBuffs.skillId, 9_001);
+assert.equal(selectedLegacyClearPlayerBuffs.fidelity, 'legacy-ordinary-recovered');
+const approximatedLegacyClearPlayerBuffs = selectPadEnemyAiLegacy(
+  decodedLegacyEnemyAiMonster,
+  [decodePadEnemyAiSkillDefinition(legacyClearPlayerBuffsDefinition)],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    rngState: 21_900,
+    legacyConditionBase: 1_000_000,
+    playerAuxiliaryBuffTurns: 1,
+  },
+);
+assert.equal(approximatedLegacyClearPlayerBuffs.skillId, 9_001);
+assert.equal(approximatedLegacyClearPlayerBuffs.legacyCallbackApproximation, true);
+assert.deepEqual(approximatedLegacyClearPlayerBuffs.approximateCallbackTypes, [6]);
+assert.equal(approximatedLegacyClearPlayerBuffs.fidelity, 'legacy-ordinary-approximate');
 const invertedLegacyEnemyAiSkillDefinition = legacyEnemyAiSkillDefinition.slice();
 const invertedLegacyEnemyAiSkillView = new DataView(invertedLegacyEnemyAiSkillDefinition.buffer);
 // Use the recovered preserve-incoming callback (types 9–11) so the polarity

@@ -1906,8 +1906,11 @@ is positive. When the acting monster's protected `sMONSTER+0x870` status-shield
 counter is positive, the native helper skips these two player lanes. The port
 preserves that admission rule, consumes no condition-owned RNG, clears both
 modeled lanes on execution, and leaves party leader multipliers derived from
-current party state as before. Other native clearable lanes remain outside the
-model until their state and lifetimes are recovered.
+current party state as before. Both the ordinary and fallback selectors accept
+an explicit `clearableBuffCount` host value when a fuller status model is
+available; otherwise the ordinary path uses the two modeled lanes and reports
+its approximation. Other native clearable lanes remain outside the model until
+their state and lifetimes are recovered.
 
 Enemy skill types `7` and `8` share the inclusive random-range setup handler
 at `0x61ff5c`. It reads signed definition percentages `+0x10/+0x14`, advances

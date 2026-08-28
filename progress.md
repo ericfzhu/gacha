@@ -8,8 +8,10 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
   `cGAMEMAIN::_getCountClearParams` (`0x618320`) and admits the fallback only
   when at least one clearable player parameter is present.
 - Added an explicit `clearableBuffCount` host/engine field for native-equivalent
-  status models. Positive and zero counts are exact; omitted counts remain
-  playable at scale one but are reported as `legacyFallbackApproximation`.
+  status models. Positive and zero counts are exact in both ordinary and
+  fallback selection; omitted fallback counts remain playable at scale one but
+  are reported as `legacyFallbackApproximation`, while ordinary selection marks
+  its two-lane status approximation.
 - Added direct and browser fixtures plus restored jump-table/instruction-anchor
   validation. The type-6 lane is now reported by the native inspector.
 

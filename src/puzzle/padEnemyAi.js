@@ -408,13 +408,18 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
     // positive-player-status lanes represented by this engine, the native
     // helper returns their count as float32. An active +0x870 monster status
     // shield bypasses these lanes, so it also suppresses their probability.
-    const clearableCount = state.enemyStatusShieldTurns > 0 ? 0 : (
-      Number(state.playerAuxiliaryBuffTurns > 0)
-      + Number(state.playerAttackBoostTurns > 0)
-    );
+    // A host with the complete native status scan can provide its recovered
+    // count explicitly; that value already includes the shield boundary.
+    const clearableCount = state.clearableBuffCountStatePresent
+      ? Math.max(0, Math.trunc(Number(state.clearableBuffCount) || 0))
+      : state.enemyStatusShieldTurns > 0 ? 0 : (
+        Number(state.playerAuxiliaryBuffTurns > 0)
+        + Number(state.playerAttackBoostTurns > 0)
+      );
     return {
       eligible: clearableCount > 0,
       probabilityScale: Math.fround(clearableCount),
+      exact: state.clearableBuffCountStatePresent,
       rngState,
     };
   }
@@ -1403,8 +1408,10 @@ function legacyCallbackScale(definition, conditionGate, incomingScale, state) {
   if (LEGACY_CALLBACK_MULTIPLY_TYPES.has(type)) {
     return {
       scale: Math.fround(local * incoming),
-      exact: true,
-      mode: 'multiply-incoming',
+      exact: conditionGate.exact !== false,
+      mode: conditionGate.exact === false
+        ? 'multiply-incoming-approximation'
+        : 'multiply-incoming',
     };
   }
   return {
