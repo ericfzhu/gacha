@@ -1082,6 +1082,11 @@ const LEGACY_FALLBACK_EFFECTIVE_ONE_TYPES = new Set([20]);
 // explicitly rather than confusing it with the bit-8-only mask query.
 const LEGACY_FALLBACK_BOARD_COUNT_TYPES = new Set([12, 56, 58]);
 
+// Types 60 and 61 share the recovered 0x61e4d0 handler. It counts every
+// non-poison cell (optionally excluding Heart) and admits the record only
+// when that count reaches the authored request.
+const LEGACY_FALLBACK_NON_POISON_COUNT_TYPES = new Set([60, 61]);
+
 // Type 39 has a dedicated status handler at 0x61e9d0.  It starts with the
 // fallback scale at zero, admits an inactive packed move-time counter, and
 // only permits an active status when the native override byte is set.
@@ -1483,6 +1488,35 @@ function legacyFallbackBuiltinScale(definition, state) {
       scale: eligible ? Math.fround(1) : Math.fround(0),
       exact: true,
       mode: eligible ? 'native-board-count-positive' : 'native-board-count-empty',
+    };
+  }
+
+  if (LEGACY_FALLBACK_NON_POISON_COUNT_TYPES.has(type)) {
+    // Native 0x61e4d0 scans the live backing grid, skips poison/mortal-poison
+    // (7/8), optionally skips Heart (5), and then performs signed integer
+    // division by the authored count. Its csinc branch reduces every positive
+    // quotient to the exact one-scale admission used by the common epilogue.
+    // The compact board-type array carries the same count without exposing
+    // native row/column storage; its aliased poison slots are both skipped.
+    if (!state.boardTypeCountsStatePresent) {
+      return {
+        scale: Math.fround(1),
+        exact: false,
+        mode: 'native-non-poison-count-missing-state',
+      };
+    }
+    const requested = Math.trunc(Number(definition.effect?.count) || 0);
+    const excludeHeart = Boolean(definition.effect?.excludeHeart);
+    const eligibleCount = state.boardTypeCounts.reduce((count, cells, orbType) => (
+      orbType === 7 || orbType === 8 || excludeHeart && orbType === 5
+        ? count
+        : count + Math.max(0, Math.trunc(Number(cells) || 0))
+    ), 0);
+    const eligible = requested > 0 && Math.trunc(eligibleCount / requested) >= 1;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact: true,
+      mode: eligible ? 'native-non-poison-count-enough' : 'native-non-poison-count-insufficient',
     };
   }
 

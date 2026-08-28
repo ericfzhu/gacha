@@ -4215,6 +4215,13 @@ try {
         rngState: snapshot.rngState,
       };
     };
+    const setCountedBoard = () => engine.setBoardFromCodes([
+      'RRRRHH',
+      'HHHHHH',
+      'HHHHHH',
+      'HHHHHH',
+      'HHHHHH',
+    ]);
     return {
       loneAttackBoost: run(9_013, 17, (view) => {
         view.setInt32(0x14, 3, true);
@@ -4297,6 +4304,18 @@ try {
         engine.moveTime = engine.baseMoveTime - 1.25;
         engine.moveTimeReductionOverrideActive = true;
       }),
+      countedPoisonEnough: run(9_101, 60, (view) => {
+        view.setInt32(0x10, 4, true);
+        view.setInt32(0x14, 1, true);
+      }, setCountedBoard),
+      countedPoisonInsufficient: run(9_102, 60, (view) => {
+        view.setInt32(0x10, 5, true);
+        view.setInt32(0x14, 1, true);
+      }, setCountedBoard),
+      countedMortalPoisonEnough: run(9_103, 61, (view) => {
+        view.setInt32(0x10, 5, true);
+        view.setInt32(0x14, 0, true);
+      }, setCountedBoard),
     };
   }) : null;
   const legacyFallbackGateExpected = {
@@ -4310,6 +4329,8 @@ try {
     sourceToMortalPoisonBoardCount: { id: 9_021, type: 58 },
     moveTimeReductionInactive: { id: 9_023, type: 39 },
     moveTimeReductionOverride: { id: 9_025, type: 39 },
+    countedPoisonEnough: { id: 9_101, type: 60, rngState: 1_271_252_807 },
+    countedMortalPoisonEnough: { id: 9_103, type: 61, rngState: 703_883_257 },
   };
   if (legacyFallbackGatesRenderState) {
     for (const [name, expected] of Object.entries(legacyFallbackGateExpected)) {
@@ -4317,8 +4338,8 @@ try {
       if (
         result?.skill?.id !== expected.id
       || result?.skill?.type !== expected.type
-      || result?.rngState !== 394_448_415
-    ) throw new Error(`Legacy-fallback gate ${name} mismatch: ${JSON.stringify(result)}`);
+      || result?.rngState !== (expected.rngState ?? 394_448_415)
+      ) throw new Error(`Legacy-fallback gate ${name} mismatch: ${JSON.stringify(result)}`);
     }
     const emptyBoardCount = legacyFallbackGatesRenderState.sourceToJammerBoardEmpty;
     if (emptyBoardCount?.skill?.id != null
@@ -4330,6 +4351,11 @@ try {
       || activeMoveTime?.skill?.type != null
       || activeMoveTime?.rngState !== 394_448_415
     ) throw new Error(`Legacy-fallback move-time rejection mismatch: ${JSON.stringify(activeMoveTime)}`);
+    const insufficientCountedPoison = legacyFallbackGatesRenderState.countedPoisonInsufficient;
+    if (insufficientCountedPoison?.skill?.id != null
+      || insufficientCountedPoison?.skill?.type != null
+      || insufficientCountedPoison?.rngState !== 394_448_415
+    ) throw new Error(`Legacy-fallback counted-poison rejection mismatch: ${JSON.stringify(insufficientCountedPoison)}`);
     if (legacyFallbackGatesRenderState.loneAttackBoost.enemy?.attackBoostTurns !== 3
       || legacyFallbackGatesRenderState.loneAttackBoost.enemy?.attackBoostPercent !== 200
       || legacyFallbackGatesRenderState.statusTriggeredAttackBoost.enemy?.attackBoostTurns !== 2

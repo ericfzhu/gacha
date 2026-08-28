@@ -730,6 +730,12 @@ can only reapply when the separate protected `+0x87210` override byte
 browser exposes that byte as `moveTimeReductionOverrideActive`, clears it on
 ordinary application and expiry, and marks a host that omits it as
 `legacyFallbackApproximation`.
+Types 60 and 61 share the recovered `0x61e4d0` fallback handler. It scans the
+live backing grid, ignores poison and mortal poison, optionally ignores Heart,
+and admits the record only when the remaining cell count reaches the authored
+`count`. The compact `boardTypeCounts` state is sufficient for this exact
+positive-count gate; an omitted array remains playable but is reported as a
+`legacyFallbackApproximation`.
 
 Hosts that have a fuller `sMONSTER`/`sGAMEWORK` model can provide
 `legacyFallbackCondition(definition, state, context)` or a

@@ -17,6 +17,17 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
   the restored inspector now validates the type-39 jump-table target and
   reports `legacyFallbackMoveTimeTypes`.
 
+## 2026-08-28 exact counted-poison fallback gate
+
+- Recovered the shared legacy type-60/61 fallback handler at `0x61e4d0`. It
+  scans the live board, excludes poison/mortal-poison and optionally Heart,
+  then admits only when the authored requested count is met.
+- The selector reuses the explicit ten-lane `boardTypeCounts` state, keeps
+  omitted board data playable but approximate, and preserves the native
+  positive-quotient gate for both poison destinations.
+- Added direct count/Heart-boundary fixtures, browser fallback fixtures, and
+  restored jump-table validation for `legacyFallbackNonPoisonCountTypes`.
+
 ## 2026-08-28 exact legacy board-count fallback gates
 
 - Recovered the shared legacy `0x61e6cc` fallback handler for source→jammer
