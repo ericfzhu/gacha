@@ -823,9 +823,8 @@ and target count `+0x20` through `_doSelectBindTarges` (`0x61652c`), storing
 the resulting six-bit party mask at `sMONSTER+0x674`. Selector 1 fixes the
 leader, 2 fixes the helper, 3 selects leaders, 4 selects subs, and other values
 select across the party. The random selector paths gather present unbound
-cards, spend two global LCG advances, and use the same private-state
-Fisher-Yates construction recovered for type 13 before taking the authored
-count.
+cards, spend two global LCG advances, and use the native private-state
+Fisher-Yates construction before taking the authored count.
 
 After target selection, setup spends one more global LCG advance to choose the
 inclusive duration from definition `+0x14..+0x18`, storing it at
@@ -1983,22 +1982,24 @@ the slot after consuming its positive fallback-weight draw. `PuzzleEngine`
 publishes the exact ten-lane `boardTypeCounts` state, including the native
 poison-family alias for source 7/8.
 
-Enemy skill type `13` is the general random-party bind, distinct from the
-leader/helper-only type `54`. Its dispatch, setup, and AI condition targets are
-`0x629430`, `0x61fee4`, and `0x61ac50`. Setup copies definition target count
-`+0x10` to runtime `sMONSTER+0x678` and preserves `+0x14` at `+0x67c`; the
-latter is not consumed by the recovered execution path. The condition counts
-present party cards whose signed-byte bind timer is zero and admits only when
-that count is at least the requested target count.
+Enemy skill type `13` is the random whole-color jammer conversion. Its
+dispatch, setup, and AI condition targets are `0x629430`, `0x61fee4`, and
+`0x61ac50`. Setup copies definition count `+0x10` to runtime
+`sMONSTER+0x678` and preserves `+0x14` at `+0x67c`; the latter is retained as
+an authored native parameter but is not consumed by the recovered action.
+The condition scans the dungeon face list, calls `_countBlockType` for each
+entry, and admits only when the number of represented faces reaches the
+requested count.
 
-Execution gathers those bindable card indices, advances the global LCG twice,
-stores the second state, and performs a Fisher-Yates shuffle with a private
-state composed from the first step's low 16 bits and second step's high 16
-bits. Private shuffle steps do not update the global RNG. It selects the first
-requested indices and calls the per-card bind path with the hardcoded operand
-`6`. The port reproduces this shuffle, per-target bind resistance rolls,
-six-turn timers, target order, mask, and bind-driven leader/attack/recovery
-suppression.
+Execution collects those represented face entries (up to the native 16-entry
+temporary array), advances the global LCG twice, stores the second state, and
+performs a forward Fisher-Yates shuffle with a private state composed from the
+first step's high 16 bits and the second step's high 16 bits. Private shuffle
+steps do not update the global RNG. It selects the first requested face types
+and calls the generic source-to-jammer writer with destination type `6` for
+each; the jammer-passive route uses the specialized presentation helper. The
+browser reproduces represented-face filtering, shuffle order, persisted RNG
+boundary, locked-cell rejection, and source 7/8 poison-family matching.
 
 Type `14` is the global active-skill seal. Its dispatch entry `0x629524` calls
 `_doVoidActSkill` (`0x616924`); setup `0x621300` spends one LCG step selecting

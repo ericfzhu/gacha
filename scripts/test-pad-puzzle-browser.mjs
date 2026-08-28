@@ -4785,9 +4785,10 @@ try {
     };
     engine.reset();
     engine.start();
+    engine.setBoardFromCodes(['RGBHLD', 'BGLDHR', 'GLXHRB', 'LDHRBG', 'DHRBGL']);
     engine.setRngState(21_900);
-    const randomBindApplied = engine.applyEnemySkillDefinition(makeSkill(9_041, 13, 2, 99));
-    const randomBindState = engine.snapshot();
+    const randomJammerApplied = engine.applyEnemySkillDefinition(makeSkill(9_041, 13, 2, 99));
+    const randomJammerState = engine.snapshot();
     engine.reset();
     engine.start();
     engine.setRngState(21_900);
@@ -4797,18 +4798,19 @@ try {
     engine.resolveEnemyTurn();
     const skillUseResult = engine.useSkill();
     return {
-      randomBindApplied,
-      randomBindState,
+      randomJammerApplied,
+      randomJammerState,
       skillUseResult,
       skillSealState: engine.snapshot(),
     };
   }) : null;
   if (earlyPartyControlRenderState && (
-    earlyPartyControlRenderState.randomBindApplied !== true
-    || earlyPartyControlRenderState.randomBindState?.lastEnemySkill?.type !== 13
-    || earlyPartyControlRenderState.randomBindState?.lastEnemySkill?.targetMask !== 0x03
-    || earlyPartyControlRenderState.randomBindState?.party?.[0]?.bindTurns !== 6
-    || earlyPartyControlRenderState.randomBindState?.party?.[1]?.bindTurns !== 6
+    earlyPartyControlRenderState.randomJammerApplied !== true
+    || earlyPartyControlRenderState.randomJammerState?.lastEnemySkill?.type !== 13
+    || JSON.stringify(earlyPartyControlRenderState.randomJammerState?.lastEnemySkill?.selectedFaceTypes) !== JSON.stringify([1, 3])
+    || earlyPartyControlRenderState.randomJammerState?.lastEnemySkill?.changedOrbCount !== 10
+    || earlyPartyControlRenderState.randomJammerState?.lastEnemySkill?.effectFlags !== 4
+    || earlyPartyControlRenderState.randomJammerState?.rngState !== 3_803_934_822
     || earlyPartyControlRenderState.skillUseResult !== false
     || earlyPartyControlRenderState.skillSealState?.lastEnemySkill?.type !== 14
     || earlyPartyControlRenderState.skillSealState?.skillSealTurns !== 1

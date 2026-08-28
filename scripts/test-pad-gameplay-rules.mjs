@@ -52,7 +52,6 @@ import {
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
   PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY,
   PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
-  PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
   PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
   PAD_ENEMY_SKILL_REPEAT_ATTACK,
   PAD_ENEMY_SKILL_INACTIVITY,
@@ -893,6 +892,42 @@ assert.equal(missingLegacyFallbackClearCount.legacyFallbackScale, 1);
 assert.equal(missingLegacyFallbackClearCount.legacyFallbackApproximation, true);
 assert.deepEqual(missingLegacyFallbackClearCount.approximateFallbackTypes, [6]);
 assert.equal(missingLegacyFallbackClearCount.fidelity, 'legacy-fallback-approximate');
+// Type 13's legacy callback returns the represented-face fraction only after
+// its authored minimum is met. Empty/insufficient face coverage rejects the
+// slot; omitted board/face state remains a visible approximation.
+const selectedLegacyFallbackRandomJammer = makeLegacyFallbackSelection(
+  9_030,
+  13,
+  (view) => view.setInt32(0x10, 2, true),
+  {
+    boardTypeCounts: [1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+    faceTypes: [0, 1, 2, 3, 4, 5],
+  },
+);
+assert.equal(selectedLegacyFallbackRandomJammer.skillId, 9_030);
+assert.equal(selectedLegacyFallbackRandomJammer.effect.kind, 'randomJammer');
+assert.equal(selectedLegacyFallbackRandomJammer.legacyFallbackScale, Math.fround(1 / 3));
+assert.equal(selectedLegacyFallbackRandomJammer.legacyFallbackApproximation, undefined);
+assert.equal(selectedLegacyFallbackRandomJammer.fidelity, 'legacy-fallback-recovered');
+const rejectedLegacyFallbackRandomJammer = makeLegacyFallbackSelection(
+  9_031,
+  13,
+  (view) => view.setInt32(0x10, 2, true),
+  {
+    boardTypeCounts: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    faceTypes: [0, 1, 2, 3, 4, 5],
+  },
+);
+assert.equal(rejectedLegacyFallbackRandomJammer.skillId, null);
+assert.equal(rejectedLegacyFallbackRandomJammer.legacyFallbackApproximation, undefined);
+const missingLegacyFallbackRandomJammer = makeLegacyFallbackSelection(9_032, 13, (view) => {
+  view.setInt32(0x10, 2, true);
+});
+assert.equal(missingLegacyFallbackRandomJammer.skillId, 9_032);
+assert.equal(missingLegacyFallbackRandomJammer.legacyFallbackScale, 1);
+assert.equal(missingLegacyFallbackRandomJammer.legacyFallbackApproximation, true);
+assert.deepEqual(missingLegacyFallbackRandomJammer.approximateFallbackTypes, [13]);
+assert.equal(missingLegacyFallbackRandomJammer.fidelity, 'legacy-fallback-approximate');
 // Types 12, 56, and 58 share the restored 0x61e6cc fallback handler.  The
 // native _countBlockType call is a positive gate only on this pass (unlike
 // the ordinary path's count/3 probability), and source 7/8 use one combined
@@ -3886,47 +3921,49 @@ directEntireBlindState = directEntireBlindEngine.snapshot();
 assert.equal(directEntireBlindState.boardState.flat().filter((orb) => orb.entireBlind).length, 28);
 assert.equal(directEntireBlindState.boardState[0][0].blockFlags & 0x04, 0);
 assert.equal(directEntireBlindState.boardState[0][1].blockFlags & 0x04, 0);
-const enemyAiRandomPartyBindDefinition = enemyAiPoisonBlocksDefinition.slice();
-const enemyAiRandomPartyBindView = new DataView(enemyAiRandomPartyBindDefinition.buffer);
-enemyAiRandomPartyBindView.setUint32(0x00, 9_023, true);
-enemyAiRandomPartyBindView.setInt16(0x04, PAD_ENEMY_SKILL_RANDOM_PARTY_BIND, true);
-enemyAiRandomPartyBindView.setInt32(0x10, 2, true);
-enemyAiRandomPartyBindView.setInt32(0x14, 99, true);
-assert.deepEqual(decodePadEnemySkillDefinition(enemyAiRandomPartyBindDefinition), {
+const enemyAiRandomJammerDefinition = enemyAiPoisonBlocksDefinition.slice();
+const enemyAiRandomJammerView = new DataView(enemyAiRandomJammerDefinition.buffer);
+enemyAiRandomJammerView.setUint32(0x00, 9_023, true);
+enemyAiRandomJammerView.setInt16(0x04, 13, true);
+enemyAiRandomJammerView.setInt32(0x10, 2, true);
+enemyAiRandomJammerView.setInt32(0x14, 99, true);
+assert.deepEqual(decodePadEnemySkillDefinition(enemyAiRandomJammerDefinition), {
   type: 13,
-  kind: 'randomPartyBind',
+  kind: 'randomJammer',
   supported: true,
-  targetCount: 2,
+  count: 2,
   nativeParameter1: 99,
-  durationTurns: 6,
+  destinationType: 6,
   attackWithSkillValue: 0,
 });
-const randomPartyBindMonsterRuntime = new Uint8Array(0x680);
-const randomPartyBindMonsterRuntimeView = new DataView(randomPartyBindMonsterRuntime.buffer);
-randomPartyBindMonsterRuntimeView.setInt32(0x678, 2, true);
-randomPartyBindMonsterRuntimeView.setInt32(0x67c, 99, true);
+const randomJammerMonsterRuntime = new Uint8Array(0x680);
+const randomJammerMonsterRuntimeView = new DataView(randomJammerMonsterRuntime.buffer);
+randomJammerMonsterRuntimeView.setInt32(0x678, 2, true);
+randomJammerMonsterRuntimeView.setInt32(0x67c, 99, true);
 assert.deepEqual(
-  decodePadEnemySkillRuntime(enemyAiRandomPartyBindDefinition, randomPartyBindMonsterRuntime),
+  decodePadEnemySkillRuntime(enemyAiRandomJammerDefinition, randomJammerMonsterRuntime),
   {
     type: 13,
-    kind: 'randomPartyBind',
+    kind: 'randomJammer',
     supported: true,
-    targetCount: 2,
+    count: 2,
     nativeParameter1: 99,
-    durationTurns: 6,
+    destinationType: 6,
     setupMaterialized: true,
     attackWithSkillValue: 0,
   },
 );
-const randomPartyBindEngine = new PuzzleEngine({ seed: 21_900 });
-randomPartyBindEngine.setRngState(21_900);
-assert.equal(randomPartyBindEngine.applyEnemySkillDefinition(
-  enemyAiRandomPartyBindDefinition,
+const randomJammerEngine = new PuzzleEngine({ seed: 21_900 });
+randomJammerEngine.setBoardFromCodes(['RGBHLD', 'BGLDHR', 'GLXHRB', 'LDHRBG', 'DHRBGL']);
+randomJammerEngine.setRngState(21_900);
+assert.equal(randomJammerEngine.applyEnemySkillDefinition(
+  enemyAiRandomJammerDefinition,
 ), true);
-assert.deepEqual(randomPartyBindEngine.lastEnemySkill.targetOrder, [0, 1]);
-assert.equal(randomPartyBindEngine.lastEnemySkill.targetMask, 0x03);
-assert.deepEqual(randomPartyBindEngine.party.map((member) => member.bindTurns), [6, 6, 0, 0, 0, 0]);
-assert.equal(randomPartyBindEngine.rng.state, padLcgStep(padLcgStep(21_900).state).state);
+assert.deepEqual(randomJammerEngine.lastEnemySkill.selectedFaceTypes, [1, 3]);
+assert.equal(randomJammerEngine.lastEnemySkill.changedOrbCount, 10);
+assert.equal(randomJammerEngine.lastEnemySkill.effectFlags, 4);
+assert.deepEqual(randomJammerEngine.board.flat().map((orb) => orb.type).filter((type) => type === 'jammer').length, 10);
+assert.equal(randomJammerEngine.rng.state, padLcgStep(padLcgStep(21_900).state).state);
 const enemyAiActiveSkillSealDefinition = enemyAiPoisonBlocksDefinition.slice();
 const enemyAiActiveSkillSealView = new DataView(enemyAiActiveSkillSealDefinition.buffer);
 enemyAiActiveSkillSealView.setUint32(0x00, 9_024, true);
@@ -8817,41 +8854,40 @@ rejectedRandomSubBindEngine.party.slice(1, 5).forEach((member) => {
 rejectedRandomSubBindEngine.setRngState(21_900);
 assert.equal(rejectedRandomSubBindEngine.takeEnemySkill(0), null);
 assert.equal(rejectedRandomSubBindEngine.rng.state, 21_900);
-const randomPartyBindMonsterDefinition = enemyAiMonsterDefinition.slice();
-new DataView(randomPartyBindMonsterDefinition.buffer).setUint32(0xec, 9_023, true);
-const selectedRandomPartyBindEngine = new PuzzleEngine({
+const randomJammerMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(randomJammerMonsterDefinition.buffer).setUint32(0xec, 9_023, true);
+const selectedRandomJammerEngine = new PuzzleEngine({
   seed: 21_900,
   enemyAiPools: [{
-    monsterDefinition: randomPartyBindMonsterDefinition,
-    skillDefinitions: [enemyAiRandomPartyBindDefinition],
+    monsterDefinition: randomJammerMonsterDefinition,
+    skillDefinitions: [enemyAiRandomJammerDefinition],
   }],
 });
-selectedRandomPartyBindEngine.setRngState(21_900);
-selectedRandomPartyBindEngine.enemies[0].counter = 1;
-selectedRandomPartyBindEngine.enemies[1].counter = 99;
-selectedRandomPartyBindEngine.resolveEnemyTurn();
-const selectedRandomPartyBindState = selectedRandomPartyBindEngine.snapshot();
-assert.equal(selectedRandomPartyBindState.lastEnemyActions[0].skill.type, 13);
-assert.equal(selectedRandomPartyBindState.lastEnemySkill.targetMask, 0x09);
-assert.deepEqual(
-  selectedRandomPartyBindState.party.map((member) => member.bindTurns),
-  [6, 0, 0, 6, 0, 0],
-);
+selectedRandomJammerEngine.setBoardFromCodes(['RGBHLD', 'BGLDHR', 'GLXHRB', 'LDHRBG', 'DHRBGL']);
+selectedRandomJammerEngine.setRngState(21_900);
+selectedRandomJammerEngine.enemies[0].counter = 1;
+selectedRandomJammerEngine.enemies[1].counter = 99;
+selectedRandomJammerEngine.resolveEnemyTurn();
+const selectedRandomJammerState = selectedRandomJammerEngine.snapshot();
+assert.equal(selectedRandomJammerState.lastEnemyActions[0].skill.type, 13);
+assert.deepEqual(selectedRandomJammerState.lastEnemySkill.selectedFaceTypes, [3, 5]);
+assert.equal(selectedRandomJammerState.lastEnemySkill.changedOrbCount, 10);
+assert.equal(selectedRandomJammerState.lastEnemySkill.effectFlags, 4);
 assert.equal(
-  selectedRandomPartyBindEngine.rng.state,
+  selectedRandomJammerEngine.rng.state,
   padLcgStep(padLcgStep(padLcgStep(21_900).state).state).state,
 );
-const rejectedRandomPartyBindEngine = new PuzzleEngine({
+const rejectedRandomJammerEngine = new PuzzleEngine({
   seed: 21_900,
   enemyAiPools: [{
-    monsterDefinition: randomPartyBindMonsterDefinition,
-    skillDefinitions: [enemyAiRandomPartyBindDefinition],
+    monsterDefinition: randomJammerMonsterDefinition,
+    skillDefinitions: [enemyAiRandomJammerDefinition],
   }],
 });
-rejectedRandomPartyBindEngine.party.slice(1).forEach((member) => { member.bindTurns = 1; });
-rejectedRandomPartyBindEngine.setRngState(21_900);
-assert.equal(rejectedRandomPartyBindEngine.takeEnemySkill(0), null);
-assert.equal(rejectedRandomPartyBindEngine.rng.state, 21_900);
+rejectedRandomJammerEngine.setBoardFromCodes(['RRRRRR', 'RRRRRR', 'RRRRRR', 'RRRRRR', 'RRRRRR']);
+rejectedRandomJammerEngine.setRngState(21_900);
+assert.equal(rejectedRandomJammerEngine.takeEnemySkill(0), null);
+assert.equal(rejectedRandomJammerEngine.rng.state, 21_900);
 const activeSkillSealMonsterDefinition = enemyAiMonsterDefinition.slice();
 new DataView(activeSkillSealMonsterDefinition.buffer).setUint32(0xec, 9_024, true);
 const selectedActiveSkillSealEngine = new PuzzleEngine({

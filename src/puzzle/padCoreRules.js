@@ -73,6 +73,11 @@ export function createPadRng(seed = 0) {
       state = shuffled.state;
       return shuffled.candidates;
     },
+    selectRandomFaceTypes(faceTypes, boardTypes, count) {
+      const selected = padSelectRandomFaceTypes(state, faceTypes, boardTypes, count);
+      state = selected.state;
+      return selected.types;
+    },
     shuffleBlockMinusCandidates(candidates) {
       const shuffled = padShuffleBlockMinusCandidates(state, candidates);
       state = shuffled.state;
@@ -762,6 +767,35 @@ export function padSelectPoisonBlockTypes(state, faceTypes, boardTypes, count, e
   if (eligible.length === 0) return { state: Number(state) >>> 0, types: [] };
   const shuffled = padShuffleBlockCandidates(state, eligible);
   const requested = Math.max(0, Math.trunc(Number(count) || 0));
+  return { state: shuffled.state, types: shuffled.candidates.slice(0, requested) };
+}
+
+// Enemy skill type 13 uses the same represented-face list and two-step/local
+// Fisher-Yates contract as the native whole-color poison selector, but writes
+// every selected face to jammer (type 6).  The face list is intentionally not
+// deduplicated: the native loop appends one candidate for every dungeon face
+// entry whose live count is positive, and the authored dungeon data normally
+// supplies each face only once.  Poison and mortal-poison share the native
+// _countBlockType alias (7/8).
+export function padSelectRandomFaceTypes(state, faceTypes, boardTypes, count) {
+  const eligible = (Array.isArray(faceTypes) ? faceTypes : []).map((value) => (
+    Math.trunc(Number(value))
+  )).filter((type) => {
+    if (type < 0 || type > 15) return false;
+    const countMask = 1 << (type === 7 || type === 8 ? 7 : type);
+    return padCountBlockBits(boardTypes, countMask) >= 1;
+  });
+  // Native type 13 returns before touching the LCG when no represented face
+  // exists.  A zero/negative request still shuffles a non-empty list before
+  // the action's runtime count gate, so do not early-return on count here.
+  if (eligible.length === 0) {
+    return { state: Number(state) >>> 0, types: [] };
+  }
+  const shuffled = padShuffleBlockCandidates(state, eligible);
+  const requested = Math.max(0, Math.min(
+    eligible.length,
+    Math.trunc(Number(count) || 0),
+  ));
   return { state: shuffled.state, types: shuffled.candidates.slice(0, requested) };
 }
 

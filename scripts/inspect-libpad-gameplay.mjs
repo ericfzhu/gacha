@@ -105,6 +105,11 @@ const LEGACY_FALLBACK_CLEAR_COUNT_TYPES = Object.freeze([6]);
 const LEGACY_FALLBACK_BOARD_COUNT_TYPES = Object.freeze([12, 56, 58]);
 const LEGACY_FALLBACK_NON_POISON_COUNT_TYPES = Object.freeze([60, 61]);
 const LEGACY_FALLBACK_FACE_FRACTION_TYPES = Object.freeze([57, 59]);
+// Type 13 is the native random-jammer face-list handler.  Keep it separate
+// from the older face-fraction handlers: both inspect the dungeon face list,
+// but type 13 gates on a requested represented-face count before its action
+// performs the private-state shuffle.
+const LEGACY_FALLBACK_RANDOM_JAMMER_TYPES = Object.freeze([13]);
 const LEGACY_FALLBACK_MOVE_TIME_TYPES = Object.freeze([39]);
 const LEGACY_FALLBACK_INSTRUCTION_ANCHORS = Object.freeze([
   [0x61e408, 0x794faa68], // current budget gate
@@ -168,7 +173,7 @@ const SOURCE_TO_JAMMER_CONDITION_HANDLER = 0x61a63c;
 const EARLY_PARTY_CONTROL_SKILLS = Object.freeze([
   Object.freeze({
     type: 13,
-    kind: 'randomPartyBind',
+    kind: 'randomJammer',
     dispatch: 0x629430,
     setup: 0x61fee4,
     condition: 0x61ac50,
@@ -1857,6 +1862,7 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       ...LEGACY_FALLBACK_BOARD_COUNT_TYPES,
       ...LEGACY_FALLBACK_NON_POISON_COUNT_TYPES,
       ...LEGACY_FALLBACK_FACE_FRACTION_TYPES,
+      ...LEGACY_FALLBACK_RANDOM_JAMMER_TYPES,
       ...LEGACY_FALLBACK_MOVE_TIME_TYPES,
     ].every((type) => {
       const entry = readUint16Virtual(
@@ -1880,7 +1886,9 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
                   : LEGACY_FALLBACK_NON_POISON_COUNT_TYPES.includes(type)
                     ? 0x61e4d0
                     : LEGACY_FALLBACK_FACE_FRACTION_TYPES.includes(type)
-                      ? 0x61e448
+                    ? 0x61e448
+                      : LEGACY_FALLBACK_RANDOM_JAMMER_TYPES.includes(type)
+                        ? 0x61e7e8
                       : LEGACY_FALLBACK_MOVE_TIME_TYPES.includes(type)
                         ? 0x61e9d0
                         : null;
@@ -3929,8 +3937,8 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
         conditionTarget: entry.conditionTarget === null ? null : hex(entry.conditionTarget),
         matches21_9: entry.matches21_9,
       })),
-      randomPartyBindSemantics:
-        'type 13: +0x10 target count; choose currently unbound party cards with the native two-step/private-state shuffle, then bind each for the hardcoded six-turn operand',
+      randomJammerSemantics:
+        'type 13: +0x10 represented-face count; scan the dungeon face list with _countBlockType, require at least that many live faces, then use the persisted two-step/private-state shuffle and convert each selected face to jammer type 6; +0x14 is retained as the native parameter lane',
       activeSkillSealSemantics:
         'type 14: one-LCG inclusive +0x10..+0x14 duration; 20% per resistance awakening plus badge; add into protected low-ten-bit sGAMEWORK+0x87250 and count down in _doOnPostEnemyAttack',
       repeatAttackSemantics:
@@ -5232,6 +5240,7 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       legacyFallbackBoardCountTypes: LEGACY_FALLBACK_BOARD_COUNT_TYPES,
       legacyFallbackNonPoisonCountTypes: LEGACY_FALLBACK_NON_POISON_COUNT_TYPES,
       legacyFallbackFaceFractionTypes: LEGACY_FALLBACK_FACE_FRACTION_TYPES,
+      legacyFallbackRandomJammerTypes: LEGACY_FALLBACK_RANDOM_JAMMER_TYPES,
       legacyFallbackMoveTimeTypes: LEGACY_FALLBACK_MOVE_TIME_TYPES,
     },
     symbols,

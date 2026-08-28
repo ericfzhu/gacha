@@ -88,7 +88,7 @@ import {
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
   PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY,
   PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
-  PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
+  PAD_ENEMY_SKILL_RANDOM_JAMMER,
   PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
   PAD_ENEMY_SKILL_REPEAT_ATTACK,
   PAD_ENEMY_SKILL_INACTIVITY,
@@ -3065,6 +3065,50 @@ export class PuzzleEngine {
       this.message = `${enemy.name} nullifies selected attributes for ${enemy.attributeNullifyTurns} turn${enemy.attributeNullifyTurns === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'randomJammer') {
+      const boardTypes = this.board.map((row) => row.map((orb) => (
+        ORB_TYPES.findIndex((candidate) => candidate.id === orb.type)
+      )));
+      // Native type 13 selects represented dungeon faces once, using the
+      // persisted two-step/private-state shuffle. Each selected face is then
+      // sent through the ordinary deterministic source->jammer writer; no
+      // extra gameplay RNG is consumed by the writes themselves.
+      const selectedFaceTypes = this.rng.selectRandomFaceTypes(
+        this.faceTypes,
+        boardTypes,
+        skill.count,
+      );
+      const countSourceOrbs = (sourceType) => this.board.reduce((count, row) => (
+        count + row.reduce((rowCount, orb) => {
+          const type = ORB_TYPES.findIndex((candidate) => candidate.id === orb.type);
+          const matches = type === sourceType
+            || (sourceType === 7 && ['poison', 'mortalPoison'].includes(orb.type))
+            || (sourceType === 8 && ['poison', 'mortalPoison'].includes(orb.type));
+          return rowCount + (matches ? 1 : 0);
+        }, 0)
+      ), 0);
+      let changedOrbCount = 0;
+      let effectFlags = 0;
+      selectedFaceTypes.forEach((sourceType) => {
+        const before = countSourceOrbs(sourceType);
+        effectFlags |= this.doBlockSwap(
+          sourceType,
+          skill.destinationType,
+          0,
+          null,
+        );
+        const after = countSourceOrbs(sourceType);
+        changedOrbCount += Math.max(0, before - after);
+      });
+      this.lastEnemySkill = Object.freeze({
+        ...skill,
+        selectedFaceTypes: Object.freeze([...selectedFaceTypes]),
+        changedOrbCount,
+        effectFlags,
+      });
+      this.message = `${changedOrbCount} orb${changedOrbCount === 1 ? '' : 's'} converted to jammer.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'randomPartyBind') {
       const targetOrder = this.selectRandomBindablePartyTargets(skill.targetCount);
       const targetMask = targetOrder.reduce((mask, index) => mask | (1 << index), 0);
@@ -3687,7 +3731,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
         PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY,
         PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
-        PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
+        PAD_ENEMY_SKILL_RANDOM_JAMMER,
         PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
         PAD_ENEMY_SKILL_REPEAT_ATTACK,
         PAD_ENEMY_SKILL_INACTIVITY,

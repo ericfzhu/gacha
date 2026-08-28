@@ -9,7 +9,12 @@ export const PAD_ENEMY_SKILL_DEFENSE_BOOST = 9;
 export const PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY = 10;
 export const PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY = 11;
 export const PAD_ENEMY_SKILL_SOURCE_TO_JAMMER = 12;
-export const PAD_ENEMY_SKILL_RANDOM_PARTY_BIND = 13;
+// Native type 13 is the random whole-color jammer conversion in PAD 21.9.
+// Keep the old name as a deprecated numeric alias so callers that used the
+// earlier reconstruction can still import it, while raw decoding reports the
+// recovered randomJammer kind below.
+export const PAD_ENEMY_SKILL_RANDOM_JAMMER = 13;
+export const PAD_ENEMY_SKILL_RANDOM_PARTY_BIND = PAD_ENEMY_SKILL_RANDOM_JAMMER;
 export const PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL = 14;
 export const PAD_ENEMY_SKILL_REPEAT_ATTACK = 15;
 export const PAD_ENEMY_SKILL_INACTIVITY = 16;
@@ -704,14 +709,14 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       attackWithSkillValue,
     });
   }
-  if (type === PAD_ENEMY_SKILL_RANDOM_PARTY_BIND) {
+  if (type === PAD_ENEMY_SKILL_RANDOM_JAMMER) {
     return Object.freeze({
       type,
-      kind: 'randomPartyBind',
+      kind: 'randomJammer',
       supported: true,
-      targetCount: definition.getInt32(0x10, true),
+      count: definition.getInt32(0x10, true),
       nativeParameter1: definition.getInt32(0x14, true),
-      durationTurns: 6,
+      destinationType: 6,
       attackWithSkillValue,
     });
   }
@@ -1923,14 +1928,14 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
-  if (type === PAD_ENEMY_SKILL_RANDOM_PARTY_BIND) {
+  if (type === PAD_ENEMY_SKILL_RANDOM_JAMMER) {
     return Object.freeze({
       type,
-      kind: 'randomPartyBind',
+      kind: 'randomJammer',
       supported: true,
-      targetCount: monster.getInt32(0x678, true),
+      count: monster.getInt32(0x678, true),
       nativeParameter1: monster.getInt32(0x67c, true),
-      durationTurns: 6,
+      destinationType: 6,
       setupMaterialized: true,
       attackWithSkillValue: definitionBytes.byteLength
           >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
@@ -3037,14 +3042,34 @@ export function normalizePadEnemySkillRecord(record) {
         : Math.trunc(Number(record.attackWithSkillValue)),
     });
   }
-  if (type === PAD_ENEMY_SKILL_RANDOM_PARTY_BIND || record?.kind === 'randomPartyBind') {
+  // Explicit synthetic records retain the pre-correction party-bind model for
+  // hosts that construct one intentionally.  A numeric/raw type 13 without
+  // that explicit kind is always the recovered random-jammer action.
+  if (record?.kind === 'randomPartyBind') {
     return Object.freeze({
-      type: PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
+      type: PAD_ENEMY_SKILL_RANDOM_JAMMER,
       kind: 'randomPartyBind',
       supported: true,
       targetCount: Math.trunc(Number(record?.targetCount) || 0),
       nativeParameter1: Math.trunc(Number(record?.nativeParameter1) || 0),
       durationTurns: 6,
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_RANDOM_JAMMER || record?.kind === 'randomJammer') {
+    const count = record?.count === undefined || record?.count === null
+      ? record?.targetCount
+      : record.count;
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_RANDOM_JAMMER,
+      kind: 'randomJammer',
+      supported: record?.supported !== false,
+      count: Math.trunc(Number(count) || 0),
+      nativeParameter1: Math.trunc(Number(record?.nativeParameter1) || 0),
+      destinationType: Math.trunc(Number(record?.destinationType) || 6),
       setupMaterialized: Boolean(record?.setupMaterialized),
       attackWithSkillValue: record?.attackWithSkillValue == null
         ? null

@@ -39,7 +39,7 @@ import {
   PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
   PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY,
   PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
-  PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
+  PAD_ENEMY_SKILL_RANDOM_JAMMER,
   PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
   PAD_ENEMY_SKILL_REPEAT_ATTACK,
   PAD_ENEMY_SKILL_INACTIVITY,
@@ -237,7 +237,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_ATTRIBUTE_NULLIFY,
     PAD_ENEMY_SKILL_DUAL_ATTRIBUTE_NULLIFY,
     PAD_ENEMY_SKILL_SOURCE_TO_JAMMER,
-    PAD_ENEMY_SKILL_RANDOM_PARTY_BIND,
+    PAD_ENEMY_SKILL_RANDOM_JAMMER,
     PAD_ENEMY_SKILL_ACTIVE_SKILL_SEAL,
     PAD_ENEMY_SKILL_REPEAT_ATTACK,
     PAD_ENEMY_SKILL_INACTIVITY,
@@ -483,7 +483,28 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
     // probability scale unchanged and consumes no RNG.
     return { eligible: true, probabilityScale: 1, rngState };
   }
-  if (definition.effect.type === PAD_ENEMY_SKILL_RANDOM_PARTY_BIND) {
+  if (definition.effect.kind === 'randomJammer') {
+    // Native type 13's ordinary condition scans the dungeon face list, counts
+    // entries whose live board count is positive, and compares that count with
+    // authored +0x10. The incoming scale is preserved; recovered callers use
+    // one here, so this is an exact positive gate for the browser model.
+    const faces = Array.isArray(state.faceTypes) ? state.faceTypes : [];
+    const counts = Array.isArray(state.boardTypeCounts) ? state.boardTypeCounts : [];
+    const countForFace = (face) => {
+      const numericFace = Math.trunc(Number(face));
+      const countIndex = numericFace === 7 || numericFace === 8 ? 7 : numericFace;
+      return countIndex >= 0 && countIndex < counts.length
+        ? Math.max(0, Math.trunc(Number(counts[countIndex]) || 0))
+        : 0;
+    };
+    const representedCount = faces.reduce((count, face) => (
+      count + (countForFace(face) >= 1 ? 1 : 0)
+    ), 0);
+    const requested = Math.max(0, Math.trunc(Number(definition.effect.count) || 0));
+    const eligible = faces.length >= 1 && representedCount >= requested;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.kind === 'randomPartyBind') {
     const bindableCount = state.party.filter((member) => (
       member?.present !== false && Number(member?.bindTurns || 0) <= 0
     )).length;
@@ -871,6 +892,12 @@ export function selectPadEnemyAiNew(monster, definitions, state = {}) {
       ? ((Math.trunc(Number(state.boardRows) || 0) << 4)
         | Math.trunc(Number(state.boardColumns) || 0)) & 0xff
       : Math.trunc(Number(state.boardSizeCode) || 0) & 0xff,
+    boardTypeCounts: Array.isArray(state.boardTypeCounts)
+      ? state.boardTypeCounts.map((count) => Math.max(0, Math.trunc(Number(count) || 0)))
+      : [],
+    faceTypes: Array.isArray(state.faceTypes)
+      ? state.faceTypes.map((type) => Math.trunc(Number(type) || 0))
+      : [],
     actingEnemyIndex: Math.trunc(Number(state.actingEnemyIndex) || 0),
     attributeAbsorbTurns: Math.max(0, Math.trunc(Number(state.attributeAbsorbTurns) || 0)),
     comboAbsorbTurns: Math.max(0, Math.trunc(Number(state.comboAbsorbTurns) || 0)),
@@ -1102,6 +1129,12 @@ const LEGACY_FALLBACK_NON_POISON_COUNT_TYPES = new Set([60, 61]);
 // one represented face after optional Heart exclusion, then return the
 // represented-face fraction used by the fallback epilogue.
 const LEGACY_FALLBACK_FACE_FRACTION_TYPES = new Set([57, 59]);
+
+// Type 13 uses the same represented dungeon-face scan in the legacy selector,
+// but its authored +0x10 is a minimum represented-face count rather than the
+// optional Heart-exclusion operand used by types 57/59.  The callback returns
+// representedFaces / totalFaces after the positive-count gate.
+const LEGACY_FALLBACK_RANDOM_JAMMER_TYPES = new Set([13]);
 
 // Type 39 has a dedicated status handler at 0x61e9d0.  It starts with the
 // fallback scale at zero, admits an inactive packed move-time counter, and
@@ -1610,6 +1643,38 @@ function legacyFallbackBuiltinScale(definition, state) {
       mode: eligible
         ? 'native-face-fraction-represented'
         : 'native-face-fraction-empty',
+    };
+  }
+
+  if (LEGACY_FALLBACK_RANDOM_JAMMER_TYPES.has(type)) {
+    if (!state.boardTypeCountsStatePresent || !state.faceTypesStatePresent) {
+      return {
+        scale: Math.fround(1),
+        exact: false,
+        mode: 'native-random-jammer-missing-state',
+      };
+    }
+    const faces = state.faceTypes;
+    const countForFace = (face) => {
+      const countIndex = face === 7 || face === 8 ? 7 : face;
+      return countIndex >= 0 && countIndex < state.boardTypeCounts.length
+        ? state.boardTypeCounts[countIndex]
+        : 0;
+    };
+    const representedCount = faces.reduce((count, face) => (
+      count + (countForFace(face) >= 1 ? 1 : 0)
+    ), 0);
+    const requested = Math.max(0, Math.trunc(Number(definition.effect?.count
+      ?? definition.effect?.targetCount) || 0));
+    const eligible = faces.length >= 1 && representedCount >= requested;
+    return {
+      scale: eligible && faces.length > 0
+        ? Math.fround(representedCount / faces.length)
+        : Math.fround(0),
+      exact: true,
+      mode: eligible
+        ? 'native-random-jammer-represented'
+        : 'native-random-jammer-insufficient',
     };
   }
 

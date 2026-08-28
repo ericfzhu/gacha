@@ -2,6 +2,20 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-28 corrected native type-13 random jammer
+
+- Restored type 13's dispatch/condition path from `libpad.so`: it scans the
+  dungeon face list with `_countBlockType`, requires the authored represented
+  face count, then shuffles the represented entries and converts selected
+  colors to jammer (type 6). It is not a random party bind in PAD 21.9.
+- Added the exact two-persisted-step/private-shuffle primitive and browser
+  action, including the no-candidate RNG boundary, locked-cell behavior, and
+  poison-family source alias. Raw definition/runtime decoding now reports
+  `kind: 'randomJammer'`; explicit synthetic `randomPartyBind` records remain
+  supported as a compatibility-only path.
+- Updated native inspector semantics, gameplay documentation, and direct
+  selector/action coverage.
+
 ## 2026-08-28 exact legacy clear-count fallback gate
 
 - Recovered the type-6 legacy fallback handler at `0x61e7d0`. It calls
