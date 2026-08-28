@@ -187,6 +187,10 @@ export default function BinaryPortPage() {
   }, [state]);
 
   const rerunProbe = () => {
+    if (state.phase === 'error') {
+      window.location.reload();
+      return;
+    }
     const runtime = runtimeRef.current;
     if (!runtime) return;
     const probe = runtime.runLibpadProbe();
@@ -374,10 +378,19 @@ export default function BinaryPortPage() {
           <button
             id="run-arm64-probe"
             onClick={state.phase === 'native game running' ? () => navigate('/puzzle') : rerunProbe}
-            disabled={!runtimeRef.current}
+            disabled={!runtimeRef.current && state.phase !== 'error'}
           >
-            {state.phase === 'native game running' ? 'Open reconstructed puzzle core' : 'Run verified ARM64 probe'}
+            {state.phase === 'native game running'
+              ? 'Open reconstructed puzzle core'
+              : state.phase === 'error'
+                ? 'Reload latest decoder'
+                : 'Run verified ARM64 probe'}
           </button>
+          {state.phase !== 'native game running' && (
+            <button id="open-reconstructed-core" type="button" onClick={() => navigate('/puzzle')}>
+              Open reconstructed puzzle core
+            </button>
+          )}
           <label className="binary-file-control">
             <span>Load APK + optional runtime data</span>
             <input id="libpad-file" type="file" multiple accept=".apk,.so,.dat,.bin,application/vnd.android.package-archive,application/octet-stream" onChange={loadElf} />
