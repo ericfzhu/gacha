@@ -41,6 +41,21 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
   operand. The tests assert the native fallback roll boundary, scale, RNG
   state, approximation diagnostic, and recovered effect metadata.
 
+## 2026-08-28 legacy fallback types 62-65
+
+- Recovered the late legacy fallback handlers from the restored jump table:
+  type 62 admits only when a visible board cell remains; type 63 admits when
+  the authored leader/helper/sub selector has at least one bindable card; type
+  64 admits when a non-poison cell remains after optional Heart exclusion; and
+  type 65 returns the native truncated percentage of unbound sub cards.
+- The selector now uses explicit board visibility, board-type-count, and six
+  party-slot state boundaries. Omitted state keeps each record playable at the
+  prior initialized-one scale but reports `legacyFallbackApproximation`; fully
+  supplied state reproduces the native zero/one/fraction gates and fallback
+  RNG boundary.
+- Added direct positive, empty, and missing-state fixtures for all four lanes;
+  `npm run pad-rules:test` passes.
+
 ## 2026-08-28 corrected native type-13 random jammer
 
 - Restored type 13's dispatch/condition path from `libpad.so`: it scans the

@@ -1163,6 +1163,18 @@ const LEGACY_FALLBACK_ORB_CHANGE_ATTACK_TYPES = new Set([48]);
 // only permits an active status when the native override byte is set.
 const LEGACY_FALLBACK_MOVE_TIME_TYPES = new Set([39]);
 
+// Types 62-65 are late entries in the same legacy fallback jump table. Their
+// handlers do not use the initialized-one path: 62 checks for at least one
+// visible cell, 63 checks for a bindable target in the authored selector, 64
+// checks for a non-poison board cell (optionally excluding Heart), and 65
+// returns the fraction of sub cards that are currently unbound. Keep these
+// sets separate from the unconditional lanes so omitted host state remains an
+// explicit approximation instead of an accidental native claim.
+const LEGACY_FALLBACK_ENTIRE_BLIND_ALT_TYPES = new Set([62]);
+const LEGACY_FALLBACK_BIND_ATTACK_TYPES = new Set([63]);
+const LEGACY_FALLBACK_POISON_BLOCK_N_TYPES = new Set([64]);
+const LEGACY_FALLBACK_RANDOM_SUB_BIND_TYPES = new Set([65]);
+
 function normalizeLegacySelectorState(state, monster) {
   const numeric = (value, fallback = 0) => {
     const candidate = Number(value);
@@ -1216,6 +1228,15 @@ function normalizeLegacySelectorState(state, monster) {
     ));
   const moveTimeReductionStatePresent = hasOwn('moveTimeReductionTurns');
   const moveTimeReductionOverrideStatePresent = hasOwn('moveTimeReductionOverrideActive');
+  const boardVisibilityStatePresent = hasOwn('boardCellCount') && hasOwn('blackBlockCount');
+  const partyStatePresent = hasOwn('party')
+    && Array.isArray(state.party)
+    && state.party.length >= 6
+    && state.party.slice(0, 6).every((member) => (
+      Boolean(member)
+      && Object.prototype.hasOwnProperty.call(member, 'present')
+      && Object.prototype.hasOwnProperty.call(member, 'bindTurns')
+    ));
   return {
     currentHp: nonNegative(state.currentHp),
     maxHp: nonNegative(state.maxHp),
@@ -1297,11 +1318,13 @@ function normalizeLegacySelectorState(state, monster) {
     moveTimeReductionStatePresent,
     moveTimeReductionOverrideStatePresent,
     party: Array.isArray(state.party) ? state.party : [],
+    partyStatePresent,
     aiBudget: nonNegative(state.aiBudget === undefined ? monster.budgetCap : state.aiBudget),
     blackFallActive: Boolean(state.blackFallActive),
     noSkyfallTurns: nonNegative(state.noSkyfallTurns),
     boardCellCount: nonNegative(state.boardCellCount),
     blackBlockCount: nonNegative(state.blackBlockCount),
+    boardVisibilityStatePresent,
     // This is the derived native baseline: +0x7c0/+0x7d0 after damage, or a
     // status-scan value on the no-damage path. Its semantic source is not
     // recoverable from the public browser state, so callers can provide a
@@ -1760,6 +1783,122 @@ function legacyFallbackBuiltinScale(definition, state) {
           : exact
             ? 'move-time-reduction-active'
             : 'move-time-reduction-active-missing-override',
+    };
+  }
+
+  if (LEGACY_FALLBACK_ENTIRE_BLIND_ALT_TYPES.has(type)) {
+    // The native type-62 handler scans the live grid's visibility bit and
+    // returns one only while at least one cell is not already black. The
+    // compact state exposes the same total/black counts used by the modern
+    // callback, so this branch is exact whenever both fields are supplied.
+    if (!state.boardVisibilityStatePresent) {
+      return {
+        scale: Math.fround(1),
+        exact: false,
+        mode: 'native-entire-blind-alt-missing-state',
+      };
+    }
+    const boardCellCount = Math.max(0, Math.trunc(Number(state.boardCellCount) || 0));
+    const blackBlockCount = Math.min(
+      boardCellCount,
+      Math.max(0, Math.trunc(Number(state.blackBlockCount) || 0)),
+    );
+    const eligible = boardCellCount > blackBlockCount;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact: true,
+      mode: eligible
+        ? 'native-entire-blind-alt-visible'
+        : 'native-entire-blind-alt-covered',
+    };
+  }
+
+  if (LEGACY_FALLBACK_BIND_ATTACK_TYPES.has(type)) {
+    // _doSelectBindTarges(true, selector, count) first filters present cards
+    // by selector (1 leader, 2 helper, 3 both leaders, 4 subs, 0/other all),
+    // then reports a positive percentage when any selected card is unbound.
+    // The authored target count is used later by setup, not by this gate.
+    if (!state.partyStatePresent) {
+      return {
+        scale: Math.fround(1),
+        exact: false,
+        mode: 'native-bind-attack-missing-state',
+      };
+    }
+    const selector = Math.trunc(Number(definition.effect?.targetSelector) || 0);
+    const targetIndices = selector === 1
+      ? [0]
+      : selector === 2
+        ? [5]
+        : selector === 3
+          ? [0, 5]
+          : selector === 4
+            ? [1, 2, 3, 4]
+            : [0, 1, 2, 3, 4, 5];
+    const present = targetIndices.filter((index) => state.party[index]?.present !== false);
+    const unbound = present.filter((index) => Number(state.party[index]?.bindTurns || 0) <= 0);
+    const eligible = unbound.length > 0;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact: true,
+      mode: eligible ? 'native-bind-attack-target-present' : 'native-bind-attack-targets-bound',
+    };
+  }
+
+  if (LEGACY_FALLBACK_POISON_BLOCK_N_TYPES.has(type)) {
+    // Type 64's fallback callback counts every non-poison cell, optionally
+    // excluding Heart, and admits the record when that count is positive. It
+    // deliberately does not use the authored +0x14 count; types 60/61 carry
+    // that thresholded variant in the neighboring handler above.
+    if (!state.boardTypeCountsStatePresent) {
+      return {
+        scale: Math.fround(1),
+        exact: false,
+        mode: 'native-poison-block-n-missing-state',
+      };
+    }
+    const excludeHeart = Boolean(definition.effect?.excludeHeart);
+    const eligibleCount = state.boardTypeCounts.reduce((count, cells, orbType) => (
+      orbType === 7 || orbType === 8 || excludeHeart && orbType === 5
+        ? count
+        : count + Math.max(0, Math.trunc(Number(cells) || 0))
+    ), 0);
+    const eligible = eligibleCount > 0;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact: true,
+      mode: eligible
+        ? 'native-poison-block-n-candidate-present'
+        : 'native-poison-block-n-no-candidate',
+    };
+  }
+
+  if (LEGACY_FALLBACK_RANDOM_SUB_BIND_TYPES.has(type)) {
+    // Type 65 scans only party slots 1..4. Its callback returns the native
+    // integer percentage (unbound / present) divided by 100, then requires a
+    // positive percentage. Reproduce the integer truncation before the final
+    // binary32 conversion rather than using an unrounded JS ratio.
+    if (!state.partyStatePresent) {
+      return {
+        scale: Math.fround(1),
+        exact: false,
+        mode: 'native-random-sub-bind-missing-state',
+      };
+    }
+    const subMembers = [1, 2, 3, 4].filter((index) => state.party[index]?.present !== false);
+    const unboundCount = subMembers.filter((index) => (
+      Number(state.party[index]?.bindTurns || 0) <= 0
+    )).length;
+    const percentage = subMembers.length > 0
+      ? Math.trunc(unboundCount * 100 / subMembers.length)
+      : 0;
+    const eligible = percentage >= 1;
+    return {
+      scale: eligible ? Math.fround(percentage / 100) : Math.fround(0),
+      exact: true,
+      mode: eligible
+        ? 'native-random-sub-bind-target-present'
+        : 'native-random-sub-bind-targets-bound',
     };
   }
 

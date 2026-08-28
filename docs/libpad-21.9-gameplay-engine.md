@@ -750,6 +750,21 @@ live face-list length. The browser supplies `faceTypes` alongside
 `boardTypeCounts` so this distinction is preserved; either omitted field keeps
 the initialized-one result playable but marks it approximate.
 
+Types 62–65 have dedicated late fallback handlers rather than the generic
+initialized-one path. Type 62 scans the live board's classic-blind bit and
+returns one only while at least one cell remains visible; the browser's
+`boardCellCount`/`blackBlockCount` pair reproduces that zero/one gate exactly.
+Type 63 calls `_doSelectBindTarges(true, selector, count)` and admits the
+record when the selected leader/helper/sub scope contains at least one
+currently unbound card; its authored target count is consumed later by setup,
+not by this gate. Type 64 counts non-poison cells, optionally excluding Heart,
+and admits any positive candidate—the authored count belongs to the separate
+type-60/61 thresholded handler. Type 65 scans sub slots 1–4 and returns the
+native integer percentage (`trunc(unbound * 100 / present) / 100`) before the
+positive gate. Supplying the corresponding board or six-slot party state is
+exact; omitted fields retain a playable initialized-one result but are marked
+`legacyFallbackApproximation`.
+
 Hosts that have a fuller `sMONSTER`/`sGAMEWORK` model can provide
 `legacyFallbackCondition(definition, state, context)` or a
 `legacyFallbackScales` map keyed by skill ID or type. A hook may return a number,

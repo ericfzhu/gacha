@@ -1018,6 +1018,162 @@ assert.equal(missingLegacyFallbackRandomJammer.legacyFallbackScale, 1);
 assert.equal(missingLegacyFallbackRandomJammer.legacyFallbackApproximation, true);
 assert.deepEqual(missingLegacyFallbackRandomJammer.approximateFallbackTypes, [13]);
 assert.equal(missingLegacyFallbackRandomJammer.fidelity, 'legacy-fallback-approximate');
+// Types 62-65 use dedicated status/board gates in the restored fallback
+// table.  Keep their positive, empty, and omitted-state paths visible here so
+// a later fallback-table expansion cannot silently regress to native-one.
+const selectedLegacyFallbackEntireBlindAlt = makeLegacyFallbackSelection(
+  9_033,
+  PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT,
+  () => {},
+  { boardCellCount: 30, blackBlockCount: 29 },
+);
+assert.equal(selectedLegacyFallbackEntireBlindAlt.skillId, 9_033);
+assert.equal(selectedLegacyFallbackEntireBlindAlt.legacyFallbackScale, 1);
+assert.equal(selectedLegacyFallbackEntireBlindAlt.legacyFallbackApproximation, undefined);
+assert.equal(selectedLegacyFallbackEntireBlindAlt.fidelity, 'legacy-fallback-recovered');
+const blockedLegacyFallbackEntireBlindAlt = makeLegacyFallbackSelection(
+  9_034,
+  PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT,
+  () => {},
+  { boardCellCount: 30, blackBlockCount: 30 },
+);
+assert.equal(blockedLegacyFallbackEntireBlindAlt.skillId, null);
+assert.equal(blockedLegacyFallbackEntireBlindAlt.rngState, 394_448_415);
+assert.equal(blockedLegacyFallbackEntireBlindAlt.fidelity, 'legacy-fallback-no-selection');
+const missingLegacyFallbackEntireBlindAlt = makeLegacyFallbackSelection(
+  9_035,
+  PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT,
+);
+assert.equal(missingLegacyFallbackEntireBlindAlt.skillId, 9_035);
+assert.equal(missingLegacyFallbackEntireBlindAlt.legacyFallbackScale, 1);
+assert.equal(missingLegacyFallbackEntireBlindAlt.legacyFallbackApproximation, true);
+assert.deepEqual(missingLegacyFallbackEntireBlindAlt.approximateFallbackTypes, [62]);
+const bindFallbackParty = Array.from({ length: 6 }, (_, index) => ({
+  present: true,
+  bindTurns: index === 1 ? 0 : 5,
+}));
+const selectedLegacyFallbackBindAttack = makeLegacyFallbackSelection(
+  9_036,
+  PAD_ENEMY_SKILL_BIND_ATTACK,
+  (view) => {
+    view.setInt32(0x14, 2, true);
+    view.setInt32(0x18, 4, true);
+    view.setInt32(0x1c, 4, true);
+    view.setInt32(0x20, 2, true);
+  },
+  { party: bindFallbackParty },
+);
+assert.equal(selectedLegacyFallbackBindAttack.skillId, 9_036);
+assert.equal(selectedLegacyFallbackBindAttack.legacyFallbackScale, 1);
+assert.equal(selectedLegacyFallbackBindAttack.legacyFallbackApproximation, undefined);
+assert.equal(selectedLegacyFallbackBindAttack.fidelity, 'legacy-fallback-recovered');
+const blockedLegacyFallbackBindAttack = makeLegacyFallbackSelection(
+  9_037,
+  PAD_ENEMY_SKILL_BIND_ATTACK,
+  (view) => {
+    view.setInt32(0x14, 2, true);
+    view.setInt32(0x18, 4, true);
+    view.setInt32(0x1c, 4, true);
+    view.setInt32(0x20, 2, true);
+  },
+  { party: bindFallbackParty.map((member) => ({ ...member, bindTurns: 5 })) },
+);
+assert.equal(blockedLegacyFallbackBindAttack.skillId, null);
+assert.equal(blockedLegacyFallbackBindAttack.rngState, 394_448_415);
+const missingLegacyFallbackBindAttack = makeLegacyFallbackSelection(
+  9_038,
+  PAD_ENEMY_SKILL_BIND_ATTACK,
+  (view) => {
+    view.setInt32(0x14, 2, true);
+    view.setInt32(0x18, 4, true);
+    view.setInt32(0x1c, 4, true);
+    view.setInt32(0x20, 2, true);
+  },
+);
+assert.equal(missingLegacyFallbackBindAttack.skillId, 9_038);
+assert.equal(missingLegacyFallbackBindAttack.legacyFallbackScale, 1);
+assert.equal(missingLegacyFallbackBindAttack.legacyFallbackApproximation, true);
+assert.deepEqual(missingLegacyFallbackBindAttack.approximateFallbackTypes, [63]);
+const selectedLegacyFallbackPoisonBlockN = makeLegacyFallbackSelection(
+  9_039,
+  PAD_ENEMY_SKILL_POISON_BLOCK_N,
+  (view) => {
+    view.setInt32(0x10, 99, true);
+    view.setInt32(0x14, 99, true);
+    view.setInt32(0x18, 0, true);
+    view.setInt32(0x1c, 0, true);
+  },
+  { boardTypeCounts: [1, 0, 0, 0, 0, 0, 0, 3, 3, 0] },
+);
+assert.equal(selectedLegacyFallbackPoisonBlockN.skillId, 9_039);
+assert.equal(selectedLegacyFallbackPoisonBlockN.legacyFallbackScale, 1);
+assert.equal(selectedLegacyFallbackPoisonBlockN.legacyFallbackApproximation, undefined);
+assert.equal(selectedLegacyFallbackPoisonBlockN.fidelity, 'legacy-fallback-recovered');
+const blockedLegacyFallbackPoisonBlockN = makeLegacyFallbackSelection(
+  9_040,
+  PAD_ENEMY_SKILL_POISON_BLOCK_N,
+  (view) => view.setInt32(0x18, 1, true),
+  { boardTypeCounts: [0, 0, 0, 0, 0, 1, 0, 3, 3, 0] },
+);
+assert.equal(blockedLegacyFallbackPoisonBlockN.skillId, null);
+assert.equal(blockedLegacyFallbackPoisonBlockN.rngState, 394_448_415);
+const missingLegacyFallbackPoisonBlockN = makeLegacyFallbackSelection(
+  9_041,
+  PAD_ENEMY_SKILL_POISON_BLOCK_N,
+);
+assert.equal(missingLegacyFallbackPoisonBlockN.skillId, 9_041);
+assert.equal(missingLegacyFallbackPoisonBlockN.legacyFallbackScale, 1);
+assert.equal(missingLegacyFallbackPoisonBlockN.legacyFallbackApproximation, true);
+assert.deepEqual(missingLegacyFallbackPoisonBlockN.approximateFallbackTypes, [64]);
+const selectedLegacyFallbackRandomSubBind = makeLegacyFallbackSelection(
+  9_042,
+  PAD_ENEMY_SKILL_RANDOM_SUB_BIND,
+  (view) => {
+    view.setInt32(0x10, 2, true);
+    view.setInt32(0x14, 2, true);
+    view.setInt32(0x18, 4, true);
+  },
+  {
+    party: [
+      { present: true, bindTurns: 5 },
+      { present: true, bindTurns: 0 },
+      { present: true, bindTurns: 5 },
+      { present: true, bindTurns: 0 },
+      { present: true, bindTurns: 5 },
+      { present: true, bindTurns: 5 },
+    ],
+  },
+);
+assert.equal(selectedLegacyFallbackRandomSubBind.skillId, 9_042);
+assert.equal(selectedLegacyFallbackRandomSubBind.legacyFallbackScale, Math.fround(0.5));
+assert.equal(selectedLegacyFallbackRandomSubBind.legacyFallbackProbability, 5_000);
+assert.equal(selectedLegacyFallbackRandomSubBind.legacyFallbackApproximation, undefined);
+assert.equal(selectedLegacyFallbackRandomSubBind.fidelity, 'legacy-fallback-recovered');
+const blockedLegacyFallbackRandomSubBind = makeLegacyFallbackSelection(
+  9_043,
+  PAD_ENEMY_SKILL_RANDOM_SUB_BIND,
+  (view) => {
+    view.setInt32(0x14, 2, true);
+    view.setInt32(0x18, 4, true);
+  },
+  {
+    party: Array.from({ length: 6 }, () => ({ present: true, bindTurns: 5 })),
+  },
+);
+assert.equal(blockedLegacyFallbackRandomSubBind.skillId, null);
+assert.equal(blockedLegacyFallbackRandomSubBind.rngState, 394_448_415);
+const missingLegacyFallbackRandomSubBind = makeLegacyFallbackSelection(
+  9_044,
+  PAD_ENEMY_SKILL_RANDOM_SUB_BIND,
+  (view) => {
+    view.setInt32(0x14, 2, true);
+    view.setInt32(0x18, 4, true);
+  },
+);
+assert.equal(missingLegacyFallbackRandomSubBind.skillId, 9_044);
+assert.equal(missingLegacyFallbackRandomSubBind.legacyFallbackScale, 1);
+assert.equal(missingLegacyFallbackRandomSubBind.legacyFallbackApproximation, true);
+assert.deepEqual(missingLegacyFallbackRandomSubBind.approximateFallbackTypes, [65]);
 // Types 12, 56, and 58 share the restored 0x61e6cc fallback handler.  The
 // native _countBlockType call is a positive gate only on this pass (unlike
 // the ordinary path's count/3 probability), and source 7/8 use one combined

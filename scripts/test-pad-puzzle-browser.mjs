@@ -4262,6 +4262,13 @@ try {
       'HHHHHH',
       'HHHHHH',
     ]);
+    const coverEntireBlindBoard = () => {
+      for (let row = 0; row < engine.rows; row += 1) {
+        for (let column = 0; column < engine.columns; column += 1) {
+          engine.setOrbState(row, column, { entireBlind: true });
+        }
+      }
+    };
     return {
       loneAttackBoost: run(9_013, 17, (view) => {
         view.setInt32(0x14, 3, true);
@@ -4374,6 +4381,43 @@ try {
         view.setInt32(0x10, 2, true);
         view.setInt32(0x14, 0, true);
       }, setWholeColorBoard),
+      entireBlindAltVisible: run(9_033, 62),
+      entireBlindAltCovered: run(9_034, 62, () => {}, coverEntireBlindBoard),
+      bindAttackTargetPresent: run(9_036, 63, (view) => {
+        view.setInt32(0x14, 2, true);
+        view.setInt32(0x18, 4, true);
+        view.setInt32(0x1c, 4, true);
+        view.setInt32(0x20, 2, true);
+      }),
+      bindAttackTargetsBound: run(9_037, 63, (view) => {
+        view.setInt32(0x14, 2, true);
+        view.setInt32(0x18, 4, true);
+        view.setInt32(0x1c, 4, true);
+        view.setInt32(0x20, 2, true);
+      }, () => {
+        engine.party.slice(1, 5).forEach((member) => { member.bindTurns = 5; });
+      }),
+      poisonBlockNCandidatePresent: run(9_039, 64, (view) => {
+        view.setInt32(0x10, 99, true);
+        view.setInt32(0x14, 99, true);
+        view.setInt32(0x18, 0, true);
+        view.setInt32(0x1c, 0, true);
+      }, () => engine.setBoardFromCodes(Array(5).fill('RRRRRR'))),
+      poisonBlockNHeartOnly: run(9_040, 64, (view) => {
+        view.setInt32(0x18, 1, true);
+      }, () => engine.setBoardFromCodes(Array(5).fill('HHHHHH'))),
+      randomSubBindTargetPresent: run(9_042, 65, (view) => {
+        view.setInt32(0x10, 2, true);
+        view.setInt32(0x14, 2, true);
+        view.setInt32(0x18, 4, true);
+      }),
+      randomSubBindTargetsBound: run(9_043, 65, (view) => {
+        view.setInt32(0x10, 2, true);
+        view.setInt32(0x14, 2, true);
+        view.setInt32(0x18, 4, true);
+      }, () => {
+        engine.party.slice(1, 5).forEach((member) => { member.bindTurns = 5; });
+      }),
     };
   }) : null;
   const legacyFallbackGateExpected = {
@@ -4392,6 +4436,10 @@ try {
     countedMortalPoisonEnough: { id: 9_103, type: 61, rngState: 703_883_257 },
     wholeColorPoisonEnough: { id: 9_104, type: 57, rngState: 1_929_471_377 },
     wholeColorMortalPoisonEnough: { id: 9_106, type: 59, rngState: 1_929_471_377 },
+    entireBlindAltVisible: { id: 9_033, type: 62 },
+    bindAttackTargetPresent: { id: 9_036, type: 63, rngState: 919_597_584 },
+    poisonBlockNCandidatePresent: { id: 9_039, type: 64, rngState: 3_823_127_909 },
+    randomSubBindTargetPresent: { id: 9_042, type: 65, rngState: 1_848_838_291 },
   };
   if (legacyFallbackGatesRenderState) {
     for (const [name, expected] of Object.entries(legacyFallbackGateExpected)) {
@@ -4427,6 +4475,26 @@ try {
       || emptyWholeColorPoison?.skill?.type != null
       || emptyWholeColorPoison?.rngState !== 394_448_415
     ) throw new Error(`Legacy-fallback whole-color rejection mismatch: ${JSON.stringify(emptyWholeColorPoison)}`);
+    const coveredEntireBlindAlt = legacyFallbackGatesRenderState.entireBlindAltCovered;
+    if (coveredEntireBlindAlt?.skill?.id != null
+      || coveredEntireBlindAlt?.skill?.type != null
+      || coveredEntireBlindAlt?.rngState !== 394_448_415
+    ) throw new Error(`Legacy-fallback blind rejection mismatch: ${JSON.stringify(coveredEntireBlindAlt)}`);
+    const boundBindAttack = legacyFallbackGatesRenderState.bindAttackTargetsBound;
+    if (boundBindAttack?.skill?.id != null
+      || boundBindAttack?.skill?.type != null
+      || boundBindAttack?.rngState !== 394_448_415
+    ) throw new Error(`Legacy-fallback bind rejection mismatch: ${JSON.stringify(boundBindAttack)}`);
+    const heartOnlyPoisonBlockN = legacyFallbackGatesRenderState.poisonBlockNHeartOnly;
+    if (heartOnlyPoisonBlockN?.skill?.id != null
+      || heartOnlyPoisonBlockN?.skill?.type != null
+      || heartOnlyPoisonBlockN?.rngState !== 394_448_415
+    ) throw new Error(`Legacy-fallback poison-block rejection mismatch: ${JSON.stringify(heartOnlyPoisonBlockN)}`);
+    const boundRandomSubBind = legacyFallbackGatesRenderState.randomSubBindTargetsBound;
+    if (boundRandomSubBind?.skill?.id != null
+      || boundRandomSubBind?.skill?.type != null
+      || boundRandomSubBind?.rngState !== 394_448_415
+    ) throw new Error(`Legacy-fallback random-sub-bind rejection mismatch: ${JSON.stringify(boundRandomSubBind)}`);
     if (legacyFallbackGatesRenderState.loneAttackBoost.enemy?.attackBoostTurns !== 3
       || legacyFallbackGatesRenderState.loneAttackBoost.enemy?.attackBoostPercent !== 200
       || legacyFallbackGatesRenderState.statusTriggeredAttackBoost.enemy?.attackBoostTurns !== 2
