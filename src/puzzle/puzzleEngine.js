@@ -1617,6 +1617,10 @@ export class PuzzleEngine {
       boardTypeCounts: Array.from({ length: 10 }, (_, type) => (
         this.countBlockBits(1 << (type === 7 || type === 8 ? 7 : type))
       )),
+      // The legacy 0x61e448 fallback handler iterates the live dungeon face
+      // list separately from board cell counts. Keep this list explicit so
+      // whole-color poison lanes can reproduce its represented-face fraction.
+      faceTypes: [...this.faceTypes],
       blackBlockCount: this.board.reduce((total, row) => total + row.reduce((count, orb) => (
         count + Number(((Number(orb?.blockFlags) >>> 0) & PAD_BLOCK_ENTIRE_BLIND_FLAG) !== 0)
       ), 0), 0),

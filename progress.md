@@ -28,6 +28,18 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
 - Added direct count/Heart-boundary fixtures, browser fallback fixtures, and
   restored jump-table validation for `legacyFallbackNonPoisonCountTypes`.
 
+## 2026-08-28 exact whole-color poison fallback gate
+
+- Recovered the shared legacy type-57/59 fallback handler at `0x61e448`. It
+  requires a represented face after optional Heart exclusion, then returns the
+  represented-face fraction over the active dungeon face list.
+- `PuzzleEngine.enemyAiState()` now exposes `faceTypes` beside the ten native
+  board-count lanes, allowing the browser to preserve the native fraction and
+  Heart-only rejection boundary. Missing face/board state remains playable but
+  explicitly approximate.
+- Added direct fraction/Heart fixtures, browser whole-color poison fixtures,
+  and restored jump-table validation for `legacyFallbackFaceFractionTypes`.
+
 ## 2026-08-28 exact legacy board-count fallback gates
 
 - Recovered the shared legacy `0x61e6cc` fallback handler for source→jammer

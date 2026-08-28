@@ -1087,6 +1087,11 @@ const LEGACY_FALLBACK_BOARD_COUNT_TYPES = new Set([12, 56, 58]);
 // when that count reaches the authored request.
 const LEGACY_FALLBACK_NON_POISON_COUNT_TYPES = new Set([60, 61]);
 
+// Types 57 and 59 share the recovered 0x61e448 handler. They require at least
+// one represented face after optional Heart exclusion, then return the
+// represented-face fraction used by the fallback epilogue.
+const LEGACY_FALLBACK_FACE_FRACTION_TYPES = new Set([57, 59]);
+
 // Type 39 has a dedicated status handler at 0x61e9d0.  It starts with the
 // fallback scale at zero, admits an inactive packed move-time counter, and
 // only permits an active status when the native override byte is set.
@@ -1133,6 +1138,12 @@ function normalizeLegacySelectorState(state, monster) {
     && state.boardTypeCounts.length >= 10
     && state.boardTypeCounts.slice(0, 10).every((count) => (
       Number.isFinite(Number(count)) && Number(count) >= 0
+    ));
+  const faceTypesStatePresent = hasOwn('faceTypes')
+    && Array.isArray(state.faceTypes)
+    && state.faceTypes.length <= 16
+    && state.faceTypes.every((type) => (
+      Number.isFinite(Number(type)) && Number(type) >= 0 && Number(type) < 16
     ));
   const moveTimeReductionStatePresent = hasOwn('moveTimeReductionTurns');
   const moveTimeReductionOverrideStatePresent = hasOwn('moveTimeReductionOverrideActive');
@@ -1208,6 +1219,10 @@ function normalizeLegacySelectorState(state, monster) {
       nonNegative(state.boardTypeCounts?.[type])
     )),
     boardTypeCountsStatePresent,
+    faceTypes: Array.isArray(state.faceTypes)
+      ? state.faceTypes.map((type) => integer(type))
+      : [],
+    faceTypesStatePresent,
     moveTimeReductionStatePresent,
     moveTimeReductionOverrideStatePresent,
     party: Array.isArray(state.party) ? state.party : [],
@@ -1517,6 +1532,45 @@ function legacyFallbackBuiltinScale(definition, state) {
       scale: eligible ? Math.fround(1) : Math.fround(0),
       exact: true,
       mode: eligible ? 'native-non-poison-count-enough' : 'native-non-poison-count-insufficient',
+    };
+  }
+
+  if (LEGACY_FALLBACK_FACE_FRACTION_TYPES.has(type)) {
+    // Native 0x61e448 first rejects an empty face list or a list with no
+    // represented non-Heart face (when +0x14 requests Heart exclusion). It
+    // then counts represented faces without that exclusion and divides by
+    // the authored face-list length. The fallback's common scale is one, so
+    // this binary32 fraction is the final condition scale.
+    if (!state.boardTypeCountsStatePresent || !state.faceTypesStatePresent) {
+      return {
+        scale: Math.fround(1),
+        exact: false,
+        mode: 'native-face-fraction-missing-state',
+      };
+    }
+    const faces = state.faceTypes;
+    const excludeHeart = Boolean(definition.effect?.excludeHeart);
+    const countForFace = (face) => {
+      const countIndex = face === 7 || face === 8 ? 7 : face;
+      return countIndex >= 0 && countIndex < state.boardTypeCounts.length
+        ? state.boardTypeCounts[countIndex]
+        : 0;
+    };
+    const representedCount = faces.reduce((count, face) => (
+      count + (countForFace(face) >= 1 ? 1 : 0)
+    ), 0);
+    const eligibleRepresentedCount = faces.reduce((count, face) => (
+      count + ((!excludeHeart || face !== 5) && countForFace(face) >= 1 ? 1 : 0)
+    ), 0);
+    const eligible = faces.length > 0 && eligibleRepresentedCount >= 1;
+    return {
+      scale: eligible && faces.length > 0
+        ? Math.fround(representedCount / faces.length)
+        : Math.fround(0),
+      exact: true,
+      mode: eligible
+        ? 'native-face-fraction-represented'
+        : 'native-face-fraction-empty',
     };
   }
 

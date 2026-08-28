@@ -736,6 +736,12 @@ and admits the record only when the remaining cell count reaches the authored
 `count`. The compact `boardTypeCounts` state is sufficient for this exact
 positive-count gate; an omitted array remains playable but is reported as a
 `legacyFallbackApproximation`.
+Types 57 and 59 share the recovered `0x61e448` fallback handler. It first
+requires at least one represented face that survives the optional Heart
+exclusion, then returns the binary32 fraction of represented faces over the
+live face-list length. The browser supplies `faceTypes` alongside
+`boardTypeCounts` so this distinction is preserved; either omitted field keeps
+the initialized-one result playable but marks it approximate.
 
 Hosts that have a fuller `sMONSTER`/`sGAMEWORK` model can provide
 `legacyFallbackCondition(definition, state, context)` or a

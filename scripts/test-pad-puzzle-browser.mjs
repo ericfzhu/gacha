@@ -4222,6 +4222,13 @@ try {
       'HHHHHH',
       'HHHHHH',
     ]);
+    const setWholeColorBoard = () => engine.setBoardFromCodes([
+      'RRBBHH',
+      'HHHHHH',
+      'HHHHHH',
+      'HHHHHH',
+      'HHHHHH',
+    ]);
     return {
       loneAttackBoost: run(9_013, 17, (view) => {
         view.setInt32(0x14, 3, true);
@@ -4316,6 +4323,18 @@ try {
         view.setInt32(0x10, 5, true);
         view.setInt32(0x14, 0, true);
       }, setCountedBoard),
+      wholeColorPoisonEnough: run(9_104, 57, (view) => {
+        view.setInt32(0x10, 2, true);
+        view.setInt32(0x14, 1, true);
+      }, setWholeColorBoard),
+      wholeColorPoisonEmpty: run(9_105, 57, (view) => {
+        view.setInt32(0x10, 2, true);
+        view.setInt32(0x14, 1, true);
+      }, () => engine.setBoardFromCodes(Array(5).fill('HHHHHH'))),
+      wholeColorMortalPoisonEnough: run(9_106, 59, (view) => {
+        view.setInt32(0x10, 2, true);
+        view.setInt32(0x14, 0, true);
+      }, setWholeColorBoard),
     };
   }) : null;
   const legacyFallbackGateExpected = {
@@ -4331,6 +4350,8 @@ try {
     moveTimeReductionOverride: { id: 9_025, type: 39 },
     countedPoisonEnough: { id: 9_101, type: 60, rngState: 1_271_252_807 },
     countedMortalPoisonEnough: { id: 9_103, type: 61, rngState: 703_883_257 },
+    wholeColorPoisonEnough: { id: 9_104, type: 57, rngState: 1_929_471_377 },
+    wholeColorMortalPoisonEnough: { id: 9_106, type: 59, rngState: 1_929_471_377 },
   };
   if (legacyFallbackGatesRenderState) {
     for (const [name, expected] of Object.entries(legacyFallbackGateExpected)) {
@@ -4356,6 +4377,11 @@ try {
       || insufficientCountedPoison?.skill?.type != null
       || insufficientCountedPoison?.rngState !== 394_448_415
     ) throw new Error(`Legacy-fallback counted-poison rejection mismatch: ${JSON.stringify(insufficientCountedPoison)}`);
+    const emptyWholeColorPoison = legacyFallbackGatesRenderState.wholeColorPoisonEmpty;
+    if (emptyWholeColorPoison?.skill?.id != null
+      || emptyWholeColorPoison?.skill?.type != null
+      || emptyWholeColorPoison?.rngState !== 394_448_415
+    ) throw new Error(`Legacy-fallback whole-color rejection mismatch: ${JSON.stringify(emptyWholeColorPoison)}`);
     if (legacyFallbackGatesRenderState.loneAttackBoost.enemy?.attackBoostTurns !== 3
       || legacyFallbackGatesRenderState.loneAttackBoost.enemy?.attackBoostPercent !== 200
       || legacyFallbackGatesRenderState.statusTriggeredAttackBoost.enemy?.attackBoostTurns !== 2

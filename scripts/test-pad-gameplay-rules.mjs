@@ -1018,6 +1018,59 @@ assert.equal(selectedLegacyFallbackCountedMortalPoison.skillId, 9_103);
 assert.equal(selectedLegacyFallbackCountedMortalPoison.legacyFallbackScale, 1);
 assert.equal(selectedLegacyFallbackCountedMortalPoison.legacyFallbackApproximation, undefined);
 assert.equal(selectedLegacyFallbackCountedMortalPoison.fidelity, 'legacy-fallback-recovered');
+// Types 57/59 share native 0x61e448: represented face colors determine the
+// fallback fraction, while Heart exclusion is only an admission gate.
+const representedFaceBoardCounts = [2, 2, 0, 0, 0, 1, 0, 0, 0, 0];
+const representedFaceTypes = [0, 1, 2, 3, 4, 5];
+const selectedLegacyFallbackPoisonBlocks = makeLegacyFallbackSelection(
+  9_104,
+  PAD_ENEMY_SKILL_POISON_BLOCKS,
+  (view) => {
+    view.setInt32(0x10, 2, true);
+    view.setInt32(0x14, 1, true);
+  },
+  {
+    boardTypeCounts: representedFaceBoardCounts,
+    faceTypes: representedFaceTypes,
+  },
+);
+assert.equal(selectedLegacyFallbackPoisonBlocks.skillId, 9_104);
+assert.equal(selectedLegacyFallbackPoisonBlocks.legacyFallbackScale, 0.5);
+assert.equal(selectedLegacyFallbackPoisonBlocks.legacyFallbackProbability, 5_000);
+assert.equal(selectedLegacyFallbackPoisonBlocks.legacyFallbackApproximation, undefined);
+assert.equal(selectedLegacyFallbackPoisonBlocks.fidelity, 'legacy-fallback-recovered');
+const rejectedLegacyFallbackPoisonBlocks = makeLegacyFallbackSelection(
+  9_105,
+  PAD_ENEMY_SKILL_POISON_BLOCKS,
+  (view) => {
+    view.setInt32(0x10, 2, true);
+    view.setInt32(0x14, 1, true);
+  },
+  {
+    boardTypeCounts: [0, 0, 0, 0, 0, 4, 0, 0, 0, 0],
+    faceTypes: representedFaceTypes,
+  },
+);
+assert.equal(rejectedLegacyFallbackPoisonBlocks.skillId, null);
+assert.equal(rejectedLegacyFallbackPoisonBlocks.legacyFallbackApproximation, undefined);
+assert.equal(rejectedLegacyFallbackPoisonBlocks.rngState, 394_448_415);
+const selectedLegacyFallbackMortalPoisonBlocks = makeLegacyFallbackSelection(
+  9_106,
+  PAD_ENEMY_SKILL_MORTAL_POISON_BLOCKS,
+  (view) => {
+    view.setInt32(0x10, 2, true);
+    view.setInt32(0x14, 0, true);
+  },
+  {
+    boardTypeCounts: representedFaceBoardCounts,
+    faceTypes: representedFaceTypes,
+  },
+);
+assert.equal(selectedLegacyFallbackMortalPoisonBlocks.skillId, 9_106);
+assert.equal(selectedLegacyFallbackMortalPoisonBlocks.legacyFallbackScale, 0.5);
+assert.equal(selectedLegacyFallbackMortalPoisonBlocks.legacyFallbackProbability, 5_000);
+assert.equal(selectedLegacyFallbackMortalPoisonBlocks.legacyFallbackApproximation, undefined);
+assert.equal(selectedLegacyFallbackMortalPoisonBlocks.fidelity, 'legacy-fallback-recovered');
 // Effect type 36 is a native ordinary-path transfer: it jumps to the fallback
 // pass immediately, so a later ordinary type-50 record must not win first.
 // In the fallback jump table the effect type itself is just a zero-scale lane.
