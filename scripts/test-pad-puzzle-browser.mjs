@@ -4210,6 +4210,8 @@ try {
         },
         playerHp: snapshot.player?.hp,
         enemy: snapshot.enemies?.[0],
+        moveTimeReduction: snapshot.moveTimeReduction,
+        moveTimeReductionOverrideActive: snapshot.moveTimeReductionOverrideActive,
         rngState: snapshot.rngState,
       };
     };
@@ -4263,6 +4265,38 @@ try {
         // Source 8 uses the same native poison-family alias as source 7.
         engine.setBoardFromCodes(Array(5).fill('PMPMPM'));
       }),
+      moveTimeReductionInactive: run(9_023, 39, (view) => {
+        view.setInt32(0x10, 2, true);
+        view.setInt32(0x14, 125, true);
+        view.setInt32(0x18, 0, true);
+      }),
+      moveTimeReductionActive: run(9_024, 39, (view) => {
+        view.setInt32(0x10, 2, true);
+        view.setInt32(0x14, 125, true);
+        view.setInt32(0x18, 0, true);
+      }, () => {
+        engine.moveTimeReduction = {
+          turnsRemaining: 2,
+          fixedReductionCentiseconds: 125,
+          percentReduction: 0,
+          percentMode: false,
+        };
+        engine.moveTime = engine.baseMoveTime - 1.25;
+      }),
+      moveTimeReductionOverride: run(9_025, 39, (view) => {
+        view.setInt32(0x10, 2, true);
+        view.setInt32(0x14, 125, true);
+        view.setInt32(0x18, 0, true);
+      }, () => {
+        engine.moveTimeReduction = {
+          turnsRemaining: 2,
+          fixedReductionCentiseconds: 125,
+          percentReduction: 0,
+          percentMode: false,
+        };
+        engine.moveTime = engine.baseMoveTime - 1.25;
+        engine.moveTimeReductionOverrideActive = true;
+      }),
     };
   }) : null;
   const legacyFallbackGateExpected = {
@@ -4274,6 +4308,8 @@ try {
     sourceToJammerBoardCount: { id: 9_018, type: 12 },
     sourceToPoisonBoardCount: { id: 9_020, type: 56 },
     sourceToMortalPoisonBoardCount: { id: 9_021, type: 58 },
+    moveTimeReductionInactive: { id: 9_023, type: 39 },
+    moveTimeReductionOverride: { id: 9_025, type: 39 },
   };
   if (legacyFallbackGatesRenderState) {
     for (const [name, expected] of Object.entries(legacyFallbackGateExpected)) {
@@ -4289,6 +4325,11 @@ try {
       || emptyBoardCount?.skill?.type != null
       || emptyBoardCount?.rngState !== 394_448_415
     ) throw new Error(`Legacy-fallback board-count rejection mismatch: ${JSON.stringify(emptyBoardCount)}`);
+    const activeMoveTime = legacyFallbackGatesRenderState.moveTimeReductionActive;
+    if (activeMoveTime?.skill?.id != null
+      || activeMoveTime?.skill?.type != null
+      || activeMoveTime?.rngState !== 394_448_415
+    ) throw new Error(`Legacy-fallback move-time rejection mismatch: ${JSON.stringify(activeMoveTime)}`);
     if (legacyFallbackGatesRenderState.loneAttackBoost.enemy?.attackBoostTurns !== 3
       || legacyFallbackGatesRenderState.loneAttackBoost.enemy?.attackBoostPercent !== 200
       || legacyFallbackGatesRenderState.statusTriggeredAttackBoost.enemy?.attackBoostTurns !== 2
@@ -4297,6 +4338,10 @@ try {
       || legacyFallbackGatesRenderState.damagedTurnAttackBoost.enemy?.attackBoostPercent !== 300
       || legacyFallbackGatesRenderState.statusShield.enemy?.statusShieldTurns !== 3
       || legacyFallbackGatesRenderState.playerHeal.playerHp !== 9_000
+      || legacyFallbackGatesRenderState.moveTimeReductionInactive.moveTimeReduction?.turnsRemaining !== 2
+      || legacyFallbackGatesRenderState.moveTimeReductionInactive.moveTimeReduction?.fixedReductionCentiseconds !== 125
+      || legacyFallbackGatesRenderState.moveTimeReductionOverride.moveTimeReduction?.turnsRemaining !== 2
+      || legacyFallbackGatesRenderState.moveTimeReductionOverride.moveTimeReduction?.fixedReductionCentiseconds !== 125
     ) throw new Error(`Legacy-fallback gate effect mismatch: ${JSON.stringify(legacyFallbackGatesRenderState)}`);
   }
   if (legacyFallbackGatesRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));

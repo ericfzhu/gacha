@@ -907,6 +907,75 @@ assert.equal(missingLegacyFallbackBoardCount.skillId, 9_022);
 assert.equal(missingLegacyFallbackBoardCount.legacyFallbackScale, 1);
 assert.equal(missingLegacyFallbackBoardCount.legacyFallbackApproximation, true);
 assert.deepEqual(missingLegacyFallbackBoardCount.approximateFallbackTypes, [12]);
+const selectedLegacyFallbackMoveTime = makeLegacyFallbackSelection(
+  9_023,
+  PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
+  (view) => {
+    view.setInt32(0x10, 2, true);
+    view.setInt32(0x14, 125, true);
+    view.setInt32(0x18, 0, true);
+  },
+  {
+    moveTimeReductionTurns: 0,
+    moveTimeReductionOverrideActive: false,
+  },
+);
+assert.equal(selectedLegacyFallbackMoveTime.skillId, 9_023);
+assert.equal(selectedLegacyFallbackMoveTime.legacyFallbackScale, 1);
+assert.equal(selectedLegacyFallbackMoveTime.legacyFallbackApproximation, undefined);
+assert.equal(selectedLegacyFallbackMoveTime.fidelity, 'legacy-fallback-recovered');
+const blockedLegacyFallbackMoveTime = makeLegacyFallbackSelection(
+  9_024,
+  PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
+  (view) => {
+    view.setInt32(0x10, 2, true);
+    view.setInt32(0x14, 125, true);
+    view.setInt32(0x18, 0, true);
+  },
+  {
+    moveTimeReductionTurns: 2,
+  },
+);
+assert.equal(blockedLegacyFallbackMoveTime.skillId, null);
+assert.equal(blockedLegacyFallbackMoveTime.legacyFallbackScale, undefined);
+assert.equal(blockedLegacyFallbackMoveTime.legacyFallbackApproximation, true);
+assert.deepEqual(blockedLegacyFallbackMoveTime.approximateFallbackTypes, [39]);
+assert.equal(blockedLegacyFallbackMoveTime.rngState, 394_448_415);
+// The native shift/sign-extension boundary is strict: packed duration 1
+// becomes counter 64, so it remains blocked without the explicit override.
+const boundaryLegacyFallbackMoveTime = makeLegacyFallbackSelection(
+  9_026,
+  PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
+  (view) => {
+    view.setInt32(0x10, 2, true);
+    view.setInt32(0x14, 125, true);
+    view.setInt32(0x18, 0, true);
+  },
+  {
+    moveTimeReductionTurns: 1,
+    moveTimeReductionOverrideActive: false,
+  },
+);
+assert.equal(boundaryLegacyFallbackMoveTime.skillId, null);
+assert.equal(boundaryLegacyFallbackMoveTime.legacyFallbackApproximation, undefined);
+assert.equal(boundaryLegacyFallbackMoveTime.rngState, 394_448_415);
+const overriddenLegacyFallbackMoveTime = makeLegacyFallbackSelection(
+  9_025,
+  PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION,
+  (view) => {
+    view.setInt32(0x10, 2, true);
+    view.setInt32(0x14, 125, true);
+    view.setInt32(0x18, 0, true);
+  },
+  {
+    moveTimeReductionTurns: 2,
+    moveTimeReductionOverrideActive: true,
+  },
+);
+assert.equal(overriddenLegacyFallbackMoveTime.skillId, 9_025);
+assert.equal(overriddenLegacyFallbackMoveTime.legacyFallbackScale, 1);
+assert.equal(overriddenLegacyFallbackMoveTime.legacyFallbackApproximation, undefined);
+assert.equal(overriddenLegacyFallbackMoveTime.fidelity, 'legacy-fallback-recovered');
 // Effect type 36 is a native ordinary-path transfer: it jumps to the fallback
 // pass immediately, so a later ordinary type-50 record must not win first.
 // In the fallback jump table the effect type itself is just a zero-scale lane.

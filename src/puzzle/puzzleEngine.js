@@ -389,6 +389,11 @@ export class PuzzleEngine {
     this.lastEnemyActions = [];
     this.moveTime = this.baseMoveTime;
     this.moveTimeReduction = null;
+    // Native type-39 fallback reapplication has a separate protected
+    // +0x87210 override byte. Ordinary execution clears it; keep the field
+    // explicit so direct hosts can reproduce the exceptional active-status
+    // branch without conflating it with the visible duration.
+    this.moveTimeReductionOverrideActive = false;
     this.playerAuxiliaryBuffTurns = this.initialPlayerAuxiliaryBuffTurns;
     this.playerAttackBoostTurns = this.initialPlayerAttackBoostTurns;
     this.skillSealTurns = 0;
@@ -1559,6 +1564,7 @@ export class PuzzleEngine {
       playerAttackBoostTurns: this.playerAttackBoostTurns,
       enemyStatusShieldTurns: enemy.statusShieldTurns,
       moveTimeReductionTurns: this.moveTimeReduction?.turnsRemaining || 0,
+      moveTimeReductionOverrideActive: Boolean(this.moveTimeReductionOverrideActive),
       skillSealTurns: this.skillSealTurns,
       awakeningBindTurns: this.awakeningBindTurns,
       orbSealActive: this.orbSealColumnTurns > 0 || this.orbSealRowTurns > 0,
@@ -2516,6 +2522,7 @@ export class PuzzleEngine {
     if (this.moveTimeReduction.turnsRemaining === 0) {
       this.moveTimeReduction = null;
       this.moveTime = this.baseMoveTime;
+      this.moveTimeReductionOverrideActive = false;
     }
   }
 
@@ -3299,6 +3306,9 @@ export class PuzzleEngine {
         percentReduction: (skill.percentReduction << 16) >> 16,
         percentMode: ((skill.percentReduction << 16) >> 16) !== 0,
       } : null;
+      // _doMoveTimeReduction clears the native override byte on every normal
+      // application; only an explicit direct host may re-arm it afterwards.
+      this.moveTimeReductionOverrideActive = false;
       if (!this.moveTimeReduction) this.moveTime = this.baseMoveTime;
       this.message = `Move time reduced to ${this.moveTime.toFixed(2)} seconds.`;
       return true;
@@ -4503,6 +4513,7 @@ export class PuzzleEngine {
       baseMoveTimeSeconds: this.baseMoveTime,
       moveTimeSeconds: this.moveTime,
       moveTimeReduction: this.moveTimeReduction ? { ...this.moveTimeReduction } : null,
+      moveTimeReductionOverrideActive: Boolean(this.moveTimeReductionOverrideActive),
       blackFallRule: this.blackFallRule ? { ...this.blackFallRule } : null,
       noSkyfallRule: this.noSkyfallRule ? { ...this.noSkyfallRule } : null,
       leaderAlterRule: this.leaderAlterRule ? { ...this.leaderAlterRule } : null,

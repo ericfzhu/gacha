@@ -1082,6 +1082,11 @@ const LEGACY_FALLBACK_EFFECTIVE_ONE_TYPES = new Set([20]);
 // explicitly rather than confusing it with the bit-8-only mask query.
 const LEGACY_FALLBACK_BOARD_COUNT_TYPES = new Set([12, 56, 58]);
 
+// Type 39 has a dedicated status handler at 0x61e9d0.  It starts with the
+// fallback scale at zero, admits an inactive packed move-time counter, and
+// only permits an active status when the native override byte is set.
+const LEGACY_FALLBACK_MOVE_TIME_TYPES = new Set([39]);
+
 function normalizeLegacySelectorState(state, monster) {
   const numeric = (value, fallback = 0) => {
     const candidate = Number(value);
@@ -1124,6 +1129,8 @@ function normalizeLegacySelectorState(state, monster) {
     && state.boardTypeCounts.slice(0, 10).every((count) => (
       Number.isFinite(Number(count)) && Number(count) >= 0
     ));
+  const moveTimeReductionStatePresent = hasOwn('moveTimeReductionTurns');
+  const moveTimeReductionOverrideStatePresent = hasOwn('moveTimeReductionOverrideActive');
   return {
     currentHp: nonNegative(state.currentHp),
     maxHp: nonNegative(state.maxHp),
@@ -1181,6 +1188,7 @@ function normalizeLegacySelectorState(state, monster) {
     enemyTransientDebuffActive: Boolean(state.enemyTransientDebuffActive),
     enemyStatusShieldTurns: nonNegative(state.enemyStatusShieldTurns),
     moveTimeReductionTurns: nonNegative(state.moveTimeReductionTurns),
+    moveTimeReductionOverrideActive: Boolean(state.moveTimeReductionOverrideActive),
     skillSealTurns: integer(state.skillSealTurns),
     awakeningBindTurns: integer(state.awakeningBindTurns),
     enemyAttribute: integer(state.enemyAttribute, -1),
@@ -1195,6 +1203,8 @@ function normalizeLegacySelectorState(state, monster) {
       nonNegative(state.boardTypeCounts?.[type])
     )),
     boardTypeCountsStatePresent,
+    moveTimeReductionStatePresent,
+    moveTimeReductionOverrideStatePresent,
     party: Array.isArray(state.party) ? state.party : [],
     aiBudget: nonNegative(state.aiBudget === undefined ? monster.budgetCap : state.aiBudget),
     blackFallActive: Boolean(state.blackFallActive),
@@ -1473,6 +1483,39 @@ function legacyFallbackBuiltinScale(definition, state) {
       scale: eligible ? Math.fround(1) : Math.fround(0),
       exact: true,
       mode: eligible ? 'native-board-count-positive' : 'native-board-count-empty',
+    };
+  }
+
+  if (LEGACY_FALLBACK_MOVE_TIME_TYPES.has(type)) {
+    // The protected status is a low-ten-bit value shifted left six bits and
+    // sign-extended to int16. Native admits values <=63; a normal positive
+    // duration therefore becomes 64 or greater and requires the separate
+    // protected +0x87210 override byte (the handler's +0x7210 field offset,
+    // with signed-wrap behavior preserved for values in the upper half of the
+    // ten-bit range).
+    if (!state.moveTimeReductionStatePresent) {
+      return {
+        scale: Math.fround(1),
+        exact: false,
+        mode: 'move-time-reduction-missing-state',
+      };
+    }
+    const packed = Math.trunc(Number(state.moveTimeReductionTurns) || 0) & 0x3ff;
+    const nativeCounter = ((packed << 6) << 16) >> 16;
+    const inactive = nativeCounter <= 63;
+    const overridePresent = state.moveTimeReductionOverrideStatePresent;
+    const eligible = inactive || (overridePresent && state.moveTimeReductionOverrideActive);
+    const exact = inactive || overridePresent;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact,
+      mode: inactive
+        ? 'move-time-reduction-inactive'
+        : eligible
+          ? 'move-time-reduction-override'
+          : exact
+            ? 'move-time-reduction-active'
+            : 'move-time-reduction-active-missing-override',
     };
   }
 

@@ -722,6 +722,14 @@ the host supplies `boardTypeCounts` (the ten native board-type counts). The
 native `_countBlockType` helper aliases source types 7 and 8 to the combined
 poison family for this test, so the browser exposes that alias in both slots;
 omitting the array remains a playable `legacyFallbackApproximation`.
+Type 39 also has an exact fallback status gate when its compact fields are
+present: the protected low-ten-bit move-time duration is shifted left six
+bits and sign-extended before the native `<= 63` test, and an active value
+can only reapply when the separate protected `+0x87210` override byte
+(handler field offset `+0x7210`) is nonzero. The
+browser exposes that byte as `moveTimeReductionOverrideActive`, clears it on
+ordinary application and expiry, and marks a host that omits it as
+`legacyFallbackApproximation`.
 
 Hosts that have a fuller `sMONSTER`/`sGAMEWORK` model can provide
 `legacyFallbackCondition(definition, state, context)` or a

@@ -2,6 +2,21 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-28 exact legacy move-time fallback gate
+
+- Recovered the legacy type-39 fallback handler at `0x61e9d0`. It checks the
+  protected low-ten-bit move-time status after the native shift/sign-extension
+  boundary, admitting inactive values and only allowing an active status when
+  the separate protected `+0x87210` override byte (handler field offset
+  `+0x7210`) is set.
+- `PuzzleEngine` now carries that override boundary explicitly, clears it on
+  normal application/expiry, and exposes it through AI state and snapshots.
+  Direct hosts with an active duration but no override field remain playable
+  while reporting `legacyFallbackApproximation`.
+- Added direct inactive/active/override fixtures and browser fallback fixtures;
+  the restored inspector now validates the type-39 jump-table target and
+  reports `legacyFallbackMoveTimeTypes`.
+
 ## 2026-08-28 exact legacy board-count fallback gates
 
 - Recovered the shared legacy `0x61e6cc` fallback handler for source→jammer
