@@ -26,6 +26,11 @@ export const PAD_ENEMY_SKILL_MOVE_TIME_REDUCTION = 39;
 export const PAD_ENEMY_SKILL_SELF_DESTRUCT = 40;
 export const PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE = 46;
 export const PAD_ENEMY_SKILL_SCALED_ATTACK = 47;
+// Type 48 is the native orb-change-plus-attack action.  It is distinct from
+// type 108: type 48 takes scalar source/destination orb indices and its
+// authored +0x10 operand is the attack percentage, while type 108 takes
+// source/destination masks and keeps the generic attack lane.
+export const PAD_ENEMY_SKILL_ORB_CHANGE_ATTACK = 48;
 export const PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY = 50;
 export const PAD_ENEMY_SKILL_REVIVE_ENEMY = 52;
 export const PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB = 53;
@@ -199,6 +204,21 @@ export function decodePadEnemySkillDefinition(skillDefinition) {
       supported: true,
       sourceType: definition.getInt32(0x10, true),
       destinationType: definition.getInt32(0x14, true),
+      attackWithSkillValue,
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_ORB_CHANGE_ATTACK) {
+    requireLength(definitionBytes, 0x1c, 'PAD enemy-skill definition');
+    return Object.freeze({
+      type,
+      kind: 'orbChangeAttack',
+      supported: true,
+      // _setupEnemyAttackSub copies +0x10/+0x14/+0x18 to the acting
+      // monster's +0x680/+0x684/+0x688 lanes.  These are scalar orb types,
+      // not the bit masks used by modern type 108.
+      damagePercent: definition.getInt32(0x10, true),
+      sourceType: definition.getInt32(0x14, true),
+      destinationType: definition.getInt32(0x18, true),
       attackWithSkillValue,
     });
   }
@@ -1506,6 +1526,25 @@ export function decodePadEnemySkillRuntime(skillDefinition, monsterRuntime) {
         : null,
     });
   }
+  if (type === PAD_ENEMY_SKILL_ORB_CHANGE_ATTACK) {
+    requireLength(monsterBytes, 0x68c, 'PAD monster runtime');
+    return Object.freeze({
+      type,
+      kind: 'orbChangeAttack',
+      supported: true,
+      // Native setup materializes the three scalar operands in the low
+      // runtime lanes, leaving the authored +0x44 attack-with-skill value
+      // available to the surrounding enemy-action controller.
+      damagePercent: monster.getInt32(0x680, true),
+      sourceType: monster.getInt32(0x684, true),
+      destinationType: monster.getInt32(0x688, true),
+      setupMaterialized: true,
+      attackWithSkillValue: definitionBytes.byteLength
+          >= PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset + 4
+        ? definition.getInt32(PAD_ENEMY_SKILL_DEFINITION_LAYOUT.attackWithSkillOffset, true)
+        : null,
+    });
+  }
   if (type === PAD_ENEMY_SKILL_ENTIRE_BLIND || type === PAD_ENEMY_SKILL_ENTIRE_BLIND_ALT) {
     return Object.freeze({
       type,
@@ -2445,6 +2484,21 @@ export function normalizePadEnemySkillRecord(record) {
       type: PAD_ENEMY_SKILL_SOURCE_ORB_CONVERSION,
       kind: 'sourceOrbConversion',
       supported: true,
+      sourceType: Math.trunc(Number(record?.sourceType) || 0),
+      destinationType: Math.trunc(Number(record?.destinationType) || 0),
+      setupMaterialized: Boolean(record?.setupMaterialized),
+      executionMaterialized: Boolean(record?.executionMaterialized),
+      attackWithSkillValue: record?.attackWithSkillValue == null
+        ? null
+        : Math.trunc(Number(record.attackWithSkillValue)),
+    });
+  }
+  if (type === PAD_ENEMY_SKILL_ORB_CHANGE_ATTACK || record?.kind === 'orbChangeAttack') {
+    return Object.freeze({
+      type: PAD_ENEMY_SKILL_ORB_CHANGE_ATTACK,
+      kind: 'orbChangeAttack',
+      supported: record?.supported !== false,
+      damagePercent: Math.trunc(Number(record?.damagePercent) || 0),
       sourceType: Math.trunc(Number(record?.sourceType) || 0),
       destinationType: Math.trunc(Number(record?.destinationType) || 0),
       setupMaterialized: Boolean(record?.setupMaterialized),

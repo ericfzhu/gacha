@@ -45,6 +45,7 @@ const renderTurnChangeState = process.argv.includes('--turn-change-render');
 const renderRemainingEnemiesTurnChangeState = process.argv.includes('--remaining-enemies-turn-change-render');
 const renderAttributeBlockState = process.argv.includes('--attribute-block-render');
 const renderAttackOrbChangeState = process.argv.includes('--attack-orb-change-render');
+const renderOrbChangeAttackState = process.argv.includes('--orb-change-attack-render');
 const renderRandomSpinnersState = process.argv.includes('--random-spinners-render');
 const renderFixedSpinnersState = process.argv.includes('--fixed-spinners-render');
 const renderMaxHpChangeState = process.argv.includes('--max-hp-change-render');
@@ -3142,6 +3143,37 @@ try {
     || attackOrbChangeRenderState.snapshot?.rngState !== 891_458_469
   )) throw new Error(`Attack-orb-change render-state mismatch: ${JSON.stringify(attackOrbChangeRenderState)}`);
   if (attackOrbChangeRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
+  const orbChangeAttackRenderState = renderOrbChangeAttackState ? await page.evaluate(() => {
+    const engine = window.__puzzleGame;
+    engine.reset();
+    engine.start();
+    engine.setBoardFromCodes([
+      'RRRBGH',
+      'BGLDHR',
+      'GLDHBR',
+      'LDHBRG',
+      'DHBRGL',
+    ]);
+    engine.setRngState(21_900);
+    const applied = engine.applyEnemySkillRecord({
+      type: 48,
+      kind: 'orbChangeAttack',
+      supported: true,
+      damagePercent: 150,
+      sourceType: 1,
+      destinationType: 2,
+      attackWithSkillValue: 0,
+    });
+    return { applied, snapshot: engine.snapshot() };
+  }) : null;
+  if (orbChangeAttackRenderState && (
+    orbChangeAttackRenderState.applied !== true
+    || orbChangeAttackRenderState.snapshot?.board?.join('/') !== 'RRRGGH/GGLDHR/GLDHGR/LDHGRG/DHGRGL'
+    || orbChangeAttackRenderState.snapshot?.lastEnemySkill?.type !== 48
+    || orbChangeAttackRenderState.snapshot?.lastEnemySkill?.changedOrbCount !== 5
+    || orbChangeAttackRenderState.snapshot?.rngState !== 21_900
+  )) throw new Error(`Orb-change-attack render-state mismatch: ${JSON.stringify(orbChangeAttackRenderState)}`);
+  if (orbChangeAttackRenderState) await page.evaluate(() => new Promise(requestAnimationFrame));
   const randomSpinnersRenderState = renderRandomSpinnersState ? await page.evaluate(() => {
     const engine = window.__puzzleGame;
     engine.reset();
@@ -5124,6 +5156,9 @@ try {
   }
   if (legacyFallbackGatesRenderState) {
     await fs.writeFile(`${outputPath}.legacy-fallback-gates.json`, JSON.stringify(legacyFallbackGatesRenderState, null, 2));
+  }
+  if (orbChangeAttackRenderState) {
+    await fs.writeFile(`${outputPath}.orb-change-attack.json`, JSON.stringify(orbChangeAttackRenderState, null, 2));
   }
   await fs.writeFile(`${outputPath}.json`, JSON.stringify({ before, during, after, bombResolution, thornInput, orbStateSample, blockPowupSample, blockMinusSample, burDropSample, lockDropSample, poisonBlockSample, largeBoard, tapTurn, matchShape, attackRounds, pointerIdentity, moveDeadline, nailRenderState, blackFallRenderState, bindRenderState, attributeAbsorbRenderState, comboAbsorbRenderState, skyfallRateRenderState, deathCryRenderState, damageVoidRenderState, damageAbsorbRenderState, awakeningBindRenderState, skillDelayRenderState, presenceCheckRenderState, maskedRandomOrbChangeRenderState, nativeNoEffectRenderState, lockRandomOrbsRenderState, enemyEscapeRenderState, lockedSkyfallRenderState, stickyBlindRandomRenderState, stickyBlindFixedRenderState, orbSealColumnsRenderState, orbSealRowsRenderState, fixedStartRenderState, randomBombsRenderState, fixedBombsRenderState, cloudRenderState, recoveryDebuffRenderState, turnChangeRenderState, remainingEnemiesTurnChangeRenderState, attributeBlockRenderState, attackOrbChangeRenderState, randomSpinnersRenderState, fixedSpinnersRenderState, maxHpChangeRenderState, fixedTargetRenderState, boardSizeChangeRenderState, noSkyfallRenderState, comboBranchRenderState, attackAttributeBranchRenderState, skillUseBranchRenderState, damageBranchRenderState, erasedAttributeBranchRenderState, typeResistRenderState, damageImmunityRenderState, remainingEnemiesBranchRenderState, damageImmunityOffRenderState, attributeResistRenderState, resolveRenderState, damageShieldRenderState, leaderSwapRenderState, legacyAiRenderState, legacyFallbackGatesRenderState, normalAttackRenderState, multiAttackRenderState, reviveRenderState, attributeChangeRenderState, selfDestructRenderState, moveTimeRenderState, statusShieldRenderState, clearPlayerBuffsRenderState, earlyHealAttackRenderState, earlyDefenseShieldsRenderState, earlyPartyControlRenderState, bindAttackRenderState, randomSubBindRenderState, repeatAttackRenderState, entireBlindRenderState, inactivityRenderState, attackBoostRenderState, consoleMessages }, null, 2));
   const atlasStatus = await page.locator('.puzzle-apk-art span').textContent();

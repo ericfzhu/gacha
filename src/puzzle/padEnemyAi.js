@@ -65,6 +65,7 @@ import {
   PAD_ENEMY_SKILL_SELF_DESTRUCT,
   PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
   PAD_ENEMY_SKILL_SCALED_ATTACK,
+  PAD_ENEMY_SKILL_ORB_CHANGE_ATTACK,
   PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
   PAD_ENEMY_SKILL_REVIVE_ENEMY,
   PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
@@ -263,6 +264,7 @@ const PAD_SUPPORTED_ENEMY_AI_TYPES = Object.freeze([
     PAD_ENEMY_SKILL_SELF_DESTRUCT,
     PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
     PAD_ENEMY_SKILL_SCALED_ATTACK,
+    PAD_ENEMY_SKILL_ORB_CHANGE_ATTACK,
     PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
     PAD_ENEMY_SKILL_REVIVE_ENEMY,
     PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
@@ -502,6 +504,21 @@ function evaluateCondition(definition, state, rngState, applyStaticEligibility =
     ), 0);
     const requested = Math.max(0, Math.trunc(Number(definition.effect.count) || 0));
     const eligible = faces.length >= 1 && representedCount >= requested;
+    return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
+  }
+  if (definition.effect.kind === 'orbChangeAttack') {
+    // Native type 48's 0x61ae10 callback gates on the scalar source operand
+    // at +0x14.  A negative source selects a random face at execution time
+    // and bypasses the count check; nonnegative values use _countBlockType,
+    // whose 7/8 inputs are the single poison family.  The callback preserves
+    // the incoming new-AI scale, which is one at this selector boundary.
+    const sourceType = Math.trunc(Number(definition.effect.sourceType) || 0);
+    const countIndex = sourceType === 7 || sourceType === 8 ? 7 : sourceType;
+    const counts = Array.isArray(state.boardTypeCounts) ? state.boardTypeCounts : [];
+    const count = countIndex >= 0 && countIndex < counts.length
+      ? Math.max(0, Math.trunc(Number(counts[countIndex]) || 0))
+      : 0;
+    const eligible = sourceType < 0 || count > 0;
     return { eligible, probabilityScale: eligible ? 1 : 0, rngState };
   }
   if (definition.effect.kind === 'randomPartyBind') {
@@ -1136,6 +1153,11 @@ const LEGACY_FALLBACK_FACE_FRACTION_TYPES = new Set([57, 59]);
 // representedFaces / totalFaces after the positive-count gate.
 const LEGACY_FALLBACK_RANDOM_JAMMER_TYPES = new Set([13]);
 
+// Type 48 uses the scalar source operand at +0x14.  Its legacy callback is a
+// strict positive _countBlockType gate, except that a negative source enters
+// the random-source execution path and therefore bypasses the gate.
+const LEGACY_FALLBACK_ORB_CHANGE_ATTACK_TYPES = new Set([48]);
+
 // Type 39 has a dedicated status handler at 0x61e9d0.  It starts with the
 // fallback scale at zero, admits an inactive packed move-time counter, and
 // only permits an active status when the native override byte is set.
@@ -1675,6 +1697,36 @@ function legacyFallbackBuiltinScale(definition, state) {
       mode: eligible
         ? 'native-random-jammer-represented'
         : 'native-random-jammer-insufficient',
+    };
+  }
+
+  if (LEGACY_FALLBACK_ORB_CHANGE_ATTACK_TYPES.has(type)) {
+    const sourceType = Math.trunc(Number(definition.effect?.sourceType) || 0);
+    if (sourceType < 0) {
+      return {
+        scale: Math.fround(1),
+        exact: true,
+        mode: 'native-orb-change-attack-random-source',
+      };
+    }
+    if (!state.boardTypeCountsStatePresent) {
+      return {
+        scale: Math.fround(1),
+        exact: false,
+        mode: 'native-orb-change-attack-missing-state',
+      };
+    }
+    const countIndex = sourceType === 7 || sourceType === 8 ? 7 : sourceType;
+    const count = countIndex >= 0 && countIndex < state.boardTypeCounts.length
+      ? state.boardTypeCounts[countIndex]
+      : 0;
+    const eligible = count > 0;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact: true,
+      mode: eligible
+        ? 'native-orb-change-attack-source-present'
+        : 'native-orb-change-attack-source-empty',
     };
   }
 

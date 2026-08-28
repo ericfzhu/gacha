@@ -1584,6 +1584,26 @@ lifetime. In the focused mask `0x11` fixture, a Fire triplet is ignored while a
 Water triplet still matches; seed 21900 remains unchanged outside ordinary AI
 selection.
 
+Enemy skill type `48` is the scalar orb-change-plus-attack lane
+(`ESOrbChangeAttack`), distinct from type `108`'s mask-based replacement. The
+recovered early dispatch target is `0x628964`; setup `0x620fc4` copies authored
+`+0x10` (attack percentage), `+0x14` (source orb type), and `+0x18`
+(destination orb type) to the acting monster's runtime `+0x680`, `+0x684`, and
+`+0x688`. The ordinary condition `0x61ae10` and legacy fallback `0x61ea14`
+both gate on `_countBlockType(source)`, with source types 7 and 8 folded into
+the poison family; a negative source bypasses the count gate for native random
+source selection.
+
+After the early repeat/presentation stage's native guard, the handler invokes
+`_doAttackAndSwapBlock`. Positive source values replace every matching,
+unlocked cell with the scalar destination; a negative source chooses a
+non-Heart dungeon face and a negative destination chooses a random ordinary
+destination. Locked cells reject writes and consume no swap RNG. The attack
+uses the authored `+0x10` percentage, rather than the generic `+0x44`
+attack-with-skill lane. The browser port materializes negative operands at
+execution, preserves the poison alias and lock behavior, and records the
+changed-cell count alongside the damage.
+
 Enemy skill type `108` combines an attack with mask-based orb replacement. Its
 dispatch, setup, and condition entries resolve to `0x62a4c8`, `0x6219f4`, and
 `0x61b84c`; the independent parser identifies `ESOrbChangeAttackBits`.

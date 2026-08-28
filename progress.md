@@ -2,6 +2,20 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-28 native type-48 orb-change attack
+
+- Recovered type 48 (`ESOrbChangeAttack`) as the scalar orb-change-plus-attack
+  lane. Setup copies authored attack percentage/source/destination from
+  `+0x10/+0x14/+0x18` into runtime `+0x680/+0x684/+0x688`; the early handler,
+  ordinary condition, and legacy fallback now have restored dispatch proofs.
+- Added exact browser decoding, native source-count gating (including the 7/8
+  poison alias), negative random source/destination materialization, locked-cell
+  writes, attack scaling, and changed-cell reporting. Type 108 remains the
+  separate mask-based attack/orb-change implementation.
+- Added direct definition/runtime, selection, empty-source, action, browser
+  render-state, and restored-inspector coverage. `npm run pad-rules:test`,
+  `npm run build`, and the restored libpad inspection pass.
+
 ## 2026-08-28 corrected native type-13 random jammer
 
 - Restored type 13's dispatch/condition path from `libpad.so`: it scans the

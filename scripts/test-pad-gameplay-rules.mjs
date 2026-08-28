@@ -76,6 +76,7 @@ import {
   PAD_ENEMY_SKILL_SELF_DESTRUCT,
   PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
   PAD_ENEMY_SKILL_SCALED_ATTACK,
+  PAD_ENEMY_SKILL_ORB_CHANGE_ATTACK,
   PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
   PAD_ENEMY_SKILL_REVIVE_ENEMY,
   PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
@@ -2660,6 +2661,35 @@ assert.deepEqual(
 assert.deepEqual(
   decodePadEnemySkillRuntime(enemyAiAttributeBlockDefinition, new Uint8Array(0x680)),
   expectedAttributeBlockDefinition,
+);
+const enemyAiOrbChangeAttackDefinition = enemyAiAttributeBlockDefinition.slice();
+const enemyAiOrbChangeAttackView = new DataView(enemyAiOrbChangeAttackDefinition.buffer);
+enemyAiOrbChangeAttackView.setUint32(0x00, 9_087, true);
+enemyAiOrbChangeAttackView.setInt16(0x04, PAD_ENEMY_SKILL_ORB_CHANGE_ATTACK, true);
+enemyAiOrbChangeAttackView.setInt32(0x10, 150, true);
+enemyAiOrbChangeAttackView.setInt32(0x14, 1, true);
+enemyAiOrbChangeAttackView.setInt32(0x18, 2, true);
+const expectedOrbChangeAttackDefinition = {
+  type: 48,
+  kind: 'orbChangeAttack',
+  supported: true,
+  damagePercent: 150,
+  sourceType: 1,
+  destinationType: 2,
+  attackWithSkillValue: 0,
+};
+assert.deepEqual(
+  decodePadEnemySkillDefinition(enemyAiOrbChangeAttackDefinition),
+  expectedOrbChangeAttackDefinition,
+);
+const orbChangeAttackRuntime = new Uint8Array(0x68c);
+const orbChangeAttackRuntimeView = new DataView(orbChangeAttackRuntime.buffer);
+orbChangeAttackRuntimeView.setInt32(0x680, 150, true);
+orbChangeAttackRuntimeView.setInt32(0x684, 1, true);
+orbChangeAttackRuntimeView.setInt32(0x688, 2, true);
+assert.deepEqual(
+  decodePadEnemySkillRuntime(enemyAiOrbChangeAttackDefinition, orbChangeAttackRuntime),
+  { ...expectedOrbChangeAttackDefinition, setupMaterialized: true },
 );
 const enemyAiAttackOrbChangeDefinition = enemyAiAttributeBlockDefinition.slice();
 const enemyAiAttackOrbChangeView = new DataView(enemyAiAttackOrbChangeDefinition.buffer);
@@ -7710,6 +7740,61 @@ const attackOrbChangeBoard = [
   'LDHBRG',
   'DHBRGL',
 ];
+const directOrbChangeAttackEngine = new PuzzleEngine({ seed: 21_900 });
+directOrbChangeAttackEngine.setBoardFromCodes(attackOrbChangeBoard);
+directOrbChangeAttackEngine.setRngState(21_900);
+assert.equal(directOrbChangeAttackEngine.applyEnemySkillDefinition(
+  enemyAiOrbChangeAttackDefinition,
+), true);
+const directOrbChangeAttackState = directOrbChangeAttackEngine.snapshot();
+assert.deepEqual(directOrbChangeAttackState.board, [
+  'RRRGGH',
+  'GGLDHR',
+  'GLDHGR',
+  'LDHGRG',
+  'DHGRGL',
+]);
+assert.equal(directOrbChangeAttackState.lastEnemySkill.changedOrbCount, 5);
+assert.equal(directOrbChangeAttackState.lastEnemySkill.effectFlags, 1);
+assert.equal(directOrbChangeAttackState.rngState, 21_900);
+
+const orbChangeAttackMonsterDefinition = enemyAiMonsterDefinition.slice();
+new DataView(orbChangeAttackMonsterDefinition.buffer).setUint32(0xec, 9_087, true);
+const selectedOrbChangeAttackEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: orbChangeAttackMonsterDefinition,
+    skillDefinitions: [enemyAiOrbChangeAttackDefinition],
+  }],
+});
+selectedOrbChangeAttackEngine.setBoardFromCodes(attackOrbChangeBoard);
+selectedOrbChangeAttackEngine.enemies[0].counter = 1;
+selectedOrbChangeAttackEngine.enemies[1].counter = 99;
+selectedOrbChangeAttackEngine.setRngState(21_900);
+selectedOrbChangeAttackEngine.resolveEnemyTurn();
+const selectedOrbChangeAttackState = selectedOrbChangeAttackEngine.snapshot();
+assert.equal(selectedOrbChangeAttackState.lastEnemyActions[0].skill.type, 48);
+assert.equal(selectedOrbChangeAttackState.lastEnemyActions[0].damage, 2_775);
+assert.equal(selectedOrbChangeAttackState.player.hp, 9_225);
+assert.equal(selectedOrbChangeAttackState.lastEnemySkill.changedOrbCount, 5);
+
+const rejectedOrbChangeAttackEngine = new PuzzleEngine({
+  seed: 21_900,
+  enemyAiPools: [{
+    monsterDefinition: orbChangeAttackMonsterDefinition,
+    skillDefinitions: [enemyAiOrbChangeAttackDefinition],
+  }],
+});
+rejectedOrbChangeAttackEngine.setBoardFromCodes(Array(5).fill('RRRGGG'));
+rejectedOrbChangeAttackEngine.enemies[0].counter = 1;
+rejectedOrbChangeAttackEngine.enemies[1].counter = 99;
+rejectedOrbChangeAttackEngine.setRngState(21_900);
+rejectedOrbChangeAttackEngine.resolveEnemyTurn();
+const rejectedOrbChangeAttackState = rejectedOrbChangeAttackEngine.snapshot();
+assert.equal(rejectedOrbChangeAttackState.lastEnemyActions[0].kind, 'attack');
+assert.equal(rejectedOrbChangeAttackState.lastEnemyActions[0].damage, 1_850);
+assert.equal(rejectedOrbChangeAttackState.rngState, 21_900);
+
 const directAttackOrbChangeEngine = new PuzzleEngine({ seed: 21_900 });
 directAttackOrbChangeEngine.setBoardFromCodes(attackOrbChangeBoard);
 directAttackOrbChangeEngine.setRngState(21_900);

@@ -112,6 +112,7 @@ import {
   PAD_ENEMY_SKILL_SELF_DESTRUCT,
   PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
   PAD_ENEMY_SKILL_SCALED_ATTACK,
+  PAD_ENEMY_SKILL_ORB_CHANGE_ATTACK,
   PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
   PAD_ENEMY_SKILL_REVIVE_ENEMY,
   PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,
@@ -1460,6 +1461,15 @@ export class PuzzleEngine {
               skill.damagePercent,
               activeBoostPercent,
             );
+          } else if (skill.kind === 'orbChangeAttack') {
+            // Type 48's action owns its attack percentage at authored
+            // params[1]; this is independent from the generic +0x44
+            // attack-with-skill field used by most enemy skills.
+            damage = padEnemySkillBoostedAttack(
+              enemy.attack,
+              skill.damagePercent,
+              activeBoostPercent,
+            );
           } else if (skill.kind === 'additionalAttack') {
             damage += padEnemySkillAdditionalAttack(enemy.attack, skill.damagePercent);
           } else if (skill.kind === 'repeatAttack') {
@@ -1656,6 +1666,17 @@ export class PuzzleEngine {
           let effectiveSourceMask = definition.effect.sourceTypeMask & 0xffff;
           if ((effectiveSourceMask & 0x180) === 0) effectiveSourceMask |= 0x180;
           const eligible = this.countBlockBits(effectiveSourceMask) >= 1;
+          return { eligible, probabilityScale: eligible ? 1 : 0, rngState: this.rng.state };
+        }
+        if (definition.effect.kind === 'orbChangeAttack') {
+          const sourceType = Math.trunc(Number(definition.effect.sourceType) || 0);
+          const countIndex = sourceType === 7 || sourceType === 8 ? 7 : sourceType;
+          const count = sourceType < 0
+            ? 1
+            : countIndex >= 0 && countIndex < ORB_TYPES.length
+              ? this.countBlockBits(1 << countIndex)
+              : 0;
+          const eligible = sourceType < 0 || count > 0;
           return { eligible, probabilityScale: eligible ? 1 : 0, rngState: this.rng.state };
         }
         if (definition.effect.kind === 'sourceToJammer') {
@@ -1974,6 +1995,27 @@ export class PuzzleEngine {
       });
     }
     if (skill.supported && skill.kind === 'sourceOrbConversion' && !skill.executionMaterialized) {
+      const faceCounts = Array.from({ length: 6 }, (_, type) => this.countBlockBits(1 << type));
+      const sourceType = skill.sourceType < 0
+        ? this.rng.getRandomBlockOnFace(faceCounts, false).type
+        : skill.sourceType;
+      const destinationType = skill.destinationType < 0
+        ? this.rng.getRandomBlock(sourceType, false, false)
+        : skill.destinationType;
+      return Object.freeze({
+        ...record,
+        sourceType,
+        destinationType,
+        setupMaterialized: true,
+        executionMaterialized: true,
+      });
+    }
+    if (skill.supported && skill.kind === 'orbChangeAttack' && !skill.executionMaterialized) {
+      // _doAttackAndSwapBlock resolves negative scalar operands at execution:
+      // a negative source chooses a non-heart dungeon face, and a negative
+      // destination chooses a random ordinary destination.  Positive values
+      // remain authored scalar orb indices.  Both choices use the same shared
+      // LCG/private-state helpers as the source-conversion path.
       const faceCounts = Array.from({ length: 6 }, (_, type) => this.countBlockBits(1 << type));
       const sourceType = skill.sourceType < 0
         ? this.rng.getRandomBlockOnFace(faceCounts, false).type
@@ -2925,6 +2967,23 @@ export class PuzzleEngine {
       this.message = `Enemy attacked and changed ${changedOrbCount} orb${changedOrbCount === 1 ? '' : 's'}.`;
       return true;
     }
+    if (skill.supported && skill.kind === 'orbChangeAttack') {
+      const beforeTypes = this.board.map((row) => row.map((orb) => orb.type));
+      const effectFlags = this.doBlockSwap(
+        skill.sourceType,
+        skill.destinationType,
+        0,
+        null,
+      );
+      const changedOrbCount = this.board.reduce((total, row, rowIndex) => (
+        total + row.reduce((count, orb, columnIndex) => (
+          count + Number(orb.type !== beforeTypes[rowIndex][columnIndex])
+        ), 0)
+      ), 0);
+      this.lastEnemySkill = Object.freeze({ ...skill, effectFlags, changedOrbCount });
+      this.message = `Enemy attacked and changed ${changedOrbCount} orb${changedOrbCount === 1 ? '' : 's'}.`;
+      return true;
+    }
     if (skill.supported && skill.kind === 'randomSpinners') {
       const candidates = [];
       this.board.forEach((row, rowIndex) => row.forEach((orb, columnIndex) => {
@@ -3761,6 +3820,7 @@ export class PuzzleEngine {
         PAD_ENEMY_SKILL_SELF_DESTRUCT,
         PAD_ENEMY_SKILL_CHANGE_ATTRIBUTE,
         PAD_ENEMY_SKILL_SCALED_ATTACK,
+        PAD_ENEMY_SKILL_ORB_CHANGE_ATTACK,
         PAD_ENEMY_SKILL_CURRENT_HP_GRAVITY,
         PAD_ENEMY_SKILL_REVIVE_ENEMY,
         PAD_ENEMY_SKILL_ATTRIBUTE_ABSORB,

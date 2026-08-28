@@ -110,6 +110,10 @@ const LEGACY_FALLBACK_FACE_FRACTION_TYPES = Object.freeze([57, 59]);
 // but type 13 gates on a requested represented-face count before its action
 // performs the private-state shuffle.
 const LEGACY_FALLBACK_RANDOM_JAMMER_TYPES = Object.freeze([13]);
+// Type 48 is the scalar orb-change-plus-attack lane.  Its legacy condition
+// uses the same positive _countBlockType gate as the ordinary callback, with
+// a negative source selecting the random-source execution path.
+const LEGACY_FALLBACK_ORB_CHANGE_ATTACK_TYPES = Object.freeze([48]);
 const LEGACY_FALLBACK_MOVE_TIME_TYPES = Object.freeze([39]);
 const LEGACY_FALLBACK_INSTRUCTION_ANCHORS = Object.freeze([
   [0x61e408, 0x794faa68], // current budget gate
@@ -133,6 +137,36 @@ const SOURCE_ORB_CONVERSION_ENEMY_SKILL_TYPE = 4;
 const SOURCE_ORB_CONVERSION_HANDLER = 0x6292b4;
 const SOURCE_ORB_CONVERSION_SETUP_HANDLER = 0x61fee4;
 const SOURCE_ORB_CONVERSION_CONDITION_HANDLER = 0x61b2d8;
+const ORB_CHANGE_ATTACK_ENEMY_SKILL_TYPE = 48;
+const ORB_CHANGE_ATTACK_EARLY_HANDLER = 0x628964;
+const ORB_CHANGE_ATTACK_SETUP_HANDLER = 0x620fc4;
+const ORB_CHANGE_ATTACK_CONDITION_HANDLER = 0x61ae10;
+const ORB_CHANGE_ATTACK_FALLBACK_CONDITION_HANDLER = 0x61ea14;
+const ORB_CHANGE_ATTACK_INSTRUCTION_ANCHORS = Object.freeze([
+  [0x620fc8, 0xb94012a8], // load authored +0x10 attack percentage
+  [0x620fe8, 0xb9068268], // store attack percentage at runtime +0x680
+  [0x620fec, 0xfd033e60], // preserve the presentation double at +0x678
+  [0x620ff0, 0xb9001a69], // mark the native attack-stage state
+  [0x620ff4, 0xb94016a8], // load scalar source type +0x14
+  [0x620ff8, 0xb9068668], // store source type at runtime +0x684
+  [0x620ffc, 0xb9401aa8], // load scalar destination type +0x18
+  [0x621000, 0xb9068a68], // store destination type at runtime +0x688
+  [0x62898c, 0xb9467e68], // load the prepared attack-stage control word
+  [0x628994, 0x0a090109], // require the low stage bit without high bit
+  [0x6289a0, 0x32110108], // set the native completion bit
+  [0x6289ac, 0xb9067e68], // persist the completion state
+  [0x6289b0, 0x97f401d4], // call _doAttackAndSwapBlock
+  [0x61ae10, 0x52a7f008], // initialize ordinary condition scale to one
+  [0x61ae18, 0xb9401661], // load scalar source type +0x14
+  [0x61ae1c, 0x37f89001], // negative source bypasses the count gate
+  [0x61ae24, 0x97f3d6df], // call _countBlockType
+  [0x61ae28, 0x7100001f], // require a positive source count
+  [0x61ea14, 0x52a7f008], // initialize legacy fallback scale to one
+  [0x61ea1c, 0xb94016c1], // legacy source type +0x14
+  [0x61ea20, 0x37f83361], // negative source bypasses fallback count
+  [0x61ea28, 0x97f3c7de], // legacy _countBlockType call
+  [0x61ea2c, 0x7100001f], // positive source count admits fallback
+]);
 const ENTIRE_BLIND_ENEMY_SKILL_TYPE = 5;
 const ENTIRE_BLIND_HANDLER = 0x6286b4;
 const ENTIRE_BLIND_SETUP_HANDLER = 0x6217c0;
@@ -1462,6 +1496,39 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     ? null : sourceOrbConversionSetupTarget === SOURCE_ORB_CONVERSION_SETUP_HANDLER;
   const sourceOrbConversionConditionMatches = sourceOrbConversionConditionTarget === null
     ? null : sourceOrbConversionConditionTarget === SOURCE_ORB_CONVERSION_CONDITION_HANDLER;
+  const orbChangeAttackEarlyDispatchTarget = resolveEarlyEnemySkillTarget(
+    ORB_CHANGE_ATTACK_ENEMY_SKILL_TYPE,
+  );
+  const orbChangeAttackSetupTarget = resolveEnemySkillTarget(
+    ORB_CHANGE_ATTACK_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_SETUP_TABLE,
+    ENEMY_SKILL_SETUP_BASE,
+  );
+  const orbChangeAttackConditionTarget = resolveEnemySkillTarget(
+    ORB_CHANGE_ATTACK_ENEMY_SKILL_TYPE,
+    ENEMY_SKILL_CONDITION_TABLE,
+    ENEMY_SKILL_CONDITION_BASE,
+  );
+  const orbChangeAttackEarlyDispatchMatches = orbChangeAttackEarlyDispatchTarget === null
+    ? null : orbChangeAttackEarlyDispatchTarget === ORB_CHANGE_ATTACK_EARLY_HANDLER;
+  const orbChangeAttackSetupMatches = orbChangeAttackSetupTarget === null
+    ? null : orbChangeAttackSetupTarget === ORB_CHANGE_ATTACK_SETUP_HANDLER;
+  const orbChangeAttackConditionMatches = orbChangeAttackConditionTarget === null
+    ? null : orbChangeAttackConditionTarget === ORB_CHANGE_ATTACK_CONDITION_HANDLER;
+  const orbChangeAttackInstructionAnchorsMatch = restoredElf === null ? null
+    : ORB_CHANGE_ATTACK_INSTRUCTION_ANCHORS.every(([address, instruction]) => (
+      readUint32Virtual(restoredElf, restoredBytes, address) === instruction
+    ));
+  const orbChangeAttackFallbackDispatchTarget = restoredElf === null ? null : (() => {
+    const entry = readUint16Virtual(
+      restoredElf,
+      restoredBytes,
+      LEGACY_FALLBACK_JUMP_TABLE + (ORB_CHANGE_ATTACK_ENEMY_SKILL_TYPE - 1) * 2,
+    );
+    return LEGACY_FALLBACK_DISPATCH_BASE + entry * 4;
+  })();
+  const orbChangeAttackFallbackDispatchMatches = orbChangeAttackFallbackDispatchTarget === null
+    ? null : orbChangeAttackFallbackDispatchTarget === ORB_CHANGE_ATTACK_FALLBACK_CONDITION_HANDLER;
   const entireBlindDispatchTarget = resolveEarlyEnemySkillTarget(ENTIRE_BLIND_ENEMY_SKILL_TYPE);
   const entireBlindSetupTarget = resolveEnemySkillTarget(
     ENTIRE_BLIND_ENEMY_SKILL_TYPE, ENEMY_SKILL_SETUP_TABLE, ENEMY_SKILL_SETUP_BASE,
@@ -1863,6 +1930,7 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       ...LEGACY_FALLBACK_NON_POISON_COUNT_TYPES,
       ...LEGACY_FALLBACK_FACE_FRACTION_TYPES,
       ...LEGACY_FALLBACK_RANDOM_JAMMER_TYPES,
+      ...LEGACY_FALLBACK_ORB_CHANGE_ATTACK_TYPES,
       ...LEGACY_FALLBACK_MOVE_TIME_TYPES,
     ].every((type) => {
       const entry = readUint16Virtual(
@@ -1887,8 +1955,10 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
                     ? 0x61e4d0
                     : LEGACY_FALLBACK_FACE_FRACTION_TYPES.includes(type)
                     ? 0x61e448
-                      : LEGACY_FALLBACK_RANDOM_JAMMER_TYPES.includes(type)
+                  : LEGACY_FALLBACK_RANDOM_JAMMER_TYPES.includes(type)
                         ? 0x61e7e8
+                      : LEGACY_FALLBACK_ORB_CHANGE_ATTACK_TYPES.includes(type)
+                        ? ORB_CHANGE_ATTACK_FALLBACK_CONDITION_HANDLER
                       : LEGACY_FALLBACK_MOVE_TIME_TYPES.includes(type)
                         ? 0x61e9d0
                         : null;
@@ -3711,6 +3781,11 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       sourceOrbConversionDispatchMatches21_9: sourceOrbConversionDispatchMatches,
       sourceOrbConversionSetupMatches21_9: sourceOrbConversionSetupMatches,
       sourceOrbConversionConditionMatches21_9: sourceOrbConversionConditionMatches,
+      orbChangeAttackEarlyDispatchMatches21_9: orbChangeAttackEarlyDispatchMatches,
+      orbChangeAttackSetupMatches21_9: orbChangeAttackSetupMatches,
+      orbChangeAttackConditionMatches21_9: orbChangeAttackConditionMatches,
+      orbChangeAttackInstructionAnchorsMatch21_9: orbChangeAttackInstructionAnchorsMatch,
+      orbChangeAttackFallbackDispatchMatches21_9: orbChangeAttackFallbackDispatchMatches,
       entireBlindDispatchMatches21_9: entireBlindDispatchMatches,
       entireBlindSetupMatches21_9: entireBlindSetupMatches,
       entireBlindConditionMatches21_9: entireBlindConditionMatches,
@@ -4095,6 +4170,22 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       sourceOrbConversionConditionMatches21_9: sourceOrbConversionConditionMatches,
       sourceOrbConversionParameters:
         'definition +0x10/+0x14 -> sMONSTER+0x678/+0x67c source/destination; negative selects native random mode',
+      orbChangeAttackType: ORB_CHANGE_ATTACK_ENEMY_SKILL_TYPE,
+      orbChangeAttackEarlyDispatchTarget: orbChangeAttackEarlyDispatchTarget === null
+        ? null : hex(orbChangeAttackEarlyDispatchTarget),
+      orbChangeAttackEarlyDispatchMatches21_9: orbChangeAttackEarlyDispatchMatches,
+      orbChangeAttackSetupTarget: orbChangeAttackSetupTarget === null
+        ? null : hex(orbChangeAttackSetupTarget),
+      orbChangeAttackSetupMatches21_9: orbChangeAttackSetupMatches,
+      orbChangeAttackConditionTarget: orbChangeAttackConditionTarget === null
+        ? null : hex(orbChangeAttackConditionTarget),
+      orbChangeAttackConditionMatches21_9: orbChangeAttackConditionMatches,
+      orbChangeAttackFallbackDispatchTarget: orbChangeAttackFallbackDispatchTarget === null
+        ? null : hex(orbChangeAttackFallbackDispatchTarget),
+      orbChangeAttackFallbackDispatchMatches21_9: orbChangeAttackFallbackDispatchMatches,
+      orbChangeAttackInstructionAnchorsMatch21_9: orbChangeAttackInstructionAnchorsMatch,
+      orbChangeAttackSemantics:
+        'type 48 setup copies authored +0x10 attack percentage and scalar +0x14/+0x18 source/destination to runtime +0x680/+0x684/+0x688; early dispatch 0x628964 calls the repeat/presentation stage and, after its native stage guard, _doAttackAndSwapBlock; negative source/destination select non-heart/random orb types, positive source uses _countBlockType (7/8 poison alias), locks reject writes, and the attack uses the authored +0x10 percentage',
       entireBlindType: ENTIRE_BLIND_ENEMY_SKILL_TYPE,
       entireBlindDispatchTarget: entireBlindDispatchTarget === null
         ? null : hex(entireBlindDispatchTarget),
@@ -5226,7 +5317,7 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       legacySelectorModeSwitchAnchorsMatch21_9: legacyEnemyAiModeSwitchAnchorsMatch,
       legacySelectorInstructionAnchorsMatch21_9: legacyEnemyAiInstructionAnchorsMatch,
       legacySelectorSemantics:
-        'chooseEnemyAi (0x61dd68) scans 64 slots in order after parseFlowControl; ordinary records use HP/maxHP, damaged-turn baseline +0x7c0/+0x7d0 (or a native no-damage status scan), signed +0x3c magnitude scaled by +0xe6 and rounded through izMathRound, then _chooseEnemyAiSub. Positive callback output is multiplied by factor0*factor1*slotChance/100000, capped at 10000, and compared with the shared +0x6a10 LCG. If ordinary selection fails, the 0x61e300 status/fallback pass rechecks budget, dispatches through the 0xd3c8e2 halfword table, and uses 0x61f08c: fcvtzs(float32(float32(int32(factor0*fallbackWeight))*scale)) > ((lcgStep(state)>>>16)*10000>>>16). Effect type 36 transfers from the ordinary pass; authored slot skill ID 36 is the fallback early-return sentinel. Types 21..38, 47, 49, and 69 resolve to zero; types 50, 76..81, 83..86, 89, and 92 use the dedicated one handler; types 7..11, 15..16, 40..46, 51, 66, 72..73, 82, and 90..91 branch directly to the common epilogue with its initialized one scale; type 20 has a status-dependent handler whose two branches both produce one; type 6 calls cGAMEMAIN::_getCountClearParams (0x618320) and admits the fallback only when at least one clearable player parameter is present; types 12, 56, and 58 call _countBlockType (0x65213c), admitting any positive source count through the common epilogue; types 57 and 59 use the 0x61e448 represented-face fraction after the optional Heart gate; types 60 and 61 call the 0x61e4d0 non-poison count gate, admitting only when the authored count is met; and type 39 admits the inactive packed move-time counter (or the explicit protected +0x87210 override branch, handler offset +0x7210) at 0x61e9d0. The recovered status gates for types 17..19 and 55 use the compact counters when present. Positive fallback weights consume one LCG step even at zero scale. Unnamed status lanes are explicit host-hook approximations.',
+        'chooseEnemyAi (0x61dd68) scans 64 slots in order after parseFlowControl; ordinary records use HP/maxHP, damaged-turn baseline +0x7c0/+0x7d0 (or a native no-damage status scan), signed +0x3c magnitude scaled by +0xe6 and rounded through izMathRound, then _chooseEnemyAiSub. Positive callback output is multiplied by factor0*factor1*slotChance/100000, capped at 10000, and compared with the shared +0x6a10 LCG. If ordinary selection fails, the 0x61e300 status/fallback pass rechecks budget, dispatches through the 0xd3c8e2 halfword table, and uses 0x61f08c: fcvtzs(float32(float32(int32(factor0*fallbackWeight))*scale)) > ((lcgStep(state)>>>16)*10000>>>16). Effect type 36 transfers from the ordinary pass; authored slot skill ID 36 is the fallback early-return sentinel. Types 21..38, 47, 49, and 69 resolve to zero; types 50, 76..81, 83..86, 89, and 92 use the dedicated one handler; types 7..11, 15..16, 40..46, 51, 66, 72..73, 82, and 90..91 branch directly to the common epilogue with its initialized one scale; type 20 has a status-dependent handler whose two branches both produce one; type 6 calls cGAMEMAIN::_getCountClearParams (0x618320) and admits the fallback only when at least one clearable player parameter is present; types 12, 56, and 58 call _countBlockType (0x65213c), admitting any positive source count through the common epilogue; type 48 uses the scalar source +0x14 positive-count gate (negative source bypasses it) and routes its attack/orb-change action through the early type-48 dispatch; types 57 and 59 use the 0x61e448 represented-face fraction after the optional Heart gate; types 60 and 61 call the 0x61e4d0 non-poison count gate, admitting only when the authored count is met; and type 39 admits the inactive packed move-time counter (or the explicit protected +0x87210 override branch, handler offset +0x7210) at 0x61e9d0. The recovered status gates for types 17..19 and 55 use the compact counters when present. Positive fallback weights consume one LCG step even at zero scale. Unnamed status lanes are explicit host-hook approximations.',
       legacyFallbackJumpTableOffset: '0xd3c8e2',
       legacyFallbackDispatchBase: '0x61e354',
       legacyFallbackCommonEpilogue: '0x61f08c',
@@ -5241,6 +5332,7 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       legacyFallbackNonPoisonCountTypes: LEGACY_FALLBACK_NON_POISON_COUNT_TYPES,
       legacyFallbackFaceFractionTypes: LEGACY_FALLBACK_FACE_FRACTION_TYPES,
       legacyFallbackRandomJammerTypes: LEGACY_FALLBACK_RANDOM_JAMMER_TYPES,
+      legacyFallbackOrbChangeAttackTypes: LEGACY_FALLBACK_ORB_CHANGE_ATTACK_TYPES,
       legacyFallbackMoveTimeTypes: LEGACY_FALLBACK_MOVE_TIME_TYPES,
     },
     symbols,
@@ -5291,6 +5383,11 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
     || sourceOrbConversionDispatchMatches === false
     || sourceOrbConversionSetupMatches === false
     || sourceOrbConversionConditionMatches === false
+    || orbChangeAttackEarlyDispatchMatches === false
+    || orbChangeAttackSetupMatches === false
+    || orbChangeAttackConditionMatches === false
+    || orbChangeAttackFallbackDispatchMatches === false
+    || orbChangeAttackInstructionAnchorsMatch === false
     || entireBlindDispatchMatches === false
     || entireBlindSetupMatches === false
     || entireBlindConditionMatches === false
