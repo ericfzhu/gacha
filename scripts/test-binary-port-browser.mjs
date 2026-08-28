@@ -23,7 +23,16 @@ if (!apkPath) {
   throw new Error('Usage: test-binary-port-browser.mjs <url> <apk> [screenshot] [--runtime-file <bin>]...');
 }
 
-const browser = await chromium.launch({ headless: true });
+// Set GACHA_PLAYWRIGHT_USER_DATA_DIR to reuse IndexedDB between invocations.
+// The normal smoke test keeps an isolated temporary profile; a persistent
+// profile makes the cold -> warm protected-snapshot path reproducible.
+const userDataDir = process.env.GACHA_PLAYWRIGHT_USER_DATA_DIR;
+const browser = userDataDir
+  ? await chromium.launchPersistentContext(userDataDir, {
+    headless: true,
+    viewport: { width: 1100, height: 760 },
+  })
+  : await chromium.launch({ headless: true });
 const runtimeFileSpecs = await Promise.all(runtimeFilePaths.map(async (path) => ({
   path: canonicalPadRuntimePath(basename(path)),
   size: (await fs.stat(path)).size,
@@ -125,6 +134,8 @@ try {
     frame: state.frame,
     drawCalls: state.drawCalls,
     deepInstructions: state.elf?.deepInstructions,
+    protectedCacheHit: state.elf?.protectedCacheHit,
+    protectedInstructionsThisRun: state.elf?.protectedInstructionsThisRun,
     initialVisualPresence,
     mountedRuntimeFiles: state.elf?.mountedRuntimeFiles,
     compatibilityCalls: state.platform?.compatibilityCalls,

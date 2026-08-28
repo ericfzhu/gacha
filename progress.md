@@ -14,6 +14,11 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
 - The browser smoke test now asserts that its page reports the expected
   decoder build, preventing a stale bundle from appearing to pass the native
   frame/touch boundary.
+- The same harness accepts `GACHA_PLAYWRIGHT_USER_DATA_DIR` for a persistent
+  Chromium profile. With the exact APK, a fresh profile took the expected
+  protected cold pass; the next run reported `protectedCacheHit: true`, zero
+  protected instructions this run, and reached the same frame/touch boundary
+  in about ten seconds.
 
 ## 2026-08-28 native type-48 orb-change attack
 
