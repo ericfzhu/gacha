@@ -827,6 +827,36 @@ assert.equal(selectedLegacyFallbackPlayerHeal.skillId, 9_017);
 assert.equal(selectedLegacyFallbackPlayerHeal.legacyFallbackScale, 1);
 assert.equal(selectedLegacyFallbackPlayerHeal.legacyFallbackApproximation, undefined);
 assert.equal(selectedLegacyFallbackPlayerHeal.fidelity, 'legacy-fallback-recovered');
+// Type 6 calls cGAMEMAIN::_getCountClearParams in the legacy fallback pass.
+// An explicit recovered count is exact; an omitted count keeps the selector
+// playable but is marked approximate because the native helper scans more
+// status lanes than the compact browser state currently exposes.
+const selectedLegacyFallbackClearCount = makeLegacyFallbackSelection(
+  9_027,
+  6,
+  () => {},
+  { clearableBuffCount: 2 },
+);
+assert.equal(selectedLegacyFallbackClearCount.skillId, 9_027);
+assert.equal(selectedLegacyFallbackClearCount.legacyFallbackScale, 1);
+assert.equal(selectedLegacyFallbackClearCount.legacyFallbackApproximation, undefined);
+assert.equal(selectedLegacyFallbackClearCount.fidelity, 'legacy-fallback-recovered');
+const rejectedLegacyFallbackClearCount = makeLegacyFallbackSelection(
+  9_028,
+  6,
+  () => {},
+  { clearableBuffCount: 0 },
+);
+assert.equal(rejectedLegacyFallbackClearCount.skillId, null);
+assert.equal(rejectedLegacyFallbackClearCount.legacyFallbackApproximation, undefined);
+assert.equal(rejectedLegacyFallbackClearCount.rngState, 394_448_415);
+assert.equal(rejectedLegacyFallbackClearCount.fidelity, 'legacy-fallback-no-selection');
+const missingLegacyFallbackClearCount = makeLegacyFallbackSelection(9_029, 6);
+assert.equal(missingLegacyFallbackClearCount.skillId, 9_029);
+assert.equal(missingLegacyFallbackClearCount.legacyFallbackScale, 1);
+assert.equal(missingLegacyFallbackClearCount.legacyFallbackApproximation, true);
+assert.deepEqual(missingLegacyFallbackClearCount.approximateFallbackTypes, [6]);
+assert.equal(missingLegacyFallbackClearCount.fidelity, 'legacy-fallback-approximate');
 // Types 12, 56, and 58 share the restored 0x61e6cc fallback handler.  The
 // native _countBlockType call is a positive gate only on this pass (unlike
 // the ordinary path's count/3 probability), and source 7/8 use one combined

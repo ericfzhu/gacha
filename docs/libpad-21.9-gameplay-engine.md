@@ -717,8 +717,15 @@ but report `legacyFallbackApproximation`. Leader swap without explicit
 `leaderSwapEligible` records (or an explicit `leaderSwapCandidateStatePresent`)
 remains playable through the same initialized-one fallback and retains that
 diagnostic; revive is exact under its explicit `unavailable` boundary described
-below. Types 12, 56, and 58 now use an exact positive-board-count gate when
-the host supplies `boardTypeCounts` (the ten native board-type counts). The
+below. Type 6 has a separate recovered fallback handler at `0x61e7d0`. It calls
+`cGAMEMAIN::_getCountClearParams` (`0x618320`) and admits the record only when
+the returned clearable-player-parameter count is at least one. A host with a
+full native status model can pass that value as `clearableBuffCount` (or the
+engine pool option of the same name) for an exact positive/zero gate; when the
+compact browser state omits it, the port keeps the record playable at scale
+one but reports `legacyFallbackApproximation`. Types 12, 56, and 58 now use an
+exact positive-board-count gate when the host supplies `boardTypeCounts` (the
+ten native board-type counts). The
 native `_countBlockType` helper aliases source types 7 and 8 to the combined
 poison family for this test, so the browser exposes that alias in both slots;
 omitting the array remains a playable `legacyFallbackApproximation`.

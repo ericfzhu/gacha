@@ -1608,6 +1608,11 @@ export class PuzzleEngine {
       legacyConditionForceOne: Boolean(pool?.legacyConditionForceOne),
       legacyFallbackCondition: pool?.legacyFallbackCondition,
       legacyFallbackScales: pool?.legacyFallbackScales,
+      // cGAMEMAIN::_getCountClearParams (legacy fallback type 6) spans native
+      // player-status lanes that are not all represented by the compact
+      // browser model. A decoded host can provide its recovered count here so
+      // the selector can apply the native positive-count gate exactly.
+      clearableBuffCount: pool?.clearableBuffCount,
       blackFallActive: Boolean(this.blackFallRule?.active),
       boardCellCount: this.rows * this.columns,
       // The legacy 0x61e6cc fallback handler calls _countBlockType with the
@@ -3764,6 +3769,10 @@ export class PuzzleEngine {
         || (options?.legacyFallbackScales
           && typeof options.legacyFallbackScales === 'object')
         ? { legacyFallbackScales: options.legacyFallbackScales }
+        : {}),
+      ...(Number.isFinite(Number(options?.clearableBuffCount))
+        && Number(options.clearableBuffCount) >= 0
+        ? { clearableBuffCount: Number(options.clearableBuffCount) }
         : {}),
     };
     if (this.enemies) this.applyEnemyPassiveSkills(index);

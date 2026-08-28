@@ -1074,6 +1074,12 @@ const LEGACY_FALLBACK_COMMON_ONE_TYPES = new Set([
 // resulting fallback scale as exact.
 const LEGACY_FALLBACK_EFFECTIVE_ONE_TYPES = new Set([20]);
 
+// Type 6 calls cGAMEMAIN::_getCountClearParams and admits the fallback record
+// only when that helper reports at least one clearable player parameter.  The
+// helper spans more native status lanes than the compact engine currently
+// exposes, so direct hosts may provide its recovered count explicitly.
+const LEGACY_FALLBACK_CLEAR_COUNT_TYPES = new Set([6]);
+
 // Types 12, 56, and 58 all share the recovered 0x61e6cc handler.  It calls
 // cGAMEMAIN::_countBlockType with the authored source type, then sends any
 // positive result through the common 0x61f08c epilogue.  The native helper
@@ -1139,6 +1145,9 @@ function normalizeLegacySelectorState(state, monster) {
     && state.boardTypeCounts.slice(0, 10).every((count) => (
       Number.isFinite(Number(count)) && Number(count) >= 0
     ));
+  const clearableBuffCountStatePresent = hasOwn('clearableBuffCount')
+    && Number.isFinite(Number(state.clearableBuffCount))
+    && Number(state.clearableBuffCount) >= 0;
   const faceTypesStatePresent = hasOwn('faceTypes')
     && Array.isArray(state.faceTypes)
     && state.faceTypes.length <= 16
@@ -1219,6 +1228,8 @@ function normalizeLegacySelectorState(state, monster) {
       nonNegative(state.boardTypeCounts?.[type])
     )),
     boardTypeCountsStatePresent,
+    clearableBuffCount: nonNegative(state.clearableBuffCount),
+    clearableBuffCountStatePresent,
     faceTypes: Array.isArray(state.faceTypes)
       ? state.faceTypes.map((type) => integer(type))
       : [],
@@ -1480,6 +1491,27 @@ function legacyFallbackBuiltinScale(definition, state) {
   }
   if (LEGACY_FALLBACK_EFFECTIVE_ONE_TYPES.has(type)) {
     return { scale: Math.fround(1), exact: true, mode: 'native-status-one' };
+  }
+
+  if (LEGACY_FALLBACK_CLEAR_COUNT_TYPES.has(type)) {
+    // Native 0x61e7d0 compares _getCountClearParams() against one.  That
+    // helper scans six party records plus the global player-status lanes, so
+    // an omitted compact count must remain playable but cannot claim exact
+    // parity with the restored image.
+    if (!state.clearableBuffCountStatePresent) {
+      return {
+        scale: Math.fround(1),
+        exact: false,
+        mode: 'native-clear-count-missing-state',
+      };
+    }
+    const clearableBuffCount = Math.max(0, Math.trunc(Number(state.clearableBuffCount) || 0));
+    const eligible = clearableBuffCount >= 1;
+    return {
+      scale: eligible ? Math.fround(1) : Math.fround(0),
+      exact: true,
+      mode: eligible ? 'native-clear-count-positive' : 'native-clear-count-empty',
+    };
   }
 
   if (LEGACY_FALLBACK_BOARD_COUNT_TYPES.has(type)) {

@@ -4186,7 +4186,7 @@ try {
       configure(view);
       return bytes;
     };
-    const run = (skillId, type, configure, configureEngine = () => {}) => {
+    const run = (skillId, type, configure, configureEngine = () => {}, poolOptions = {}) => {
       engine.reset();
       engine.start();
       engine.setEnemySkillQueue(0, []);
@@ -4194,6 +4194,7 @@ try {
         0,
         makeMonsterDefinition(skillId),
         [makeDefinition(skillId, type, configure)],
+        poolOptions,
       );
       engine.setRngState(21_900);
       engine.enemies[0].counter = 1;
@@ -4255,6 +4256,12 @@ try {
         view.setInt32(0x14, 50, true);
       }, () => {
         engine.player.hp = 3_000;
+      }),
+      clearCountPositive: run(9_027, 6, () => {}, () => {}, {
+        clearableBuffCount: 2,
+      }),
+      clearCountEmpty: run(9_028, 6, () => {}, () => {}, {
+        clearableBuffCount: 0,
       }),
       sourceToJammerBoardCount: run(9_018, 12, (view) => {
         view.setInt32(0x10, 0, true);
@@ -4343,6 +4350,7 @@ try {
     damagedTurnAttackBoost: { id: 9_015, type: 19 },
     statusShield: { id: 9_016, type: 20 },
     playerHeal: { id: 9_017, type: 55 },
+    clearCountPositive: { id: 9_027, type: 6 },
     sourceToJammerBoardCount: { id: 9_018, type: 12 },
     sourceToPoisonBoardCount: { id: 9_020, type: 56 },
     sourceToMortalPoisonBoardCount: { id: 9_021, type: 58 },
@@ -4367,6 +4375,11 @@ try {
       || emptyBoardCount?.skill?.type != null
       || emptyBoardCount?.rngState !== 394_448_415
     ) throw new Error(`Legacy-fallback board-count rejection mismatch: ${JSON.stringify(emptyBoardCount)}`);
+    const emptyClearCount = legacyFallbackGatesRenderState.clearCountEmpty;
+    if (emptyClearCount?.skill?.id != null
+      || emptyClearCount?.skill?.type != null
+      || emptyClearCount?.rngState !== 394_448_415
+    ) throw new Error(`Legacy-fallback clear-count rejection mismatch: ${JSON.stringify(emptyClearCount)}`);
     const activeMoveTime = legacyFallbackGatesRenderState.moveTimeReductionActive;
     if (activeMoveTime?.skill?.id != null
       || activeMoveTime?.skill?.type != null

@@ -101,6 +101,7 @@ const LEGACY_FALLBACK_COMMON_ONE_TYPES = Object.freeze([
   91,
 ]);
 const LEGACY_FALLBACK_EFFECTIVE_ONE_TYPES = Object.freeze([20]);
+const LEGACY_FALLBACK_CLEAR_COUNT_TYPES = Object.freeze([6]);
 const LEGACY_FALLBACK_BOARD_COUNT_TYPES = Object.freeze([12, 56, 58]);
 const LEGACY_FALLBACK_NON_POISON_COUNT_TYPES = Object.freeze([60, 61]);
 const LEGACY_FALLBACK_FACE_FRACTION_TYPES = Object.freeze([57, 59]);
@@ -119,6 +120,9 @@ const LEGACY_FALLBACK_INSTRUCTION_ANCHORS = Object.freeze([
   [0x61e448, 0xf9402be8], // type 57/59 face-list base
   [0x61e4d0, 0xb94016d7], // type 60/61 optional-Heart parameter
   [0x61e5d8, 0x34fff349], // type 60/61 positive-count gate
+  [0x61e7d0, 0xaa1403e0], // type 6 enters cGAMEMAIN::_getCountClearParams
+  [0x61e7d8, 0x97f401ce], // type 6 calls the native clearable-status counter
+  [0x61e7dc, 0x7100041f], // type 6 admits only a positive returned count
 ]);
 const SOURCE_ORB_CONVERSION_ENEMY_SKILL_TYPE = 4;
 const SOURCE_ORB_CONVERSION_HANDLER = 0x6292b4;
@@ -1849,6 +1853,7 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       ...LEGACY_FALLBACK_SCALE_ONE_TYPES,
       ...LEGACY_FALLBACK_COMMON_ONE_TYPES,
       ...LEGACY_FALLBACK_EFFECTIVE_ONE_TYPES,
+      ...LEGACY_FALLBACK_CLEAR_COUNT_TYPES,
       ...LEGACY_FALLBACK_BOARD_COUNT_TYPES,
       ...LEGACY_FALLBACK_NON_POISON_COUNT_TYPES,
       ...LEGACY_FALLBACK_FACE_FRACTION_TYPES,
@@ -1868,15 +1873,17 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
             ? LEGACY_FALLBACK_COMMON_EPILOGUE
             : LEGACY_FALLBACK_EFFECTIVE_ONE_TYPES.includes(type)
               ? 0x61e9b8
-              : LEGACY_FALLBACK_BOARD_COUNT_TYPES.includes(type)
-                ? 0x61e6cc
-                : LEGACY_FALLBACK_NON_POISON_COUNT_TYPES.includes(type)
-                  ? 0x61e4d0
-                  : LEGACY_FALLBACK_FACE_FRACTION_TYPES.includes(type)
-                    ? 0x61e448
-                    : LEGACY_FALLBACK_MOVE_TIME_TYPES.includes(type)
-                      ? 0x61e9d0
-                      : null;
+              : LEGACY_FALLBACK_CLEAR_COUNT_TYPES.includes(type)
+                ? 0x61e7d0
+                : LEGACY_FALLBACK_BOARD_COUNT_TYPES.includes(type)
+                  ? 0x61e6cc
+                  : LEGACY_FALLBACK_NON_POISON_COUNT_TYPES.includes(type)
+                    ? 0x61e4d0
+                    : LEGACY_FALLBACK_FACE_FRACTION_TYPES.includes(type)
+                      ? 0x61e448
+                      : LEGACY_FALLBACK_MOVE_TIME_TYPES.includes(type)
+                        ? 0x61e9d0
+                        : null;
       return expectedTarget !== null && target === expectedTarget;
     });
   const normalAttackDispatchTarget = resolveEnemySkillTarget(
@@ -5211,7 +5218,7 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       legacySelectorModeSwitchAnchorsMatch21_9: legacyEnemyAiModeSwitchAnchorsMatch,
       legacySelectorInstructionAnchorsMatch21_9: legacyEnemyAiInstructionAnchorsMatch,
       legacySelectorSemantics:
-        'chooseEnemyAi (0x61dd68) scans 64 slots in order after parseFlowControl; ordinary records use HP/maxHP, damaged-turn baseline +0x7c0/+0x7d0 (or a native no-damage status scan), signed +0x3c magnitude scaled by +0xe6 and rounded through izMathRound, then _chooseEnemyAiSub. Positive callback output is multiplied by factor0*factor1*slotChance/100000, capped at 10000, and compared with the shared +0x6a10 LCG. If ordinary selection fails, the 0x61e300 status/fallback pass rechecks budget, dispatches through the 0xd3c8e2 halfword table, and uses 0x61f08c: fcvtzs(float32(float32(int32(factor0*fallbackWeight))*scale)) > ((lcgStep(state)>>>16)*10000>>>16). Effect type 36 transfers from the ordinary pass; authored slot skill ID 36 is the fallback early-return sentinel. Types 21..38, 47, 49, and 69 resolve to zero; types 50, 76..81, 83..86, 89, and 92 use the dedicated one handler; types 7..11, 15..16, 40..46, 51, 66, 72..73, 82, and 90..91 branch directly to the common epilogue with its initialized one scale; type 20 has a status-dependent handler whose two branches both produce one; types 12, 56, and 58 call _countBlockType (0x65213c), admitting any positive source count through the common epilogue; types 57 and 59 use the 0x61e448 represented-face fraction after the optional Heart gate; types 60 and 61 call the 0x61e4d0 non-poison count gate, admitting only when the authored count is met; and type 39 admits the inactive packed move-time counter (or the explicit protected +0x87210 override branch, handler offset +0x7210) at 0x61e9d0. The recovered status gates for types 17..19 and 55 use the compact counters when present. Positive fallback weights consume one LCG step even at zero scale. Unnamed status lanes are explicit host-hook approximations.',
+        'chooseEnemyAi (0x61dd68) scans 64 slots in order after parseFlowControl; ordinary records use HP/maxHP, damaged-turn baseline +0x7c0/+0x7d0 (or a native no-damage status scan), signed +0x3c magnitude scaled by +0xe6 and rounded through izMathRound, then _chooseEnemyAiSub. Positive callback output is multiplied by factor0*factor1*slotChance/100000, capped at 10000, and compared with the shared +0x6a10 LCG. If ordinary selection fails, the 0x61e300 status/fallback pass rechecks budget, dispatches through the 0xd3c8e2 halfword table, and uses 0x61f08c: fcvtzs(float32(float32(int32(factor0*fallbackWeight))*scale)) > ((lcgStep(state)>>>16)*10000>>>16). Effect type 36 transfers from the ordinary pass; authored slot skill ID 36 is the fallback early-return sentinel. Types 21..38, 47, 49, and 69 resolve to zero; types 50, 76..81, 83..86, 89, and 92 use the dedicated one handler; types 7..11, 15..16, 40..46, 51, 66, 72..73, 82, and 90..91 branch directly to the common epilogue with its initialized one scale; type 20 has a status-dependent handler whose two branches both produce one; type 6 calls cGAMEMAIN::_getCountClearParams (0x618320) and admits the fallback only when at least one clearable player parameter is present; types 12, 56, and 58 call _countBlockType (0x65213c), admitting any positive source count through the common epilogue; types 57 and 59 use the 0x61e448 represented-face fraction after the optional Heart gate; types 60 and 61 call the 0x61e4d0 non-poison count gate, admitting only when the authored count is met; and type 39 admits the inactive packed move-time counter (or the explicit protected +0x87210 override branch, handler offset +0x7210) at 0x61e9d0. The recovered status gates for types 17..19 and 55 use the compact counters when present. Positive fallback weights consume one LCG step even at zero scale. Unnamed status lanes are explicit host-hook approximations.',
       legacyFallbackJumpTableOffset: '0xd3c8e2',
       legacyFallbackDispatchBase: '0x61e354',
       legacyFallbackCommonEpilogue: '0x61f08c',
@@ -5221,6 +5228,7 @@ if (!inputPath || restoredFlag >= 0 && !restoredPath) {
       legacyFallbackScaleOneTypes: LEGACY_FALLBACK_SCALE_ONE_TYPES,
       legacyFallbackCommonOneTypes: LEGACY_FALLBACK_COMMON_ONE_TYPES,
       legacyFallbackEffectiveOneTypes: LEGACY_FALLBACK_EFFECTIVE_ONE_TYPES,
+      legacyFallbackClearCountTypes: LEGACY_FALLBACK_CLEAR_COUNT_TYPES,
       legacyFallbackBoardCountTypes: LEGACY_FALLBACK_BOARD_COUNT_TYPES,
       legacyFallbackNonPoisonCountTypes: LEGACY_FALLBACK_NON_POISON_COUNT_TYPES,
       legacyFallbackFaceFractionTypes: LEGACY_FALLBACK_FACE_FRACTION_TYPES,

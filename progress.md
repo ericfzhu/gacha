@@ -2,6 +2,17 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-28 exact legacy clear-count fallback gate
+
+- Recovered the type-6 legacy fallback handler at `0x61e7d0`. It calls
+  `cGAMEMAIN::_getCountClearParams` (`0x618320`) and admits the fallback only
+  when at least one clearable player parameter is present.
+- Added an explicit `clearableBuffCount` host/engine field for native-equivalent
+  status models. Positive and zero counts are exact; omitted counts remain
+  playable at scale one but are reported as `legacyFallbackApproximation`.
+- Added direct and browser fixtures plus restored jump-table/instruction-anchor
+  validation. The type-6 lane is now reported by the native inspector.
+
 ## 2026-08-28 exact legacy move-time fallback gate
 
 - Recovered the legacy type-39 fallback handler at `0x61e9d0`. It checks the
