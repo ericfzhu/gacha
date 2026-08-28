@@ -744,6 +744,95 @@ assert.equal(selectedLegacyFallback.fidelity, 'legacy-fallback-recovered');
 assert.equal(selectedLegacyFallback.legacyFallbackSelected, true);
 assert.equal(selectedLegacyFallback.legacyFallbackScale, 1);
 assert.equal(selectedLegacyFallback.legacyFallbackProbability, 10_000);
+// Type 48 has a dedicated legacy fallback gate: a positive source type must
+// be represented on the live board, while a negative source enters the native
+// random-source path and bypasses that count check. The fallback pass still
+// consumes its ordinary 0..9999 roll before applying the strict comparison.
+const legacyFallbackOrbChangeDefinition = legacyFallbackType50Definition.slice();
+const legacyFallbackOrbChangeView = new DataView(legacyFallbackOrbChangeDefinition.buffer);
+legacyFallbackOrbChangeView.setUint32(0x00, 9_048, true);
+legacyFallbackOrbChangeView.setInt16(0x04, PAD_ENEMY_SKILL_ORB_CHANGE_ATTACK, true);
+legacyFallbackOrbChangeView.setInt32(0x10, 150, true);
+legacyFallbackOrbChangeView.setInt32(0x14, 1, true);
+legacyFallbackOrbChangeView.setInt32(0x18, 2, true);
+const decodedLegacyFallbackOrbChange = decodePadEnemyAiSkillDefinition(
+  legacyFallbackOrbChangeDefinition,
+);
+const legacyFallbackOrbChangeMonsterDefinition = legacyFallbackMonsterDefinition.slice();
+new DataView(legacyFallbackOrbChangeMonsterDefinition.buffer).setUint32(0xec, 9_048, true);
+const decodedLegacyFallbackOrbChangeMonster = decodePadEnemyAiMonsterDefinition(
+  legacyFallbackOrbChangeMonsterDefinition,
+);
+const selectedLegacyFallbackOrbChange = selectPadEnemyAiLegacy(
+  decodedLegacyFallbackOrbChangeMonster,
+  [decodedLegacyFallbackOrbChange],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    rngState: 21_900,
+    boardTypeCounts: [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+  },
+);
+assert.equal(selectedLegacyFallbackOrbChange.skillId, 9_048);
+assert.equal(selectedLegacyFallbackOrbChange.effect.kind, 'orbChangeAttack');
+assert.equal(selectedLegacyFallbackOrbChange.effect.sourceType, 1);
+assert.equal(selectedLegacyFallbackOrbChange.effect.destinationType, 2);
+assert.equal(selectedLegacyFallbackOrbChange.legacyFallbackType, PAD_ENEMY_SKILL_ORB_CHANGE_ATTACK);
+assert.equal(selectedLegacyFallbackOrbChange.legacyFallbackScale, 1);
+assert.equal(selectedLegacyFallbackOrbChange.legacyFallbackProbability, 10_000);
+assert.equal(selectedLegacyFallbackOrbChange.legacyFallbackApproximation, undefined);
+assert.equal(selectedLegacyFallbackOrbChange.fidelity, 'legacy-fallback-recovered');
+assert.equal(selectedLegacyFallbackOrbChange.rngState, 394_448_415);
+const rejectedLegacyFallbackOrbChange = selectPadEnemyAiLegacy(
+  decodedLegacyFallbackOrbChangeMonster,
+  [decodedLegacyFallbackOrbChange],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    rngState: 21_900,
+    boardTypeCounts: Array(10).fill(0),
+  },
+);
+assert.equal(rejectedLegacyFallbackOrbChange.skillId, null);
+assert.equal(rejectedLegacyFallbackOrbChange.legacyFallbackScale, undefined);
+assert.equal(rejectedLegacyFallbackOrbChange.legacyFallbackApproximation, undefined);
+assert.equal(rejectedLegacyFallbackOrbChange.legacyFallbackTypes.includes(48), true);
+assert.equal(rejectedLegacyFallbackOrbChange.rngState, 394_448_415);
+assert.equal(rejectedLegacyFallbackOrbChange.fidelity, 'legacy-fallback-no-selection');
+const missingLegacyFallbackOrbChange = selectPadEnemyAiLegacy(
+  decodedLegacyFallbackOrbChangeMonster,
+  [decodedLegacyFallbackOrbChange],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    rngState: 21_900,
+  },
+);
+assert.equal(missingLegacyFallbackOrbChange.skillId, 9_048);
+assert.equal(missingLegacyFallbackOrbChange.legacyFallbackScale, 1);
+assert.equal(missingLegacyFallbackOrbChange.legacyFallbackApproximation, true);
+assert.deepEqual(missingLegacyFallbackOrbChange.approximateFallbackTypes, [48]);
+assert.equal(missingLegacyFallbackOrbChange.fidelity, 'legacy-fallback-approximate');
+const randomSourceLegacyFallbackOrbChangeDefinition = legacyFallbackOrbChangeDefinition.slice();
+new DataView(randomSourceLegacyFallbackOrbChangeDefinition.buffer).setInt32(0x14, -1, true);
+const randomSourceLegacyFallbackOrbChange = selectPadEnemyAiLegacy(
+  decodedLegacyFallbackOrbChangeMonster,
+  [decodePadEnemyAiSkillDefinition(randomSourceLegacyFallbackOrbChangeDefinition)],
+  {
+    currentHp: 92_000,
+    maxHp: 92_000,
+    aiBudget: 100,
+    rngState: 21_900,
+  },
+);
+assert.equal(randomSourceLegacyFallbackOrbChange.skillId, 9_048);
+assert.equal(randomSourceLegacyFallbackOrbChange.legacyFallbackScale, 1);
+assert.equal(randomSourceLegacyFallbackOrbChange.legacyFallbackApproximation, undefined);
+assert.equal(randomSourceLegacyFallbackOrbChange.fidelity, 'legacy-fallback-recovered');
+assert.equal(randomSourceLegacyFallbackOrbChange.rngState, 394_448_415);
 // Type 82 is not handled by the dedicated 0x61ee9c constant-one routine in
 // the legacy jump table. Its entry branches directly to the common fallback
 // epilogue at 0x61f08c, which receives the pass's initialized scale of one.

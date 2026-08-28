@@ -29,6 +29,13 @@ Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, 
   render-state, and restored-inspector coverage. `npm run pad-rules:test`,
   `npm run build`, and the restored libpad inspection pass.
 
+## 2026-08-28 type-48 legacy fallback coverage
+
+- Added deterministic legacy-selector fixtures for a represented positive
+  source, an empty source, omitted board state, and the negative random-source
+  operand. The tests assert the native fallback roll boundary, scale, RNG
+  state, approximation diagnostic, and recovered effect metadata.
+
 ## 2026-08-28 corrected native type-13 random jammer
 
 - Restored type 13's dispatch/condition path from `libpad.so`: it scans the
