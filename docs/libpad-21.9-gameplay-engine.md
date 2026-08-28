@@ -2834,10 +2834,15 @@ run reaches frame 199 and 21,766 translated draws after four touch callbacks.
 The public ARM64 core is now served as `20260828-frame23`. It performs a
 two-instruction capability check for the exact `NEG V2.2S` opcode that
 previously produced the guest-callback banner; an old cached core is rejected
-before the protected pass begins with a reload hint. The imported linear-memory
-size is cached inside the interpreter and refreshed after host growth, and the
-protected worker batches 50 million instructions per Wasm call while retaining
-all module tracepoint and syscall interruptions.
+before the protected pass begins with a reload hint. If a stale app-shell
+bundle still reports that opcode from a later callback, the page preserves the
+fault text, labels the decoder stale, and reloads with the current decoder
+generation in the URL so an HTTP cache cannot return the same shell. The
+browser smoke test asserts that the page's reported decoder generation matches
+the tested source. The imported linear-memory size is cached inside the
+interpreter and refreshed after host growth, and the protected worker batches
+50 million instructions per Wasm call while retaining all module tracepoint
+and syscall interruptions.
 
 Cold startup still interprets 151,900,682 guest instructions. The protection
 wrapper contributes 151,793,049 of them; `libpad.so` contributes 107,633 before

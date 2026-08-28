@@ -141,6 +141,24 @@ export default function BinaryPortPage() {
   const inputRef = useRef(new PadBrowserInputModel());
   const [state, setState] = useState({ phase: 'booting', probe: null, elf: null, error: null });
 
+  const decoderReloadUrl = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('decoder', ARM64_CORE_BUILD);
+    return url.toString();
+  };
+
+  const formatDecoderError = (error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    // This is the exact opcode emitted by the older Wasm decoder that could
+    // run through the initial screen and then fail in a later frame callback.
+    // Keep the original message visible, but make the recovery action clear
+    // when a stale worker/page bundle somehow survives the initial probe.
+    if (/instruction\s+0x2ea0b842/i.test(message)) {
+      return `Stale ARM64 decoder detected (${message}). Reload the latest decoder before starting the native port.`;
+    }
+    return message;
+  };
+
   useEffect(() => {
     let disposed = false;
     Arm64Runtime.create().then((runtime) => {
@@ -150,7 +168,7 @@ export default function BinaryPortPage() {
       const probe = runtime.runLibpadProbe();
       setState({ phase: probe.passed ? 'wasm ready' : 'probe failed', probe, coreFeatureProbe, elf: null, error: null });
     }).catch((error) => {
-      if (!disposed) setState({ phase: 'error', probe: null, elf: null, error: error.message });
+      if (!disposed) setState({ phase: 'error', probe: null, elf: null, error: formatDecoderError(error) });
     });
 
     return () => {
@@ -188,7 +206,10 @@ export default function BinaryPortPage() {
 
   const rerunProbe = () => {
     if (state.phase === 'error') {
-      window.location.reload();
+      // A query-string version makes this a cache miss even when the hosting
+      // layer has retained an old app-shell response. The decoder itself is
+      // also fetched with cache: 'no-store' by Arm64Runtime.create().
+      window.location.replace(decoderReloadUrl());
       return;
     }
     const runtime = runtimeRef.current;
@@ -266,13 +287,13 @@ export default function BinaryPortPage() {
           } else if (data.type === 'touch') {
             setState((current) => ({ ...current, lastTouch: data.touch, touchResult: data.result, touchCount: data.touchCount }));
           } else if (data.type === 'error') {
-            setState((current) => ({ ...current, phase: 'error', error: data.message }));
+            setState((current) => ({ ...current, phase: 'error', error: formatDecoderError(data.message) }));
             worker.terminate();
             if (workerRef.current === worker) workerRef.current = null;
           }
         };
         worker.onerror = (workerError) => {
-          setState((current) => ({ ...current, phase: 'error', error: workerError.message || 'Binary-port worker failed.' }));
+          setState((current) => ({ ...current, phase: 'error', error: formatDecoderError(workerError.message || 'Binary-port worker failed.') }));
         };
         const offscreen = gameCanvasRef.current?.transferControlToOffscreen();
         if (!offscreen) throw new Error('OffscreenCanvas is required for the native GLES worker.');
@@ -325,7 +346,7 @@ export default function BinaryPortPage() {
         },
       });
     } catch (error) {
-      setState((current) => ({ ...current, phase: 'error', error: error.message }));
+      setState((current) => ({ ...current, phase: 'error', error: formatDecoderError(error) }));
     }
   };
 

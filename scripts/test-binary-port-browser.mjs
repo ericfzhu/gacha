@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import { basename } from 'node:path';
 import { canonicalPadRuntimePath } from '../src/binary-port/padRuntimeFiles.js';
+import { ARM64_CORE_BUILD } from '../src/binary-port/arm64Runtime.js';
 
 const { chromium } = await import(process.env.GACHA_PLAYWRIGHT_MODULE || 'playwright');
 
@@ -84,11 +85,13 @@ try {
   await fs.writeFile(`${outputPath}.json`, JSON.stringify({ state, consoleMessages }, null, 2));
   const requestedFiles = new Set(state.platform?.files?.map(({ path }) => path));
   const mountedRuntimeFiles = new Set(state.elf?.mountedRuntimeFiles || []);
-  if (state.phase !== 'native game running' || !state.probe?.passed || state.elf?.lifecycleExports !== 6 ||
+  if (state.decoderBuild !== ARM64_CORE_BUILD || state.phase !== 'native game running' || !state.probe?.passed || state.elf?.lifecycleExports !== 6 ||
       state.elf?.deepInstructions < 100_000_000 || state.frame < 100 || state.drawCalls < 10_000 ||
       state.touchCount < 4 || !requestedFiles.has('/data/user/0/jp.gungho.pad/files/data048.bin') ||
       !requestedFiles.has('/data/user/0/jp.gungho.pad/cache/data030.bin') || initialVisualPresence < 0.01) {
     throw new Error(`Native binary-port smoke test did not reach the verified content boundary: ${JSON.stringify({
+      decoderBuild: state.decoderBuild,
+      expectedDecoderBuild: ARM64_CORE_BUILD,
       phase: state.phase,
       probePassed: state.probe?.passed,
       lifecycleExports: state.elf?.lifecycleExports,

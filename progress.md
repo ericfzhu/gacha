@@ -2,6 +2,19 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-28 stale decoder recovery hardening
+
+- The page now recognizes the exact old-core `NEG V2.2S` fault opcode from the
+  reported guest-callback banner and keeps the original fault context while
+  explaining that the decoder is stale.
+- The recovery button appends the current decoder generation to the app-shell
+  URL before reloading, so an HTTP/app-shell cache cannot silently restore the
+  page bundle that launched the old worker. The Wasm fetch remains
+  `cache: 'no-store'`.
+- The browser smoke test now asserts that its page reports the expected
+  decoder build, preventing a stale bundle from appearing to pass the native
+  frame/touch boundary.
+
 ## 2026-08-28 native type-48 orb-change attack
 
 - Recovered type 48 (`ESOrbChangeAttack`) as the scalar orb-change-plus-attack
