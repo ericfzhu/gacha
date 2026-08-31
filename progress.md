@@ -2,6 +2,34 @@ Original prompt: I'd like you to go through this project, and make it as close i
 
 Current request: Reconstruct the inspected Puzzle & Dragons 21.9.0 core engine, input model, and gameplay mechanism in browser-accessible JavaScript/TypeScript.
 
+## 2026-08-29 designer/backend content model foundation
+
+- Reprioritized the PAD reconstruction around designer-authored master data and
+  headless rule inspection before further battle-screen work.
+- Added strict TypeScript definitions for skill categories, lifecycle hooks,
+  conditions/effects, fidelity evidence, card masters/instances, 64-slot enemy
+  skill references, dungeons, banners, accounts, receipts, battle status, and
+  trace output under `src/pad-backend/`.
+- Added effect-contract validation so base board-size rules are limited to
+  leader/passive battle setup while timed board changes belong to active/enemy
+  runtime hooks. Content validation checks cross-domain references, categories,
+  slot ranges, banner dates/weights, and board dimensions.
+- Added a headless lifecycle evaluator that distinguishes base board rules from
+  temporary overrides and emits evidence-labeled condition/effect/expiry traces.
+- Added an exact native type-126 compiler for the recovered 0x48-byte enemy
+  record and cross-checked its bytes through the existing native decoder. The
+  semantic demonstration is conservatively `native-partial` because it invokes
+  the effect directly rather than claiming parity with type 126's unusual AI
+  admission condition.
+- Added an injected-RNG, currency-checked, inventory-capacity-aware, idempotent
+  gacha transaction that creates player instances referencing card masters.
+- Added `pad-content:test`, `pad-content:inspect`, and strict `typecheck` scripts
+  plus `docs/pad-designer-backend-model.md`.
+- Verification: TypeScript check, content-model test, existing PAD rule test,
+  APK-data test, and production build pass. Next: expand the normalized effect
+  catalog from recovered native types and model content publication/version
+  pinning before building a designer UI.
+
 ## 2026-08-28 stale decoder recovery hardening
 
 - The page now recognizes the exact old-core `NEG V2.2S` fault opcode from the
